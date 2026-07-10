@@ -4,14 +4,20 @@ namespace LaravelMonitor\Livewire;
 
 class Jobs extends Card
 {
-    public function render()
+    protected function view(): string
+    {
+        return 'monitor::livewire.jobs';
+    }
+
+    protected function data(): array
     {
         $since = $this->since();
+        $until = $this->until();
         $storage = $this->storage();
 
-        $processed = $storage->aggregateByKey('job', $since, 'processed', 50);
-        $failed = $storage->aggregateByKey('job', $since, 'failed', 50);
-        $queued = $storage->aggregateByKey('job', $since, 'queued', 50);
+        $processed = $storage->aggregateByKey('job', $since, 'processed', 50, 'count', $until);
+        $failed = $storage->aggregateByKey('job', $since, 'failed', 50, 'count', $until);
+        $queued = $storage->aggregateByKey('job', $since, 'queued', 50, 'count', $until);
 
         $jobs = collect();
 
@@ -37,8 +43,8 @@ class Jobs extends Card
             }
         }
 
-        return view('monitor::livewire.jobs', [
+        return [
             'jobs' => $jobs->sortByDesc(fn ($job) => $job->processed + $job->failed)->take($this->limit)->values(),
-        ]);
+        ];
     }
 }

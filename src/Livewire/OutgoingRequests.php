@@ -4,23 +4,27 @@ namespace LaravelMonitor\Livewire;
 
 class OutgoingRequests extends Card
 {
-    public function render()
+    protected function view(): string
+    {
+        return 'monitor::livewire.outgoing-requests';
+    }
+
+    protected function data(): array
     {
         $since = $this->since();
+        $until = $this->until();
         $storage = $this->storage();
 
-        $errors = $storage->aggregateByKey('outgoing_request', $since, 'error', 100)
-            ->merge($storage->aggregateByKey('outgoing_request', $since, 'failed', 100))
-            ->groupBy('key')
-            ->map(fn ($groups) => $groups->sum('count'));
+        $errors = $storage->aggregateByKey('outgoing_request', $since, 'error', 100, 'count', $until)
+            ->keyBy('key');
 
-        return view('monitor::livewire.outgoing-requests', [
-            'requests' => $storage->aggregateByKey('outgoing_request', $since, null, $this->limit)
-                ->map(function ($group) use ($errors) {
-                    $group->errors = $errors->get($group->key, 0);
+        return [
+            'requests' => $storage->aggregateByKey('outgoing_request', $since, null, $this->limit, 'count', $until)
+                ->map(function ($request) use ($errors) {
+                    $request->errors = $errors->get($request->key)?->count ?? 0;
 
-                    return $group;
+                    return $request;
                 }),
-        ]);
+        ];
     }
 }

@@ -6,10 +6,16 @@ class Requests extends Card
 {
     public string $orderBy = 'count';
 
-    public function render()
+    protected function view(): string
     {
-        return view('monitor::livewire.requests', [
-            'routes' => $this->storage()->aggregateByKey('request', $this->since(), null, $this->limit, $this->orderBy),
-        ]);
+        return 'monitor::livewire.requests';
+    }
+
+    protected function data(): array
+    {
+        return [
+            'routes' => $this->storage()->aggregateByKey('request', $this->since(), null, $this->limit, $this->orderBy, $this->until()),
+            'threshold' => (int) config('monitor.thresholds.request', 1000),
+        ];
     }
 }

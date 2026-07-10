@@ -4,24 +4,30 @@ namespace LaravelMonitor\Livewire;
 
 class Exceptions extends Card
 {
-    public function render()
+    protected function view(): string
+    {
+        return 'monitor::livewire.exceptions';
+    }
+
+    protected function data(): array
     {
         $since = $this->since();
+        $until = $this->until();
 
-        $groups = $this->storage()->aggregateByKey('exception', $since, null, $this->limit, 'last_seen');
+        $groups = $this->storage()->aggregateByKey('exception', $since, null, $this->limit, 'last_seen', $until);
 
         // Attach the latest message/location for each exception class.
         $latest = $this->storage()
-            ->recent('exception', $since, 100)
+            ->recent('exception', $since, 100, null, null, $until)
             ->groupBy('key')
             ->map(fn ($entries) => $entries->first());
 
-        return view('monitor::livewire.exceptions', [
+        return [
             'exceptions' => $groups->map(function ($group) use ($latest) {
                 $group->latest = $latest->get($group->key)?->payload ?? [];
 
                 return $group;
             }),
-        ]);
+        ];
     }
 }

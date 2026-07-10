@@ -6,22 +6,36 @@ use Throwable;
 
 class Users extends Card
 {
-    public function render()
+    protected function view(): string
+    {
+        return 'monitor::livewire.users';
+    }
+
+    protected function data(): array
     {
         $since = $this->since();
+        $until = $this->until();
         $storage = $this->storage();
 
-        $topUsers = $storage->topUsers('request', $since, $this->limit);
-        $names = $this->resolveNames($topUsers->pluck('user_id')->all());
+        $topUsers = $storage->topUsers('request', $since, $this->limit, $until);
+        $impactedUsers = $storage->topUsers('exception', $since, $this->limit, $until);
 
-        return view('monitor::livewire.users', [
-            'topUsers' => $topUsers->map(function ($row) use ($names) {
-                $row->name = $names[$row->user_id] ?? "User #{$row->user_id}";
+        $names = $this->resolveNames(
+            $topUsers->pluck('user_id')->merge($impactedUsers->pluck('user_id'))->unique()->all()
+        );
 
-                return $row;
-            }),
-            'authEvents' => $storage->recent('auth', $since, $this->limit),
-        ]);
+        $withNames = fn ($rows) => $rows->map(function ($row) use ($names) {
+            $row->name = $names[$row->user_id] ?? "User #{$row->user_id}";
+
+            return $row;
+        });
+
+        return [
+            'topUsers' => $withNames($topUsers),
+            'impactedUsers' => $withNames($impactedUsers),
+            'authenticatedUsers' => $storage->topUsers('request', $since, 1000, $until)->count(),
+            'authEvents' => $storage->recent('auth', $since, $this->limit, null, null, $until),
+        ];
     }
 
     /**

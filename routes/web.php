@@ -2,25 +2,34 @@
 
 use Illuminate\Support\Facades\Route;
 use LaravelMonitor\Http\Middleware\Authorize;
+use LaravelMonitor\Livewire\Card;
+use LaravelMonitor\Support\Nav;
 
 Route::domain(config('monitor.domain'))
     ->middleware(array_merge(config('monitor.middleware', ['web']), [Authorize::class]))
     ->prefix(config('monitor.path', 'monitor'))
     ->group(function () {
         Route::get('/', function () {
-            $period = request('period', '1h');
-            $tab = request('tab', 'overview');
+            $period = request('period', Card::DEFAULT_PERIOD);
 
-            if (! in_array($period, ['1h', '6h', '24h', '7d'], true)) {
-                $period = '1h';
+            if (! array_key_exists($period, Card::periods())) {
+                $period = Card::DEFAULT_PERIOD;
             }
 
-            $tabs = ['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'users', 'logs'];
+            $tab = request('tab', 'overview');
 
-            if (! in_array($tab, $tabs, true)) {
+            if (! in_array($tab, Nav::keys(), true)) {
                 $tab = 'overview';
             }
 
-            return view('monitor::dashboard', ['period' => $period, 'tab' => $tab]);
+            [$from, $to] = Card::normalizeRange(request('from'), request('to'));
+
+            return view('monitor::dashboard', [
+                'period' => $period,
+                'tab' => $tab,
+                'key' => request('key'),
+                'from' => $from,
+                'to' => $to,
+            ]);
         })->name('monitor.dashboard');
     });

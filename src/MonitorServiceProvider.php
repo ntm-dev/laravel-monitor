@@ -3,6 +3,7 @@
 namespace LaravelMonitor;
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LaravelMonitor\Contracts\Storage;
@@ -55,6 +56,7 @@ class MonitorServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'monitor');
+        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'monitor');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
     }
 
@@ -93,6 +95,11 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.mail', Cards\MailAndNotifications::class);
         Livewire::component('monitor.logs', Cards\Logs::class);
         Livewire::component('monitor.users', Cards\Users::class);
+        Livewire::component('monitor.application', Cards\Application::class);
+        Livewire::component('monitor.issues', Cards\Issues::class);
+        Livewire::component('monitor.notifications', Cards\Notifications::class);
+        Livewire::component('monitor.request-detail', Cards\RequestDetail::class);
+        Livewire::component('monitor.job-detail', Cards\JobDetail::class);
     }
 
     protected function registerAuthorization(): void

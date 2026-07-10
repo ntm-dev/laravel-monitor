@@ -1,141 +1,231 @@
 @php
-    $tabs = [
-        'overview' => ['label' => 'Overview', 'icon' => 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z'],
-        'requests' => ['label' => 'Requests', 'icon' => 'M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418'],
-        'exceptions' => ['label' => 'Exceptions', 'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'],
-        'queries' => ['label' => 'Slow Queries', 'icon' => 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125'],
-        'jobs' => ['label' => 'Queue Jobs', 'icon' => 'M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122'],
-        'schedule' => ['label' => 'Schedule', 'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
-        'cache' => ['label' => 'Cache', 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z'],
-        'outgoing' => ['label' => 'Outgoing HTTP', 'icon' => 'M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25'],
-        'mail' => ['label' => 'Mail & Notifications', 'icon' => 'M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75'],
-        'users' => ['label' => 'Users', 'icon' => 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z'],
-        'logs' => ['label' => 'Logs', 'icon' => 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z'],
-    ];
+    use Illuminate\Support\Str;
+    use LaravelMonitor\Livewire\Card;
+    use LaravelMonitor\Support\Format;
+    use LaravelMonitor\Support\Icons;
+    use LaravelMonitor\Support\Nav;
 
-    $components = [
-        'requests' => 'monitor.requests',
-        'exceptions' => 'monitor.exceptions',
-        'queries' => 'monitor.slow-queries',
-        'jobs' => 'monitor.jobs',
-        'schedule' => 'monitor.schedule',
-        'cache' => 'monitor.cache',
-        'outgoing' => 'monitor.outgoing-requests',
-        'mail' => 'monitor.mail',
-        'users' => 'monitor.users',
-        'logs' => 'monitor.logs',
-    ];
+    $tabs = Nav::tabs();
+    $key = $key ?? null;
+    $from = $from ?? null;
+    $to = $to ?? null;
+    $hasCustomRange = filled($from) && filled($to);
+
+    // Query-string state carried through every dashboard link.
+    $range = array_filter(['period' => $period, 'from' => $from, 'to' => $to]);
+
+    $groups = [];
+    $footerTabs = [];
+    foreach ($tabs as $tabKey => $item) {
+        if ($item['group'] === 'footer') {
+            $footerTabs[$tabKey] = $item;
+        } else {
+            $groups[$item['group']][$tabKey] = $item;
+        }
+    }
+
+    $isDetail = in_array($tab, ['requests', 'jobs'], true) && filled($key);
+    $title = $tabs[$tab]['label'];
+    $refresh = (int) config('monitor.refresh', 10);
+    $appInitial = strtoupper(mb_substr(config('app.name', 'L'), 0, 1));
 @endphp
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $tabs[$tab]['label'] }} — Monitor</title>
+    <title>{{ $isDetail ? $key : $title }} — Monitor</title>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        night: {
-                            950: '#08080f',
-                            900: '#0d0d17',
-                            800: '#12121e',
-                            700: '#1c1c2b',
-                            600: '#2a2a3f',
-                        },
+                    fontFamily: {
+                        sans: ['InterVariable', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        mono: ['"CommitMono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
                     },
                 },
             },
         };
     </script>
+    <style>[x-cloak] { display: none !important; }</style>
     @livewireStyles
 </head>
-<body class="bg-night-950 text-gray-100 min-h-screen antialiased">
+<body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased">
     <div class="flex min-h-screen">
 
-        <aside class="hidden md:flex w-60 shrink-0 flex-col border-r border-night-700/60 bg-night-900/70 sticky top-0 h-screen">
-            <div class="flex items-center gap-2.5 px-4 py-4 border-b border-night-700/60">
-                <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 shadow-lg shadow-violet-600/30">
-                    <svg class="h-4.5 w-4.5 text-white" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/>
-                    </svg>
-                </span>
-                <div class="min-w-0">
-                    <p class="font-semibold text-sm leading-tight">Monitor</p>
-                    <p class="text-[11px] text-gray-500 leading-tight truncate">{{ config('app.name', 'Laravel') }}</p>
+        <aside class="sticky top-0 hidden h-screen w-[228px] shrink-0 flex-col border-r border-neutral-200 bg-white md:flex">
+            <div class="p-2">
+                <div class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-sm font-semibold text-white">{{ $appInitial }}</span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-semibold leading-tight">{{ config('app.name', 'Laravel') }}</span>
+                        <span class="block text-xs leading-tight text-neutral-500">{{ ucfirst(app()->environment()) }}</span>
+                    </span>
+                    <x-monitor::icon :path="Icons::CHEVRON_UP_DOWN" class="h-4 w-4 shrink-0 text-neutral-400"/>
                 </div>
             </div>
 
-            <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
-                @foreach ($tabs as $key => $item)
-                    <a href="{{ route('monitor.dashboard', ['tab' => $key, 'period' => $period]) }}"
-                       @class([
-                           'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors',
-                           'bg-violet-500/15 text-violet-200 font-medium' => $tab === $key,
-                           'text-gray-400 hover:text-gray-100 hover:bg-night-800' => $tab !== $key,
-                       ])>
-                        <svg class="h-4 w-4 shrink-0 {{ $tab === $key ? 'text-violet-400' : 'text-gray-500' }}" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"/>
-                        </svg>
-                        {{ $item['label'] }}
-                    </a>
+            <nav class="flex-1 overflow-y-auto px-2 pb-2">
+                @foreach ($groups as $group => $items)
+                    @if ($group !== '')
+                        <p class="px-2 pb-1 pt-4 text-xs text-neutral-400">{{ $group }}</p>
+                    @endif
+                    <div class="space-y-px">
+                        @foreach ($items as $tabKey => $item)
+                            <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
+                               @class([
+                                   'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm',
+                                   'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5' => $tab === $tabKey,
+                                   'border-transparent text-neutral-500 hover:text-neutral-900' => $tab !== $tabKey,
+                               ])>
+                                <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600' : 'text-neutral-400 group-hover:text-neutral-600' }}"/>
+                                {{ $item['label'] }}
+                            </a>
+                        @endforeach
+                    </div>
                 @endforeach
             </nav>
 
-            <div class="p-4 border-t border-night-700/60 space-y-1">
-                <p class="text-[11px] text-gray-500 flex items-center gap-1.5">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Live · refreshes every 10s
-                </p>
-                <p class="text-[11px] text-gray-600">{{ app()->environment() }} environment</p>
+            <div class="p-2">
+                <div class="space-y-px pb-2">
+                    @foreach ($footerTabs as $tabKey => $item)
+                        <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
+                           @class([
+                               'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm',
+                               'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5' => $tab === $tabKey,
+                               'border-transparent text-neutral-500 hover:text-neutral-900' => $tab !== $tabKey,
+                           ])>
+                            <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600' : 'text-neutral-400 group-hover:text-neutral-600' }}"/>
+                            {{ $item['label'] }}
+                        </a>
+                    @endforeach
+                    <a href="https://github.com/ntm-dev/laravel-monitor" target="_blank" rel="noopener"
+                       class="group flex h-9 w-full items-center gap-3 rounded-md border border-transparent px-2 text-sm text-neutral-500 hover:text-neutral-900">
+                        <x-monitor::icon :path="Icons::SUPPORT" class="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-neutral-600"/>
+                        Support
+                    </a>
+                </div>
+                <div class="flex items-center gap-2.5 border-t border-neutral-100 px-2 pb-1 pt-2.5">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600">{{ $appInitial }}</span>
+                    <span class="truncate text-sm text-neutral-700">{{ config('app.name', 'Laravel') }}</span>
+                    <span class="ml-auto flex items-center gap-1.5 text-xs text-neutral-400" title="Live · refreshes every {{ $refresh }}s">
+                        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
+                    </span>
+                </div>
             </div>
         </aside>
 
-        <div class="flex-1 min-w-0 flex flex-col">
-            <header class="sticky top-0 z-10 border-b border-night-700/60 bg-night-950/80 backdrop-blur">
-                <div class="flex items-center justify-between gap-4 px-4 md:px-6 py-3">
-                    <h1 class="font-semibold truncate">{{ $tabs[$tab]['label'] }}</h1>
-                    <div class="inline-flex items-center rounded-lg border border-night-700 bg-night-900 p-0.5 text-xs">
-                        @foreach (['1h' => '1h', '6h' => '6h', '24h' => '24h', '7d' => '7d'] as $value => $label)
-                            <a href="{{ route('monitor.dashboard', ['tab' => $tab, 'period' => $value]) }}"
+        <div class="flex min-w-0 flex-1 flex-col">
+            <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur">
+                <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-5 md:px-8">
+                    @if ($isDetail)
+                        <div class="min-w-0">
+                            <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900">{{ $tabs[$tab]['label'] }}</a>
+                            <div class="mt-0.5 flex min-w-0 items-center gap-2.5">
+                                @if ($tab === 'requests')
+                                    <span class="shrink-0 rounded bg-neutral-200/70 px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight text-neutral-600">{{ Str::before($key, ' ') }}</span>
+                                    <h1 class="truncate text-2xl font-bold tracking-tight">{{ Str::after($key, ' ') }}</h1>
+                                @else
+                                    <span class="shrink-0 rounded bg-neutral-200/70 px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight text-neutral-600">Job</span>
+                                    <h1 class="truncate text-2xl font-bold tracking-tight" title="{{ $key }}">{{ class_basename($key) }}</h1>
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <h1 class="truncate text-2xl font-bold tracking-tight">{{ $title }}</h1>
+                    @endif
+
+                    <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm">
+                        @foreach (array_keys(Card::periods()) as $value)
+                            <a href="{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'period' => $value, 'key' => $key])) }}"
                                @class([
-                                   'px-3 py-1.5 rounded-md transition-colors',
-                                   'bg-violet-600 text-white font-medium' => $period === $value,
-                                   'text-gray-400 hover:text-gray-100' => $period !== $value,
-                               ])>{{ $label }}</a>
+                                   'flex h-full min-w-8 items-center justify-center rounded-md border px-2.5 font-mono text-xs',
+                                   'border-blue-500 bg-blue-600 text-white' => ! $hasCustomRange && $period === $value,
+                                   'border-transparent text-neutral-500 hover:text-neutral-900' => $hasCustomRange || $period !== $value,
+                               ])>{{ strtoupper($value) }}</a>
                         @endforeach
+                        <span class="mx-0.5 h-4 w-px bg-neutral-200"></span>
+                        <div x-data="{
+                                open: false,
+                                mode: 'utc',
+                                from: '{{ $from }}',
+                                to: '{{ $to }}',
+                                error: '',
+                                apply() {
+                                    if (! this.from || ! this.to) { this.error = 'Pick both dates.'; return; }
+                                    const now = new Date();
+                                    if (new Date(this.to) > now) { this.to = now.toISOString().slice(0, 16); }
+                                    if (new Date(this.from) >= new Date(this.to)) { this.error = 'Start must be before end.'; return; }
+                                    const params = new URLSearchParams({ tab: '{{ $tab }}', from: this.from, to: this.to });
+                                    @if (filled($key)) params.set('key', @js($key)); @endif
+                                    window.location = '{{ route('monitor.dashboard') }}?' + params.toString();
+                                },
+                             }" class="relative h-full">
+                            <button type="button" @click="open = ! open"
+                                    @class([
+                                        'flex h-full items-center gap-1 rounded-md border px-2',
+                                        'border-blue-500 bg-blue-600 text-white' => $hasCustomRange,
+                                        'border-transparent text-neutral-400 hover:text-neutral-900' => ! $hasCustomRange,
+                                    ])>
+                                @if ($hasCustomRange)
+                                    <span class="font-mono text-xs">{{ $from }} → {{ $to }}</span>
+                                @endif
+                                <x-monitor::icon :path="Icons::CALENDAR" class="h-4 w-4"/>
+                                <x-monitor::icon :path="Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3"/>
+                            </button>
+                            <div x-show="open" x-cloak @click.outside="open = false"
+                                 class="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20">
+                                <div class="grid grid-cols-2 gap-0.5 rounded-md bg-neutral-800 p-0.5 font-mono text-xs">
+                                    <button type="button" @click="mode = 'utc'" class="rounded px-2 py-1.5" :class="mode === 'utc' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">{{ Format::timezone() }}</button>
+                                    <button type="button" @click="mode = 'local'" class="rounded px-2 py-1.5" :class="mode === 'local' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">LOCAL</button>
+                                </div>
+                                <label class="mt-3 block text-xs text-neutral-400">Starting date</label>
+                                <input type="datetime-local" x-model="from" max="{{ now()->format(Format::RANGE) }}"
+                                       class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
+                                <label class="mt-3 block text-xs text-neutral-400">Ending date</label>
+                                <input type="datetime-local" x-model="to" max="{{ now()->format(Format::RANGE) }}"
+                                       class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
+                                <p x-show="error" x-text="error" class="mt-2 text-xs text-rose-400"></p>
+                                <button type="button" @click="apply()"
+                                        class="mt-3 w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Apply</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {{-- Mobile navigation --}}
-                <nav class="md:hidden flex gap-1 overflow-x-auto px-4 pb-2 text-xs">
-                    @foreach ($tabs as $key => $item)
-                        <a href="{{ route('monitor.dashboard', ['tab' => $key, 'period' => $period]) }}"
-                           @class([
-                               'shrink-0 rounded-lg px-2.5 py-1.5',
-                               'bg-violet-500/15 text-violet-200' => $tab === $key,
-                               'text-gray-400' => $tab !== $key,
-                           ])>{{ $item['label'] }}</a>
+                <nav class="flex gap-1 overflow-x-auto px-4 pb-2 text-xs md:hidden">
+                    @foreach ($groups as $items)
+                        @foreach ($items as $tabKey => $item)
+                            <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
+                               @class([
+                                   'shrink-0 rounded-md border px-2.5 py-1.5',
+                                   'border-neutral-200 bg-white text-neutral-900 shadow-sm' => $tab === $tabKey,
+                                   'border-transparent text-neutral-500' => $tab !== $tabKey,
+                               ])>{{ $item['label'] }}</a>
+                        @endforeach
                     @endforeach
                 </nav>
             </header>
 
-            <main class="flex-1 p-4 md:p-6">
+            <main class="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 md:px-8">
+                @php($rangeProps = ['period' => $period, 'from' => $from, 'to' => $to])
                 @if ($tab === 'overview')
                     <div class="space-y-4">
-                        @livewire('monitor.overview', ['period' => $period])
-
-                        <div class="grid gap-4 grid-cols-1 xl:grid-cols-2">
-                            @livewire('monitor.requests', ['period' => $period])
-                            @livewire('monitor.exceptions', ['period' => $period])
-                            @livewire('monitor.jobs', ['period' => $period])
-                            @livewire('monitor.slow-queries', ['period' => $period])
-                        </div>
+                        @livewire('monitor.overview', $rangeProps)
+                        @livewire('monitor.application', $rangeProps)
+                        @livewire('monitor.users', $rangeProps)
                     </div>
+                @elseif ($tab === 'settings')
+                    @include('monitor::settings')
+                @elseif ($tab === 'requests' && filled($key))
+                    @livewire('monitor.request-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'jobs' && filled($key))
+                    @livewire('monitor.job-detail', $rangeProps + ['key' => $key])
                 @else
-                    @livewire($components[$tab], ['period' => $period, 'limit' => 25])
+                    @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif
             </main>
         </div>

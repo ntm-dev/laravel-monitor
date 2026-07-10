@@ -4,10 +4,15 @@ namespace LaravelMonitor\Livewire;
 
 class Schedule extends Card
 {
-    public function render()
+    protected function view(): string
     {
-        return view('monitor::livewire.schedule', [
-            'tasks' => $this->storage()->recent('scheduled_task', $this->since(), $this->limit),
-        ]);
+        return 'monitor::livewire.schedule';
+    }
+
+    protected function data(): array
+    {
+        return [
+            'tasks' => $this->storage()->recent('scheduled_task', $this->since(), $this->limit, null, null, $this->until()),
+        ];
     }
 }

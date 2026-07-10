@@ -4,14 +4,15 @@ namespace LaravelMonitor\Livewire;
 
 class MailAndNotifications extends Card
 {
-    public function render()
+    protected function view(): string
     {
-        $since = $this->since();
-        $storage = $this->storage();
+        return 'monitor::livewire.mail';
+    }
 
-        return view('monitor::livewire.mail', [
-            'mails' => $storage->recent('mail', $since, $this->limit),
-            'notifications' => $storage->aggregateByKey('notification', $since, null, $this->limit),
-        ]);
+    protected function data(): array
+    {
+        return [
+            'mails' => $this->storage()->recent('mail', $this->since(), $this->limit, null, null, $this->until()),
+        ];
     }
 }

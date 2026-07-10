@@ -4,21 +4,26 @@ namespace LaravelMonitor\Livewire;
 
 class CacheStats extends Card
 {
-    public function render()
+    protected function view(): string
+    {
+        return 'monitor::livewire.cache';
+    }
+
+    protected function data(): array
     {
         $since = $this->since();
+        $until = $this->until();
         $storage = $this->storage();
 
-        $hits = $storage->stats('cache', $since, 'hit')->count;
-        $misses = $storage->stats('cache', $since, 'miss')->count;
-        $total = $hits + $misses;
+        $hits = $storage->stats('cache', $since, 'hit', null, $until)->count;
+        $misses = $storage->stats('cache', $since, 'miss', null, $until)->count;
 
-        return view('monitor::livewire.cache', [
+        return [
             'hits' => $hits,
             'misses' => $misses,
-            'writes' => $storage->stats('cache', $since, 'write')->count,
-            'hitRate' => $total > 0 ? round($hits / $total * 100, 1) : null,
-            'keys' => $storage->aggregateByKey('cache', $since, null, $this->limit),
-        ]);
+            'writes' => $storage->stats('cache', $since, 'write', null, $until)->count,
+            'hitRate' => ($hits + $misses) > 0 ? round($hits / ($hits + $misses) * 100) : null,
+            'keys' => $storage->aggregateByKey('cache', $since, null, $this->limit, 'count', $until),
+        ];
     }
 }

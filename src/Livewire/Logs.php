@@ -6,10 +6,15 @@ class Logs extends Card
 {
     public string $level = '';
 
-    public function render()
+    protected function view(): string
     {
-        return view('monitor::livewire.logs', [
-            'logs' => $this->storage()->recent('log', $this->since(), $this->limit, $this->level !== '' ? $this->level : null),
-        ]);
+        return 'monitor::livewire.logs';
+    }
+
+    protected function data(): array
+    {
+        return [
+            'logs' => $this->storage()->recent('log', $this->since(), $this->limit, $this->level ?: null, null, $this->until()),
+        ];
     }
 }

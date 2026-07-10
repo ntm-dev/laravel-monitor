@@ -30,6 +30,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dashboard Periods & Refresh
+    |--------------------------------------------------------------------------
+    |
+    | Preset time ranges offered by the dashboard (key => hours) and how
+    | often the Livewire cards poll for fresh data, in seconds. Arbitrary
+    | ranges can also be picked from the calendar popover.
+    |
+    */
+
+    'periods' => [
+        '1h' => 1,
+        '24h' => 24,
+        '7d' => 168,
+        '14d' => 336,
+        '30d' => 720,
+    ],
+
+    'refresh' => env('MONITOR_REFRESH', 10),
+
+    /*
+    |--------------------------------------------------------------------------
     | Storage Driver
     |--------------------------------------------------------------------------
     |
@@ -60,6 +81,22 @@ return [
 
     'retention' => [
         'hours' => env('MONITOR_RETENTION_HOURS', 168),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Performance Thresholds
+    |--------------------------------------------------------------------------
+    |
+    | Requests and jobs at or above these durations (milliseconds) are shown
+    | as "over threshold" on the dashboard, mirroring Nightwatch's routes /
+    | jobs threshold cards.
+    |
+    */
+
+    'thresholds' => [
+        'request' => env('MONITOR_REQUEST_THRESHOLD', 1000),
+        'job' => env('MONITOR_JOB_THRESHOLD', 1000),
     ],
 
     /*

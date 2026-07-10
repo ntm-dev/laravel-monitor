@@ -48,8 +48,10 @@ class DatabaseStorage implements Storage
         DateTimeInterface $since,
         int $limit = 50,
         ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
     ): Collection {
-        return $this->query($type, $since, $subtype)
+        return $this->query($type, $since, $subtype, $key, $until)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
@@ -68,6 +70,7 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         int $limit = 10,
         string $orderBy = 'count',
+        ?DateTimeInterface $until = null,
     ): Collection {
         if (! in_array($orderBy, ['count', 'avg_duration', 'max_duration', 'last_seen'], true)) {
             $orderBy = 'count';
@@ -75,7 +78,7 @@ class DatabaseStorage implements Storage
 
         $orderColumn = $orderBy === 'count' ? 'aggregate_count' : $orderBy;
 
-        return $this->query($type, $since, $subtype)
+        return $this->query($type, $since, $subtype, null, $until)
             ->select('key')
             ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, max(created_at) as last_seen')
             ->groupBy('key')
@@ -93,16 +96,22 @@ class DatabaseStorage implements Storage
             });
     }
 
-    public function stats(string $type, DateTimeInterface $since, ?string $subtype = null): object
-    {
-        $row = $this->query($type, $since, $subtype)
-            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration')
+    public function stats(
+        string $type,
+        DateTimeInterface $since,
+        ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
+    ): object {
+        $row = $this->query($type, $since, $subtype, $key, $until)
+            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, min(duration) as min_duration')
             ->first();
 
         return (object) [
             'count' => (int) ($row->aggregate_count ?? 0),
             'avg_duration' => isset($row->avg_duration) ? (float) $row->avg_duration : null,
             'max_duration' => isset($row->max_duration) ? (int) $row->max_duration : null,
+            'min_duration' => isset($row->min_duration) ? (int) $row->min_duration : null,
         ];
     }
 
@@ -111,29 +120,67 @@ class DatabaseStorage implements Storage
         DateTimeInterface $since,
         int $buckets = 40,
         ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
     ): array {
-        $start = CarbonImmutable::instance(
-            $since instanceof CarbonImmutable ? $since : CarbonImmutable::parse($since->format('Y-m-d H:i:s'))
-        );
-        $seconds = max(1, $start->diffInSeconds(CarbonImmutable::now()));
-        $bucketSize = $seconds / $buckets;
+        [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
 
         $counts = array_fill(0, $buckets, 0);
 
-        $this->query($type, $since, $subtype)
+        $this->query($type, $since, $subtype, $key, $until)
             ->pluck('created_at')
             ->each(function ($createdAt) use (&$counts, $start, $bucketSize, $buckets) {
-                $offset = CarbonImmutable::parse($createdAt)->getTimestamp() - $start->getTimestamp();
-                $index = min($buckets - 1, max(0, (int) floor($offset / $bucketSize)));
-                $counts[$index]++;
+                $counts[$this->bucketIndex($createdAt, $start, $bucketSize, $buckets)]++;
             });
 
         return $counts;
     }
 
-    public function topUsers(string $type, DateTimeInterface $since, int $limit = 10): Collection
-    {
-        return $this->query($type, $since)
+    public function durationStats(
+        string $type,
+        DateTimeInterface $since,
+        int $buckets = 40,
+        ?string $key = null,
+        ?string $subtype = null,
+        ?DateTimeInterface $until = null,
+    ): object {
+        [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
+
+        $perBucket = array_fill(0, $buckets, []);
+        $all = [];
+
+        $this->query($type, $since, $subtype, $key, $until)
+            ->whereNotNull('duration')
+            ->get(['created_at', 'duration'])
+            ->each(function ($row) use (&$perBucket, &$all, $start, $bucketSize, $buckets) {
+                $duration = (int) $row->duration;
+                $all[] = $duration;
+                $perBucket[$this->bucketIndex($row->created_at, $start, $bucketSize, $buckets)][] = $duration;
+            });
+
+        return (object) [
+            'min' => $all === [] ? null : min($all),
+            'max' => $all === [] ? null : max($all),
+            'avg' => $all === [] ? null : array_sum($all) / count($all),
+            'p95' => $this->percentile($all, 0.95),
+            'avg_per_bucket' => array_map(
+                fn (array $values) => $values === [] ? null : array_sum($values) / count($values),
+                $perBucket,
+            ),
+            'p95_per_bucket' => array_map(
+                fn (array $values) => $this->percentile($values, 0.95),
+                $perBucket,
+            ),
+        ];
+    }
+
+    public function topUsers(
+        string $type,
+        DateTimeInterface $since,
+        int $limit = 10,
+        ?DateTimeInterface $until = null,
+    ): Collection {
+        return $this->query($type, $since, null, null, $until)
             ->whereNotNull('user_id')
             ->select('user_id')
             ->selectRaw('count(*) as aggregate_count')
@@ -149,11 +196,59 @@ class DatabaseStorage implements Storage
             });
     }
 
-    protected function query(string $type, DateTimeInterface $since, ?string $subtype = null): Builder
+    /**
+     * @return array{0: CarbonImmutable, 1: float}
+     */
+    protected function bucketGrid(DateTimeInterface $since, int $buckets, ?DateTimeInterface $until = null): array
     {
+        $start = CarbonImmutable::instance(
+            $since instanceof CarbonImmutable ? $since : CarbonImmutable::parse($since->format('Y-m-d H:i:s'))
+        );
+
+        $end = $until !== null
+            ? CarbonImmutable::parse($until->format('Y-m-d H:i:s'))
+            : CarbonImmutable::now();
+
+        $seconds = max(1, $start->diffInSeconds($end));
+
+        return [$start, $seconds / $buckets];
+    }
+
+    protected function bucketIndex(mixed $createdAt, CarbonImmutable $start, float $bucketSize, int $buckets): int
+    {
+        $offset = CarbonImmutable::parse($createdAt)->getTimestamp() - $start->getTimestamp();
+
+        return min($buckets - 1, max(0, (int) floor($offset / $bucketSize)));
+    }
+
+    /**
+     * @param  int[]  $values
+     */
+    protected function percentile(array $values, float $percentile): ?float
+    {
+        if ($values === []) {
+            return null;
+        }
+
+        sort($values);
+
+        $index = (int) ceil($percentile * count($values)) - 1;
+
+        return (float) $values[max(0, min($index, count($values) - 1))];
+    }
+
+    protected function query(
+        string $type,
+        DateTimeInterface $since,
+        ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
+    ): Builder {
         return $this->table()
             ->where('type', $type)
             ->when($subtype !== null, fn (Builder $query) => $query->where('subtype', $subtype))
+            ->when($key !== null, fn (Builder $query) => $query->where('key', $key))
+            ->when($until !== null, fn (Builder $query) => $query->where('created_at', '<=', $until))
             ->where('created_at', '>=', $since);
     }
 

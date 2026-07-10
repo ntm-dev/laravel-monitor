@@ -30,6 +30,8 @@ interface Storage
         DateTimeInterface $since,
         int $limit = 50,
         ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
     ): Collection;
 
     /**
@@ -44,16 +46,23 @@ interface Storage
         ?string $subtype = null,
         int $limit = 10,
         string $orderBy = 'count',
+        ?DateTimeInterface $until = null,
     ): Collection;
 
     /**
-     * Totals for a type: object with count, avg_duration, max_duration.
+     * Totals for a type: object with count, avg_duration, max_duration, min_duration.
      */
-    public function stats(string $type, DateTimeInterface $since, ?string $subtype = null): object;
+    public function stats(
+        string $type,
+        DateTimeInterface $since,
+        ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
+    ): object;
 
     /**
      * Entry counts split into $buckets equal time slices between $since and
-     * now — used to draw activity sparklines.
+     * $until (defaults to now) — used to draw activity charts.
      *
      * @return int[]
      */
@@ -62,11 +71,31 @@ interface Storage
         DateTimeInterface $since,
         int $buckets = 40,
         ?string $subtype = null,
+        ?string $key = null,
+        ?DateTimeInterface $until = null,
     ): array;
+
+    /**
+     * Duration distribution for a type: object with min, max, avg, p95 plus
+     * avg_per_bucket / p95_per_bucket arrays (float|null per time slice).
+     */
+    public function durationStats(
+        string $type,
+        DateTimeInterface $since,
+        int $buckets = 40,
+        ?string $key = null,
+        ?string $subtype = null,
+        ?DateTimeInterface $until = null,
+    ): object;
 
     /**
      * Users generating the most entries of a type. Each item exposes:
      * user_id, count.
      */
-    public function topUsers(string $type, DateTimeInterface $since, int $limit = 10): Collection;
+    public function topUsers(
+        string $type,
+        DateTimeInterface $since,
+        int $limit = 10,
+        ?DateTimeInterface $until = null,
+    ): Collection;
 }
