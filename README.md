@@ -20,8 +20,8 @@ Local-first application monitoring for Laravel — Nightwatch-style insights on 
 ## Requirements
 
 - PHP 8.1+
-- Laravel 10, 11 or 12
-- Livewire 3 (installed automatically)
+- Laravel 10, 11, 12 or 13
+- Livewire 3 or 4 (installed automatically)
 
 ## Installation
 
