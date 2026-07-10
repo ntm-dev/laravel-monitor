@@ -1,16 +1,16 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Cache</h2>
 
     <div class="grid grid-cols-3 gap-3 mb-3">
-        <div class="rounded-lg bg-gray-950/60 border border-gray-800/60 p-2.5">
+        <div class="rounded-lg bg-night-950/60 border border-night-600/40 p-2.5">
             <p class="text-xs text-gray-500">Hit rate</p>
             <p class="text-lg font-semibold {{ $hitRate !== null && $hitRate < 50 ? 'text-amber-400' : 'text-emerald-400' }}">{{ $hitRate !== null ? $hitRate.'%' : '—' }}</p>
         </div>
-        <div class="rounded-lg bg-gray-950/60 border border-gray-800/60 p-2.5">
+        <div class="rounded-lg bg-night-950/60 border border-night-600/40 p-2.5">
             <p class="text-xs text-gray-500">Hits / Misses</p>
             <p class="text-lg font-semibold">{{ number_format($hits) }} <span class="text-gray-600">/</span> {{ number_format($misses) }}</p>
         </div>
-        <div class="rounded-lg bg-gray-950/60 border border-gray-800/60 p-2.5">
+        <div class="rounded-lg bg-night-950/60 border border-night-600/40 p-2.5">
             <p class="text-xs text-gray-500">Writes</p>
             <p class="text-lg font-semibold">{{ number_format($writes) }}</p>
         </div>

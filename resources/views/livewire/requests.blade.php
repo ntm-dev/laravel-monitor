@@ -1,7 +1,7 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <div class="flex items-center justify-between mb-3">
         <h2 class="font-semibold text-sm">Requests</h2>
-        <select wire:model.live="orderBy" class="bg-gray-800 border border-gray-700 rounded-lg text-xs px-2 py-1 text-gray-300">
+        <select wire:model.live="orderBy" class="bg-night-800 border border-night-600 rounded-lg text-xs px-2 py-1 text-gray-300">
             <option value="count">Most hit</option>
             <option value="avg_duration">Slowest (avg)</option>
             <option value="max_duration">Slowest (max)</option>
@@ -20,7 +20,7 @@
                     <th class="pb-2 font-normal text-right">Max</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-800/60">
+            <tbody class="divide-y divide-night-700/50">
                 @foreach ($routes as $route)
                     <tr>
                         <td class="py-1.5 pr-2 font-mono text-xs text-gray-300 truncate max-w-[16rem]" title="{{ $route->key }}">{{ $route->key }}</td>

@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Mail &amp; notifications</h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -9,7 +9,7 @@
             @else
                 <div class="space-y-1.5">
                     @foreach ($mails as $mail)
-                        <div class="rounded-lg bg-gray-950/60 border border-gray-800/60 px-2.5 py-1.5 text-xs">
+                        <div class="rounded-lg bg-night-950/60 border border-night-600/40 px-2.5 py-1.5 text-xs">
                             <p class="text-gray-300 truncate" title="{{ $mail->payload['subject'] ?? '' }}">{{ $mail->payload['subject'] ?? '(no subject)' }}</p>
                             <p class="text-gray-600 truncate">to {{ $mail->payload['to'] ?? '?' }} · {{ $mail->created_at->diffForHumans(short: true) }}</p>
                         </div>

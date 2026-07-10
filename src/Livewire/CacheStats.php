@@ -18,7 +18,7 @@ class CacheStats extends Card
             'misses' => $misses,
             'writes' => $storage->stats('cache', $since, 'write')->count,
             'hitRate' => $total > 0 ? round($hits / $total * 100, 1) : null,
-            'keys' => $storage->aggregateByKey('cache', $since, null, 8),
+            'keys' => $storage->aggregateByKey('cache', $since, null, $this->limit),
         ]);
     }
 }

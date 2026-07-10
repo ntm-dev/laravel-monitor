@@ -38,7 +38,7 @@ class Jobs extends Card
         }
 
         return view('monitor::livewire.jobs', [
-            'jobs' => $jobs->sortByDesc(fn ($job) => $job->processed + $job->failed)->take(10)->values(),
+            'jobs' => $jobs->sortByDesc(fn ($job) => $job->processed + $job->failed)->take($this->limit)->values(),
         ]);
     }
 }

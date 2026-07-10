@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Outgoing HTTP</h2>
 
     @if ($requests->isEmpty())
@@ -13,7 +13,7 @@
                     <th class="pb-2 font-normal text-right">Avg</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-800/60">
+            <tbody class="divide-y divide-night-700/50">
                 @foreach ($requests as $request)
                     <tr>
                         <td class="py-1.5 pr-2 font-mono text-xs text-gray-300 truncate max-w-[16rem]" title="{{ $request->key }}">{{ $request->key }}</td>

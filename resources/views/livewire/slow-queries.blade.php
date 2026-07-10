@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Slow queries</h2>
 
     @if ($queries->isEmpty())
@@ -6,7 +6,7 @@
     @else
         <div class="space-y-2">
             @foreach ($queries as $query)
-                <div class="rounded-lg bg-gray-950/60 border border-gray-800/60 p-2.5">
+                <div class="rounded-lg bg-night-950/60 border border-night-600/40 p-2.5">
                     <code class="block font-mono text-xs text-gray-300 break-all line-clamp-2" title="{{ $query->key }}">{{ $query->key }}</code>
                     <div class="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
                         <span>{{ number_format($query->count) }}×</span>

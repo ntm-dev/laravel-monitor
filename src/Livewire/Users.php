@@ -11,7 +11,7 @@ class Users extends Card
         $since = $this->since();
         $storage = $this->storage();
 
-        $topUsers = $storage->topUsers('request', $since, 8);
+        $topUsers = $storage->topUsers('request', $since, $this->limit);
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
 
         return view('monitor::livewire.users', [
@@ -20,7 +20,7 @@ class Users extends Card
 
                 return $row;
             }),
-            'authEvents' => $storage->recent('auth', $since, 10),
+            'authEvents' => $storage->recent('auth', $since, $this->limit),
         ]);
     }
 

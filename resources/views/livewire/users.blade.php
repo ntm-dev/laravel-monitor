@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Users</h2>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -10,7 +10,7 @@
                 <div class="space-y-1">
                     @foreach ($topUsers as $user)
                         <div class="flex items-center gap-2 text-xs">
-                            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold shrink-0">
+                            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-semibold shrink-0">
                                 {{ strtoupper(mb_substr($user->name, 0, 1)) }}
                             </span>
                             <span class="text-gray-300 truncate">{{ $user->name }}</span>

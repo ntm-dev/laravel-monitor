@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Scheduled tasks</h2>
 
     @if ($tasks->isEmpty())
@@ -6,7 +6,7 @@
     @else
         <div class="space-y-1.5">
             @foreach ($tasks as $task)
-                <div class="flex items-center gap-2 text-xs rounded-lg bg-gray-950/60 border border-gray-800/60 px-2.5 py-2">
+                <div class="flex items-center gap-2 text-xs rounded-lg bg-night-950/60 border border-night-600/40 px-2.5 py-2">
                     <span @class([
                         'h-2 w-2 rounded-full shrink-0',
                         'bg-emerald-400' => $task->subtype === 'finished',

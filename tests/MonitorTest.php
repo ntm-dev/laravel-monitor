@@ -104,4 +104,30 @@ class MonitorTest extends TestCase
             ->assertSee('Monitor')
             ->assertSee('Requests');
     }
+
+    public function test_every_tab_renders(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record('request', 'GET /users', ['status' => 200], 120, '2xx', 1);
+        Monitor::record('exception', 'RuntimeException', ['class' => 'RuntimeException', 'message' => 'boom', 'file' => 'app/X.php', 'line' => 1]);
+        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 250);
+        Monitor::record('job', 'App\\Jobs\\SendEmail', ['queue' => 'default'], 40, 'processed');
+        Monitor::record('scheduled_task', 'inspire', ['command' => 'inspire'], 12, 'finished');
+        Monitor::record('cache', 'users:1', [], null, 'hit');
+        Monitor::record('outgoing_request', 'GET https://api.example.com', ['status' => 200], 90, 'success');
+        Monitor::record('mail', 'Welcome', ['subject' => 'Welcome', 'to' => 'a@b.c']);
+        Monitor::record('notification', 'App\\Notifications\\Invoice', ['channel' => 'mail'], null, 'mail');
+        Monitor::record('log', 'Something happened', ['message' => 'Something happened', 'level' => 'warning'], null, 'warning');
+        Monitor::record('auth', 'a@b.c', ['guard' => 'web'], null, 'login', 1);
+        Monitor::flush();
+
+        foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'users', 'logs'] as $tab) {
+            $response = $this->get('/monitor?tab='.$tab)->assertOk();
+
+            if (($dir = getenv('MONITOR_DUMP_HTML')) !== false) {
+                file_put_contents($dir.'/'.$tab.'.html', $response->getContent());
+            }
+        }
+    }
 }

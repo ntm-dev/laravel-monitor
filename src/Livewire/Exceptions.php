@@ -8,7 +8,7 @@ class Exceptions extends Card
     {
         $since = $this->since();
 
-        $groups = $this->storage()->aggregateByKey('exception', $since, null, 10, 'last_seen');
+        $groups = $this->storage()->aggregateByKey('exception', $since, null, $this->limit, 'last_seen');
 
         // Attach the latest message/location for each exception class.
         $latest = $this->storage()

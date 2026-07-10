@@ -1,4 +1,4 @@
-<div wire:poll.10s class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+<div wire:poll.10s class="bg-night-900 border border-night-700/60 rounded-xl p-4">
     <h2 class="font-semibold text-sm mb-3">Exceptions</h2>
 
     @if ($exceptions->isEmpty())
@@ -6,7 +6,7 @@
     @else
         <div class="space-y-2">
             @foreach ($exceptions as $exception)
-                <div class="rounded-lg bg-gray-950/60 border border-red-900/30 p-2.5">
+                <div class="rounded-lg bg-night-950/60 border border-rose-900/30 p-2.5">
                     <div class="flex items-start justify-between gap-2">
                         <p class="font-mono text-xs text-red-400 break-all">{{ class_basename($exception->key) }}</p>
                         <span class="shrink-0 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">{{ number_format($exception->count) }}×</span>

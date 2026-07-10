@@ -10,6 +10,8 @@ abstract class Card extends Component
 {
     public string $period = '1h';
 
+    public int $limit = 10;
+
     public function mount(?string $period = null): void
     {
         $period ??= request('period', '1h');

@@ -10,8 +10,8 @@ class MailAndNotifications extends Card
         $storage = $this->storage();
 
         return view('monitor::livewire.mail', [
-            'mails' => $storage->recent('mail', $since, 8),
-            'notifications' => $storage->aggregateByKey('notification', $since, null, 8),
+            'mails' => $storage->recent('mail', $since, $this->limit),
+            'notifications' => $storage->aggregateByKey('notification', $since, null, $this->limit),
         ]);
     }
 }

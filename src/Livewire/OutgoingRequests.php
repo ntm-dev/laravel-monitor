@@ -15,7 +15,7 @@ class OutgoingRequests extends Card
             ->map(fn ($groups) => $groups->sum('count'));
 
         return view('monitor::livewire.outgoing-requests', [
-            'requests' => $storage->aggregateByKey('outgoing_request', $since, null, 10)
+            'requests' => $storage->aggregateByKey('outgoing_request', $since, null, $this->limit)
                 ->map(function ($group) use ($errors) {
                     $group->errors = $errors->get($group->key, 0);
 
