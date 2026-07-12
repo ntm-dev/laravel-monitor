@@ -20,9 +20,14 @@
             <div class="border-t border-neutral-100"></div>
         @endfor
     </div>
-    <div class="relative flex h-full items-end gap-px">
+    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300"
+         x-show="hoverIndex !== null" x-cloak
+         :style="'left: ' + (((hoverIndex ?? 0) + 0.5) / {{ $chartBuckets }} * 100) + '%'"></div>
+    <div class="relative flex h-full items-end gap-px" @mouseleave="clearHoverIndex()">
         @for ($chartI = 0; $chartI < $chartBuckets; $chartI++)
-            <div class="group relative flex h-full flex-1 flex-col justify-end hover:bg-neutral-100/60">
+            <div class="relative flex h-full flex-1 flex-col justify-end"
+                 :class="{ 'bg-neutral-100/60': hoverIndex === {{ $chartI }} }"
+                 @mouseenter="setHoverIndex({{ $chartI }})">
                 @foreach (array_reverse($series) as $chartSerie)
                     @php($chartValue = $chartSerie['data'][$chartI] ?? 0)
                     @if ($chartValue > 0)
@@ -33,7 +38,8 @@
                 @if (($chartTotals[$chartI] ?? 0) === 0)
                     <div class="h-[2px] w-full bg-neutral-200/70"></div>
                 @endif
-                <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 hidden w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20 group-hover:block">
+                <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
+                     x-show="hoverIndex === {{ $chartI }}" x-cloak>
                     <p class="font-mono text-[11px] text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($since->copy()->addSeconds($chartI * $chartSeconds)) }} <span class="text-neutral-500">{{ $chartTz }}</span></p>
                     <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
                         @foreach ($series as $chartSerie)

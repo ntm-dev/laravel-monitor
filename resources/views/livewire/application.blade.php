@@ -5,7 +5,12 @@
             <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'jobs'] + $range)" external>Jobs</x-monitor::link-button>
         </x-slot:actions>
 
-        <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3"
+             x-data="{
+                 hoverIndex: null,
+                 setHoverIndex(i) { this.hoverIndex = i },
+                 clearHoverIndex() { this.hoverIndex = null },
+             }">
             {{-- Exceptions --}}
             @if ($exceptions > 0)
                 <x-monitor::card class="flex flex-col p-4">

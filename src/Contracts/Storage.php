@@ -58,6 +58,7 @@ interface Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): object;
 
     /**
@@ -73,6 +74,7 @@ interface Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): array;
 
     /**
@@ -86,6 +88,7 @@ interface Storage
         ?string $key = null,
         ?string $subtype = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): object;
 
     /**
@@ -97,5 +100,16 @@ interface Storage
         DateTimeInterface $since,
         int $limit = 10,
         ?DateTimeInterface $until = null,
+    ): Collection;
+
+    /**
+     * Per-route breakdown for a type: one item per key exposing
+     * key, count, success, client_errors, server_errors, avg_duration, p95_duration.
+     */
+    public function routeStats(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): Collection;
 }

@@ -102,8 +102,9 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): object {
-        $row = $this->query($type, $since, $subtype, $key, $until)
+        $row = $this->query($type, $since, $subtype, $key, $until, $userId)
             ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, min(duration) as min_duration')
             ->first();
 
@@ -122,12 +123,13 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): array {
         [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
 
         $counts = array_fill(0, $buckets, 0);
 
-        $this->query($type, $since, $subtype, $key, $until)
+        $this->query($type, $since, $subtype, $key, $until, $userId)
             ->pluck('created_at')
             ->each(function ($createdAt) use (&$counts, $start, $bucketSize, $buckets) {
                 $counts[$this->bucketIndex($createdAt, $start, $bucketSize, $buckets)]++;
@@ -143,13 +145,14 @@ class DatabaseStorage implements Storage
         ?string $key = null,
         ?string $subtype = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): object {
         [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
 
         $perBucket = array_fill(0, $buckets, []);
         $all = [];
 
-        $this->query($type, $since, $subtype, $key, $until)
+        $this->query($type, $since, $subtype, $key, $until, $userId)
             ->whereNotNull('duration')
             ->get(['created_at', 'duration'])
             ->each(function ($row) use (&$perBucket, &$all, $start, $bucketSize, $buckets) {
@@ -194,6 +197,31 @@ class DatabaseStorage implements Storage
 
                 return $row;
             });
+    }
+
+    public function routeStats(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
+    ): Collection {
+        return $this->query($type, $since, null, null, $until, $userId)
+            ->get(['key', 'subtype', 'duration'])
+            ->groupBy('key')
+            ->map(function (Collection $rows, string $key) {
+                $durations = $rows->pluck('duration')->filter(fn ($duration) => $duration !== null)->map(fn ($duration) => (int) $duration)->values()->all();
+
+                return (object) [
+                    'key' => $key,
+                    'count' => $rows->count(),
+                    'success' => $rows->whereIn('subtype', ['1xx', '2xx', '3xx'])->count(),
+                    'client_errors' => $rows->where('subtype', '4xx')->count(),
+                    'server_errors' => $rows->where('subtype', '5xx')->count(),
+                    'avg_duration' => $durations === [] ? null : array_sum($durations) / count($durations),
+                    'p95_duration' => $this->percentile($durations, 0.95),
+                ];
+            })
+            ->values();
     }
 
     /**
@@ -243,12 +271,14 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        ?int $userId = null,
     ): Builder {
         return $this->table()
             ->where('type', $type)
             ->when($subtype !== null, fn (Builder $query) => $query->where('subtype', $subtype))
             ->when($key !== null, fn (Builder $query) => $query->where('key', $key))
             ->when($until !== null, fn (Builder $query) => $query->where('created_at', '<=', $until))
+            ->when($userId !== null, fn (Builder $query) => $query->where('user_id', $userId))
             ->where('created_at', '>=', $since);
     }
 

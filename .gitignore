@@ -4,3 +4,5 @@ composer.lock
 .phpunit.cache
 .DS_Store
 testbench.yaml
+.tokensave/
+.claude/.headroom_wrap_marker.json

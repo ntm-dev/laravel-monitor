@@ -3,7 +3,12 @@
     $tz = \LaravelMonitor\Support\Format::timezone();
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2"
+         x-data="{
+             hoverIndex: null,
+             setHoverIndex(i) { this.hoverIndex = i },
+             clearHoverIndex() { this.hoverIndex = null },
+         }">
         <x-monitor::jobs-chart-card
             :queued="$queued" :processed="$processed" :failed="$failed"
             :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets"

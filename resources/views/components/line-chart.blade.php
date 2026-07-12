@@ -33,6 +33,7 @@
         }
         return $segments;
     };
+    $lineY = fn ($v) => round(97 - ($v / $lineMax) * 90, 2);
     $lineTz = \LaravelMonitor\Support\Format::timezone();
 @endphp
 <div class="relative {{ $height }}">
@@ -56,11 +57,26 @@
                 @endif
             @endforeach
         @endforeach
-    </svg>
-    <div class="absolute inset-0 flex">
         @for ($lineI = 0; $lineI < $lineBuckets; $lineI++)
-            <div class="group relative h-full flex-1 hover:bg-neutral-100/60">
-                <div class="pointer-events-none absolute bottom-full {{ $lineI < $lineBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 hidden w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20 group-hover:block">
+            @if (($avg[$lineI] ?? null) !== null)
+                <circle cx="{{ $lineI + 0.5 }}" cy="{{ $lineY($avg[$lineI]) }}" r="2" fill="#404040" stroke="#fff" stroke-width="1"
+                        x-show="hoverIndex === {{ $lineI }}" x-cloak vector-effect="non-scaling-stroke"/>
+            @endif
+            @if (($p95[$lineI] ?? null) !== null)
+                <circle cx="{{ $lineI + 0.5 }}" cy="{{ $lineY($p95[$lineI]) }}" r="2" fill="#f59e0b" stroke="#fff" stroke-width="1"
+                        x-show="hoverIndex === {{ $lineI }}" x-cloak vector-effect="non-scaling-stroke"/>
+            @endif
+        @endfor
+    </svg>
+    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300"
+         x-show="hoverIndex !== null" x-cloak
+         :style="'left: ' + (((hoverIndex ?? 0) + 0.5) / {{ $lineBuckets }} * 100) + '%'"></div>
+    <div class="absolute inset-0 flex" @mouseleave="clearHoverIndex()">
+        @for ($lineI = 0; $lineI < $lineBuckets; $lineI++)
+            <div class="relative h-full flex-1" :class="{ 'bg-neutral-100/60': hoverIndex === {{ $lineI }} }"
+                 @mouseenter="setHoverIndex({{ $lineI }})">
+                <div class="pointer-events-none absolute bottom-full {{ $lineI < $lineBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
+                     x-show="hoverIndex === {{ $lineI }}" x-cloak>
                     <p class="font-mono text-[11px] text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($since->copy()->addSeconds($lineI * $lineSeconds)) }} <span class="text-neutral-500">{{ $lineTz }}</span></p>
                     <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
                         <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">

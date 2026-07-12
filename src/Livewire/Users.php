@@ -2,10 +2,12 @@
 
 namespace LaravelMonitor\Livewire;
 
-use Throwable;
+use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 
 class Users extends Card
 {
+    use ResolvesUserNames;
+
     protected function view(): string
     {
         return 'monitor::livewire.users';
@@ -36,28 +38,5 @@ class Users extends Card
             'authenticatedUsers' => $storage->topUsers('request', $since, 1000, $until)->count(),
             'authEvents' => $storage->recent('auth', $since, $this->limit, null, null, $until),
         ];
-    }
-
-    /**
-     * @return array<int|string, string>
-     */
-    protected function resolveNames(array $ids): array
-    {
-        $model = config('auth.providers.users.model');
-
-        if ($ids === [] || ! is_string($model) || ! class_exists($model)) {
-            return [];
-        }
-
-        try {
-            return $model::query()
-                ->findMany($ids)
-                ->mapWithKeys(fn ($user) => [
-                    $user->getKey() => (string) ($user->name ?? $user->email ?? 'User #'.$user->getKey()),
-                ])
-                ->all();
-        } catch (Throwable) {
-            return [];
-        }
     }
 }
