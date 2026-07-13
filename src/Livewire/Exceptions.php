@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Livewire;
 
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+use LaravelMonitor\Support\Format;
 
 class Exceptions extends Card
 {
@@ -11,6 +12,18 @@ class Exceptions extends Card
     public const PER_PAGE = 15;
 
     public const SORTABLE = ['last_seen', 'count', 'users'];
+
+    /** Status filter tabs shown above the table. */
+    public const FILTERS = ['all' => 'View All', 'handled' => 'Handled', 'unhandled' => 'Unhandled'];
+
+    /** Table columns: label, alignment and whether the header is sortable. */
+    public const COLUMNS = [
+        'last_seen' => ['label' => 'Last Seen', 'align' => 'left', 'sortable' => true],
+        'status' => ['label' => 'Status', 'align' => 'left', 'sortable' => false],
+        'class' => ['label' => 'Exception', 'align' => 'left', 'sortable' => false],
+        'count' => ['label' => 'Count', 'align' => 'right', 'sortable' => true],
+        'users' => ['label' => 'Users', 'align' => 'right', 'sortable' => true],
+    ];
 
     public string $search = '';
 
@@ -108,6 +121,7 @@ class Exceptions extends Card
 
         $topUsers = $storage->topUsers('exception', $since, 100, $until);
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
+        $tz = Format::timezone();
 
         return [
             'total' => $storage->stats('exception', $since, null, null, $until, $userId)->count,
@@ -115,7 +129,11 @@ class Exceptions extends Card
             'unhandledCount' => $storage->stats('exception', $since, 'unhandled', null, $until, $userId)->count,
             'handledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'handled', null, $until, $userId),
             'unhandledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'unhandled', null, $until, $userId),
-            'groups' => $groups->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
+            'filters' => self::FILTERS,
+            'columns' => self::COLUMNS,
+            'groups' => $groups->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)
+                ->map(fn ($group) => $this->presentGroup($group, $tz))
+                ->values(),
             'totalGroups' => $total,
             'page' => $page,
             'lastPage' => $lastPage,
@@ -125,6 +143,28 @@ class Exceptions extends Card
                 'id' => $user->user_id,
                 'name' => $names[$user->user_id] ?? "User #{$user->user_id}",
             ]),
+        ];
+    }
+
+    /**
+     * Shape a grouped-exception row into a display-ready object so the Blade
+     * view carries no formatting logic.
+     */
+    protected function presentGroup(object $group, string $tz): object
+    {
+        return (object) [
+            'key' => $group->key,
+            'class' => $group->class,
+            'class_short' => class_basename($group->class),
+            'message' => $group->message,
+            'file' => $group->file,
+            'line' => $group->line,
+            'count' => $group->count,
+            'users' => $group->users,
+            'unhandled' => $group->unhandled,
+            'handled' => $group->unhandled === 0,
+            'last_seen_human' => $group->last_seen?->diffForHumans(short: true),
+            'last_seen_full' => $group->last_seen !== null ? Format::datetime($group->last_seen).' '.$tz : null,
         ];
     }
 }

@@ -73,7 +73,7 @@ class ExceptionDetail extends Card
             'unhandledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'unhandled', $key, $until),
             // Occurrences table
             'occurrences' => $occurrences->take(50)->map(fn ($row) => (object) [
-                'created_at' => $row->created_at,
+                'date' => Format::datetime($row->created_at),
                 'server' => $row->payload['server'] ?? null,
                 'message' => $row->payload['message'] ?? null,
                 'user' => $row->user_id !== null ? ($names[$row->user_id] ?? "User #{$row->user_id}") : null,

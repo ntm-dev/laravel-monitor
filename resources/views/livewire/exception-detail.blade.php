@@ -1,7 +1,3 @@
-@php
-    use LaravelMonitor\Support\Icons;
-    use LaravelMonitor\Support\Format;
-@endphp
 <div wire:poll.{{ $refresh }}s>
     @if (! $exists)
         <x-monitor::card class="p-10 text-center">
@@ -35,7 +31,7 @@
             </div>
             <button type="button" @click="copy()"
                     class="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-600 shadow-sm hover:bg-neutral-50">
-                <x-monitor::icon :path="Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5"/>
+                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5"/>
                 <span x-text="copied ? 'Copied!' : 'Copy as Markdown'"></span>
             </button>
         </div>
@@ -74,7 +70,7 @@
         {{-- Stack trace --}}
         <div class="mt-6">
             <div class="flex items-center gap-2 px-1 pb-3">
-                <x-monitor::icon :path="Icons::EXCEPTIONS" class="h-4 w-4 text-rose-500"/>
+                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::EXCEPTIONS" class="h-4 w-4 text-rose-500"/>
                 <h3 class="font-semibold text-neutral-900">Stack Trace</h3>
             </div>
             @if (! empty($frameGroups))
@@ -87,7 +83,7 @@
         {{-- Occurrences --}}
         <div class="mt-6">
             <div class="flex items-center gap-2 px-1 pb-3">
-                <x-monitor::icon :path="Icons::CLOCK" class="h-4 w-4 text-blue-600"/>
+                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOCK" class="h-4 w-4 text-blue-600"/>
                 <h3 class="font-semibold text-neutral-900">{{ number_format($occurrences->count()) }} {{ $occurrences->count() === 1 ? 'Occurrence' : 'Occurrences' }}</h3>
                 @if ($occurrencesCount > $occurrences->count())
                     <span class="font-mono text-xs text-neutral-400">(showing latest {{ $occurrences->count() }} of {{ number_format($occurrencesCount) }})</span>
@@ -107,7 +103,7 @@
                         <tbody class="divide-y divide-neutral-100">
                             @foreach ($occurrences as $occurrence)
                                 <tr class="hover:bg-neutral-50">
-                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700">{{ Format::datetime($occurrence->created_at) }} <span class="text-neutral-300">{{ $tz }}</span></td>
+                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700">{{ $occurrence->date }} <span class="text-neutral-300">{{ $tz }}</span></td>
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-500">{{ $occurrence->server ?? '—' }}</td>
                                     <td class="max-w-[22rem] truncate py-2 pr-3 text-xs text-neutral-600" title="{{ $occurrence->message }}">{{ $occurrence->message ?? '—' }}</td>
                                     <td class="py-2 pr-3 text-xs text-neutral-600">{{ $occurrence->user ?? '—' }}</td>

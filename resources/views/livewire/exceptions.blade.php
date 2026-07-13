@@ -1,21 +1,5 @@
-@php
-    use LaravelMonitor\Support\Icons;
-    use LaravelMonitor\Support\Format;
-
-    $tz = Format::timezone();
-
-    $filters = ['all' => 'View All', 'handled' => 'Handled', 'unhandled' => 'Unhandled'];
-
-    $columns = [
-        'last_seen' => ['label' => 'Last Seen', 'align' => 'left'],
-        'status' => ['label' => 'Status', 'align' => 'left', 'sortable' => false],
-        'class' => ['label' => 'Exception', 'align' => 'left', 'sortable' => false],
-        'count' => ['label' => 'Count', 'align' => 'right'],
-        'users' => ['label' => 'Users', 'align' => 'right'],
-    ];
-@endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::EXCEPTIONS" title="Exceptions">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::EXCEPTIONS" title="Exceptions">
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 <select wire:model.live="userId" class="h-8 rounded-md border border-neutral-200 bg-white px-2 text-xs text-neutral-600 shadow-sm focus:outline-none">
@@ -26,7 +10,7 @@
                 </select>
                 <button type="button" wire:click="$refresh" title="Refresh"
                         class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 shadow-sm hover:bg-neutral-50">
-                    <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
                 </button>
             </div>
         </x-slot:actions>
@@ -58,7 +42,7 @@
                     @endforeach
                 </div>
                 <div class="relative">
-                    <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400"/>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400"/>
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search exceptions…"
                            class="h-8 w-56 rounded-md border border-neutral-200 bg-white pl-8 pr-2 text-xs text-neutral-600 shadow-sm focus:outline-none">
                 </div>
@@ -83,7 +67,7 @@
                                         <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row-reverse' : '' }}">
                                             {{ $column['label'] }}
                                             @if (($column['sortable'] ?? true) && $sortBy === $field)
-                                                <x-monitor::icon :path="Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3 {{ $sortDirection === 'asc' ? 'rotate-180' : '' }}"/>
+                                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3 {{ $sortDirection === 'asc' ? 'rotate-180' : '' }}"/>
                                             @endif
                                         </span>
                                     </th>
@@ -93,17 +77,16 @@
                         </thead>
                         <tbody class="divide-y divide-neutral-100">
                             @foreach ($groups as $group)
-                                @php($handled = $group->unhandled === 0)
                                 <tr class="group cursor-pointer {{ $group->unhandled > 0 ? 'hover:bg-rose-50/50' : 'hover:bg-neutral-50' }}"
                                     onclick="window.location='{{ route('monitor.dashboard', ['tab' => 'exceptions', 'key' => $group->key] + $range) }}'">
-                                    <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500" title="{{ Format::datetime($group->last_seen) }} {{ $tz }}">
-                                        {{ $group->last_seen->diffForHumans(short: true) }}
+                                    <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500" title="{{ $group->last_seen_full }}">
+                                        {{ $group->last_seen_human }}
                                     </td>
                                     <td class="py-2.5 pr-3">
-                                        <x-monitor::status-badge :handled="$handled"/>
+                                        <x-monitor::status-badge :handled="$group->handled"/>
                                     </td>
                                     <td class="max-w-[26rem] py-2.5 pr-3">
-                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600' : 'text-neutral-800' }}" title="{{ $group->class }}">{{ class_basename($group->class) }}</p>
+                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600' : 'text-neutral-800' }}" title="{{ $group->class }}">{{ $group->class_short }}</p>
                                         @if (filled($group->message))
                                             <p class="mt-0.5 truncate text-xs text-neutral-400" title="{{ $group->message }}">{{ $group->message }}</p>
                                         @elseif (filled($group->file))
@@ -114,7 +97,7 @@
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-500">{{ $group->users > 0 ? number_format($group->users) : '—' }}</td>
                                     <td class="py-2.5 pl-2 text-right">
                                         <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 group-hover:border-neutral-200 group-hover:bg-white group-hover:text-neutral-600 group-hover:shadow-sm">
-                                            <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     </td>
                                 </tr>

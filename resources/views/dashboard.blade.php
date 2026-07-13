@@ -25,16 +25,7 @@
     }
 
     $isDetail = in_array($tab, ['requests', 'jobs', 'exceptions'], true) && filled($key);
-
-    // Resolve a human title for the exception detail header from its fingerprint.
-    $detailClass = null;
-    if ($isDetail && $tab === 'exceptions') {
-        $detailClass = optional(
-            app(\LaravelMonitor\Contracts\Storage::class)
-                ->recent('exception', \Carbon\CarbonImmutable::now()->subYears(5), 1, null, $key)
-                ->first()
-        )->payload['class'] ?? null;
-    }
+    $detailClass = $detailClass ?? null;
 
     $title = $tabs[$tab]['label'];
     $refresh = (int) config('monitor.refresh', 10);
