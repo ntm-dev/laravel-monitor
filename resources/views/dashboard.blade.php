@@ -132,7 +132,7 @@
 
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur">
-                <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-5 md:px-8">
+                <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
                     @if ($isDetail)
                         <div class="min-w-0">
                             <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900">{{ $tabs[$tab]['label'] }}</a>
@@ -226,7 +226,7 @@
                 </nav>
             </header>
 
-            <main class="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 md:px-8">
+            <main class="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-10 md:px-8">
                 @php($rangeProps = ['period' => $period, 'from' => $from, 'to' => $to])
                 @if ($tab === 'overview')
                     <div class="space-y-4">
