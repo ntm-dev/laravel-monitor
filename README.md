@@ -8,7 +8,7 @@ Local-first application monitoring for Laravel — Nightwatch-style insights on 
 | --- | --- |
 | Requests (count, avg/max time, status) | `RequestHandled` |
 | Slow queries (with app-code location) | `QueryExecuted` over a threshold |
-| Exceptions (grouped, with message + trace) | `MessageLogged` |
+| Exceptions (grouped by fingerprint, handled/unhandled, occurrence timeline, Ignition-style stack trace + detail page) | `MessageLogged` |
 | Logs (filterable by level) | `MessageLogged` |
 | Queue jobs (queued / processed / failed, runtime) | queue events |
 | Scheduled tasks (finished / failed / skipped) | scheduler events |

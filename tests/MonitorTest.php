@@ -5,10 +5,13 @@ namespace LaravelMonitor\Tests;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
+use LaravelMonitor\Support\Fingerprint;
+use RuntimeException;
 
 class MonitorTest extends TestCase
 {
@@ -85,6 +88,91 @@ class MonitorTest extends TestCase
         Monitor::flush();
 
         $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
+    public function test_exception_recorder_fingerprints_and_classifies(): void
+    {
+        $exception = new RuntimeException('Charge declined for order 4821');
+
+        event(new MessageLogged('error', $exception->getMessage(), ['exception' => $exception]));
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'exception')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('unhandled', $row->subtype);
+        $this->assertSame(32, strlen($row->key));
+
+        $payload = json_decode($row->payload, true);
+        $this->assertSame(RuntimeException::class, $payload['class']);
+        $this->assertFalse($payload['handled']);
+        $this->assertNotEmpty($payload['frames']);
+    }
+
+    public function test_exception_recorder_marks_lower_levels_as_handled(): void
+    {
+        $exception = new RuntimeException('Retrying webhook');
+
+        event(new MessageLogged('warning', $exception->getMessage(), ['exception' => $exception]));
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'exception',
+            'subtype' => 'handled',
+        ]);
+    }
+
+    public function test_fingerprint_groups_by_normalized_message(): void
+    {
+        $same = Fingerprint::for('App\\Boom', 'No results for model 41', 'app/X.php:10');
+        $alsoSame = Fingerprint::for('App\\Boom', 'No results for model 992', 'app/X.php:10');
+        $different = Fingerprint::for('App\\Boom', 'Totally different problem', 'app/X.php:10');
+
+        $this->assertSame($same, $alsoSame);
+        $this->assertNotSame($same, $different);
+    }
+
+    public function test_exception_groups_aggregate_handled_unhandled_and_users(): void
+    {
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 1);
+        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 2);
+        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'handled', 2);
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $group = $storage->exceptionGroups(CarbonImmutable::now()->subHour())->firstWhere('key', $key);
+
+        $this->assertNotNull($group);
+        $this->assertSame(3, $group->count);
+        $this->assertSame(2, $group->unhandled);
+        $this->assertSame(1, $group->handled);
+        $this->assertSame(2, $group->users);
+        $this->assertSame('App\\Boom', $group->class);
+        $this->assertNotNull($storage->firstSeen('exception', $key));
+    }
+
+    public function test_exception_detail_page_renders(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [['file' => 'app/X.php', 'line' => 10, 'label' => 'App\\Services\\Boom->go', 'vendor' => false]],
+        ], null, 'unhandled', 1);
+        Monitor::flush();
+
+        $this->get('/monitor?tab=exceptions&key='.$key)
+            ->assertOk()
+            ->assertSee('Boom')
+            ->assertSee('Stack Trace')
+            ->assertSee('Occurrences');
     }
 
     public function test_dashboard_is_protected_by_gate(): void

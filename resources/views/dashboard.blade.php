@@ -24,7 +24,18 @@
         }
     }
 
-    $isDetail = in_array($tab, ['requests', 'jobs'], true) && filled($key);
+    $isDetail = in_array($tab, ['requests', 'jobs', 'exceptions'], true) && filled($key);
+
+    // Resolve a human title for the exception detail header from its fingerprint.
+    $detailClass = null;
+    if ($isDetail && $tab === 'exceptions') {
+        $detailClass = optional(
+            app(\LaravelMonitor\Contracts\Storage::class)
+                ->recent('exception', \Carbon\CarbonImmutable::now()->subYears(5), 1, null, $key)
+                ->first()
+        )->payload['class'] ?? null;
+    }
+
     $title = $tabs[$tab]['label'];
     $refresh = (int) config('monitor.refresh', 10);
     $appInitial = strtoupper(mb_substr(config('app.name', 'L'), 0, 1));
@@ -34,8 +45,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $isDetail ? $key : $title }} — Monitor</title>
+    <title>{{ $isDetail ? ($detailClass ? class_basename($detailClass) : $key) : $title }} — Monitor</title>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -127,6 +140,9 @@
                                 @if ($tab === 'requests')
                                     <span class="shrink-0 rounded bg-neutral-200/70 px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight text-neutral-600">{{ Str::before($key, ' ') }}</span>
                                     <h1 class="truncate text-2xl font-bold tracking-tight">{{ Str::after($key, ' ') }}</h1>
+                                @elseif ($tab === 'exceptions')
+                                    <span class="shrink-0 rounded bg-rose-100 px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight text-rose-600">Exception</span>
+                                    <h1 class="truncate text-2xl font-bold tracking-tight" title="{{ $detailClass ?? $key }}">{{ $detailClass ? class_basename($detailClass) : 'Exception' }}</h1>
                                 @else
                                     <span class="shrink-0 rounded bg-neutral-200/70 px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight text-neutral-600">Job</span>
                                     <h1 class="truncate text-2xl font-bold tracking-tight" title="{{ $key }}">{{ class_basename($key) }}</h1>
@@ -224,6 +240,8 @@
                     @livewire('monitor.request-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'jobs' && filled($key))
                     @livewire('monitor.job-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'exceptions' && filled($key))
+                    @livewire('monitor.exception-detail', $rangeProps + ['key' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif
@@ -232,5 +250,29 @@
     </div>
 
     @livewireScripts
+
+    {{-- Progressive syntax highlighting for stack-trace snippets (highlight.js),
+         re-applied after every Livewire poll/morph so it survives DOM patches. --}}
+    <script>
+        (function () {
+            function highlight() {
+                if (! window.hljs) return;
+                document.querySelectorAll('[data-line-code]').forEach(function (el) {
+                    el.innerHTML = window.hljs.highlight(el.textContent, { language: 'php', ignoreIllegals: true }).value;
+                });
+            }
+
+            function hookLivewire() {
+                if (! window.Livewire) return;
+                window.Livewire.hook('morphed', highlight);
+                window.Livewire.hook('morph', highlight);
+            }
+
+            window.addEventListener('load', highlight);
+            document.addEventListener('livewire:init', hookLivewire);
+            document.addEventListener('livewire:navigated', highlight);
+            hookLivewire();
+        })();
+    </script>
 </body>
 </html>

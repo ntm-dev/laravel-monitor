@@ -88,12 +88,119 @@ $jobs = [
     'App\\Jobs\\SyncInventory' => 2600,
 ];
 
-$exceptions = [
-    ['App\\Exceptions\\PaymentFailedException', 'Charge declined by provider: insufficient_funds', 'app/Services/PaymentService.php', 87],
-    ['Illuminate\\Database\\QueryException', "SQLSTATE[40001]: Serialization failure: deadlock detected", 'app/Repositories/OrderRepository.php', 142],
-    ['ErrorException', 'Undefined array key "shipping_address"', 'app/Http/Controllers/CheckoutController.php', 63],
-    ['Symfony\\Component\\HttpKernel\\Exception\\NotFoundHttpException', 'No query results for model [App\\Models\\Order] 9931', 'vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php', 44],
+// Fingerprint helper — kept in sync with LaravelMonitor\Support\Fingerprint.
+$normalizeMessage = function (string $message): string {
+    $message = preg_replace('/0x[0-9a-fA-F]+/', '{hex}', $message);
+    $message = preg_replace('/\b[0-9a-f]{16,}\b/i', '{hash}', $message);
+    $message = preg_replace('/\d+/', '{n}', $message);
+    $message = preg_replace('/[\'"][^\'"]*[\'"]/', '{s}', $message);
+
+    return trim($message);
+};
+$fingerprint = fn (string $class, string $message, string $topFrame): string => substr(
+    sha1($class.'|'.$normalizeMessage($message).'|'.$topFrame), 0, 32
+);
+
+$appFrame = fn (string $file, int $line, string $label, ?string $code = null, ?int $start = null) => array_filter([
+    'file' => $file, 'line' => $line, 'label' => $label, 'function' => $label,
+    'vendor' => false, 'code' => $code, 'start_line' => $start,
+], fn ($v) => $v !== null);
+
+$vendorFrame = fn (string $file, int $line, string $label) => [
+    'file' => $file, 'line' => $line, 'label' => $label, 'function' => $label, 'vendor' => true,
 ];
+
+// Common vendor tail shared by every trace (framework dispatch + entrypoint).
+$vendorTail = [
+    $vendorFrame('vendor/laravel/framework/src/Illuminate/Routing/Router.php', 725, 'Illuminate\\Routing\\Router->runRoute'),
+    $vendorFrame('vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php', 141, 'Illuminate\\Foundation\\Http\\Kernel->handle'),
+    $vendorFrame('public/index.php', 51, 'require_once'),
+];
+
+// [class, message, file, line, handled, frames]
+$exceptions = [
+    [
+        'App\\Exceptions\\PaymentFailedException',
+        'Charge declined by provider: insufficient_funds',
+        'app/Services/PaymentService.php', 87, false,
+        array_merge([
+            $appFrame('app/Services/PaymentService.php', 87, 'App\\Services\\PaymentService->charge',
+                "    public function charge(Order \$order, Card \$card): Charge\n    {\n        \$response = \$this->gateway->charge(\$order->total, \$card);\n\n        if (\$response->declined()) {\n            throw new PaymentFailedException(\n                \"Charge declined by provider: {\$response->reason()}\"\n            );\n        }\n\n        return \$response->charge();\n    }", 82),
+            $appFrame('app/Http/Controllers/CheckoutController.php', 71, 'App\\Http\\Controllers\\CheckoutController->store'),
+        ], $vendorTail),
+    ],
+    [
+        'Illuminate\\Database\\QueryException',
+        'SQLSTATE[40001]: Serialization failure: deadlock detected (SQL: update "orders" set "status" = ? where "id" = 4821)',
+        'app/Repositories/OrderRepository.php', 142, false,
+        array_merge([
+            $appFrame('app/Repositories/OrderRepository.php', 142, 'App\\Repositories\\OrderRepository->markPaid',
+                "    public function markPaid(Order \$order): void\n    {\n        DB::transaction(function () use (\$order) {\n            \$order->update(['status' => 'paid']);\n            \$this->ledger->credit(\$order);\n        });\n    }", 138),
+            $vendorFrame('vendor/laravel/framework/src/Illuminate/Database/Connection.php', 813, 'Illuminate\\Database\\Connection->runQueryCallback'),
+        ], $vendorTail),
+    ],
+    [
+        'ErrorException',
+        'Undefined array key "shipping_address"',
+        'app/Http/Controllers/CheckoutController.php', 63, false,
+        array_merge([
+            $appFrame('app/Http/Controllers/CheckoutController.php', 63, 'App\\Http\\Controllers\\CheckoutController->store',
+                "    public function store(CheckoutRequest \$request)\n    {\n        \$payload = \$request->validated();\n\n        \$address = \$payload['shipping_address'];\n\n        return \$this->checkout->place(\$payload, \$address);\n    }", 59),
+        ], $vendorTail),
+    ],
+    [
+        'Symfony\\Component\\HttpKernel\\Exception\\NotFoundHttpException',
+        'No query results for model [App\\Models\\Order] 9931',
+        'vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php', 44, true,
+        array_merge([
+            $vendorFrame('vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php', 44, 'Illuminate\\Routing\\Middleware\\SubstituteBindings->handle'),
+            $appFrame('app/Http/Controllers/OrderController.php', 38, 'App\\Http\\Controllers\\OrderController->show'),
+        ], $vendorTail),
+    ],
+    [
+        'Illuminate\\Validation\\ValidationException',
+        'The shipping address field is required.',
+        'app/Http/Requests/CheckoutRequest.php', 29, true,
+        array_merge([
+            $appFrame('app/Http/Requests/CheckoutRequest.php', 29, 'App\\Http\\Requests\\CheckoutRequest->rules',
+                "    public function rules(): array\n    {\n        return [\n            'shipping_address' => ['required', 'string'],\n            'payment_token'    => ['required'],\n        ];\n    }", 25),
+        ], $vendorTail),
+    ],
+    [
+        'GuzzleHttp\\Exception\\ConnectException',
+        'cURL error 28: Operation timed out after 5000 milliseconds',
+        'app/Services/InventoryClient.php', 54, true,
+        array_merge([
+            $appFrame('app/Services/InventoryClient.php', 54, 'App\\Services\\InventoryClient->sync',
+                "    public function sync(): Collection\n    {\n        \$response = \$this->http\n            ->timeout(5)\n            ->get(\$this->endpoint.'/stock');\n\n        return collect(\$response->json('data'));\n    }", 50),
+            $vendorFrame('vendor/guzzlehttp/guzzle/src/Handler/CurlFactory.php', 210, 'GuzzleHttp\\Handler\\CurlFactory::createRejection'),
+        ], $vendorTail),
+    ],
+];
+
+$phpVersions = ['8.2.20', '8.3.9'];
+$laravelVersion = '11.23.5';
+$servers = ['web-01', 'web-02', 'worker-01'];
+
+$unhandledExceptions = array_values(array_filter($exceptions, fn ($e) => ! $e[4]));
+$handledExceptions = array_values(array_filter($exceptions, fn ($e) => $e[4]));
+
+$recordException = function (DateTimeImmutable $at, array $tpl, ?int $userId) use ($record, $fingerprint, $phpVersions, $laravelVersion, $servers) {
+    [$class, $message, $file, $line, $handled, $frames] = $tpl;
+
+    $record($at, 'exception', $handled ? 'handled' : 'unhandled', $fingerprint($class, $message, $file.':'.$line), [
+        'class' => $class,
+        'message' => $message,
+        'file' => $file,
+        'line' => $line,
+        'handled' => $handled,
+        'php_version' => $phpVersions[array_rand($phpVersions)],
+        'laravel_version' => $laravelVersion,
+        'server' => $servers[array_rand($servers)],
+        'frames' => $frames,
+        'trace' => array_map(fn ($f) => $f['file'].':'.$f['line'].' '.$f['label'], $frames),
+    ], null, $userId);
+};
 
 $notifications = [
     ['App\\Notifications\\OrderShipped', 'mail'],
@@ -170,26 +277,20 @@ for ($hour = clone $start; $hour < $now; $hour = $hour->add(new DateInterval('PT
             'ip' => '192.168.1.'.mt_rand(2, 254),
         ], $duration, $userId);
 
-        // 5xx responses come with an exception entry, like the real recorders.
+        // 5xx responses crash with an unhandled exception, like the real recorders.
         if ($subtype === '5xx') {
-            [$class, $message, $file, $line] = $exceptions[array_rand($exceptions)];
-            $record($at, 'exception', null, $class, [
-                'class' => $class,
-                'message' => $message,
-                'file' => $file,
-                'line' => $line,
-                'trace' => [
-                    $file.':'.$line.' '.$class.'->handle',
-                    'app/Http/Kernel.php:38 App\\Http\\Kernel->handle',
-                    'public/index.php:52 require_once',
-                ],
-            ]);
+            $recordException($at, $unhandledExceptions[array_rand($unhandledExceptions)], $userId ?? (mt_rand(1, 3) === 1 ? array_rand($users) : null));
         }
 
         // Cache chatter alongside requests.
         if (mt_rand(1, 3) === 1) {
             $record($at, 'cache', ['hit', 'hit', 'hit', 'miss', 'write'][mt_rand(0, 4)], $cacheKeys[array_rand($cacheKeys)]);
         }
+    }
+
+    // Handled exceptions: caught and logged deliberately, a couple per hour.
+    if ($handledExceptions !== [] && mt_rand(1, 2) === 1) {
+        $recordException($randomTime($hour), $handledExceptions[array_rand($handledExceptions)], mt_rand(1, 2) === 1 ? array_rand($users) : null);
     }
 
     // Jobs: a few per hour, occasionally failing.
