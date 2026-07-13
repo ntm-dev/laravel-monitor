@@ -57,6 +57,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'monitor');
         Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'monitor');
+        Blade::componentNamespace('LaravelMonitor\\View\\Components', 'monitor');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
     }
 

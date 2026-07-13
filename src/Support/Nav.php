@@ -44,4 +44,25 @@ class Nav
     {
         return array_keys(self::tabs());
     }
+
+    /**
+     * Tabs split into sidebar groups and footer entries.
+     *
+     * @return array{0: array<string, array<string, array<string, mixed>>>, 1: array<string, array<string, mixed>>}
+     */
+    public static function grouped(): array
+    {
+        $groups = [];
+        $footer = [];
+
+        foreach (self::tabs() as $key => $item) {
+            if ($item['group'] === 'footer') {
+                $footer[$key] = $item;
+            } else {
+                $groups[$item['group']][$key] = $item;
+            }
+        }
+
+        return [$groups, $footer];
+    }
 }

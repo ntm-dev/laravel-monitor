@@ -3,12 +3,13 @@
      default); consecutive vendor frames collapse into a single dashed group.
      Frame grouping and source lines are prepared by the component. --}}
 @props(['groups'])
-<div class="flex flex-col gap-1.5">
+<div class="flex flex-col gap-1.5 p-2.5 md:p-2.5 lg:p-2.5">
     @foreach ($groups as $group)
         @if ($group['vendor'])
-            <div x-data="{ expanded: false }" class="group overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-neutral-50/70">
-                <button type="button" @click="expanded = ! expanded" class="flex h-11 w-full cursor-pointer items-center gap-3 pl-4 pr-2.5 text-left hover:bg-neutral-100/70">
-                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER" class="h-3.5 w-3.5 shrink-0 text-neutral-400"/>
+            <div x-data="{ expanded: false }" class="overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-neutral-50/70">
+                <button type="button" @click="expanded = ! expanded" class="group flex h-11 w-full cursor-pointer items-center gap-3 pl-4 pr-2.5 text-left hover:bg-neutral-100/70">
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER" x-show="! expanded" class="h-3.5 w-3.5 shrink-0 text-neutral-400 group-hover:text-green-600"/>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER_OPEN" x-show="expanded" x-cloak class="h-3.5 w-3.5 shrink-0 text-neutral-400 group-hover:text-green-600"/>
                     <span class="flex-1 font-mono text-xs text-neutral-500">{{ $group['count'] }} vendor {{ $group['count'] === 1 ? 'frame' : 'frames' }}</span>
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2" class="h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform" x-bind:class="expanded ? 'rotate-180' : ''"/>
                 </button>
