@@ -24,12 +24,25 @@ Route::domain(config('monitor.domain'))
 
             [$from, $to] = Card::normalizeRange(request('from'), request('to'));
 
+            $key = request('key');
+
+            // Resolve a human title for the exception detail header from its fingerprint.
+            $detailClass = null;
+            if ($tab === 'exceptions' && filled($key)) {
+                $detailClass = optional(
+                    app(\LaravelMonitor\Contracts\Storage::class)
+                        ->recent('exception', \Carbon\CarbonImmutable::now()->subYears(5), 1, null, $key)
+                        ->first()
+                )->payload['class'] ?? null;
+            }
+
             return view('monitor::dashboard', [
                 'period' => $period,
                 'tab' => $tab,
-                'key' => request('key'),
+                'key' => $key,
                 'from' => $from,
                 'to' => $to,
+                'detailClass' => $detailClass,
             ]);
         })->name('monitor.dashboard');
     });

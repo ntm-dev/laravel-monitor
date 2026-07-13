@@ -8,6 +8,12 @@ use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class TestCase extends Orchestra
 {
+    /**
+     * Keep tests hermetic: ignore any local .env (e.g. the demo-preview file)
+     * so the environment comes solely from defineEnvironment().
+     */
+    protected $loadEnvironmentVariables = false;
+
     protected function getPackageProviders($app): array
     {
         return [

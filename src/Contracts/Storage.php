@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Contracts;
 
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Entry;
@@ -112,4 +113,21 @@ interface Storage
         ?DateTimeInterface $until = null,
         ?int $userId = null,
     ): Collection;
+
+    /**
+     * Grouped exceptions: one item per fingerprint key exposing
+     * key, class, message, file, line, count, handled, unhandled, users
+     * (distinct impacted users), first_seen and last_seen.
+     */
+    public function exceptionGroups(
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
+    ): Collection;
+
+    /**
+     * Earliest occurrence (across all retained data, ignoring the range) of a
+     * given key, or null when it has never been seen.
+     */
+    public function firstSeen(string $type, string $key): ?CarbonImmutable;
 }

@@ -224,6 +224,47 @@ class DatabaseStorage implements Storage
             ->values();
     }
 
+    public function exceptionGroups(
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
+    ): Collection {
+        return $this->query('exception', $since, null, null, $until, $userId)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get(['key', 'subtype', 'user_id', 'payload', 'created_at'])
+            ->groupBy('key')
+            ->map(function (Collection $rows, string $key) {
+                // Rows arrive newest-first, so the first payload is the latest.
+                $latest = json_decode($rows->first()->payload ?? '[]', true) ?: [];
+
+                return (object) [
+                    'key' => $key,
+                    'class' => $latest['class'] ?? $key,
+                    'message' => $latest['message'] ?? null,
+                    'file' => $latest['file'] ?? null,
+                    'line' => $latest['line'] ?? null,
+                    'count' => $rows->count(),
+                    'handled' => $rows->where('subtype', 'handled')->count(),
+                    'unhandled' => $rows->where('subtype', 'unhandled')->count(),
+                    'users' => $rows->pluck('user_id')->filter(fn ($id) => $id !== null)->unique()->count(),
+                    'last_seen' => CarbonImmutable::parse($rows->max('created_at')),
+                    'first_seen' => CarbonImmutable::parse($rows->min('created_at')),
+                ];
+            })
+            ->values();
+    }
+
+    public function firstSeen(string $type, string $key): ?CarbonImmutable
+    {
+        $first = $this->table()
+            ->where('type', $type)
+            ->where('key', $key)
+            ->min('created_at');
+
+        return $first !== null ? CarbonImmutable::parse($first) : null;
+    }
+
     /**
      * @return array{0: CarbonImmutable, 1: float}
      */

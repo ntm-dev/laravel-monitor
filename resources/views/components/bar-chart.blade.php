@@ -1,6 +1,6 @@
 {{-- Stacked bar chart with Nightwatch-style dark tooltips.
      $series = [['label', 'dot' (pill class), 'bar' (segment class), 'data' => int[]], ...] --}}
-@props(['series', 'since', 'until', 'height' => 'h-28'])
+@props(['series', 'since', 'until', 'height' => 'h-28', 'barWidth' => 'w-[calc(100%-4px)]'])
 @php
     $chartBuckets = count($series[0]['data'] ?? []) ?: 1;
     $chartSeconds = max(1, (int) ($since->diffInSeconds($until) / $chartBuckets));
@@ -25,18 +25,18 @@
          :style="'left: ' + (((hoverIndex ?? 0) + 0.5) / {{ $chartBuckets }} * 100) + '%'"></div>
     <div class="relative flex h-full items-end gap-px" @mouseleave="clearHoverIndex()">
         @for ($chartI = 0; $chartI < $chartBuckets; $chartI++)
-            <div class="relative flex h-full flex-1 flex-col justify-end"
+            <div class="relative flex h-full flex-1 flex-col items-center justify-end"
                  :class="{ 'bg-neutral-100/60': hoverIndex === {{ $chartI }} }"
                  @mouseenter="setHoverIndex({{ $chartI }})">
                 @foreach (array_reverse($series) as $chartSerie)
                     @php($chartValue = $chartSerie['data'][$chartI] ?? 0)
                     @if ($chartValue > 0)
-                        <div class="w-full first:rounded-t-[2px] {{ $chartSerie['bar'] ?? $chartSerie['dot'] }}"
+                        <div class="{{ $barWidth }} first:rounded-t-[2px] {{ $chartSerie['bar'] ?? $chartSerie['dot'] }}"
                              style="height: {{ max(2, $chartValue / $chartMax * 100) }}%"></div>
                     @endif
                 @endforeach
                 @if (($chartTotals[$chartI] ?? 0) === 0)
-                    <div class="h-[2px] w-full bg-neutral-200/70"></div>
+                    <div class="h-[2px] {{ $barWidth }} bg-neutral-200/70"></div>
                 @endif
                 <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
                      x-show="hoverIndex === {{ $chartI }}" x-cloak>
