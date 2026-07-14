@@ -23,6 +23,8 @@ class MonitorServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Support\Settings::apply();
+
         $this->registerPublishing();
         $this->registerResources();
         $this->registerRecorders();
@@ -50,11 +52,16 @@ class MonitorServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/monitor'),
         ], 'monitor-views');
+
+        $this->publishes([
+            __DIR__.'/../resources/lang' => lang_path('vendor/monitor'),
+        ], 'monitor-lang');
     }
 
     protected function registerResources(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'monitor');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'monitor');
         Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'monitor');
         Blade::componentNamespace('LaravelMonitor\\View\\Components', 'monitor');
