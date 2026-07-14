@@ -171,7 +171,7 @@ class MonitorTest extends TestCase
         $this->get('/monitor?tab=exceptions&key='.$key)
             ->assertOk()
             ->assertSee('Boom')
-            ->assertSee('Stack Trace')
+            ->assertSee('Copy as Markdown')
             ->assertSee('Occurrences');
     }
 
@@ -217,5 +217,94 @@ class MonitorTest extends TestCase
                 file_put_contents($dir.'/'.$tab.'.html', $response->getContent());
             }
         }
+    }
+
+    public function test_entries_recorded_during_a_request_are_correlated(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
+        $monitor->markResponseReady();
+        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $requestId = $monitor->requestId();
+
+        $this->assertNotNull($requestId);
+
+        $root = $storage->findByRequestId($requestId);
+
+        $this->assertNotNull($root);
+        $this->assertSame('GET /users', $root->key);
+
+        $phases = collect($root->payload['phases'] ?? [])->pluck('name');
+        $this->assertContains('bootstrap', $phases);
+        $this->assertContains('middleware', $phases);
+        $this->assertContains('sending', $phases);
+
+        $children = $storage->timelineFor($requestId);
+
+        $this->assertCount(1, $children);
+        $this->assertSame('slow_query', $children->first()->type);
+        $this->assertSame($requestId, $children->first()->request_id);
+        $this->assertIsInt($children->first()->start_offset);
+    }
+
+    public function test_request_recorder_captures_correlated_timeline_end_to_end(): void
+    {
+        \Illuminate\Support\Facades\Route::middleware('web')->get('/demo-users', function () {
+            Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
+
+            return 'ok';
+        });
+
+        $this->get('/demo-users')->assertOk();
+
+        Monitor::flush();
+
+        $row = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'request')->first();
+
+        $this->assertNotNull($row);
+        $this->assertNotNull($row->request_id);
+
+        $payload = json_decode($row->payload, true);
+
+        $this->assertSame('GET', $payload['method']);
+        $this->assertSame('/demo-users', $payload['path']);
+        $this->assertArrayHasKey('peak_memory', $payload);
+        $this->assertArrayHasKey('request_headers', $payload);
+        $this->assertNotEmpty($payload['phases']);
+
+        $query = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'slow_query')->first();
+
+        $this->assertSame($row->request_id, $query->request_id);
+    }
+
+    public function test_request_detail_page_renders(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
+        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::flush();
+
+        $this->get('/monitor/requests/'.$monitor->requestId())
+            ->assertOk()
+            ->assertSee('/users')
+            ->assertSee('Timeline');
+    }
+
+    public function test_request_detail_page_returns_404_for_unknown_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/requests/does-not-exist')->assertNotFound();
     }
 }

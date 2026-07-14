@@ -324,8 +324,26 @@
             },
             useBrowser() {
                 const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                if (tz && this.options.some(o => o.value === tz)) {
-                    this.selected = tz;
+                if (!tz) {
+                    return;
+                }
+                // The browser may report a legacy CLDR alias (e.g. "Asia/Saigon")
+                // while our options use IANA canonical ids ("Asia/Ho_Chi_Minh").
+                // Intl normalises any id passed as timeZone to the same alias
+                // form, so compare options through that normalisation.
+                const canonical = (value) => {
+                    try {
+                        return Intl.DateTimeFormat('en', {
+                            timeZone: value
+                        }).resolvedOptions().timeZone;
+                    } catch (e) {
+                        return value;
+                    }
+                };
+                const match = this.options.find(o => o.value === tz) ||
+                    this.options.find(o => canonical(o.value) === tz);
+                if (match) {
+                    this.selected = match.value;
                 }
             },
         };

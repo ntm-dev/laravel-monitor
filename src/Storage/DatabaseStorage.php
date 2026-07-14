@@ -56,12 +56,37 @@ class DatabaseStorage implements Storage
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(function ($row) {
-                $row->payload = json_decode($row->payload ?? '[]', true) ?: [];
-                $row->created_at = CarbonImmutable::parse($row->created_at);
+            ->map(fn ($row) => $this->hydrate($row));
+    }
 
-                return $row;
-            });
+    public function findByRequestId(string $requestId): ?object
+    {
+        $row = $this->table()
+            ->where('type', 'request')
+            ->where('request_id', $requestId)
+            ->first();
+
+        return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    public function timelineFor(string $requestId): Collection
+    {
+        return $this->table()
+            ->where('request_id', $requestId)
+            ->where('type', '!=', 'request')
+            ->orderBy('start_offset')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($row) => $this->hydrate($row));
+    }
+
+    /** Decode the JSON payload and parse timestamps on a raw row. */
+    protected function hydrate(object $row): object
+    {
+        $row->payload = json_decode($row->payload ?? '[]', true) ?: [];
+        $row->created_at = CarbonImmutable::parse($row->created_at);
+
+        return $row;
     }
 
     public function aggregateByKey(

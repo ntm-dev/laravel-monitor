@@ -130,4 +130,17 @@ interface Storage
      * given key, or null when it has never been seen.
      */
     public function firstSeen(string $type, string $key): ?CarbonImmutable;
+
+    /**
+     * The root `request` entry recorded with the given correlation id, or
+     * null when unknown. Exposes the same fields as recent() rows plus
+     * request_id and start_offset.
+     */
+    public function findByRequestId(string $requestId): ?object;
+
+    /**
+     * Every non-request entry correlated to the given request, ordered by
+     * where it started on the timeline. Same row shape as findByRequestId().
+     */
+    public function timelineFor(string $requestId): Collection;
 }
