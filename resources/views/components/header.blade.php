@@ -2,11 +2,11 @@
      custom range picker, and the mobile tab strip. All data is prepared by
      Http\Controllers\DashboardController. --}}
 @props(['tab', 'tabs', 'groups', 'title', 'detail', 'key', 'range', 'period', 'periods', 'hasCustomRange', 'from', 'to', 'timezone', 'rangeMax'])
-<header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur">
+<header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
     <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
         @if ($detail !== null)
             <div class="min-w-0">
-                <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900">{{ $tabs[$tab]['label'] }}</a>
+                <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">{{ $tabs[$tab]['label'] }}</a>
                 @if ($detail->badge !== null || $detail->heading !== null)
                     <div class="mt-0.5 flex min-w-0 items-center gap-2.5">
                         @if ($detail->badge !== null)
@@ -22,16 +22,17 @@
             <h1 class="truncate text-2xl font-bold tracking-tight">{{ $title }}</h1>
         @endif
 
-        <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm">
+        @if ($tab !== 'settings')
+        <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
                 <a href="{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'period' => $value, 'key' => $key])) }}"
                    @class([
                        'flex h-full min-w-8 items-center justify-center rounded-md border px-2.5 font-mono text-xs',
                        'border-blue-500 bg-blue-600 text-white' => ! $hasCustomRange && $period === $value,
-                       'border-transparent text-neutral-500 hover:text-neutral-900' => $hasCustomRange || $period !== $value,
+                       'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $hasCustomRange || $period !== $value,
                    ])>{{ strtoupper($value) }}</a>
             @endforeach
-            <span class="mx-0.5 h-4 w-px bg-neutral-200"></span>
+            <span class="mx-0.5 h-4 w-px bg-neutral-200 dark:bg-neutral-700"></span>
             <div x-data="{
                     open: false,
                     mode: 'utc',
@@ -52,7 +53,7 @@
                         @class([
                             'flex h-full items-center gap-1 rounded-md border px-2',
                             'border-blue-500 bg-blue-600 text-white' => $hasCustomRange,
-                            'border-transparent text-neutral-400 hover:text-neutral-900' => ! $hasCustomRange,
+                            'border-transparent text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100' => ! $hasCustomRange,
                         ])>
                     @if ($hasCustomRange)
                         <span class="font-mono text-xs">{{ $from }} → {{ $to }}</span>
@@ -78,6 +79,7 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 
     {{-- Mobile navigation --}}
@@ -87,8 +89,8 @@
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                    @class([
                        'shrink-0 rounded-md border px-2.5 py-1.5',
-                       'border-neutral-200 bg-white text-neutral-900 shadow-sm' => $tab === $tabKey,
-                       'border-transparent text-neutral-500' => $tab !== $tabKey,
+                       'border-neutral-200 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
+                       'border-transparent text-neutral-500 dark:text-neutral-400' => $tab !== $tabKey,
                    ])>{{ $item['label'] }}</a>
             @endforeach
         @endforeach

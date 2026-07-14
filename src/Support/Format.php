@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Support;
 
 use DateTimeInterface;
+use Illuminate\Support\Carbon;
 
 class Format
 {
@@ -35,11 +36,11 @@ class Format
 
     public static function datetime(DateTimeInterface $date): string
     {
-        return $date->format(self::DATETIME);
+        return Carbon::instance($date)->setTimezone(Preferences::timezone())->format(self::DATETIME);
     }
 
     public static function timezone(): string
     {
-        return strtoupper(config('app.timezone', 'UTC'));
+        return strtoupper(Preferences::timezone());
     }
 }

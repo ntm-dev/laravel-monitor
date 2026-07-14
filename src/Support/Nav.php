@@ -17,21 +17,24 @@ class Nav
      */
     public static function tabs(): array
     {
+        $activity = __('monitor::messages.group.activity');
+        $monitoring = __('monitor::messages.group.monitoring');
+
         return [
-            'overview' => ['label' => 'Dashboard', 'group' => null, 'icon' => Icons::DASHBOARD, 'component' => null],
-            'issues' => ['label' => 'Issues', 'group' => null, 'icon' => Icons::ISSUES, 'component' => 'monitor.issues'],
-            'requests' => ['label' => 'Requests', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::REQUESTS, 'component' => 'monitor.requests'],
-            'jobs' => ['label' => 'Jobs', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::JOBS, 'component' => 'monitor.jobs'],
-            'schedule' => ['label' => 'Scheduled Tasks', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::SCHEDULE, 'component' => 'monitor.schedule'],
-            'exceptions' => ['label' => 'Exceptions', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::EXCEPTIONS, 'component' => 'monitor.exceptions'],
-            'queries' => ['label' => 'Queries', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::QUERIES, 'component' => 'monitor.slow-queries'],
-            'notifications' => ['label' => 'Notifications', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::NOTIFICATIONS, 'component' => 'monitor.notifications'],
-            'mail' => ['label' => 'Mail', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::MAIL, 'component' => 'monitor.mail'],
-            'cache' => ['label' => 'Cache', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::CACHE, 'component' => 'monitor.cache'],
-            'outgoing' => ['label' => 'Outgoing Requests', 'group' => self::GROUP_ACTIVITY, 'icon' => Icons::OUTGOING, 'component' => 'monitor.outgoing-requests'],
-            'users' => ['label' => 'Users', 'group' => self::GROUP_MONITORING, 'icon' => Icons::USERS, 'component' => 'monitor.users'],
-            'logs' => ['label' => 'Logs', 'group' => self::GROUP_MONITORING, 'icon' => Icons::LOGS, 'component' => 'monitor.logs'],
-            'settings' => ['label' => 'Settings', 'group' => 'footer', 'icon' => Icons::SETTINGS, 'component' => null],
+            'overview' => ['label' => __('monitor::messages.nav.overview'), 'group' => null, 'icon' => Icons::DASHBOARD, 'component' => null],
+            'issues' => ['label' => __('monitor::messages.nav.issues'), 'group' => null, 'icon' => Icons::ISSUES, 'component' => 'monitor.issues'],
+            'requests' => ['label' => __('monitor::messages.nav.requests'), 'group' => $activity, 'icon' => Icons::REQUESTS, 'component' => 'monitor.requests'],
+            'jobs' => ['label' => __('monitor::messages.nav.jobs'), 'group' => $activity, 'icon' => Icons::JOBS, 'component' => 'monitor.jobs'],
+            'schedule' => ['label' => __('monitor::messages.nav.schedule'), 'group' => $activity, 'icon' => Icons::SCHEDULE, 'component' => 'monitor.schedule'],
+            'exceptions' => ['label' => __('monitor::messages.nav.exceptions'), 'group' => $activity, 'icon' => Icons::EXCEPTIONS, 'component' => 'monitor.exceptions'],
+            'queries' => ['label' => __('monitor::messages.nav.queries'), 'group' => $activity, 'icon' => Icons::QUERIES, 'component' => 'monitor.slow-queries'],
+            'notifications' => ['label' => __('monitor::messages.nav.notifications'), 'group' => $activity, 'icon' => Icons::NOTIFICATIONS, 'component' => 'monitor.notifications'],
+            'mail' => ['label' => __('monitor::messages.nav.mail'), 'group' => $activity, 'icon' => Icons::MAIL, 'component' => 'monitor.mail'],
+            'cache' => ['label' => __('monitor::messages.nav.cache'), 'group' => $activity, 'icon' => Icons::CACHE, 'component' => 'monitor.cache'],
+            'outgoing' => ['label' => __('monitor::messages.nav.outgoing'), 'group' => $activity, 'icon' => Icons::OUTGOING, 'component' => 'monitor.outgoing-requests'],
+            'users' => ['label' => __('monitor::messages.nav.users'), 'group' => $monitoring, 'icon' => Icons::USERS, 'component' => 'monitor.users'],
+            'logs' => ['label' => __('monitor::messages.nav.logs'), 'group' => $monitoring, 'icon' => Icons::LOGS, 'component' => 'monitor.logs'],
+            'settings' => ['label' => __('monitor::messages.nav.settings'), 'group' => 'footer', 'icon' => Icons::SETTINGS, 'component' => null],
         ];
     }
 

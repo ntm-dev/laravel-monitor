@@ -6,7 +6,7 @@
         @if ($threshold !== null)
             <x-monitor::legend label="Threshold" dot="bg-teal-400" :value="$fmt($threshold)" :size="$size"/>
         @endif
-        <x-monitor::legend label="Avg" dot="bg-neutral-800" :value="$fmt($duration->avg)" :size="$size"/>
+        <x-monitor::legend label="Avg" dot="bg-neutral-800 dark:bg-neutral-400" :value="$fmt($duration->avg)" :size="$size"/>
         <x-monitor::legend label="P95" dot="bg-amber-500" :value="$fmt($duration->p95)" :size="$size"/>
     </x-monitor::metric>
     <div class="{{ $size === 'lg' ? 'mt-5' : 'mt-4' }}">

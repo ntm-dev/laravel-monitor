@@ -15,14 +15,14 @@
             @if ($exceptions > 0)
                 <x-monitor::card class="flex flex-col p-4">
                     <x-monitor::badge>Exceptions</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900">{{ number_format($exceptions) }} exceptions reported {{ $periodPhrase }}.</p>
-                    <p class="mt-1.5 text-sm text-neutral-500">Errors have impacted {{ $impactedUsers }} {{ $impactedUsers === 1 ? 'user' : 'users' }}.</p>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($exceptions) }} exceptions reported {{ $periodPhrase }}.</p>
+                    <p class="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">Errors have impacted {{ $impactedUsers }} {{ $impactedUsers === 1 ? 'user' : 'users' }}.</p>
                     <div class="mt-6 flex-1">
                         <x-monitor::bar-chart :since="$since" :until="$until" height="h-36"
                             :series="[['label' => 'Unhandled', 'dot' => 'bg-rose-500', 'data' => $exceptionBuckets]]"/>
                     </div>
-                    <div class="mt-3 flex items-center justify-center gap-4 font-mono text-[11px] text-neutral-500">
-                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-neutral-300"></span>0 Handled</span>
+                    <div class="mt-3 flex items-center justify-center gap-4 font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-neutral-300 dark:bg-neutral-600"></span>0 Handled</span>
                         <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-rose-500"></span>{{ number_format($exceptions) }} Unhandled</span>
                     </div>
                     <div class="mt-4 flex justify-end">
@@ -37,16 +37,16 @@
             @if ($slowRouteCount > 0)
                 <x-monitor::card class="flex flex-col p-4">
                     <x-monitor::badge>Routes</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900">{{ number_format($slowRouteCount) }} {{ $slowRouteCount === 1 ? 'route' : 'routes' }} exceeded thresholds {{ $periodPhrase }}.</p>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($slowRouteCount) }} {{ $slowRouteCount === 1 ? 'route' : 'routes' }} exceeded thresholds {{ $periodPhrase }}.</p>
                     <div class="mt-5 space-y-2">
                         @foreach ($slowRoutes as $route)
                             <a href="{{ route('monitor.dashboard', ['tab' => 'requests', 'key' => $route->key] + $range) }}"
-                               class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50/80 p-3 hover:border-neutral-300 hover:bg-white hover:shadow-sm">
+                               class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-800/50 p-3 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:shadow-sm">
                                 <span class="min-w-0">
-                                    <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>
-                                    <span class="block truncate font-mono text-xs text-neutral-700">{{ \Illuminate\Support\Str::after($route->key, ' ') }}</span>
+                                    <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>
+                                    <span class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \Illuminate\Support\Str::after($route->key, ' ') }}</span>
                                 </span>
-                                <span class="shrink-0 font-mono text-xs text-neutral-400">MAX <span class="text-amber-600">{{ $fmt($route->max_duration) }}</span></span>
+                                <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">MAX <span class="text-amber-600 dark:text-amber-400">{{ $fmt($route->max_duration) }}</span></span>
                             </a>
                         @endforeach
                     </div>

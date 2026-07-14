@@ -5,20 +5,20 @@
             <x-monitor::empty-state label="Scheduled tasks" message="No scheduled task runs" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card>
-                <div class="divide-y divide-neutral-100">
+                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
                     @foreach ($tasks as $task)
                         <div class="flex items-center gap-2.5 px-3.5 py-2.5 text-xs">
                             <span @class([
                                 'h-2 w-2 shrink-0 rounded-full',
                                 'bg-emerald-500' => $task->subtype === 'finished',
                                 'bg-rose-500' => $task->subtype === 'failed',
-                                'bg-neutral-300' => $task->subtype === 'skipped',
+                                'bg-neutral-300 dark:bg-neutral-600' => $task->subtype === 'skipped',
                             ])></span>
-                            <span class="truncate font-mono text-neutral-700" title="{{ $task->key }}">{{ $task->key }}</span>
+                            <span class="truncate font-mono text-neutral-700 dark:text-neutral-200" title="{{ $task->key }}">{{ $task->key }}</span>
                             @if ($task->duration !== null)
-                                <span class="shrink-0 font-mono text-neutral-400">{{ $fmt($task->duration) }}</span>
+                                <span class="shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ $fmt($task->duration) }}</span>
                             @endif
-                            <span class="ml-auto shrink-0 font-mono text-neutral-400">{{ $task->created_at->diffForHumans(short: true) }}</span>
+                            <span class="ml-auto shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ $task->created_at->diffForHumans(short: true) }}</span>
                         </div>
                     @endforeach
                 </div>

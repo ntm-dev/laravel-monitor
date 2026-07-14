@@ -17,16 +17,16 @@
 <div class="relative {{ $height }}">
     <div class="pointer-events-none absolute inset-0 flex flex-col justify-between">
         @for ($chartI = 0; $chartI < 5; $chartI++)
-            <div class="border-t border-neutral-100"></div>
+            <div class="border-t border-neutral-100 dark:border-neutral-800"></div>
         @endfor
     </div>
-    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300"
+    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300 dark:bg-neutral-600"
          x-show="hoverIndex !== null" x-cloak
          :style="'left: ' + (((hoverIndex ?? 0) + 0.5) / {{ $chartBuckets }} * 100) + '%'"></div>
     <div class="relative flex h-full items-end gap-px" @mouseleave="clearHoverIndex()">
         @for ($chartI = 0; $chartI < $chartBuckets; $chartI++)
             <div class="relative flex h-full flex-1 flex-col items-center justify-end"
-                 :class="{ 'bg-neutral-100/60': hoverIndex === {{ $chartI }} }"
+                 :class="{ 'bg-neutral-100/60 dark:bg-neutral-800/60': hoverIndex === {{ $chartI }} }"
                  @mouseenter="setHoverIndex({{ $chartI }})">
                 @foreach (array_reverse($series) as $chartSerie)
                     @php($chartValue = $chartSerie['data'][$chartI] ?? 0)
@@ -36,7 +36,7 @@
                     @endif
                 @endforeach
                 @if (($chartTotals[$chartI] ?? 0) === 0)
-                    <div class="h-[2px] {{ $barWidth }} bg-neutral-200/70"></div>
+                    <div class="h-[2px] {{ $barWidth }} bg-neutral-200/70 dark:bg-neutral-700/70"></div>
                 @endif
                 <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
                      x-show="hoverIndex === {{ $chartI }}" x-cloak>

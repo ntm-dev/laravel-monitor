@@ -11,18 +11,22 @@ use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Livewire\Card;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
-use LaravelMonitor\Support\SettingsPage;
+use LaravelMonitor\Support\Preferences;
+use LaravelMonitor\Support\Settings;
 
 /**
  * Renders the dashboard shell: resolves the active tab and time range, then
  * hands presentation-ready data to the (logic-free) Blade views. Per-tab
  * concerns live elsewhere: detail headings in Http\Headings, navigation in
- * Support\Nav, settings rows in Support\SettingsPage.
+ * Support\Nav, editable settings in Support\Settings.
  */
 class DashboardController
 {
     public function __invoke(Request $request): View
     {
+        // Apply the viewer's language before any label/heading is resolved.
+        app()->setLocale(Preferences::locale());
+
         $period = $request->query('period', Card::DEFAULT_PERIOD);
 
         if (! array_key_exists($period, Card::periods())) {
@@ -66,7 +70,11 @@ class DashboardController
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
             'timezone' => Format::timezone(),
             'rangeMax' => now()->format(Format::RANGE),
-            'settings' => $tab === 'settings' ? SettingsPage::rows() : null,
+            'system' => $tab === 'settings' ? Settings::current() : null,
+            'storageDrivers' => $tab === 'settings' ? Settings::storageDrivers() : null,
+            'prefs' => $tab === 'settings' ? Preferences::all() : null,
+            'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
+            'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,
         ]);
     }
 

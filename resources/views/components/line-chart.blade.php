@@ -4,13 +4,13 @@
 <div class="relative {{ $height }}" x-data="{ lineHoverY: {{ \Illuminate\Support\Js::from($hoverY) }} }">
     <div class="pointer-events-none absolute inset-0 flex flex-col justify-between">
         @for ($i = 0; $i < 5; $i++)
-            <div class="border-t border-neutral-100"></div>
+            <div class="border-t border-neutral-100 dark:border-neutral-800"></div>
         @endfor
     </div>
     <svg class="absolute inset-0 h-full w-full" viewBox="0 0 {{ $buckets }} 100" preserveAspectRatio="none">
         @if ($thresholdY !== null)
             <line x1="0" x2="{{ $buckets }}" y1="{{ $thresholdY }}" y2="{{ $thresholdY }}"
-                  stroke="#2dd4bf" stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>
+                  stroke="#2dd4bf" stroke-width="0.1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>
         @endif
         @foreach ($series as $serie)
             @foreach ($serie['lines'] as $points)
@@ -27,7 +27,7 @@
                  style="width: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; height: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; transform: translate(-50%, -50%); left: {{ $dot['x'] }}%; top: {{ $dot['y'] }}%; background: {{ $serie['color'] }}"></div>
         @endforeach
     @endforeach
-    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300"
+    <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300 dark:bg-neutral-600"
          x-show="hoverIndex !== null" x-cloak
          :style="{ left: (((hoverIndex ?? 0) + 0.5) / {{ $buckets }} * 100) + '%' }"></div>
     {{-- Hover markers reuse the polyline coordinates (lineHoverY); hidden when the hovered bucket has no data. --}}
@@ -42,7 +42,7 @@
     <div class="absolute inset-0 flex" @mouseleave="clearHoverIndex()">
         @foreach ($tooltips as $i => $tooltip)
             <div class="relative h-full flex-1"
-                 @if ($tooltip['hasData']) :class="{ 'bg-neutral-100/60': hoverIndex === {{ $i }} }" @endif
+                 @if ($tooltip['hasData']) :class="{ 'bg-neutral-100/60 dark:bg-neutral-800/60': hoverIndex === {{ $i }} }" @endif
                  @mouseenter="setHoverIndex({{ $i }})">
                 <div class="pointer-events-none absolute bottom-full {{ $tooltip['anchor'] }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
                      x-show="hoverIndex === {{ $i }}" x-cloak>
