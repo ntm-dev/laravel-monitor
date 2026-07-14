@@ -14,14 +14,15 @@
 
             <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
                 <x-monitor::requests.summary :root="$root" :user-name="$userName" :timezone="$timezone"/>
+                <x-monitor::requests.headers-section
+                    :request-headers="$root->payload['request_headers'] ?? []"
+                    :response-headers="$root->payload['response_headers'] ?? []"
+                />
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
                 <x-monitor::requests.timeline :entries="$timeline" :total-duration="$totalDuration"/>
 
-                <x-monitor::requests.headers-section
-                    :request-headers="$root->payload['request_headers'] ?? []"
-                    :response-headers="$root->payload['response_headers'] ?? []"/>
             </main>
         </div>
     </div>

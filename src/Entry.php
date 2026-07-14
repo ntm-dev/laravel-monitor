@@ -15,6 +15,8 @@ class Entry
         public ?int $duration = null,
         public ?string $subtype = null,
         public int|string|null $userId = null,
+        public ?string $requestId = null,
+        public ?int $startOffset = null,
         ?CarbonImmutable $timestamp = null,
     ) {
         $this->timestamp = $timestamp ?? CarbonImmutable::now();
@@ -29,6 +31,8 @@ class Entry
             'payload' => $this->payload,
             'duration' => $this->duration,
             'user_id' => $this->userId,
+            'request_id' => $this->requestId,
+            'start_offset' => $this->startOffset,
             'created_at' => $this->timestamp,
         ];
     }

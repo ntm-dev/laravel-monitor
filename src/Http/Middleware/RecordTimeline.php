@@ -48,7 +48,7 @@ class RecordTimeline
             return;
         }
 
-        $composing = $this->monitor->lastComposingOffset();
+        $composing = $this->monitor->firstComposingOffset();
         $renderStart = $composing !== null && $composing > $controllerStart && $composing < $now
             ? $composing
             : null;

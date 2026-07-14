@@ -28,6 +28,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerPublishing();
         $this->registerResources();
         $this->registerRecorders();
+        $this->registerRequestTimeline();
         $this->registerLivewireComponents();
         $this->registerAuthorization();
         $this->registerCommands();
@@ -83,6 +84,41 @@ class MonitorServiceProvider extends ServiceProvider
             }
 
             (new $recorder($monitor, $config))->register($events);
+        }
+    }
+
+    /**
+     * Hook the request-lifecycle markers used by the Request Detail timeline,
+     * following Nightwatch's approach: a global middleware brackets the whole
+     * request, a route-group middleware marks the controller boundary, and
+     * framework events refine the render/terminating phases — all without
+     * requiring the host app to edit its HTTP kernel.
+     */
+    protected function registerRequestTimeline(): void
+    {
+        if (! $this->app['config']->get('monitor.enabled', true)) {
+            return;
+        }
+
+        $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
+
+        if ($kernel instanceof \Illuminate\Foundation\Http\Kernel) {
+            $kernel->pushMiddleware(Http\Middleware\RecordTimeline::class);
+        }
+
+        $router = $this->app['router'];
+
+        foreach (['web', 'api'] as $group) {
+            $router->pushMiddlewareToGroup($group, Http\Middleware\MarkControllerStart::class);
+        }
+
+        $monitor = $this->app->make(Monitor::class);
+        $events = $this->app->make(Dispatcher::class);
+
+        $events->listen('composing:*', fn () => $monitor->markComposing());
+
+        if (class_exists(\Illuminate\Foundation\Events\Terminating::class)) {
+            $events->listen(\Illuminate\Foundation\Events\Terminating::class, fn () => $monitor->markTerminating());
         }
     }
 

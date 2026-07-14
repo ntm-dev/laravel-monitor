@@ -39,8 +39,16 @@
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
                             @php($status = (int) ($entry->payload['status'] ?? 0))
-                            <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                            @php($detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.show', $entry->request_id) : null)
+                            <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
+                                <td class="py-2 pr-3 font-mono text-xs">
+                                    @if ($detailUrl)
+                                        <a href="{{ $detailUrl }}" class="text-blue-600 hover:underline dark:text-blue-400" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</a>
+                                    @else
+                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</span>
+                                    @endif
+                                    <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span>
+                                </td>
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['method'] ?? '—' }}</td>
                                 <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['path'] ?? '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
