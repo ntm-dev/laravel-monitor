@@ -70,6 +70,11 @@ class Timeline extends Component
             'start' => $entry->start,
             'duration' => $entry->duration,
             'metadata' => $entry->metadata,
+            // Only queries have their own detail page; the SQL is that page's
+            // lookup key (see Recorders\Queries::record() and Livewire\Queries).
+            'queryUrl' => $entry->type === 'query'
+                ? route('monitor.dashboard', ['tab' => 'queries', 'key' => $entry->metadata['sql'] ?? $entry->label])
+                : null,
         ]])->all())->toHtml();
     }
 
