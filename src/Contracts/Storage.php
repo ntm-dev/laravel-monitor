@@ -143,4 +143,11 @@ interface Storage
      * where it started on the timeline. Same row shape as findByRequestId().
      */
     public function timelineFor(string $requestId): Collection;
+
+    /**
+     * Per-key cache breakdown, unsorted: one row per key exposing key,
+     * hit_ratio, hits, misses, writes, deletes, failures, total. Callers
+     * sort/paginate themselves, same convention as routeStats().
+     */
+    public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 }

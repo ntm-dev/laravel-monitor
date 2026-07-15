@@ -35,7 +35,7 @@ class Timeline
      */
     public static function build(object $root, Collection $children): array
     {
-        $duration = (int) ($root->duration ?? 0);
+        $duration = (float) ($root->duration ?? 0);
 
         $requestEntry = new TimelineEntry(id: 'request', type: 'request', label: $root->key ?? 'Request', start: 0, duration: $duration);
 
@@ -86,7 +86,7 @@ class Timeline
         $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 
         $start = max(0, (int) ($row->start_offset ?? 0));
-        $duration = max(0, (int) ($row->duration ?? 0));
+        $duration = max(0.0, (float) ($row->duration ?? 0));
 
         return new TimelineEntry(
             id: (string) $row->id,

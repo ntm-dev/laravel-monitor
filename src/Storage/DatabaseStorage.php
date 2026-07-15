@@ -80,6 +80,38 @@ class DatabaseStorage implements Storage
             ->map(fn ($row) => $this->hydrate($row));
     }
 
+    public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
+    {
+        return $this->table()
+            ->where('type', 'cache')
+            ->where('created_at', '>=', $since)
+            ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->select('key')
+            ->selectRaw("sum(case when subtype = 'hit' then 1 else 0 end) as hits")
+            ->selectRaw("sum(case when subtype = 'miss' then 1 else 0 end) as misses")
+            ->selectRaw("sum(case when subtype = 'write' then 1 else 0 end) as writes")
+            ->selectRaw("sum(case when subtype = 'forget' then 1 else 0 end) as deletes")
+            ->selectRaw("sum(case when subtype in ('write_failed', 'forget_failed') then 1 else 0 end) as failures")
+            ->selectRaw('count(*) as aggregate_count')
+            ->groupBy('key')
+            ->get()
+            ->map(function ($row) {
+                $hits = (int) $row->hits;
+                $misses = (int) $row->misses;
+
+                return (object) [
+                    'key' => $row->key,
+                    'hit_ratio' => ($hits + $misses) > 0 ? round($hits / ($hits + $misses) * 100) : null,
+                    'hits' => $hits,
+                    'misses' => $misses,
+                    'writes' => (int) $row->writes,
+                    'deletes' => (int) $row->deletes,
+                    'failures' => (int) $row->failures,
+                    'total' => (int) $row->aggregate_count,
+                ];
+            });
+    }
+
     /** Decode the JSON payload and parse timestamps on a raw row. */
     protected function hydrate(object $row): object
     {
@@ -113,8 +145,8 @@ class DatabaseStorage implements Storage
             ->map(function ($row) {
                 $row->count = (int) $row->aggregate_count;
                 unset($row->aggregate_count);
-                $row->avg_duration = $row->avg_duration !== null ? (float) $row->avg_duration : null;
-                $row->max_duration = $row->max_duration !== null ? (int) $row->max_duration : null;
+                $row->avg_duration = $row->avg_duration !== null ? round((float) $row->avg_duration, 2) : null;
+                $row->max_duration = $row->max_duration !== null ? (float) $row->max_duration : null;
                 $row->last_seen = $row->last_seen !== null ? CarbonImmutable::parse($row->last_seen) : null;
 
                 return $row;
@@ -135,9 +167,9 @@ class DatabaseStorage implements Storage
 
         return (object) [
             'count' => (int) ($row->aggregate_count ?? 0),
-            'avg_duration' => isset($row->avg_duration) ? (float) $row->avg_duration : null,
-            'max_duration' => isset($row->max_duration) ? (int) $row->max_duration : null,
-            'min_duration' => isset($row->min_duration) ? (int) $row->min_duration : null,
+            'avg_duration' => isset($row->avg_duration) ? round((float) $row->avg_duration, 2) : null,
+            'max_duration' => isset($row->max_duration) ? (float) $row->max_duration : null,
+            'min_duration' => isset($row->min_duration) ? (float) $row->min_duration : null,
         ];
     }
 
@@ -181,7 +213,7 @@ class DatabaseStorage implements Storage
             ->whereNotNull('duration')
             ->get(['created_at', 'duration'])
             ->each(function ($row) use (&$perBucket, &$all, $start, $bucketSize, $buckets) {
-                $duration = (int) $row->duration;
+                $duration = (float) $row->duration;
                 $all[] = $duration;
                 $perBucket[$this->bucketIndex($row->created_at, $start, $bucketSize, $buckets)][] = $duration;
             });
@@ -189,10 +221,10 @@ class DatabaseStorage implements Storage
         return (object) [
             'min' => $all === [] ? null : min($all),
             'max' => $all === [] ? null : max($all),
-            'avg' => $all === [] ? null : array_sum($all) / count($all),
+            'avg' => $all === [] ? null : round(array_sum($all) / count($all), 2),
             'p95' => $this->percentile($all, 0.95),
             'avg_per_bucket' => array_map(
-                fn (array $values) => $values === [] ? null : array_sum($values) / count($values),
+                fn (array $values) => $values === [] ? null : round(array_sum($values) / count($values), 2),
                 $perBucket,
             ),
             'p95_per_bucket' => array_map(
@@ -234,7 +266,7 @@ class DatabaseStorage implements Storage
             ->get(['key', 'subtype', 'duration'])
             ->groupBy('key')
             ->map(function (Collection $rows, string $key) {
-                $durations = $rows->pluck('duration')->filter(fn ($duration) => $duration !== null)->map(fn ($duration) => (int) $duration)->values()->all();
+                $durations = $rows->pluck('duration')->filter(fn ($duration) => $duration !== null)->map(fn ($duration) => (float) $duration)->values()->all();
 
                 return (object) [
                     'key' => $key,
@@ -242,7 +274,7 @@ class DatabaseStorage implements Storage
                     'success' => $rows->whereIn('subtype', ['1xx', '2xx', '3xx'])->count(),
                     'client_errors' => $rows->where('subtype', '4xx')->count(),
                     'server_errors' => $rows->where('subtype', '5xx')->count(),
-                    'avg_duration' => $durations === [] ? null : array_sum($durations) / count($durations),
+                    'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                     'p95_duration' => $this->percentile($durations, 0.95),
                 ];
             })
@@ -316,7 +348,7 @@ class DatabaseStorage implements Storage
     }
 
     /**
-     * @param  int[]  $values
+     * @param  float[]  $values
      */
     protected function percentile(array $values, float $percentile): ?float
     {
@@ -328,7 +360,7 @@ class DatabaseStorage implements Storage
 
         $index = (int) ceil($percentile * count($values)) - 1;
 
-        return (float) $values[max(0, min($index, count($values) - 1))];
+        return round((float) $values[max(0, min($index, count($values) - 1))], 2);
     }
 
     protected function query(

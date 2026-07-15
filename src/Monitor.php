@@ -29,6 +29,7 @@ class Monitor
      *     composing: ?int,
      *     response_ready: ?int,
      *     terminating: ?int,
+     *     queries: int,
      * }|null
      */
     protected ?array $request = null;
@@ -48,7 +49,7 @@ class Monitor
         string $type,
         ?string $key = null,
         array $payload = [],
-        ?int $duration = null,
+        ?float $duration = null,
         ?string $subtype = null,
         int|string|null $userId = null,
     ): void {
@@ -83,7 +84,7 @@ class Monitor
      * start is "now minus how long it took". The root request itself starts
      * at zero.
      */
-    protected function startOffsetFor(string $type, ?int $duration): ?int
+    protected function startOffsetFor(string $type, ?float $duration): ?int
     {
         if ($this->request === null) {
             return null;
@@ -93,7 +94,7 @@ class Monitor
             return 0;
         }
 
-        return max(0, $this->elapsedMs() - ($duration ?? 0));
+        return max(0, (int) round($this->elapsedMs() - ($duration ?? 0)));
     }
 
     public function enabled(): bool
@@ -120,6 +121,7 @@ class Monitor
             'composing' => null,
             'response_ready' => null,
             'terminating' => null,
+            'queries' => 0,
         ];
 
         $elapsed = $this->elapsedMs();
@@ -133,6 +135,24 @@ class Monitor
         return $this->request['id'] ?? null;
     }
 
+    /**
+     * Count every query executed during the request, not just the slow ones
+     * SlowQueries persists a full row for — mirrors Nightwatch's `queries`
+     * counter, which tracks total query count independently of any
+     * slow-query threshold.
+     */
+    public function incrementQueryCount(): void
+    {
+        if ($this->request !== null && $this->enabled()) {
+            $this->request['queries']++;
+        }
+    }
+
+    public function queryCount(): int
+    {
+        return $this->request['queries'] ?? 0;
+    }
+
     /** Milliseconds elapsed since the request started, or null outside one. */
     public function elapsedMs(): ?int
     {
@@ -141,6 +161,21 @@ class Monitor
         }
 
         return max(0, (int) round((microtime(true) - $this->request['start']) * 1000));
+    }
+
+    /**
+     * Milliseconds elapsed since the request started, to 2 decimal places.
+     * Used wherever a recorded `duration` is derived from wall-clock time —
+     * phase boundaries/offsets stay whole milliseconds, they're only used
+     * for ordering and layout.
+     */
+    public function elapsedMsPrecise(): ?float
+    {
+        if ($this->request === null) {
+            return null;
+        }
+
+        return max(0.0, round((microtime(true) - $this->request['start']) * 1000, 2));
     }
 
     /**
@@ -244,7 +279,8 @@ class Monitor
         }
 
         $entry->payload['phases'] = $this->request['phases'];
-        $entry->duration = max($entry->duration ?? 0, $elapsed);
+        $entry->payload['query_count'] = $this->request['queries'];
+        $entry->duration = max($entry->duration ?? 0.0, $this->elapsedMsPrecise() ?? 0.0);
     }
 
     /**
@@ -267,10 +303,29 @@ class Monitor
 
         try {
             $this->storage()->store($entries);
-        } catch (Throwable) {
-            // Monitoring must never take the application down.
+        } catch (Throwable $e) {
+            // Monitoring must never take the application down, but a storage
+            // failure (e.g. schema drift after an update whose migration
+            // wasn't run) should still be diagnosable instead of silently
+            // dropping every entry — mirrors Nightwatch reporting its own
+            // internal exceptions rather than swallowing them outright.
+            $this->reportStorageFailure($e);
         } finally {
             $this->recording = true;
+        }
+    }
+
+    /**
+     * Report a storage failure through the app's exception handler.
+     * Recording is already paused by flush(), so this cannot recurse into
+     * the Exceptions recorder.
+     */
+    protected function reportStorageFailure(Throwable $e): void
+    {
+        try {
+            $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)->report($e);
+        } catch (Throwable) {
+            // The exception handler itself is unavailable; nothing more we can do.
         }
     }
 

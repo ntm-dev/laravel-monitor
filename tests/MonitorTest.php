@@ -45,7 +45,7 @@ class MonitorTest extends TestCase
         $this->assertSame('GET /users', $groups->first()->key);
         $this->assertSame(2, $groups->first()->count);
         $this->assertSame(200.0, $groups->first()->avg_duration);
-        $this->assertSame(300, $groups->first()->max_duration);
+        $this->assertSame(300.0, $groups->first()->max_duration);
     }
 
     public function test_stats_and_recent_and_purge(): void

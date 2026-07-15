@@ -46,7 +46,7 @@ class Requests extends Recorder
         $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : '/'.ltrim($path, '/');
 
         $startTime = $request->server('REQUEST_TIME_FLOAT') ?: (defined('LARAVEL_START') ? LARAVEL_START : null);
-        $duration = $startTime ? (int) round((microtime(true) - $startTime) * 1000) : null;
+        $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 2) : null;
 
         try {
             $userId = $request->user()?->getAuthIdentifier();

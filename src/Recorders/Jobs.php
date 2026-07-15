@@ -77,11 +77,11 @@ class Jobs extends Recorder
         $this->monitor->flush();
     }
 
-    protected function duration(string $id): ?int
+    protected function duration(string $id): ?float
     {
         $startedAt = $this->startedAt[$id] ?? null;
         unset($this->startedAt[$id]);
 
-        return $startedAt !== null ? (int) round((microtime(true) - $startedAt) * 1000) : null;
+        return $startedAt !== null ? round((microtime(true) - $startedAt) * 1000, 2) : null;
     }
 }

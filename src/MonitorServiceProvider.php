@@ -3,6 +3,8 @@
 namespace LaravelMonitor;
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Routing\Events\RouteMatched;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -19,29 +21,27 @@ class MonitorServiceProvider extends ServiceProvider
         $this->app->singleton(Monitor::class);
         $this->app->singleton(StorageManager::class);
         $this->app->bind(Storage::class, fn ($app) => $app[StorageManager::class]->driver());
+        $this->registerResources();
+        $this->registerRecorders();
+        $this->registerRequestTimeline();
+        $this->registerLivewireComponents();
+        $this->registerAuthorization();
+
+        $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
     }
 
     public function boot(): void
     {
         Support\Settings::apply();
 
-        $this->registerPublishing();
-        $this->registerResources();
-        $this->registerRecorders();
-        $this->registerRequestTimeline();
-        $this->registerLivewireComponents();
-        $this->registerAuthorization();
-        $this->registerCommands();
-
-        $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
+        if ($this->app->runningInConsole()) {
+            $this->registerPublications();
+            $this->registerCommands();
+        }
     }
 
-    protected function registerPublishing(): void
+    protected function registerPublications(): void
     {
-        if (! $this->app->runningInConsole()) {
-            return;
-        }
-
         $this->publishes([
             __DIR__.'/../config/monitor.php' => config_path('monitor.php'),
         ], 'monitor-config');
@@ -90,9 +90,11 @@ class MonitorServiceProvider extends ServiceProvider
     /**
      * Hook the request-lifecycle markers used by the Request Detail timeline,
      * following Nightwatch's approach: a global middleware brackets the whole
-     * request, a route-group middleware marks the controller boundary, and
-     * framework events refine the render/terminating phases — all without
-     * requiring the host app to edit its HTTP kernel.
+     * request, and the controller boundary is marked by attaching a marker
+     * middleware directly onto the matched route (not by pushing into a
+     * middleware *group* array) — framework events refine the
+     * render/terminating phases. All without requiring the host app to edit
+     * its HTTP kernel.
      */
     protected function registerRequestTimeline(): void
     {
@@ -106,20 +108,39 @@ class MonitorServiceProvider extends ServiceProvider
             $kernel->pushMiddleware(Http\Middleware\RecordTimeline::class);
         }
 
-        $router = $this->app['router'];
-
-        foreach (['web', 'api'] as $group) {
-            $router->pushMiddlewareToGroup($group, Http\Middleware\MarkControllerStart::class);
-        }
-
         $monitor = $this->app->make(Monitor::class);
         $events = $this->app->make(Dispatcher::class);
+
+        $events->listen(RouteMatched::class, fn (RouteMatched $event) => $this->attachControllerStartMarker($event->route));
 
         $events->listen('composing:*', fn () => $monitor->markComposing());
 
         if (class_exists(\Illuminate\Foundation\Events\Terminating::class)) {
             $events->listen(\Illuminate\Foundation\Events\Terminating::class, fn () => $monitor->markTerminating());
         }
+    }
+
+    /**
+     * Attach the controller-boundary marker directly onto the matched route.
+     *
+     * Pushing onto a middleware *group* array (e.g. Router::pushMiddlewareToGroup)
+     * doesn't stick: Illuminate\Foundation\Http\Kernel::syncMiddlewareToRouter()
+     * overwrites the router's group arrays wholesale whenever any other
+     * package calls e.g. $kernel->appendMiddlewareToGroup() afterwards
+     * (commonly from another provider's boot(), which runs after this one's
+     * register()), silently dropping our addition. Mutating the resolved
+     * Route's own middleware list at RouteMatched time is immune to that.
+     */
+    protected function attachControllerStartMarker(Route $route): void
+    {
+        $middleware = (array) ($route->action['middleware'] ?? []);
+
+        if (in_array(Http\Middleware\MarkControllerStart::class, $middleware, true)) {
+            return;
+        }
+
+        $middleware[] = Http\Middleware\MarkControllerStart::class;
+        $route->action['middleware'] = $middleware;
     }
 
     protected function registerLivewireComponents(): void

@@ -31,7 +31,7 @@ class Format
             return rtrim(rtrim(number_format($milliseconds / 1000, 2), '0'), '.').'s';
         }
 
-        return round($milliseconds).'ms';
+        return rtrim(rtrim(number_format($milliseconds, 2), '0'), '.').'ms';
     }
 
     public static function datetime(DateTimeInterface $date): string

@@ -14,9 +14,23 @@ class SlowQueries extends Recorder
 
     public function record(QueryExecuted $event): void
     {
-        $threshold = (float) ($this->config['threshold'] ?? 100);
+        // Count every query for the request's total, regardless of the
+        // slow-query threshold below — otherwise a request whose queries
+        // all ran under threshold looks like it made zero queries at all.
+        $this->monitor->incrementQueryCount();
 
-        if ($event->time < $threshold) {
+        $threshold = (float) ($this->config['threshold'] ?? 100);
+        $isSlow = $event->time >= $threshold;
+
+        // Outside a request (console command, queue worker), only persist
+        // queries over the threshold — a long-running worker can run far
+        // more queries than a request ever will, and nothing outside a
+        // request needs a full per-query timeline. Inside a request,
+        // persist every query so it shows up on that request's timeline
+        // (mirrors Nightwatch, which records every query), tagging it
+        // slow/fast so the dedicated Slow Queries digest can still filter
+        // down to just the slow ones.
+        if (! $isSlow && $this->monitor->requestId() === null) {
             return;
         }
 
@@ -28,7 +42,8 @@ class SlowQueries extends Recorder
                 'connection' => $event->connectionName,
                 'location' => $this->location(),
             ],
-            duration: (int) round($event->time),
+            duration: round($event->time, 2),
+            subtype: $isSlow ? 'slow' : 'fast',
         );
     }
 

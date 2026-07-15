@@ -52,13 +52,13 @@ class OutgoingRequests extends Recorder
         return $method.' '.Str::before($url, '?');
     }
 
-    protected function duration(ResponseReceived $event): ?int
+    protected function duration(ResponseReceived $event): ?float
     {
         try {
             $stats = $event->response->transferStats;
 
             return $stats?->getTransferTime() !== null
-                ? (int) round($stats->getTransferTime() * 1000)
+                ? round($stats->getTransferTime() * 1000, 2)
                 : null;
         } catch (Throwable) {
             return null;

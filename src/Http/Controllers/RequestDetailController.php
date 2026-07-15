@@ -56,7 +56,7 @@ class RequestDetailController
             'root' => $root,
             'timeline' => Timeline::build($root, $children),
             'totalDuration' => max(1, (int) ($root->duration ?? 0)),
-            'summary' => $this->eventsSummary($children),
+            'summary' => $this->eventsSummary($root, $children),
             'userName' => $userName,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
@@ -70,9 +70,9 @@ class RequestDetailController
     }
 
     /**
-     * @return array<string, array{count: int, duration: int}>
+     * @return array<string, array{count: int, duration: float}>
      */
-    protected function eventsSummary(Collection $children): array
+    protected function eventsSummary(object $root, Collection $children): array
     {
         $summary = collect(self::SUMMARY_TYPES)
             ->flip()
@@ -87,7 +87,17 @@ class RequestDetailController
             }
 
             $summary[$key]['count']++;
-            $summary[$key]['duration'] += (int) ($row->duration ?? 0);
+            $summary[$key]['duration'] += (float) ($row->duration ?? 0);
+        }
+
+        // `slow_query` rows only exist for queries at/above the configured
+        // threshold, so counting them undercounts (or, as often happens,
+        // shows zero for a request that ran several fast queries). The
+        // request payload carries a true total incremented on every query —
+        // fall back to the slow-query count for older rows recorded before
+        // that counter existed.
+        if (isset($root->payload['query_count'])) {
+            $summary['queries']['count'] = (int) $root->payload['query_count'];
         }
 
         return $summary;
