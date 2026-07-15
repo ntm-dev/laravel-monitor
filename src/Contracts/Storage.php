@@ -150,4 +150,21 @@ interface Storage
      * sort/paginate themselves, same convention as routeStats().
      */
     public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
+
+    /**
+     * Per (query, connection) breakdown, unsorted: one row per pair exposing
+     * key (the SQL), connection, calls, total, avg, p95. Callers sort/
+     * paginate themselves, same convention as routeStats().
+     */
+    public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
+
+    /**
+     * "METHOD /path" label for each of the given request ids, keyed by
+     * request_id, in a single query — batches what would otherwise be one
+     * findByRequestId() call per row (e.g. a Query Detail page's calls table).
+     *
+     * @param  string[]  $requestIds
+     * @return Collection<string, string>
+     */
+    public function requestLabels(array $requestIds): Collection;
 }

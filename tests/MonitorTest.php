@@ -63,21 +63,37 @@ class MonitorTest extends TestCase
         $this->assertDatabaseCount('monitor_entries', 0);
     }
 
-    public function test_slow_query_recorder_captures_queries_over_threshold(): void
+    public function test_slow_query_recorder_captures_every_query_and_tags_slow_ones(): void
     {
-        config(['monitor.recorders.'.\LaravelMonitor\Recorders\SlowQueries::class.'.threshold' => 100]);
+        config(['monitor.recorders.'.\LaravelMonitor\Recorders\Queries::class.'.threshold' => 100]);
 
         event(new QueryExecuted('select * from users', [], 250.0, DB::connection()));
         event(new QueryExecuted('select * from posts', [], 5.0, DB::connection()));
 
         Monitor::flush();
 
-        $this->assertDatabaseCount('monitor_entries', 1);
+        $this->assertDatabaseCount('monitor_entries', 2);
         $this->assertDatabaseHas('monitor_entries', [
             'type' => 'slow_query',
             'key' => 'select * from users',
             'duration' => 250,
+            'subtype' => 'slow',
         ]);
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'slow_query',
+            'key' => 'select * from posts',
+            'duration' => 5,
+            'subtype' => 'fast',
+        ]);
+    }
+
+    public function test_slow_query_recorder_ignores_its_own_storage_table(): void
+    {
+        event(new QueryExecuted('select * from monitor_entries', [], 1.0, DB::connection()));
+
+        Monitor::flush();
+
+        $this->assertDatabaseCount('monitor_entries', 0);
     }
 
     public function test_recording_can_be_disabled(): void

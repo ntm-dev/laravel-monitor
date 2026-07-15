@@ -134,9 +134,14 @@ return [
             ],
         ],
 
-        Recorders\SlowQueries::class => [
+        // Env var names keep their historical "slow query" wording even
+        // though this recorder now captures every query — renaming them
+        // would silently drop any existing .env override.
+        Recorders\Queries::class => [
             'enabled' => env('MONITOR_SLOW_QUERIES_ENABLED', true),
-            // Milliseconds. Queries at or above this threshold are recorded.
+            // Milliseconds. Queries at or above this threshold are tagged
+            // `slow` (surfaced in the dedicated Slow Queries digest) rather
+            // than `fast` — every query is recorded either way.
             'threshold' => env('MONITOR_SLOW_QUERY_THRESHOLD', 100),
         ],
 

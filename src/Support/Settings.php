@@ -62,6 +62,8 @@ class Settings
             $classes = static::recorderClasses();
 
             foreach ($stored['recorders'] as $name => $enabled) {
+                $name = self::LEGACY_RECORDER_ALIASES[$name] ?? $name;
+
                 if (isset($classes[$name])) {
                     config(['monitor.recorders.'.$classes[$name].'.enabled' => (bool) $enabled]);
                 }
@@ -92,10 +94,18 @@ class Settings
         ];
     }
 
+    /**
+     * Old recorder basename => current one, so a settings file saved before
+     * a class rename still resolves instead of silently losing the toggle.
+     */
+    protected const LEGACY_RECORDER_ALIASES = [
+        'SlowQueries' => 'Queries',
+    ];
+
     /** Recorder basename => sidebar icon shown next to its toggle. */
     protected const RECORDER_ICONS = [
         'Requests' => Icons::REQUESTS,
-        'SlowQueries' => Icons::QUERIES,
+        'Queries' => Icons::QUERIES,
         'Exceptions' => Icons::EXCEPTIONS,
         'Logs' => Icons::LOGS,
         'Jobs' => Icons::JOBS,

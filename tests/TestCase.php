@@ -2,6 +2,8 @@
 
 namespace LaravelMonitor\Tests;
 
+use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Monitor;
 use LaravelMonitor\MonitorServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -13,6 +15,21 @@ abstract class TestCase extends Orchestra
      * so the environment comes solely from defineEnvironment().
      */
     protected $loadEnvironmentVariables = false;
+
+    /**
+     * The Queries recorder records every query regardless of duration or
+     * context, so RefreshDatabase's own migration queries (run during
+     * setUp, before the test body) get buffered too. Flush and purge them
+     * here so each test starts from a clean monitor_entries table instead
+     * of asserting against leftover framework-bootstrap noise.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->make(Monitor::class)->flush();
+        $this->app->make(Storage::class)->purge();
+    }
 
     protected function getPackageProviders($app): array
     {

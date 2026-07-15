@@ -112,6 +112,53 @@ class DatabaseStorage implements Storage
             });
     }
 
+    public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
+    {
+        return $this->table()
+            ->where('type', 'slow_query')
+            ->where('created_at', '>=', $since)
+            ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->get(['key', 'duration', 'payload'])
+            ->map(function ($row) {
+                $payload = json_decode($row->payload ?? '[]', true) ?: [];
+
+                return (object) [
+                    'key' => (string) $row->key,
+                    'connection' => $payload['connection'] ?? 'default',
+                    'duration' => $row->duration !== null ? (float) $row->duration : null,
+                ];
+            })
+            ->groupBy(fn ($row) => $row->key.'@@'.$row->connection)
+            ->map(function (Collection $rows) {
+                $durations = $rows->pluck('duration')->filter(fn ($d) => $d !== null)->values()->all();
+                $first = $rows->first();
+
+                return (object) [
+                    'key' => $first->key,
+                    'connection' => $first->connection,
+                    'calls' => $rows->count(),
+                    'total' => round(array_sum($durations), 2),
+                    'avg' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
+                    'p95' => $this->percentile($durations, 0.95),
+                ];
+            })
+            ->values();
+    }
+
+    public function requestLabels(array $requestIds): Collection
+    {
+        if ($requestIds === []) {
+            return collect();
+        }
+
+        // The `request` entry's key is already stored as "METHOD /path"
+        // (see Recorders\Requests) — no need to decode payload for this.
+        return $this->table()
+            ->where('type', 'request')
+            ->whereIn('request_id', $requestIds)
+            ->pluck('key', 'request_id');
+    }
+
     /** Decode the JSON payload and parse timestamps on a raw row. */
     protected function hydrate(object $row): object
     {

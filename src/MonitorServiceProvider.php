@@ -24,6 +24,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerResources();
         $this->registerRecorders();
         $this->registerRequestTimeline();
+        $this->registerCommandTracking();
         $this->registerLivewireComponents();
         $this->registerAuthorization();
 
@@ -143,6 +144,27 @@ class MonitorServiceProvider extends ServiceProvider
         $route->action['middleware'] = $middleware;
     }
 
+    /**
+     * Label queries recorded outside a request (no request_id) with the
+     * artisan command that triggered them, e.g. "beauty:test" or "tinker" —
+     * mirrors requestId() giving the Queries page a real source instead of
+     * a generic "console" label.
+     */
+    protected function registerCommandTracking(): void
+    {
+        if (! $this->app['config']->get('monitor.enabled', true)) {
+            return;
+        }
+
+        $monitor = $this->app->make(Monitor::class);
+        $events = $this->app->make(Dispatcher::class);
+
+        $events->listen(
+            \Illuminate\Console\Events\CommandStarting::class,
+            fn (\Illuminate\Console\Events\CommandStarting $event) => $monitor->setCommand($event->command),
+        );
+    }
+
     protected function registerLivewireComponents(): void
     {
         if (! class_exists(Livewire::class)) {
@@ -151,7 +173,7 @@ class MonitorServiceProvider extends ServiceProvider
 
         Livewire::component('monitor.overview', Cards\Overview::class);
         Livewire::component('monitor.requests', Cards\Requests::class);
-        Livewire::component('monitor.slow-queries', Cards\SlowQueries::class);
+        Livewire::component('monitor.queries', Cards\Queries::class);
         Livewire::component('monitor.exceptions', Cards\Exceptions::class);
         Livewire::component('monitor.jobs', Cards\Jobs::class);
         Livewire::component('monitor.schedule', Cards\Schedule::class);
@@ -166,6 +188,7 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.request-detail', Cards\RequestDetail::class);
         Livewire::component('monitor.job-detail', Cards\JobDetail::class);
         Livewire::component('monitor.exception-detail', Cards\ExceptionDetail::class);
+        Livewire::component('monitor.query-detail', Cards\QueryDetail::class);
     }
 
     protected function registerAuthorization(): void

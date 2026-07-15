@@ -27,7 +27,7 @@ class Nav
             'jobs' => ['label' => __('monitor::messages.nav.jobs'), 'group' => $activity, 'icon' => Icons::JOBS, 'component' => 'monitor.jobs'],
             'schedule' => ['label' => __('monitor::messages.nav.schedule'), 'group' => $activity, 'icon' => Icons::SCHEDULE, 'component' => 'monitor.schedule'],
             'exceptions' => ['label' => __('monitor::messages.nav.exceptions'), 'group' => $activity, 'icon' => Icons::EXCEPTIONS, 'component' => 'monitor.exceptions'],
-            'queries' => ['label' => __('monitor::messages.nav.queries'), 'group' => $activity, 'icon' => Icons::QUERIES, 'component' => 'monitor.slow-queries'],
+            'queries' => ['label' => __('monitor::messages.nav.queries'), 'group' => $activity, 'icon' => Icons::QUERIES, 'component' => 'monitor.queries'],
             'notifications' => ['label' => __('monitor::messages.nav.notifications'), 'group' => $activity, 'icon' => Icons::NOTIFICATIONS, 'component' => 'monitor.notifications'],
             'mail' => ['label' => __('monitor::messages.nav.mail'), 'group' => $activity, 'icon' => Icons::MAIL, 'component' => 'monitor.mail'],
             'cache' => ['label' => __('monitor::messages.nav.cache'), 'group' => $activity, 'icon' => Icons::CACHE, 'component' => 'monitor.cache'],

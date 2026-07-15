@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use LaravelMonitor\Http\Headings\ExceptionHeading;
 use LaravelMonitor\Http\Headings\Heading;
 use LaravelMonitor\Http\Headings\JobHeading;
+use LaravelMonitor\Http\Headings\QueryHeading;
 use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Livewire\Card;
 use LaravelMonitor\Support\Format;
@@ -91,6 +92,7 @@ class DashboardController
             'requests' => (new RequestHeading)($key),
             'jobs' => (new JobHeading)($key),
             'exceptions' => app(ExceptionHeading::class)($key),
+            'queries' => (new QueryHeading)($key),
             default => null,
         };
     }

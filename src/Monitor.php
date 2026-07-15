@@ -37,6 +37,9 @@ class Monitor
     /** The buffered root `request` entry, finalised (phases, duration) on flush. */
     protected ?Entry $pendingRequest = null;
 
+    /** The artisan command currently running, or null outside a console command. */
+    protected ?string $command = null;
+
     public function __construct(protected Application $app)
     {
     }
@@ -135,11 +138,21 @@ class Monitor
         return $this->request['id'] ?? null;
     }
 
+    /** Set by the CommandStarting listener; used to label queries recorded outside a request. */
+    public function setCommand(?string $command): void
+    {
+        $this->command = $command;
+    }
+
+    public function commandName(): ?string
+    {
+        return $this->command;
+    }
+
     /**
-     * Count every query executed during the request, not just the slow ones
-     * SlowQueries persists a full row for — mirrors Nightwatch's `queries`
-     * counter, which tracks total query count independently of any
-     * slow-query threshold.
+     * Count every query executed during the request — mirrors Nightwatch's
+     * `queries` counter, tracked independently of the Queries recorder's
+     * slow/fast tagging.
      */
     public function incrementQueryCount(): void
     {

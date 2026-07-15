@@ -1,7 +1,17 @@
 {{-- AVG / P95 duration line chart with Nightwatch-style dark tooltips.
      All geometry is precomputed by LaravelMonitor\View\Components\LineChart so lines,
-     standalone dots and hover markers share the exact same coordinates. --}}
-<div class="relative {{ $height }}" x-data="{ lineHoverY: {{ \Illuminate\Support\Js::from($hoverY) }} }">
+     standalone dots and hover markers share the exact same coordinates.
+
+     wire:key is keyed off the hover data itself: Alpine's morph plugin
+     deliberately preserves an existing x-data's *reactive value* across a
+     Livewire update (so client interaction state like an open dropdown
+     survives a poll) — it does not re-evaluate the x-data expression just
+     because the attribute string changed. Without this key, lineHoverY
+     stays frozen at whatever it was on first mount, so the hover dot drifts
+     off the line after any wire:poll refresh or manual $refresh. Changing
+     the key forces morphdom to replace the node instead of patching it,
+     which remounts x-data with the fresh value. --}}
+<div wire:key="line-chart-{{ md5(json_encode($hoverY)) }}" class="relative {{ $height }}" x-data="{ lineHoverY: {{ \Illuminate\Support\Js::from($hoverY) }} }">
     <div class="pointer-events-none absolute inset-0 flex flex-col justify-between">
         @for ($i = 0; $i < 5; $i++)
             <div class="border-t border-neutral-100 dark:border-neutral-800"></div>
