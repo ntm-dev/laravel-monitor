@@ -13,6 +13,11 @@ use Throwable;
 class Requests extends Recorder
 {
     /**
+     * Route-list label for requests that matched no Laravel route.
+     */
+    public const UNMATCHED_ROUTE = 'Unmatched Route';
+
+    /**
      * Headers whose values are replaced before storing (lowercase).
      * Mirrors Nightwatch's header redaction.
      */
@@ -43,7 +48,11 @@ class Requests extends Recorder
 
         $status = $event->response->getStatusCode();
         $route = $request->route();
-        $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : '/'.ltrim($path, '/');
+        // Requests with no matched Laravel route (404s, arbitrary probed
+        // paths) are grouped under one label instead of the raw path, or
+        // dynamic/unknown URLs would each fragment the route list into
+        // their own row. Mirrors Nightwatch's "Unmatched Route" grouping.
+        $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : self::UNMATCHED_ROUTE;
 
         $startTime = $request->server('REQUEST_TIME_FLOAT') ?: (defined('LARAVEL_START') ? LARAVEL_START : null);
         $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 2) : null;
