@@ -34,8 +34,11 @@ class QueryDetail extends Card
         $requestIds = $entries->pluck('request_id')->filter()->unique()->values()->all();
         $requestLabels = $storage->requestLabels($requestIds);
 
+        $stats = $storage->stats('slow_query', $since, null, $key, $until);
+
         return [
-            'calls' => $storage->stats('slow_query', $since, null, $key, $until)->count,
+            'calls' => $stats->count,
+            'totalTime' => $stats->total_duration,
             'callBuckets' => $storage->countsPerBucket('slow_query', $since, $buckets, null, $key, $until),
             'duration' => $storage->durationStats('slow_query', $since, $buckets, $key, null, $until),
             'entries' => $entries,

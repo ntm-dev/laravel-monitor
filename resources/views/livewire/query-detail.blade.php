@@ -11,40 +11,63 @@
     $typeLabel = $isWrite ? 'Write' : 'Read';
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    {{-- Full SQL — the page header shows a wrapped version of this same
-         text; this card renders it syntax-highlighted. --}}
-    <x-monitor::card class="p-4">
-        <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">SQL</p>
-        <pre class="mt-2 overflow-x-auto rounded-lg bg-neutral-50 dark:bg-neutral-800/50 p-3 font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200"><code data-line-code data-lang="sql">{{ $key }}</code></pre>
-    </x-monitor::card>
+    {{-- Info: metrics list on the left half, the full SQL as a nested card
+         on the right half — mirrors Nightwatch's query detail layout. The
+         page header already shows a wrapped copy of the SQL for quick
+         reference; this is the canonical full text, wrapping instead of
+         scrolling horizontally, capped in height with its own vertical
+         scroll for pathologically long queries. --}}
+    <x-monitor::card class="flex flex-col gap-6 p-4 md:flex-row">
+        <div class="md:w-1/2">
+            <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Info</h3>
+            <dl class="flex flex-col gap-3">
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Total Time</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($totalTime) }}</dd>
+                </div>
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Avg Time</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->avg) }}</dd>
+                </div>
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">P95</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->p95) }}</dd>
+                </div>
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Calls</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ number_format($calls) }}</dd>
+                </div>
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Connection</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="flex flex-wrap justify-end gap-1">
+                        @forelse ($connections as $conn)
+                            <span class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
+                                {{ $conn }}
+                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ $typeBadgeClass }}">{{ $typeLabel }}</span>
+                            </span>
+                        @empty
+                            <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">—</span>
+                        @endforelse
+                    </dd>
+                </div>
+                <div class="flex max-w-full items-baseline gap-2">
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">First seen</dt>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $firstSeen ? Format::datetime($firstSeen).' '.$tz : '—' }}</dd>
+                </div>
+            </dl>
+        </div>
 
-    {{-- Info --}}
-    <x-monitor::card class="mt-1.5 p-4">
-        <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Info</p>
-        <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-            <div>
-                <dt class="font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">Type</dt>
-                <dd class="mt-1">
-                    <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight {{ $typeBadgeClass }}">{{ $typeLabel }}</span>
-                </dd>
+        <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 md:w-1/2">
+            <div class="max-h-64 overflow-auto p-4">
+                <pre class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200"><code data-line-code data-lang="sql">{{ $key }}</code></pre>
             </div>
-            <div>
-                <dt class="font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">First seen</dt>
-                <dd class="mt-1 font-mono text-xs text-neutral-700 dark:text-neutral-200">
-                    {{ $firstSeen ? Format::datetime($firstSeen).' '.$tz : '—' }}
-                </dd>
-            </div>
-            <div>
-                <dt class="font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">Connections</dt>
-                <dd class="mt-1 flex flex-wrap gap-1">
-                    @forelse ($connections as $conn)
-                        <span class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">{{ $conn }}</span>
-                    @empty
-                        <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">—</span>
-                    @endforelse
-                </dd>
-            </div>
-        </dl>
+        </div>
     </x-monitor::card>
 
     <div class="mt-1.5 grid grid-cols-1 gap-1.5 lg:grid-cols-2"

@@ -51,7 +51,8 @@ interface Storage
     ): Collection;
 
     /**
-     * Totals for a type: object with count, avg_duration, max_duration, min_duration.
+     * Totals for a type: object with count, avg_duration, max_duration,
+     * min_duration, total_duration.
      */
     public function stats(
         string $type,

@@ -209,7 +209,7 @@ class DatabaseStorage implements Storage
         ?int $userId = null,
     ): object {
         $row = $this->query($type, $since, $subtype, $key, $until, $userId)
-            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, min(duration) as min_duration')
+            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, min(duration) as min_duration, sum(duration) as total_duration')
             ->first();
 
         return (object) [
@@ -217,6 +217,7 @@ class DatabaseStorage implements Storage
             'avg_duration' => isset($row->avg_duration) ? round((float) $row->avg_duration, 2) : null,
             'max_duration' => isset($row->max_duration) ? (float) $row->max_duration : null,
             'min_duration' => isset($row->min_duration) ? (float) $row->min_duration : null,
+            'total_duration' => isset($row->total_duration) ? round((float) $row->total_duration, 2) : null,
         ];
     }
 
