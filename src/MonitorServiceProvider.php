@@ -35,6 +35,14 @@ class MonitorServiceProvider extends ServiceProvider
     {
         Support\Settings::apply();
 
+        // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
+        // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
+        // certain dependency combinations that static stack gets unbalanced and array_pop() on
+        // an empty stack returns null, crashing the next loop with "Trying to access array
+        // offset on null" (hit on the dashboard's nested @for/@foreach chart component). The
+        // dashboard's lists don't need Livewire's implicit wire:key diffing, so disable it.
+        config(['livewire.smart_wire_keys' => false]);
+
         if ($this->app->runningInConsole()) {
             $this->registerPublications();
             $this->registerCommands();

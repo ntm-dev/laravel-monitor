@@ -47,5 +47,9 @@ abstract class TestCase extends Orchestra
             'driver' => 'sqlite',
             'database' => ':memory:',
         ]);
+
+        // Belt-and-suspenders alongside MonitorServiceProvider::boot(): keep the dashboard
+        // tests immune to Livewire's smart_wire_keys bug even if provider boot order changes.
+        $app['config']->set('livewire.smart_wire_keys', false);
     }
 }
