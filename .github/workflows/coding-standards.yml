@@ -1,0 +1,43 @@
+name: fix code styling
+
+on:
+  push:
+  workflow_call:
+    inputs:
+      php:
+        default: "8.2"
+        type: string
+      message:
+        default: Fix code styling
+        type: string
+      fix:
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php }}
+          tools: composer:v2, laravel/pint
+          extensions: json, dom, curl, libxml, mbstring
+          coverage: none
+
+      - name: Run Pint
+        run: pint
+
+      - name: Commit linted files
+        if: ${{ inputs.fix }}
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: ${{ inputs.message }}
