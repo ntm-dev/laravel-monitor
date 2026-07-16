@@ -94,7 +94,7 @@ jobs:
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}
 
       - name: Execute tests
-        run: vendor/bin/phpunit -vvv
+        run: vendor/bin/phpunit -v
         env:
           DB_CONNECTION: mysql
           DB_DATABASE: monitor
@@ -163,7 +163,7 @@ jobs:
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}
 
       - name: Execute tests
-        run: vendor/bin/phpunit -vvv
+        run: vendor/bin/phpunit -v
         env:
           DB_CONNECTION: mariadb
           DB_DATABASE: monitor
@@ -230,7 +230,7 @@ jobs:
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}
 
       - name: Execute tests
-        run: vendor/bin/phpunit -vvv
+        run: vendor/bin/phpunit -v
         env:
           DB_CONNECTION: pgsql
           DB_DATABASE: monitor
@@ -288,6 +288,6 @@ jobs:
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}
 
       - name: Execute tests
-        run: vendor/bin/phpunit -vvv
+        run: vendor/bin/phpunit -v
         env:
           DB_CONNECTION: sqlite
