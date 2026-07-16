@@ -1,5 +1,7 @@
 {
   "enabledPlugins": {
-    "mattpocock-skills@mattpocock": true
+    "mattpocock-skills@mattpocock": true,
+    "php-lsp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true
   }
 }
