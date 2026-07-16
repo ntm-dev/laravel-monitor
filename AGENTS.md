@@ -8,7 +8,7 @@ cache, mail, etc. Package root is this repo; source (`autoload: LaravelMonitor\`
 ## Commands
 ```bash
 composer install
-composer test        # = phpunit; must stay green (currently 18 tests)
+composer test        # = phpunit; must stay green (currently 31 tests)
 php -l path/to/file.blade.php   # syntax-check a single blade file
 ```
 

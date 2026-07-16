@@ -178,9 +178,17 @@
                         <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400" x-text="selected()?.type"></h3>
                         <span class="mt-0.5 block font-mono text-xs text-neutral-400 dark:text-neutral-500" x-text="selectedTimestamp()"></span>
                     </div>
-                    <button type="button" @click="selectedId = null" class="shrink-0 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
-                        <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOSE" :stroke="2" class="h-4 w-4"/>
-                    </button>
+                    <div class="flex shrink-0 items-center gap-1">
+                        <template x-if="selected()?.type === 'query'">
+                            <a :href="selected()?.queryUrl" title="View Query"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <button type="button" @click="selectedId = null" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOSE" :stroke="2" class="h-4 w-4"/>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- SQL — syntax-highlighted via the highlight.js build already
@@ -220,13 +228,6 @@
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.location" x-text="selected()?.metadata?.location"></dd>
                             </div>
                         </template>
-                        <div class="px-4 py-3">
-                            <a :href="selected()?.queryUrl"
-                               class="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 py-1.5 font-mono text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
-                                View Query
-                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3.5 w-3.5"/>
-                            </a>
-                        </div>
                     </dl>
                 </template>
 

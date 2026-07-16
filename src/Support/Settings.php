@@ -8,7 +8,8 @@ namespace LaravelMonitor\Support;
  *
  * Unlike {@see Preferences} (per-viewer, cookie), these are shared by the whole
  * application and affect recording behaviour, so they are persisted server-side
- * in a JSON file. {@see apply()} overlays whatever is stored onto the live
+ * as a PHP array-returning file — see {@see write()} for why. {@see apply()}
+ * overlays whatever is stored onto the live
  * config at boot — a stored value wins, and anything not stored keeps its
  * config/monitor.php default ("nếu chưa cài đặt thì lấy mặc định").
  */
@@ -179,6 +180,12 @@ class Settings
 
     /**
      * The stored overrides, or an empty array when nothing has been saved.
+     * Persisted as a plain PHP file returning an array — the same technique
+     * `artisan config:cache` uses — instead of JSON, so a read is a
+     * `require` that PHP's own opcache compiles once and reuses across
+     * requests, rather than paying file_get_contents() + json_decode() on
+     * every single request this is read on (recorders, the dashboard,
+     * Settings::apply() at boot).
      *
      * @return array<string, mixed>
      */
@@ -194,7 +201,7 @@ class Settings
             return static::$cache = [];
         }
 
-        $data = json_decode((string) file_get_contents($path), true);
+        $data = require $path;
 
         return static::$cache = is_array($data) ? $data : [];
     }
@@ -217,7 +224,7 @@ class Settings
 
     protected static function path(): string
     {
-        return storage_path('app/monitor-settings.json');
+        return storage_path('app/monitor-settings.php');
     }
 
     /**
@@ -232,7 +239,24 @@ class Settings
             mkdir($dir, 0755, true);
         }
 
-        file_put_contents($path, json_encode($values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+        // var_export(), not json_encode(): the file must be valid PHP
+        // source (`<?php return [...];`) for all() to require() it — see
+        // there for why. Written to a temp file and renamed into place so a
+        // concurrent require() during the write never sees a half-written
+        // file; rename() is atomic on the same filesystem.
+        //
+        // Deliberately not calling opcache_invalidate() here: it forces an
+        // immediate revalidation across every PHP-FPM worker sharing this
+        // opcache, not just this one — a save on this one settings file
+        // would briefly contend with every other worker's unrelated
+        // requests. Left to PHP's normal opcache.validate_timestamps
+        // behaviour instead, so a save becomes visible within one
+        // opcache.revalidate_freq window (2s by default) rather than
+        // instantly — an acceptable trade for not touching shared state
+        // other requests depend on.
+        $tmp = $path.'.'.uniqid('', true).'.tmp';
+        file_put_contents($tmp, '<?php'.PHP_EOL.PHP_EOL.'return '.var_export($values, true).';'.PHP_EOL, LOCK_EX);
+        rename($tmp, $path);
 
         static::$cache = $values;
     }

@@ -2,10 +2,12 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 
 class Requests extends Card
 {
+    use CombinesSubtypeStats;
     use ResolvesUserNames;
 
     public const PER_PAGE = 15;
@@ -91,12 +93,15 @@ class Requests extends Card
         $topUsers = $storage->topUsers('request', $since, 100, $until);
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
 
+        // One query grouped by subtype instead of five separate stats()
+        // calls (total + 2xx/3xx/4xx/5xx) — see Overview.php.
+        $bySubtype = $storage->statsBySubtype('request', $since, $until, $userId);
+
         return [
-            'requests' => $storage->stats('request', $since, null, null, $until, $userId),
-            'okRequests' => $storage->stats('request', $since, '2xx', null, $until, $userId)->count
-                + $storage->stats('request', $since, '3xx', null, $until, $userId)->count,
-            'clientErrors' => $storage->stats('request', $since, '4xx', null, $until, $userId)->count,
-            'serverErrors' => $storage->stats('request', $since, '5xx', null, $until, $userId)->count,
+            'requests' => $this->combineStats($bySubtype),
+            'okRequests' => ($bySubtype->get('2xx')?->count ?? 0) + ($bySubtype->get('3xx')?->count ?? 0),
+            'clientErrors' => $bySubtype->get('4xx')?->count ?? 0,
+            'serverErrors' => $bySubtype->get('5xx')?->count ?? 0,
             'okBuckets' => array_map(fn ($a, $b) => $a + $b, $ok2xx, $ok3xx),
             'clientErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, '4xx', null, $until, $userId),
             'serverErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, '5xx', null, $until, $userId),

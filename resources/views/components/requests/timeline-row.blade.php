@@ -32,7 +32,7 @@
          @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
          @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
         @for ($i = 0; $i < $depth; $i++)
-            <span class="h-9 w-4 shrink-0 border-l border-neutral-300 dark:border-neutral-700"></span>
+            <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
         <div class="flex min-w-0 items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
@@ -70,12 +70,12 @@
                 </div>
             @elseif ($kind === 'phase')
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800"></span>
-                <div class="sticky left-0 z-10 flex h-6 items-baseline gap-1.5 whitespace-nowrap px-1.5">
+                <div class="sticky left-0 z-10 flex h-6 items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                 </div>
             @else
-                <span class="relative h-6 w-full shrink-0 rounded {{ $barColor }}"
+                <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded {{ $barColor }}"
                       @if ($detailable) :class="selectedId === '{{ $entry->id }}' ? 'ring-1 ring-blue-500' : ''" @endif>
                     @if ($detail !== '')
                         <div class="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1.5 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 opacity-0 shadow-lg transition-opacity duration-100"
@@ -84,7 +84,7 @@
                         </div>
                     @endif
                 </span>
-                <div class="sticky left-0 z-10 ml-1.5 flex shrink-0 items-baseline gap-1.5 whitespace-nowrap">
+                <div class="sticky left-0 z-10 flex h-6 items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] font-medium text-neutral-700 dark:text-neutral-200">{{ $badge }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detailShort }}</span>

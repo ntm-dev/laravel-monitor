@@ -15,7 +15,7 @@ class TimelineEntry
         public string $id,
         public string $type,
         public string $label,
-        public int $start,
+        public int|float $start,
         public int|float $duration,
         public ?string $parentId = null,
         public array $metadata = [],

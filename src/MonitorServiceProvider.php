@@ -212,6 +212,7 @@ class MonitorServiceProvider extends ServiceProvider
             $this->commands([
                 Commands\PruneCommand::class,
                 Commands\ClearCommand::class,
+                Commands\AggregateCommand::class,
             ]);
         }
     }

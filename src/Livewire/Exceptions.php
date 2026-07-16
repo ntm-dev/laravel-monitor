@@ -123,10 +123,14 @@ class Exceptions extends Card
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
         $tz = Format::timezone();
 
+        // One query grouped by subtype instead of three separate stats()
+        // calls (total + handled + unhandled) — see Livewire/Overview.php.
+        $bySubtype = $storage->statsBySubtype('exception', $since, $until, $userId);
+
         return [
-            'total' => $storage->stats('exception', $since, null, null, $until, $userId)->count,
-            'handledCount' => $storage->stats('exception', $since, 'handled', null, $until, $userId)->count,
-            'unhandledCount' => $storage->stats('exception', $since, 'unhandled', null, $until, $userId)->count,
+            'total' => $bySubtype->sum('count'),
+            'handledCount' => $bySubtype->get('handled')?->count ?? 0,
+            'unhandledCount' => $bySubtype->get('unhandled')?->count ?? 0,
             'handledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'handled', null, $until, $userId),
             'unhandledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'unhandled', null, $until, $userId),
             'filters' => self::FILTERS,

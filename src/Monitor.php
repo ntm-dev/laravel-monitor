@@ -85,19 +85,21 @@ class Monitor
     /**
      * Where on the request timeline this entry started, in ms: an event's
      * start is "now minus how long it took". The root request itself starts
-     * at zero.
+     * at zero. Measured via elapsedMsPrecise() (not elapsedMs()) so the
+     * offset keeps microsecond precision instead of being floored to a
+     * whole millisecond before it ever reaches storage.
      */
-    protected function startOffsetFor(string $type, ?float $duration): ?int
+    protected function startOffsetFor(string $type, ?float $duration): ?float
     {
         if ($this->request === null) {
             return null;
         }
 
         if ($type === 'request') {
-            return 0;
+            return 0.0;
         }
 
-        return max(0, (int) round($this->elapsedMs() - ($duration ?? 0)));
+        return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
     }
 
     public function enabled(): bool
@@ -177,10 +179,11 @@ class Monitor
     }
 
     /**
-     * Milliseconds elapsed since the request started, to 2 decimal places.
-     * Used wherever a recorded `duration` is derived from wall-clock time —
-     * phase boundaries/offsets stay whole milliseconds, they're only used
-     * for ordering and layout.
+     * Milliseconds elapsed since the request started, to 3 decimal places
+     * (microsecond precision). Used wherever a recorded `duration` or
+     * `start_offset` is derived from wall-clock time; lifecycle phase
+     * boundaries (bootstrap/middleware/...) stay whole milliseconds via
+     * elapsedMs() — they're only used for layout, not stored precisely.
      */
     public function elapsedMsPrecise(): ?float
     {
@@ -188,7 +191,7 @@ class Monitor
             return null;
         }
 
-        return max(0.0, round((microtime(true) - $this->request['start']) * 1000, 2));
+        return max(0.0, round((microtime(true) - $this->request['start']) * 1000, 3));
     }
 
     /**

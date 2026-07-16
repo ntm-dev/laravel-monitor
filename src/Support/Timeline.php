@@ -42,7 +42,9 @@ class Timeline
         $phases = self::phaseEntries($root->payload['phases'] ?? []);
 
         $events = self::assignLanes(
-            $children->map(fn (object $row) => self::eventEntry($row, $phases))->all()
+            $children->reject(fn (object $row) => $row->type === 'log')
+                ->map(fn (object $row) => self::eventEntry($row, $phases))
+                ->all()
         );
 
         return array_merge([$requestEntry], $phases, $events);
@@ -85,7 +87,7 @@ class Timeline
     {
         $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 
-        $start = max(0, (int) ($row->start_offset ?? 0));
+        $start = max(0.0, (float) ($row->start_offset ?? 0));
         $duration = max(0.0, (float) ($row->duration ?? 0));
 
         return new TimelineEntry(
@@ -129,7 +131,7 @@ class Timeline
     /**
      * @param  TimelineEntry[]  $phases
      */
-    protected static function containingPhase(int $start, array $phases): ?TimelineEntry
+    protected static function containingPhase(int|float $start, array $phases): ?TimelineEntry
     {
         foreach ($phases as $phase) {
             if ($start >= $phase->start && $start < $phase->end()) {

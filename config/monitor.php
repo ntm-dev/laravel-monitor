@@ -85,6 +85,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Aggregates
+    |--------------------------------------------------------------------------
+    |
+    | The `monitor:aggregate` command rolls raw entries up into fixed-width
+    | count buckets, so the dashboard's unfiltered trend charts (Overview,
+    | Requests, Cache, ...) read this much smaller table instead of scanning
+    | every raw row on every page load. Schedule it to run about once every
+    | `period` seconds in your console kernel / routes — each run covers
+    | exactly one bucket, so it needs to run at roughly that cadence to stay
+    | caught up. Charts filtered to a single route/job/user still scan raw
+    | entries directly; aggregates only ever back the unfiltered totals.
+    |
+    */
+
+    'aggregates' => [
+        'table' => 'monitor_aggregates',
+        'period' => env('MONITOR_AGGREGATE_PERIOD', 60),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Performance Thresholds
     |--------------------------------------------------------------------------
     |

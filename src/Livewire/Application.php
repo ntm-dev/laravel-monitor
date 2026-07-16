@@ -21,6 +21,10 @@ class Application extends Card
             ->filter(fn ($route) => ($route->max_duration ?? 0) >= $threshold)
             ->values();
 
+        // One query grouped by subtype instead of three separate stats()
+        // calls (queued/processed/failed) — see Livewire/Overview.php.
+        $jobsBySubtype = $storage->statsBySubtype('job', $since, $until);
+
         return [
             'exceptions' => $storage->stats('exception', $since, null, null, $until)->count,
             'exceptionBuckets' => $storage->countsPerBucket('exception', $since, $buckets, null, null, $until),
@@ -28,9 +32,9 @@ class Application extends Card
             'slowRoutes' => $slowRoutes->take(3),
             'slowRouteCount' => $slowRoutes->count(),
             'threshold' => $threshold,
-            'queuedJobs' => $storage->stats('job', $since, 'queued', null, $until)->count,
-            'processedJobs' => $storage->stats('job', $since, 'processed', null, $until)->count,
-            'failedJobs' => $storage->stats('job', $since, 'failed', null, $until)->count,
+            'queuedJobs' => $jobsBySubtype->get('queued')?->count ?? 0,
+            'processedJobs' => $jobsBySubtype->get('processed')?->count ?? 0,
+            'failedJobs' => $jobsBySubtype->get('failed')?->count ?? 0,
             'queuedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'queued', null, $until),
             'processedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'processed', null, $until),
             'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', null, $until),

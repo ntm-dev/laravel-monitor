@@ -3,6 +3,9 @@
 namespace LaravelMonitor\Tests;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\Events\CacheHit;
+use Illuminate\Cache\Events\CacheMissed;
+use Illuminate\Cache\Events\RetrievingKey;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
@@ -30,6 +33,29 @@ class MonitorTest extends TestCase
             'subtype' => '2xx',
             'user_id' => 1,
         ]);
+    }
+
+    public function test_stats_by_subtype_groups_in_a_single_query(): void
+    {
+        Monitor::record('request', 'GET /users', [], 100, '2xx');
+        Monitor::record('request', 'GET /users', [], 300, '2xx');
+        Monitor::record('request', 'GET /posts', [], 50, '4xx');
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $since = CarbonImmutable::now()->subHour();
+
+        $bySubtype = $storage->statsBySubtype('request', $since);
+
+        $this->assertCount(2, $bySubtype);
+        $this->assertSame(2, $bySubtype->get('2xx')->count);
+        $this->assertSame(200.0, $bySubtype->get('2xx')->avg_duration);
+        $this->assertSame(1, $bySubtype->get('4xx')->count);
+        $this->assertNull($bySubtype->get('5xx'));
+
+        // Matches what separate stats() calls per subtype would have returned.
+        $this->assertSame($storage->stats('request', $since, '2xx')->count, $bySubtype->get('2xx')->count);
+        $this->assertSame($storage->stats('request', $since, '2xx')->avg_duration, $bySubtype->get('2xx')->avg_duration);
     }
 
     public function test_aggregates_by_key(): void
@@ -94,6 +120,35 @@ class MonitorTest extends TestCase
         Monitor::flush();
 
         $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
+    public function test_cache_recorder_captures_duration_between_the_before_and_after_events(): void
+    {
+        event(new RetrievingKey(null, 'users:1'));
+        usleep(2000);
+        event(new CacheHit(null, 'users:1', 'value'));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'cache')->first();
+
+        $this->assertNotNull($row);
+        $this->assertNotNull($row->duration);
+        $this->assertGreaterThan(0, $row->duration);
+    }
+
+    public function test_cache_recorder_records_null_duration_without_a_preceding_before_event(): void
+    {
+        event(new CacheMissed(null, 'users:2'));
+
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'cache',
+            'key' => 'users:2',
+            'subtype' => 'miss',
+            'duration' => null,
+        ]);
     }
 
     public function test_recording_can_be_disabled(): void
@@ -266,7 +321,7 @@ class MonitorTest extends TestCase
         $this->assertCount(1, $children);
         $this->assertSame('slow_query', $children->first()->type);
         $this->assertSame($requestId, $children->first()->request_id);
-        $this->assertIsInt($children->first()->start_offset);
+        $this->assertIsNumeric($children->first()->start_offset);
     }
 
     public function test_request_recorder_captures_correlated_timeline_end_to_end(): void
