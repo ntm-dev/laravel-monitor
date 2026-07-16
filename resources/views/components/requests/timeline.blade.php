@@ -193,7 +193,9 @@
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5"/>
                             </button>
                         </div>
-                        <pre class="overflow-x-auto rounded-md bg-neutral-900 p-3 text-[11px] leading-relaxed"><code class="hljs language-sql" x-html="sqlHighlighted()"></code></pre>
+                        <div class="max-h-64 overflow-auto">
+                            <pre class="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200"><code data-line-code data-lang="sql" x-html="sqlHighlighted()"></code></pre>
+                        </div>
                     </div>
                 </template>
 
