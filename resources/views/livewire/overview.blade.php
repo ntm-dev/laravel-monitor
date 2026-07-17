@@ -13,8 +13,8 @@
             <x-monitor::requests-chart-card
                 :count="$requests->count" :ok="$okRequests" :client="$clientErrors" :server="$serverErrors"
                 :ok-buckets="$okBuckets" :client-buckets="$clientErrorBuckets" :server-buckets="$serverErrorBuckets"
-                :since="$since" :until="$until"/>
-            <x-monitor::duration-chart-card :duration="$duration" :since="$since" :until="$until"/>
+                :since="$since" :until="$until" height="h-[167px]"/>
+            <x-monitor::duration-chart-card :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
         </div>
     </x-monitor::section>
 </div>

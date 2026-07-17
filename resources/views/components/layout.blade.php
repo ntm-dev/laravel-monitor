@@ -57,7 +57,8 @@
             function highlight() {
                 if (! window.hljs) return;
                 document.querySelectorAll('[data-line-code]').forEach(function (el) {
-                    el.innerHTML = window.hljs.highlight(el.textContent, { language: 'php', ignoreIllegals: true }).value;
+                    var language = el.dataset.lang || 'php';
+                    el.innerHTML = window.hljs.highlight(el.textContent, { language: language, ignoreIllegals: true }).value;
                 });
             }
 

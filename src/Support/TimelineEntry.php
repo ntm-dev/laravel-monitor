@@ -15,15 +15,15 @@ class TimelineEntry
         public string $id,
         public string $type,
         public string $label,
-        public int $start,
-        public int $duration,
+        public int|float $start,
+        public int|float $duration,
         public ?string $parentId = null,
         public array $metadata = [],
         public int $lane = 0,
     ) {
     }
 
-    public function end(): int
+    public function end(): int|float
     {
         return $this->start + $this->duration;
     }

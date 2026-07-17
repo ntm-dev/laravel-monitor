@@ -26,10 +26,14 @@ class JobDetail extends Card
         $buckets = self::CHART_BUCKETS;
         $key = $this->key;
 
+        // One query grouped by subtype instead of three separate stats()
+        // calls (queued/processed/failed) — see Livewire/Overview.php.
+        $bySubtype = $storage->statsBySubtype('job', $since, $until, key: $key);
+
         return [
-            'queued' => $storage->stats('job', $since, 'queued', $key, $until)->count,
-            'processed' => $storage->stats('job', $since, 'processed', $key, $until)->count,
-            'failed' => $storage->stats('job', $since, 'failed', $key, $until)->count,
+            'queued' => $bySubtype->get('queued')?->count ?? 0,
+            'processed' => $bySubtype->get('processed')?->count ?? 0,
+            'failed' => $bySubtype->get('failed')?->count ?? 0,
             'queuedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'queued', $key, $until),
             'processedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'processed', $key, $until),
             'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', $key, $until),

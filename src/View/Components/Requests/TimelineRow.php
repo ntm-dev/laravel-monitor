@@ -5,6 +5,7 @@ namespace LaravelMonitor\View\Components\Requests;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\View\Component;
+use LaravelMonitor\Recorders\Queries;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\TimelineEntry;
 
@@ -16,7 +17,7 @@ use LaravelMonitor\Support\TimelineEntry;
  */
 class TimelineRow extends Component
 {
-    /** Bar colour per event type; unknown types fall back to neutral. */
+    /** Dot colour per event type shown in the pinned tree column; unknown types fall back to neutral. */
     protected const COLORS = [
         'query' => 'bg-amber-500 dark:bg-amber-400',
         'cache' => 'bg-emerald-500 dark:bg-emerald-400',
@@ -38,13 +39,18 @@ class TimelineRow extends Component
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';
 
+    /** Nightwatch-style neutral event bar; only over-threshold events get a warning colour instead. */
+    public const NEUTRAL_BAR = 'border border-neutral-200 bg-white group-hover:border-blue-400 dark:border-neutral-700 dark:bg-neutral-800 dark:group-hover:border-blue-500';
+
+    public const SLOW_BAR = 'border border-amber-500 bg-amber-500/20 dark:border-amber-400 dark:bg-amber-400/20';
+
+    /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
+    protected const DETAILABLE_TYPES = ['query', 'cache'];
+
     /** Bar left edge / width as percentages of the total duration. */
     public float $left;
 
     public float $width;
-
-    /** Left edge of the inline label rendered right after an event bar. */
-    public float $labelLeft;
 
     public string $durationLabel;
 
@@ -56,7 +62,17 @@ class TimelineRow extends Component
     /** Detail clamped for the inline chart label. */
     public string $detailShort;
 
+    /** Dot colour per event type, used only in the pinned tree column. */
     public string $color;
+
+    /** Whether this event's duration is at/above the slow-event threshold — the only case the bar gets coloured. */
+    public bool $slow;
+
+    /** Bar background/border classes: neutral by default, warning colour when {@see $slow}. */
+    public string $barColor;
+
+    /** Whether clicking this row opens the inspector panel. */
+    public bool $detailable;
 
     public string $rootColor = self::ROOT_COLOR;
 
@@ -64,13 +80,23 @@ class TimelineRow extends Component
         public TimelineEntry $entry,
         public int $total,
         public string $kind = 'event',
+        /**
+         * Which half of the two-pane layout this instance renders: the
+         * pinned tree-column label ('label') or the horizontally-scrolling
+         * chart bar ('bar'). The two panes are separate flex siblings (see
+         * timeline.blade.php) rendered from the same $rows list, so each row
+         * is built twice — once per pane — from this one component.
+         */
+        public string $part = 'bar',
     ) {
         $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
         $this->width = $total > 0 ? min(100 - $this->left, max(0.15, ($entry->duration / $total) * 100)) : 0.15;
-        $this->labelLeft = min(100, $this->left + $this->width);
         $this->durationLabel = Format::duration($entry->duration);
         $this->badge = self::BADGES[$entry->type] ?? strtoupper($entry->type);
         $this->color = self::COLORS[$entry->type] ?? 'bg-neutral-400 dark:bg-neutral-500';
+        $this->slow = $kind === 'event' && $entry->duration >= (float) config('monitor.recorders.'.Queries::class.'.threshold', 100);
+        $this->barColor = $this->slow ? self::SLOW_BAR : self::NEUTRAL_BAR;
+        $this->detailable = $kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true);
         $this->detail = $this->resolveDetail();
         $this->detailShort = Str::limit($this->detail, 90);
     }

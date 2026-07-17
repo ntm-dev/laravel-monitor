@@ -85,6 +85,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Aggregates
+    |--------------------------------------------------------------------------
+    |
+    | The `monitor:aggregate` command rolls raw entries up into fixed-width
+    | count buckets, so the dashboard's unfiltered trend charts (Overview,
+    | Requests, Cache, ...) read this much smaller table instead of scanning
+    | every raw row on every page load. Schedule it to run about once every
+    | `period` seconds in your console kernel / routes — each run covers
+    | exactly one bucket, so it needs to run at roughly that cadence to stay
+    | caught up. Charts filtered to a single route/job/user still scan raw
+    | entries directly; aggregates only ever back the unfiltered totals.
+    |
+    */
+
+    'aggregates' => [
+        'table' => 'monitor_aggregates',
+        'period' => env('MONITOR_AGGREGATE_PERIOD', 60),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Performance Thresholds
     |--------------------------------------------------------------------------
     |
@@ -136,9 +157,14 @@ return [
             ],
         ],
 
-        Recorders\SlowQueries::class => [
+        // Env var names keep their historical "slow query" wording even
+        // though this recorder now captures every query — renaming them
+        // would silently drop any existing .env override.
+        Recorders\Queries::class => [
             'enabled' => env('MONITOR_SLOW_QUERIES_ENABLED', true),
-            // Milliseconds. Queries at or above this threshold are recorded.
+            // Milliseconds. Queries at or above this threshold are tagged
+            // `slow` (surfaced in the dedicated Slow Queries digest) rather
+            // than `fast` — every query is recorded either way.
             'threshold' => env('MONITOR_SLOW_QUERY_THRESHOLD', 100),
         ],
 

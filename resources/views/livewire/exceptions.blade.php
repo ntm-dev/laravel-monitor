@@ -24,7 +24,7 @@
             <x-monitor::exceptions-chart-card
                 :count="$total" :handled="$handledCount" :unhandled="$unhandledCount"
                 :handled-buckets="$handledBuckets" :unhandled-buckets="$unhandledBuckets"
-                :since="$since" :until="$until" height="h-32"/>
+                :since="$since" :until="$until" height="h-[167px]"/>
         </div>
 
         {{-- Grouped exception table --}}
