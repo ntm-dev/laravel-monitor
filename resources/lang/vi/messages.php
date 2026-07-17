@@ -68,6 +68,8 @@ return [
         'periods' => 'Khoảng thời gian',
         'request_threshold' => 'Ngưỡng request',
         'job_threshold' => 'Ngưỡng job',
+        'query_threshold' => 'Ngưỡng query',
+        'outgoing_request_threshold' => 'Ngưỡng outgoing request',
 
         'enabled' => 'Bật',
         'disabled' => 'Tắt',

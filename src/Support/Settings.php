@@ -25,6 +25,8 @@ class Settings
         'refresh' => 'monitor.refresh',
         'request_threshold' => 'monitor.thresholds.request',
         'job_threshold' => 'monitor.thresholds.job',
+        'query_threshold' => 'monitor.thresholds.query',
+        'outgoing_request_threshold' => 'monitor.thresholds.outgoing_request',
     ];
 
     /** @var array<string, mixed>|null In-request cache of the decoded store. */
@@ -90,6 +92,8 @@ class Settings
             'periods' => (array) config('monitor.periods', []),
             'request_threshold' => (int) config('monitor.thresholds.request', 1000),
             'job_threshold' => (int) config('monitor.thresholds.job', 1000),
+            'query_threshold' => (int) config('monitor.thresholds.query', 500),
+            'outgoing_request_threshold' => (int) config('monitor.thresholds.outgoing_request', 1000),
             'recorders' => static::recorders(),
             'is_customized' => static::all() !== [],
         ];

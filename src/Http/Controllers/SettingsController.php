@@ -33,6 +33,8 @@ class SettingsController
             'refresh' => ['required', 'integer', 'min:1', 'max:3600'],
             'request_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'job_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
+            'query_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
+            'outgoing_request_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'period_labels' => ['required', 'array', 'min:1'],
             'period_labels.*' => ['nullable', 'string', 'max:50'],
             'period_hours' => ['required', 'array'],
@@ -60,6 +62,8 @@ class SettingsController
             'refresh' => (int) $validated['refresh'],
             'request_threshold' => (int) $validated['request_threshold'],
             'job_threshold' => (int) $validated['job_threshold'],
+            'query_threshold' => (int) $validated['query_threshold'],
+            'outgoing_request_threshold' => (int) $validated['outgoing_request_threshold'],
             'periods' => $periods,
             'recorders' => $this->recorderToggles($request),
         ]);

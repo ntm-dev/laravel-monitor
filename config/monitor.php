@@ -109,15 +109,17 @@ return [
     | Performance Thresholds
     |--------------------------------------------------------------------------
     |
-    | Requests and jobs at or above these durations (milliseconds) are shown
-    | as "over threshold" on the dashboard, mirroring Nightwatch's routes /
-    | jobs threshold cards.
+    | Requests, jobs, queries and outgoing requests at or above these
+    | durations (milliseconds) are shown as "over threshold" on the
+    | dashboard, mirroring Nightwatch's per-area threshold cards.
     |
     */
 
     'thresholds' => [
         'request' => env('MONITOR_REQUEST_THRESHOLD', 1000),
         'job' => env('MONITOR_JOB_THRESHOLD', 1000),
+        'query' => env('MONITOR_QUERY_THRESHOLD', 500),
+        'outgoing_request' => env('MONITOR_OUTGOING_REQUEST_THRESHOLD', 1000),
     ],
 
     /*

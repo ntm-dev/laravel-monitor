@@ -66,8 +66,11 @@ return [
         'dashboard_path' => 'Dashboard path',
         'dashboard_refresh' => 'Dashboard refresh',
         'periods' => 'Periods',
+        'threshold' => 'Threshold',
         'request_threshold' => 'Request threshold',
         'job_threshold' => 'Job threshold',
+        'query_threshold' => 'Query threshold',
+        'outgoing_request_threshold' => 'Outgoing request threshold',
 
         'enabled' => 'Enabled',
         'disabled' => 'Disabled',
