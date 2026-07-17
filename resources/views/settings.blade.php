@@ -36,11 +36,18 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ theme: '{{ $prefs['theme'] }}' }" class="space-y-4">
+    <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']) }" class="space-y-4">
         @csrf
 
         {{-- Per-viewer preferences (cookie) --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.preferences') }}">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }">
+            <x-slot:actions>
+                <x-monitor::settings-section-toggle/>
+            </x-slot:actions>
+            <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2">
             <x-monitor::card class="p-4">
                 <p class="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.preferences_hint') }}</p>
@@ -125,10 +132,18 @@
                     </div>
                 </div>
             </x-monitor::card>
+            </div>
         </x-monitor::section>
 
         {{-- App-wide environment (config overrides) --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }">
+            <x-slot:actions>
+                <x-monitor::settings-section-toggle/>
+            </x-slot:actions>
+            <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2">
             <x-monitor::card class="p-4">
                 <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
@@ -136,7 +151,7 @@
 
                     <div class="{{ $rowClass }}">
                         <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.recording') }}</span>
-                        <x-monitor::toggle name="enabled" :checked="$system['enabled']" />
+                        <x-monitor::toggle name="enabled" :checked="$system['enabled']" x-model="recordingEnabled" />
                     </div>
 
                     <div class="{{ $rowClass }}">
@@ -187,28 +202,6 @@
                         </div>
                     </div>
 
-                    <div class="{{ $rowClass }}">
-                        <label for="s-req"
-                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.request_threshold') }}</label>
-                        <div class="flex items-center gap-1.5">
-                            <input id="s-req" name="request_threshold" type="number" min="0"
-                                value="{{ old('request_threshold', $system['request_threshold']) }}"
-                                class="{{ $numClass }}">
-                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
-                        </div>
-                    </div>
-
-                    <div class="{{ $rowClass }}">
-                        <label for="s-job"
-                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.job_threshold') }}</label>
-                        <div class="flex items-center gap-1.5">
-                            <input id="s-job" name="job_threshold" type="number" min="0"
-                                value="{{ old('job_threshold', $system['job_threshold']) }}"
-                                class="{{ $numClass }}">
-                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
-                        </div>
-                    </div>
-
                     <div class="py-2.5" x-data="{ items: @js($periodItems) }">
                         <label
                             class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.periods') }}</label>
@@ -241,10 +234,78 @@
                 <p class="mt-3 text-[11px] text-neutral-400 dark:text-neutral-500">
                     {{ __('monitor::messages.settings.storage_note') }}</p>
             </x-monitor::card>
+            </div>
         </x-monitor::section>
 
+        {{-- App-wide threshold (config overrides) --}}
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ANOMALY" icon-view-box="0 0 512 512" icon-fill="currentColor" icon-transform="translate(42.666667, 42.666667)" title="{{ __('monitor::messages.settings.threshold') }}" class="group" x-data="{ open: false }">
+            <x-slot:actions>
+                <x-monitor::settings-section-toggle/>
+            </x-slot:actions>
+            <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2">
+            <x-monitor::card class="p-4">
+                <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+                    {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
+                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+
+                    <div class="{{ $rowClass }}">
+                        <label for="s-req"
+                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.request_threshold') }}</label>
+                        <div class="flex items-center gap-1.5">
+                            <input id="s-req" name="request_threshold" type="number" min="0"
+                                value="{{ old('request_threshold', $system['request_threshold']) }}"
+                                class="{{ $numClass }}">
+                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
+                        </div>
+                    </div>
+
+                    <div class="{{ $rowClass }}">
+                        <label for="s-job"
+                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.job_threshold') }}</label>
+                        <div class="flex items-center gap-1.5">
+                            <input id="s-job" name="job_threshold" type="number" min="0"
+                                value="{{ old('job_threshold', $system['job_threshold']) }}"
+                                class="{{ $numClass }}">
+                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
+                        </div>
+                    </div>
+                    <div class="{{ $rowClass }}">
+                        <label for="s-query"
+                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.query_threshold') }}</label>
+                        <div class="flex items-center gap-1.5">
+                            <input id="s-query" name="query_threshold" type="number" min="0"
+                                value="{{ old('query_threshold', $system['query_threshold']) }}"
+                                class="{{ $numClass }}">
+                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
+                        </div>
+                    </div>
+
+                    <div class="{{ $rowClass }}">
+                        <label for="s-outgoing"
+                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.outgoing_request_threshold') }}</label>
+                        <div class="flex items-center gap-1.5">
+                            <input id="s-outgoing" name="outgoing_request_threshold" type="number" min="0"
+                                value="{{ old('outgoing_request_threshold', $system['outgoing_request_threshold']) }}"
+                                class="{{ $numClass }}">
+                            <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
+                        </div>
+                    </div>
+                </div>
+            </x-monitor::card>
+            </div>
+        </x-monitor::section>
         {{-- Recorders, two columns in one card --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::BELL_ALERT" title="{{ __('monitor::messages.settings.recorders') }}">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::BELL_ALERT" title="{{ __('monitor::messages.settings.recorders') }}" class="group" x-data="{ open: false }" x-show="recordingEnabled" x-cloak>
+            <x-slot:actions>
+                <x-monitor::settings-section-toggle/>
+            </x-slot:actions>
+            <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 -translate-y-2">
             <x-monitor::card class="p-4">
                 <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.recorders_hint') }}</p>
@@ -261,6 +322,7 @@
                     @endforeach
                 </div>
             </x-monitor::card>
+            </div>
         </x-monitor::section>
 
         <div class="flex items-center justify-end gap-2">
