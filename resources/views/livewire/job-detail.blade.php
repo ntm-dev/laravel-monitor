@@ -13,7 +13,7 @@
             :queued="$queued" :processed="$processed" :failed="$failed"
             :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets"
             :since="$since" :until="$until"/>
-        <x-monitor::duration-chart-card label="Job duration" :duration="$duration" :since="$since" :until="$until"/>
+        <x-monitor::duration-chart-card label="Job duration" :duration="$duration" :since="$since" :until="$until" :threshold="$threshold"/>
     </div>
 
     {{-- Individual job runs --}}

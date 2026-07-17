@@ -25,6 +25,7 @@ class OutgoingRequests extends Card
 
                     return $request;
                 }),
+            'threshold' => (int) config('monitor.thresholds.outgoing_request', 1000),
         ];
     }
 }

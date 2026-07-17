@@ -13,6 +13,7 @@ class SlowQueries extends Card
     {
         return [
             'queries' => $this->storage()->aggregateByKey('slow_query', $this->since(), null, $this->limit, 'max_duration', $this->until()),
+            'threshold' => (int) config('monitor.thresholds.query', 500),
         ];
     }
 }

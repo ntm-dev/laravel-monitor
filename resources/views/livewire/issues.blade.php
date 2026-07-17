@@ -5,7 +5,7 @@
 <div wire:poll.{{ $refresh }}s>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
-            @foreach (['exceptions' => ['Exceptions', $exceptionCount], 'performance' => ['Performance', $slowRouteCount]] as $issueTab => [$issueLabel, $issueCount])
+            @foreach (['exceptions' => ['Exceptions', $exceptionCount], 'performance' => ['Performance', $performanceCount]] as $issueTab => [$issueLabel, $issueCount])
                 <button type="button" wire:click="$set('view', '{{ $issueTab }}')"
                         @class([
                             'flex h-full items-center gap-2 rounded-md border px-3 text-sm',
@@ -55,19 +55,19 @@
                     @endforeach
                 </div>
             </x-monitor::card>
-        @elseif ($view === 'performance' && $slowRoutes->isNotEmpty())
+        @elseif ($view === 'performance' && $performance->isNotEmpty())
             <x-monitor::card>
                 <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    @foreach ($slowRoutes as $route)
-                        <a href="{{ route('monitor.dashboard', ['tab' => 'requests', 'key' => $route->key] + $range) }}"
+                    @foreach ($performance as $item)
+                        <a href="{{ route('monitor.dashboard', ['tab' => $item->tab] + (in_array($item->type, ['request', 'job'], true) ? ['key' => $item->key] : []) + $range) }}"
                            class="flex items-center justify-between gap-3 p-3.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                            <span class="min-w-0">
-                                <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>
-                                <span class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \Illuminate\Support\Str::after($route->key, ' ') }}</span>
+                            <span class="flex min-w-0 items-center gap-2.5">
+                                <span class="shrink-0 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $item->badge }}</span>
+                                <span class="truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $item->label }}</span>
                             </span>
                             <span class="flex shrink-0 items-center gap-4 font-mono text-xs text-neutral-400 dark:text-neutral-500">
-                                <span>{{ number_format($route->count) }}×</span>
-                                <span>MAX <span class="text-amber-600 dark:text-amber-400">{{ $fmt($route->max_duration) }}</span></span>
+                                <span>{{ number_format($item->count) }}×</span>
+                                <span>MAX <span class="text-amber-600 dark:text-amber-400">{{ $fmt($item->max_duration) }}</span></span>
                             </span>
                         </a>
                     @endforeach

@@ -45,6 +45,7 @@ class Jobs extends Card
 
         return [
             'jobs' => $jobs->sortByDesc(fn ($job) => $job->processed + $job->failed)->take($this->limit)->values(),
+            'threshold' => (int) config('monitor.thresholds.job', 1000),
         ];
     }
 }

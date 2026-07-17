@@ -40,6 +40,8 @@ interface Storage
      * key, count, avg_duration, max_duration, last_seen.
      *
      * $orderBy is one of: count, avg_duration, max_duration, last_seen.
+     * Sampled at high volume — see DatabaseStorage::MAX_SAMPLE_ROWS — `count`
+     * is exact only up to that many matching rows.
      */
     public function aggregateByKey(
         string $type,

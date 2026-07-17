@@ -12,7 +12,7 @@
                             <div class="mt-1.5 flex items-center gap-3 font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
                                 <span>{{ number_format($query->count) }}×</span>
                                 <span>avg {{ $fmt($query->avg_duration) }}</span>
-                                <span class="text-amber-600 dark:text-amber-400">max {{ $fmt($query->max_duration) }}</span>
+                                <span class="{{ ($query->max_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : '' }}">max {{ $fmt($query->max_duration) }}</span>
                                 <span class="ml-auto">{{ $query->last_seen?->diffForHumans(short: true) }}</span>
                             </div>
                         </div>

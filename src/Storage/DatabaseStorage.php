@@ -12,6 +12,19 @@ use LaravelMonitor\Contracts\Storage;
 
 class DatabaseStorage implements Storage
 {
+    /**
+     * aggregateByKey() GROUPs BY key in SQL, which doesn't need PHP memory
+     * but isn't free: MySQL sometimes picks the [type, key] index to avoid a
+     * sort for the GROUP BY, which means every matching row needs a lookup
+     * just to check the date filter — 100+ seconds instead of milliseconds
+     * once `type` alone matches millions of rows (hit directly building the
+     * Issues page's over-threshold feed against a 10M-row / 7-day table).
+     * Wrapping the filtered rows in a LIMITed subquery ordered by
+     * created_at — which [type, created_at] DOES cover — before the GROUP BY
+     * bounds that cost regardless of which index MySQL ends up choosing.
+     */
+    protected const MAX_SAMPLE_ROWS = 50000;
+
     public function __construct(
         protected DatabaseManager $db,
         protected array $config = [],
@@ -103,7 +116,17 @@ class DatabaseStorage implements Storage
 
         $orderColumn = $orderBy === 'count' ? 'aggregate_count' : $orderBy;
 
-        return $this->query($type, $since, $subtype, null, $until)
+        // See the class docblock for MAX_SAMPLE_ROWS: GROUP BY over a capped,
+        // created_at-ordered subquery instead of the raw filtered table
+        // directly, so the query stays bounded regardless of which index
+        // MySQL picks for the GROUP BY.
+        $sample = $this->query($type, $since, $subtype, null, $until)
+            ->select(['key', 'duration', 'created_at'])
+            ->orderByDesc('created_at')
+            ->limit(self::MAX_SAMPLE_ROWS);
+
+        return $this->table()
+            ->fromSub($sample, 't')
             ->select('key')
             ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, max(created_at) as last_seen')
             ->groupBy('key')

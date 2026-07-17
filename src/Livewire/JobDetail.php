@@ -35,6 +35,7 @@ class JobDetail extends Card
             'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', $key, $until),
             'duration' => $storage->durationStats('job', $since, $buckets, $key, null, $until),
             'entries' => $storage->recent('job', $since, 50, null, $key, $until),
+            'threshold' => (int) config('monitor.thresholds.job', 1000),
         ];
     }
 }
