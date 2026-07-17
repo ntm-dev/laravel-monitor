@@ -3,6 +3,9 @@
 namespace LaravelMonitor\Tests;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\Events\CacheHit;
+use Illuminate\Cache\Events\CacheMissed;
+use Illuminate\Cache\Events\RetrievingKey;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
@@ -11,6 +14,7 @@ use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Support\Fingerprint;
+use ReflectionClass;
 use RuntimeException;
 
 class MonitorTest extends TestCase
@@ -32,6 +36,29 @@ class MonitorTest extends TestCase
         ]);
     }
 
+    public function test_stats_by_subtype_groups_in_a_single_query(): void
+    {
+        Monitor::record('request', 'GET /users', [], 100, '2xx');
+        Monitor::record('request', 'GET /users', [], 300, '2xx');
+        Monitor::record('request', 'GET /posts', [], 50, '4xx');
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $since = CarbonImmutable::now()->subHour();
+
+        $bySubtype = $storage->statsBySubtype('request', $since);
+
+        $this->assertCount(2, $bySubtype);
+        $this->assertSame(2, $bySubtype->get('2xx')->count);
+        $this->assertSame(200.0, $bySubtype->get('2xx')->avg_duration);
+        $this->assertSame(1, $bySubtype->get('4xx')->count);
+        $this->assertNull($bySubtype->get('5xx'));
+
+        // Matches what separate stats() calls per subtype would have returned.
+        $this->assertSame($storage->stats('request', $since, '2xx')->count, $bySubtype->get('2xx')->count);
+        $this->assertSame($storage->stats('request', $since, '2xx')->avg_duration, $bySubtype->get('2xx')->avg_duration);
+    }
+
     public function test_aggregates_by_key(): void
     {
         Monitor::record('request', 'GET /users', [], 100, '2xx');
@@ -45,7 +72,7 @@ class MonitorTest extends TestCase
         $this->assertSame('GET /users', $groups->first()->key);
         $this->assertSame(2, $groups->first()->count);
         $this->assertSame(200.0, $groups->first()->avg_duration);
-        $this->assertSame(300, $groups->first()->max_duration);
+        $this->assertSame(300.0, $groups->first()->max_duration);
     }
 
     public function test_stats_and_recent_and_purge(): void
@@ -63,21 +90,92 @@ class MonitorTest extends TestCase
         $this->assertDatabaseCount('monitor_entries', 0);
     }
 
-    public function test_slow_query_recorder_captures_queries_over_threshold(): void
+    public function test_slow_query_recorder_captures_every_query_and_tags_slow_ones(): void
     {
-        config(['monitor.recorders.'.\LaravelMonitor\Recorders\SlowQueries::class.'.threshold' => 100]);
+        config(['monitor.recorders.'.\LaravelMonitor\Recorders\Queries::class.'.threshold' => 100]);
 
         event(new QueryExecuted('select * from users', [], 250.0, DB::connection()));
         event(new QueryExecuted('select * from posts', [], 5.0, DB::connection()));
 
         Monitor::flush();
 
-        $this->assertDatabaseCount('monitor_entries', 1);
+        $this->assertDatabaseCount('monitor_entries', 2);
         $this->assertDatabaseHas('monitor_entries', [
             'type' => 'slow_query',
             'key' => 'select * from users',
             'duration' => 250,
+            'subtype' => 'slow',
         ]);
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'slow_query',
+            'key' => 'select * from posts',
+            'duration' => 5,
+            'subtype' => 'fast',
+        ]);
+    }
+
+    public function test_slow_query_recorder_ignores_its_own_storage_table(): void
+    {
+        event(new QueryExecuted('select * from monitor_entries', [], 1.0, DB::connection()));
+
+        Monitor::flush();
+
+        $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
+    public function test_cache_recorder_captures_duration_between_the_before_and_after_events(): void
+    {
+        if (! class_exists(RetrievingKey::class)) {
+            $this->markTestSkipped('Illuminate\Cache\Events\RetrievingKey was added in Laravel 11.15; unavailable on this Laravel version.');
+        }
+
+        event($this->cacheEvent(RetrievingKey::class, 'users:1'));
+        usleep(2000);
+        event($this->cacheEvent(CacheHit::class, 'users:1', 'value'));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'cache')->first();
+
+        $this->assertNotNull($row);
+        $this->assertNotNull($row->duration);
+        $this->assertGreaterThan(0, $row->duration);
+    }
+
+    public function test_cache_recorder_records_null_duration_without_a_preceding_before_event(): void
+    {
+        event($this->cacheEvent(CacheMissed::class, 'users:2'));
+
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'cache',
+            'key' => 'users:2',
+            'subtype' => 'miss',
+            'duration' => null,
+        ]);
+    }
+
+    /**
+     * Builds a cache event instance by name, tolerant of the constructor
+     * signature differing across Laravel versions — Laravel 11 added a
+     * leading $storeName parameter that Laravel 10 doesn't have.
+     */
+    private function cacheEvent(string $eventClass, string $key, mixed $value = null): object
+    {
+        $reflection = new ReflectionClass($eventClass);
+
+        $arguments = array_map(
+            fn ($parameter) => match ($parameter->getName()) {
+                'storeName' => null,
+                'key' => $key,
+                'value' => $value,
+                default => $parameter->getDefaultValue(),
+            },
+            $reflection->getConstructor()->getParameters(),
+        );
+
+        return $reflection->newInstanceArgs($arguments);
     }
 
     public function test_recording_can_be_disabled(): void
@@ -250,7 +348,7 @@ class MonitorTest extends TestCase
         $this->assertCount(1, $children);
         $this->assertSame('slow_query', $children->first()->type);
         $this->assertSame($requestId, $children->first()->request_id);
-        $this->assertIsInt($children->first()->start_offset);
+        $this->assertIsNumeric($children->first()->start_offset);
     }
 
     public function test_request_recorder_captures_correlated_timeline_end_to_end(): void

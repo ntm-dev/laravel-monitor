@@ -29,12 +29,16 @@ class Monitor
      *     composing: ?int,
      *     response_ready: ?int,
      *     terminating: ?int,
+     *     queries: int,
      * }|null
      */
     protected ?array $request = null;
 
     /** The buffered root `request` entry, finalised (phases, duration) on flush. */
     protected ?Entry $pendingRequest = null;
+
+    /** The artisan command currently running, or null outside a console command. */
+    protected ?string $command = null;
 
     public function __construct(protected Application $app)
     {
@@ -48,7 +52,7 @@ class Monitor
         string $type,
         ?string $key = null,
         array $payload = [],
-        ?int $duration = null,
+        ?float $duration = null,
         ?string $subtype = null,
         int|string|null $userId = null,
     ): void {
@@ -81,19 +85,21 @@ class Monitor
     /**
      * Where on the request timeline this entry started, in ms: an event's
      * start is "now minus how long it took". The root request itself starts
-     * at zero.
+     * at zero. Measured via elapsedMsPrecise() (not elapsedMs()) so the
+     * offset keeps microsecond precision instead of being floored to a
+     * whole millisecond before it ever reaches storage.
      */
-    protected function startOffsetFor(string $type, ?int $duration): ?int
+    protected function startOffsetFor(string $type, ?float $duration): ?float
     {
         if ($this->request === null) {
             return null;
         }
 
         if ($type === 'request') {
-            return 0;
+            return 0.0;
         }
 
-        return max(0, $this->elapsedMs() - ($duration ?? 0));
+        return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
     }
 
     public function enabled(): bool
@@ -120,6 +126,7 @@ class Monitor
             'composing' => null,
             'response_ready' => null,
             'terminating' => null,
+            'queries' => 0,
         ];
 
         $elapsed = $this->elapsedMs();
@@ -133,6 +140,34 @@ class Monitor
         return $this->request['id'] ?? null;
     }
 
+    /** Set by the CommandStarting listener; used to label queries recorded outside a request. */
+    public function setCommand(?string $command): void
+    {
+        $this->command = $command;
+    }
+
+    public function commandName(): ?string
+    {
+        return $this->command;
+    }
+
+    /**
+     * Count every query executed during the request — mirrors Nightwatch's
+     * `queries` counter, tracked independently of the Queries recorder's
+     * slow/fast tagging.
+     */
+    public function incrementQueryCount(): void
+    {
+        if ($this->request !== null && $this->enabled()) {
+            $this->request['queries']++;
+        }
+    }
+
+    public function queryCount(): int
+    {
+        return $this->request['queries'] ?? 0;
+    }
+
     /** Milliseconds elapsed since the request started, or null outside one. */
     public function elapsedMs(): ?int
     {
@@ -141,6 +176,22 @@ class Monitor
         }
 
         return max(0, (int) round((microtime(true) - $this->request['start']) * 1000));
+    }
+
+    /**
+     * Milliseconds elapsed since the request started, to 3 decimal places
+     * (microsecond precision). Used wherever a recorded `duration` or
+     * `start_offset` is derived from wall-clock time; lifecycle phase
+     * boundaries (bootstrap/middleware/...) stay whole milliseconds via
+     * elapsedMs() — they're only used for layout, not stored precisely.
+     */
+    public function elapsedMsPrecise(): ?float
+    {
+        if ($this->request === null) {
+            return null;
+        }
+
+        return max(0.0, round((microtime(true) - $this->request['start']) * 1000, 3));
     }
 
     /**
@@ -244,7 +295,8 @@ class Monitor
         }
 
         $entry->payload['phases'] = $this->request['phases'];
-        $entry->duration = max($entry->duration ?? 0, $elapsed);
+        $entry->payload['query_count'] = $this->request['queries'];
+        $entry->duration = max($entry->duration ?? 0.0, $this->elapsedMsPrecise() ?? 0.0);
     }
 
     /**
@@ -267,10 +319,29 @@ class Monitor
 
         try {
             $this->storage()->store($entries);
-        } catch (Throwable) {
-            // Monitoring must never take the application down.
+        } catch (Throwable $e) {
+            // Monitoring must never take the application down, but a storage
+            // failure (e.g. schema drift after an update whose migration
+            // wasn't run) should still be diagnosable instead of silently
+            // dropping every entry — mirrors Nightwatch reporting its own
+            // internal exceptions rather than swallowing them outright.
+            $this->reportStorageFailure($e);
         } finally {
             $this->recording = true;
+        }
+    }
+
+    /**
+     * Report a storage failure through the app's exception handler.
+     * Recording is already paused by flush(), so this cannot recurse into
+     * the Exceptions recorder.
+     */
+    protected function reportStorageFailure(Throwable $e): void
+    {
+        try {
+            $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)->report($e);
+        } catch (Throwable) {
+            // The exception handler itself is unavailable; nothing more we can do.
         }
     }
 

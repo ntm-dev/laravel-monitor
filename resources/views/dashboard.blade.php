@@ -25,6 +25,8 @@
                     @livewire('monitor.job-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'exceptions' && filled($key))
                     @livewire('monitor.exception-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'queries' && filled($key))
+                    @livewire('monitor.query-detail', $rangeProps + ['key' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif

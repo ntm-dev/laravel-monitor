@@ -20,7 +20,7 @@ class ScheduledTasks extends Recorder
 
     public function recordFinished(ScheduledTaskFinished $event): void
     {
-        $this->record($event->task, 'finished', (int) round($event->runtime * 1000));
+        $this->record($event->task, 'finished', round($event->runtime * 1000, 2));
     }
 
     public function recordFailed(ScheduledTaskFailed $event): void
@@ -33,7 +33,7 @@ class ScheduledTasks extends Recorder
         $this->record($event->task, 'skipped');
     }
 
-    protected function record(ScheduledEvent $task, string $status, ?int $duration = null, ?string $error = null): void
+    protected function record(ScheduledEvent $task, string $status, ?float $duration = null, ?string $error = null): void
     {
         $this->monitor->record(
             type: 'scheduled_task',

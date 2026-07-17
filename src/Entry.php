@@ -12,11 +12,11 @@ class Entry
         public string $type,
         public ?string $key = null,
         public array $payload = [],
-        public ?int $duration = null,
+        public ?float $duration = null,
         public ?string $subtype = null,
         public int|string|null $userId = null,
         public ?string $requestId = null,
-        public ?int $startOffset = null,
+        public ?float $startOffset = null,
         ?CarbonImmutable $timestamp = null,
     ) {
         $this->timestamp = $timestamp ?? CarbonImmutable::now();
@@ -29,10 +29,10 @@ class Entry
             'subtype' => $this->subtype !== null ? mb_substr($this->subtype, 0, 32) : null,
             'key' => $this->key !== null ? mb_substr($this->key, 0, 255) : null,
             'payload' => $this->payload,
-            'duration' => $this->duration,
+            'duration' => $this->duration !== null ? round($this->duration, 3) : null,
             'user_id' => $this->userId,
             'request_id' => $this->requestId,
-            'start_offset' => $this->startOffset,
+            'start_offset' => $this->startOffset !== null ? round($this->startOffset, 3) : null,
             'created_at' => $this->timestamp,
         ];
     }

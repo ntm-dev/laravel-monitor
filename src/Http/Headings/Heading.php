@@ -14,6 +14,8 @@ class Heading
         public readonly ?string $heading = null,
         public readonly ?string $titleAttr = null,
         public readonly string $pageTitle = '',
+        /** Wrap onto multiple lines instead of single-line CSS truncation — for long, meaningful text like SQL where clipping loses information. */
+        public readonly bool $wrap = false,
     ) {
     }
 }

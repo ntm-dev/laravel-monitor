@@ -8,3 +8,5 @@ composer.lock
 testbench.yaml
 .tokensave/
 .claude/.headroom_wrap_marker.json
+.claude/deploy-verify.local.json
+CLAUDE.local.md

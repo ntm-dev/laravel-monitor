@@ -80,6 +80,28 @@ Schedule::command('monitor:prune')->daily();
 
 `php artisan monitor:clear` wipes everything.
 
+## Aggregating trend data
+
+`monitor:aggregate` rolls raw entries up into fixed-width buckets
+(`monitor_aggregates`) — count, plus sum/max/min of `duration` — so the
+dashboard's unfiltered trend charts *and* headline totals (Overview,
+Requests, Application, Exceptions, ...) read that much smaller table instead
+of scanning every raw row on every page load. Schedule it to run about once
+every `monitor.aggregates.period` seconds (60 by default) — each run only
+covers one bucket, so it needs to run at roughly that cadence to stay caught
+up:
+
+```php
+// routes/console.php (Laravel 11+) or app/Console/Kernel.php
+Schedule::command('monitor:aggregate')->everyMinute();
+```
+
+Charts and totals filtered to a single route/job/user still scan raw entries
+directly — aggregates only ever back the unfiltered case. Until this is
+scheduled (or for any range older than the aggregator has backfilled), those
+reads fall back to scanning raw entries directly rather than under-reporting
+— slower, but never silently wrong.
+
 ## Storage drivers
 
 The default `database` driver stores entries in a `monitor_entries` table (MySQL, PostgreSQL, SQLite). Point it at a separate connection to keep monitoring data out of your main database:
