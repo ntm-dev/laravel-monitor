@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Support\Fingerprint;
+use ReflectionClass;
 use RuntimeException;
 
 class MonitorTest extends TestCase
@@ -124,9 +125,13 @@ class MonitorTest extends TestCase
 
     public function test_cache_recorder_captures_duration_between_the_before_and_after_events(): void
     {
-        event(new RetrievingKey(null, 'users:1'));
+        if (! class_exists(RetrievingKey::class)) {
+            $this->markTestSkipped('Illuminate\Cache\Events\RetrievingKey was added in Laravel 11.15; unavailable on this Laravel version.');
+        }
+
+        event($this->cacheEvent(RetrievingKey::class, 'users:1'));
         usleep(2000);
-        event(new CacheHit(null, 'users:1', 'value'));
+        event($this->cacheEvent(CacheHit::class, 'users:1', 'value'));
 
         Monitor::flush();
 
@@ -139,7 +144,7 @@ class MonitorTest extends TestCase
 
     public function test_cache_recorder_records_null_duration_without_a_preceding_before_event(): void
     {
-        event(new CacheMissed(null, 'users:2'));
+        event($this->cacheEvent(CacheMissed::class, 'users:2'));
 
         Monitor::flush();
 
@@ -149,6 +154,28 @@ class MonitorTest extends TestCase
             'subtype' => 'miss',
             'duration' => null,
         ]);
+    }
+
+    /**
+     * Builds a cache event instance by name, tolerant of the constructor
+     * signature differing across Laravel versions — Laravel 11 added a
+     * leading $storeName parameter that Laravel 10 doesn't have.
+     */
+    private function cacheEvent(string $eventClass, string $key, mixed $value = null): object
+    {
+        $reflection = new ReflectionClass($eventClass);
+
+        $arguments = array_map(
+            fn ($parameter) => match ($parameter->getName()) {
+                'storeName' => null,
+                'key' => $key,
+                'value' => $value,
+                default => $parameter->getDefaultValue(),
+            },
+            $reflection->getConstructor()->getParameters(),
+        );
+
+        return $reflection->newInstanceArgs($arguments);
     }
 
     public function test_recording_can_be_disabled(): void
