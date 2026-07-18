@@ -37,6 +37,18 @@ class DatabaseStorage implements Storage
      */
     protected const MAX_SAMPLE_ROWS = 50000;
 
+    /**
+     * A method, not a bare reference to the constant, so tests can subclass
+     * DatabaseStorage and shrink this to reproduce cap-related sampling
+     * behavior (e.g. an early bucket losing all representation once total
+     * volume exceeds the cap) without needing to actually insert tens of
+     * thousands of rows.
+     */
+    protected function maxSampleRows(): int
+    {
+        return self::MAX_SAMPLE_ROWS;
+    }
+
     public function __construct(
         protected DatabaseManager $db,
         protected array $config = [],
@@ -129,7 +141,7 @@ class DatabaseStorage implements Storage
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
             ->select(['key', 'subtype'])
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS);
+            ->limit($this->maxSampleRows());
 
         return $this->table()
             ->fromSub($sample, 't')
@@ -167,7 +179,7 @@ class DatabaseStorage implements Storage
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
             // created_at, not id — see cacheKeyStats() for why.
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS)
+            ->limit($this->maxSampleRows())
             ->get(['key', 'duration', 'payload']);
 
         // Single foreach pass with plain arrays — see routeStats() for why
@@ -251,7 +263,7 @@ class DatabaseStorage implements Storage
         $sample = $this->query($type, $since, $subtype, null, $until)
             ->select(['key', 'duration', 'created_at'])
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS);
+            ->limit($this->maxSampleRows());
 
         return $this->table()
             ->fromSub($sample, 't')
@@ -486,7 +498,7 @@ class DatabaseStorage implements Storage
         // on a wide enough window — measured directly on a 7-day range.
         $this->query($type, $since, $subtype, $key, $until, $userId)
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS)
+            ->limit($this->maxSampleRows())
             ->pluck('created_at')
             ->each(function ($createdAt) use (&$counts, $start, $bucketSize, $buckets) {
                 $counts[$this->bucketIndex($createdAt, $start, $bucketSize, $buckets)]++;
@@ -542,12 +554,7 @@ class DatabaseStorage implements Storage
         $perBucket = array_fill(0, $buckets, []);
         $all = [];
 
-        $this->query($type, $since, $subtype, $key, $until, $userId)
-            ->whereNotNull('duration')
-            // created_at, not id — see cacheKeyStats() for why.
-            ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS)
-            ->get(['created_at', 'duration'])
+        $this->sampleDurationsAcrossBuckets($type, $subtype, $key, $userId, $until, $start, $bucketSize, $buckets)
             ->each(function ($row) use (&$perBucket, &$all, $start, $bucketSize, $buckets) {
                 $duration = (float) $row->duration;
                 $all[] = $duration;
@@ -570,6 +577,69 @@ class DatabaseStorage implements Storage
         ];
     }
 
+    /**
+     * Samples up to MAX_SAMPLE_ROWS / $buckets rows per bucket instead of the
+     * most recent MAX_SAMPLE_ROWS overall. A flat "most recent N" cap starves
+     * the earlier buckets once total volume for the range exceeds the cap —
+     * e.g. a busy install with 250k requests in a 24h window would only ever
+     * see duration data for roughly the last 19 of those 24 hours, while the
+     * request-count chart (backed by monitor_aggregates, which isn't capped
+     * by row count) kept showing real traffic throughout, making the gap look
+     * like missing data rather than a sampling artifact.
+     *
+     * One SQL statement — a UNION ALL of one capped, ordered subquery per
+     * bucket — not one round trip per bucket. The last bucket has no
+     * exclusive upper bound of its own (it instead reuses the same `$until`
+     * constraint the other methods apply): its computed boundary is derived
+     * from float division and could, by a fraction of a second, fall short
+     * of the actual end of the range and silently drop the most recent row.
+     */
+    protected function sampleDurationsAcrossBuckets(
+        string $type,
+        ?string $subtype,
+        ?string $key,
+        ?int $userId,
+        ?DateTimeInterface $until,
+        CarbonImmutable $start,
+        float $bucketSize,
+        int $buckets,
+    ): Collection {
+        $capPerBucket = max(1, intdiv($this->maxSampleRows(), $buckets));
+        $startTimestamp = $start->getTimestamp();
+
+        $subqueries = [];
+
+        for ($i = 0; $i < $buckets; $i++) {
+            $isLastBucket = $i === $buckets - 1;
+            $bucketStart = CarbonImmutable::createFromTimestamp($startTimestamp + (int) round($i * $bucketSize));
+            $bucketEnd = $isLastBucket
+                ? null
+                : CarbonImmutable::createFromTimestamp($startTimestamp + (int) round(($i + 1) * $bucketSize));
+
+            $subqueries[] = $this->table()
+                ->where('type', $type)
+                ->when($subtype !== null, fn (Builder $q) => $q->where('subtype', $subtype))
+                ->when($key !== null, fn (Builder $q) => $q->where('key', $key))
+                ->when($userId !== null, fn (Builder $q) => $q->where('user_id', $userId))
+                ->whereNotNull('duration')
+                ->where('created_at', '>=', $bucketStart)
+                ->when($bucketEnd !== null, fn (Builder $q) => $q->where('created_at', '<', $bucketEnd))
+                ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+                ->select(['created_at', 'duration'])
+                // created_at, not id — see cacheKeyStats() for why.
+                ->orderByDesc('created_at')
+                ->limit($capPerBucket);
+        }
+
+        $query = array_shift($subqueries);
+
+        foreach ($subqueries as $subquery) {
+            $query->unionAll($subquery);
+        }
+
+        return $query->get();
+    }
+
     public function topUsers(
         string $type,
         DateTimeInterface $since,
@@ -583,7 +653,7 @@ class DatabaseStorage implements Storage
             ->whereNotNull('user_id')
             ->select('user_id')
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS);
+            ->limit($this->maxSampleRows());
 
         return $this->table()
             ->fromSub($sample, 't')
@@ -610,7 +680,7 @@ class DatabaseStorage implements Storage
         $rows = $this->query($type, $since, null, null, $until, $userId)
             // created_at, not id — see cacheKeyStats() for why.
             ->orderByDesc('created_at')
-            ->limit(self::MAX_SAMPLE_ROWS)
+            ->limit($this->maxSampleRows())
             ->get(['key', 'subtype', 'duration']);
 
         // A single foreach pass with plain arrays, not groupBy()->map()
@@ -667,7 +737,7 @@ class DatabaseStorage implements Storage
         return $this->query('exception', $since, null, null, $until, $userId)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->limit(self::MAX_SAMPLE_ROWS)
+            ->limit($this->maxSampleRows())
             ->get(['key', 'subtype', 'user_id', 'payload', 'created_at'])
             ->groupBy('key')
             ->map(function (Collection $rows, string $key) {
