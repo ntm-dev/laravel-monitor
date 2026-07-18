@@ -139,6 +139,6 @@ class SettingsController
      */
     protected function backTo(string $path, string $flag): RedirectResponse
     {
-        return redirect('/'.trim($path, '/').'?tab=settings')->with($flag, true);
+        return redirect('/'.trim($path, '/').'/settings')->with($flag, true);
     }
 }

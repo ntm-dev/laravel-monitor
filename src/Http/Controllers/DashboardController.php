@@ -34,7 +34,7 @@ class DashboardController
             $period = Card::DEFAULT_PERIOD;
         }
 
-        $tab = $request->query('tab', 'overview');
+        $tab = $request->route('tab', 'overview');
 
         if (! in_array($tab, Nav::keys(), true)) {
             $tab = 'overview';

@@ -44,9 +44,8 @@
                         const now = new Date();
                         if (new Date(this.to) > now) { this.to = now.toISOString().slice(0, 16); }
                         if (new Date(this.from) >= new Date(this.to)) { this.error = 'Start must be before end.'; return; }
-                        const params = new URLSearchParams({ tab: '{{ $tab }}', from: this.from, to: this.to });
-                        @if (filled($key)) params.set('key', @js($key)); @endif
-                        window.location = '{{ route('monitor.dashboard') }}?' + params.toString();
+                        const params = new URLSearchParams({ from: this.from, to: this.to });
+                        window.location = '{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'key' => $key])) }}?' + params.toString();
                     },
                  }" class="relative h-full">
                 <button type="button" @click="open = ! open"

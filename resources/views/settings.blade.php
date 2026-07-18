@@ -40,7 +40,7 @@
         @csrf
 
         {{-- Per-viewer preferences (cookie) --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
             </x-slot:actions>
@@ -136,7 +136,7 @@
         </x-monitor::section>
 
         {{-- App-wide environment (config overrides) --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
             </x-slot:actions>
@@ -152,6 +152,28 @@
                     <div class="{{ $rowClass }}">
                         <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.recording') }}</span>
                         <x-monitor::toggle name="enabled" :checked="$system['enabled']" x-model="recordingEnabled" />
+                    </div>
+
+                    {{-- Recorders: shown right below the Recording toggle, only while recording is enabled --}}
+                    <div x-show="recordingEnabled" x-cloak x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 -translate-y-2" class="py-2.5">
+                        <label class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.recorders') }}</label>
+                        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+                            {{ __('monitor::messages.settings.recorders_hint') }}</p>
+                        <div class="grid gap-x-8 sm:grid-cols-2">
+                            @foreach ($system['recorders'] as $recorder)
+                                <div
+                                    class="flex items-center justify-between gap-4 border-b border-neutral-100 py-2.5 dark:border-neutral-800">
+                                    <span class="flex min-w-0 items-center gap-2 font-mono text-xs text-neutral-700 dark:text-neutral-300">
+                                        <x-monitor::icon :path="$recorder['icon']" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
+                                        <span class="truncate">{{ $recorder['name'] }}</span>
+                                    </span>
+                                    <x-monitor::toggle name="recorders[{{ $recorder['name'] }}]" :checked="$recorder['enabled']" />
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
 
                     <div class="{{ $rowClass }}">
@@ -238,7 +260,7 @@
         </x-monitor::section>
 
         {{-- App-wide threshold (config overrides) --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ANOMALY" icon-view-box="0 0 512 512" icon-fill="currentColor" icon-transform="translate(42.666667, 42.666667)" title="{{ __('monitor::messages.settings.threshold') }}" class="group" x-data="{ open: false }">
+        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ANOMALY" icon-view-box="0 0 512 512" icon-fill="currentColor" icon-transform="translate(42.666667, 42.666667)" title="{{ __('monitor::messages.settings.threshold') }}" class="group" x-data="{ open: false }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
             </x-slot:actions>
@@ -293,33 +315,6 @@
                             <span class="text-xs text-neutral-400 dark:text-neutral-500">ms</span>
                         </div>
                     </div>
-                </div>
-            </x-monitor::card>
-            </div>
-        </x-monitor::section>
-        {{-- Recorders, two columns in one card --}}
-        <x-monitor::section :icon="\LaravelMonitor\Support\Icons::BELL_ALERT" title="{{ __('monitor::messages.settings.recorders') }}" class="group" x-data="{ open: false }" x-show="recordingEnabled" x-cloak>
-            <x-slot:actions>
-                <x-monitor::settings-section-toggle/>
-            </x-slot:actions>
-            <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 -translate-y-2">
-            <x-monitor::card class="p-4">
-                <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-                    {{ __('monitor::messages.settings.recorders_hint') }}</p>
-                <div class="grid gap-x-8 sm:grid-cols-2">
-                    @foreach ($system['recorders'] as $recorder)
-                        <div
-                            class="flex items-center justify-between gap-4 border-b border-neutral-100 py-2.5 dark:border-neutral-800">
-                            <span class="flex min-w-0 items-center gap-2 font-mono text-xs text-neutral-700 dark:text-neutral-300">
-                                <x-monitor::icon :path="$recorder['icon']" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
-                                <span class="truncate">{{ $recorder['name'] }}</span>
-                            </span>
-                            <x-monitor::toggle name="recorders[{{ $recorder['name'] }}]" :checked="$recorder['enabled']" />
-                        </div>
-                    @endforeach
                 </div>
             </x-monitor::card>
             </div>
