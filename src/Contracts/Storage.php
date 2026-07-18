@@ -147,6 +147,23 @@ interface Storage
     ): Collection;
 
     /**
+     * Generic per-key breakdown for a type with no status/subtype dimension
+     * to split by (unlike routeStats()) — one item per key exposing key,
+     * count, avg_duration, p95_duration, last_seen. Used to group a list of
+     * individual occurrences (e.g. notification sends) into one row per key
+     * (e.g. notification class) with a real percentile, not just the
+     * count/avg_duration/max_duration aggregateByKey() computes in SQL.
+     * Sampled at high volume — see durationStats() — so `count` is exact
+     * only up to DatabaseStorage::MAX_SAMPLE_ROWS matching rows.
+     */
+    public function keyStats(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
+    ): Collection;
+
+    /**
      * Grouped exceptions: one item per fingerprint key exposing
      * key, class, message, file, line, count, handled, unhandled, users
      * (distinct impacted users), first_seen and last_seen. Sampled at high
@@ -167,17 +184,35 @@ interface Storage
     public function firstSeen(string $type, string $key): ?CarbonImmutable;
 
     /**
-     * The root `request` entry recorded with the given correlation id, or
-     * null when unknown. Exposes the same fields as recent() rows plus
-     * request_id and start_offset.
+     * The root entry (type $rootType — 'request' or 'job') recorded with the
+     * given correlation id, or null when unknown. Exposes the same fields as
+     * recent() rows plus request_id and start_offset.
      */
-    public function findByRequestId(string $requestId): ?object;
+    public function findByRequestId(string $requestId, string $rootType = 'request'): ?object;
 
     /**
-     * Every non-request entry correlated to the given request, ordered by
-     * where it started on the timeline. Same row shape as findByRequestId().
+     * A single entry by its own primary key, scoped to $type, or null when
+     * unknown — for a detail page about one specific occurrence (e.g. one
+     * notification send) rather than an aggregate across many. Same row
+     * shape as recent().
      */
-    public function timelineFor(string $requestId): Collection;
+    public function findById(int $id, string $type): ?object;
+
+    /**
+     * The first entry of $type whose payload has `correlation_id` equal to
+     * $correlationId, or null when none match — links a mail-channel
+     * notification's entry to the `mail` entry its send produced (and back).
+     * Scans only entries of $type within $since/$until, since a correlated
+     * pair is always recorded moments apart.
+     */
+    public function findByCorrelationId(string $type, string $correlationId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object;
+
+    /**
+     * Every entry correlated to the given request/job attempt (excluding the
+     * root entry itself, type $rootType), ordered by where it started on the
+     * timeline. Same row shape as findByRequestId().
+     */
+    public function timelineFor(string $requestId, string $rootType = 'request'): Collection;
 
     /**
      * Per-key cache breakdown, unsorted: one row per key exposing key,
@@ -207,4 +242,16 @@ interface Storage
      * @return Collection<string, string>
      */
     public function requestLabels(array $requestIds): Collection;
+
+    /**
+     * Which root type ('request' or 'job') each of the given correlation ids
+     * belongs to, keyed by request_id, in a single query — batches what
+     * would otherwise be one findByRequestId() probe per row (e.g. deciding
+     * whether a notification/mail list row should link to the Request or
+     * Job Attempt timeline).
+     *
+     * @param  string[]  $requestIds
+     * @return Collection<string, string>
+     */
+    public function rootTypesFor(array $requestIds): Collection;
 }

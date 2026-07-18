@@ -84,21 +84,47 @@ class DatabaseStorage implements Storage
             ->map(fn ($row) => $this->hydrate($row));
     }
 
-    public function findByRequestId(string $requestId): ?object
+    public function findByRequestId(string $requestId, string $rootType = 'request'): ?object
     {
         $row = $this->table()
-            ->where('type', 'request')
+            ->where('type', $rootType)
             ->where('request_id', $requestId)
             ->first();
 
         return $row !== null ? $this->hydrate($row) : null;
     }
 
-    public function timelineFor(string $requestId): Collection
+    public function findById(int $id, string $type): ?object
+    {
+        $row = $this->table()
+            ->where('type', $type)
+            ->where('id', $id)
+            ->first();
+
+        return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    public function findByCorrelationId(string $type, string $correlationId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
+    {
+        // Narrowed by the existing [type, created_at] index before the JSON
+        // lookup — a correlated pair always lands moments apart, so callers
+        // pass a tight since/until around the source entry rather than the
+        // dashboard's full selected range.
+        $row = $this->table()
+            ->where('type', $type)
+            ->where('created_at', '>=', $since)
+            ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->where('payload->correlation_id', $correlationId)
+            ->first();
+
+        return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    public function timelineFor(string $requestId, string $rootType = 'request'): Collection
     {
         return $this->table()
             ->where('request_id', $requestId)
-            ->where('type', '!=', 'request')
+            ->where('type', '!=', $rootType)
             ->orderBy('start_offset')
             ->orderBy('id')
             ->get()
@@ -220,6 +246,18 @@ class DatabaseStorage implements Storage
             ->where('type', 'request')
             ->whereIn('request_id', $requestIds)
             ->pluck('key', 'request_id');
+    }
+
+    public function rootTypesFor(array $requestIds): Collection
+    {
+        if ($requestIds === []) {
+            return collect();
+        }
+
+        return $this->table()
+            ->whereIn('type', ['request', 'job'])
+            ->whereIn('request_id', $requestIds)
+            ->pluck('type', 'request_id');
     }
 
     /** Decode the JSON payload and parse timestamps on a raw row. */
@@ -597,6 +635,50 @@ class DatabaseStorage implements Storage
                 'server_errors' => $group['server_errors'],
                 'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                 'p95_duration' => $this->percentile($durations, 0.95),
+            ];
+        }
+
+        return collect($result);
+    }
+
+    public function keyStats(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        ?int $userId = null,
+    ): Collection {
+        $rows = $this->query($type, $since, null, null, $until, $userId)
+            // created_at, not id — see cacheKeyStats() for why. Rows arrive
+            // newest-first, so the first row seen per key is its last_seen.
+            ->orderByDesc('created_at')
+            ->limit(self::MAX_SAMPLE_ROWS)
+            ->get(['key', 'duration', 'created_at']);
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $group = &$groups[$row->key];
+            $group ??= ['count' => 0, 'durations' => [], 'last_seen' => $row->created_at];
+
+            $group['count']++;
+
+            if ($row->duration !== null) {
+                $group['durations'][] = (float) $row->duration;
+            }
+            unset($group);
+        }
+
+        $result = [];
+
+        foreach ($groups as $key => $group) {
+            $durations = $group['durations'];
+
+            $result[] = (object) [
+                'key' => $key,
+                'count' => $group['count'],
+                'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
+                'p95_duration' => $this->percentile($durations, 0.95),
+                'last_seen' => CarbonImmutable::parse($group['last_seen']),
             ];
         }
 

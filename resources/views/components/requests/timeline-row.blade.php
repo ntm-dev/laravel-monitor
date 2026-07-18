@@ -36,7 +36,7 @@
         @endfor
         <div class="flex min-w-0 items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
-                <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">REQUEST</span>
+                <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
             @elseif ($kind === 'phase')
                 <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>

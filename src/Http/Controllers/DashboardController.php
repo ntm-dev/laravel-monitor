@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use LaravelMonitor\Http\Headings\ExceptionHeading;
 use LaravelMonitor\Http\Headings\Heading;
 use LaravelMonitor\Http\Headings\JobHeading;
+use LaravelMonitor\Http\Headings\MailHeading;
+use LaravelMonitor\Http\Headings\NotificationHeading;
 use LaravelMonitor\Http\Headings\QueryHeading;
 use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Livewire\Card;
@@ -93,6 +95,8 @@ class DashboardController
             'jobs' => (new JobHeading)($key),
             'exceptions' => app(ExceptionHeading::class)($key),
             'queries' => (new QueryHeading)($key),
+            'notifications' => app(NotificationHeading::class)($key),
+            'mail' => app(MailHeading::class)($key),
             default => null,
         };
     }

@@ -40,6 +40,11 @@ class Jobs extends Recorder
     public function recordProcessing(JobProcessing $event): void
     {
         $this->startedAt[$event->job->getJobId() ?: spl_object_hash($event->job)] = microtime(true);
+
+        // Before handle() runs, so everything it triggers (queries, mail,
+        // notifications) correlates onto this attempt's own timeline —
+        // mirrors RecordTimeline's beginRequest() for HTTP requests.
+        $this->monitor->beginJobAttempt();
     }
 
     public function recordProcessed(JobProcessed $event): void
@@ -54,6 +59,8 @@ class Jobs extends Recorder
             duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
             subtype: 'processed',
         );
+
+        $this->monitor->endJobAttempt();
 
         // Long-running workers never hit the request lifecycle, so persist now.
         $this->monitor->flush();
@@ -73,6 +80,8 @@ class Jobs extends Recorder
             duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
             subtype: 'failed',
         );
+
+        $this->monitor->endJobAttempt();
 
         $this->monitor->flush();
     }

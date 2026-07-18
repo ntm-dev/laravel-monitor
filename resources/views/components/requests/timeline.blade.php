@@ -107,7 +107,7 @@
              horizontally — no sticky/z-index tricks required. --}}
         <div class="w-1/5 max-w-[250px] shrink-0 overflow-hidden whitespace-nowrap">
             @foreach ($rows as $row)
-                <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" part="label"/>
+                <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
             @endforeach
 
             @if ($orphanRows !== [])
@@ -116,7 +116,7 @@
                     <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
                 </div>
                 @foreach ($orphanRows as $row)
-                    <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" part="label"/>
+                    <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
                 @endforeach
             @endif
         </div>
@@ -148,14 +148,14 @@
                          :style="'left: ' + crossX + 'px'"></div>
 
                     @foreach ($rows as $row)
-                        <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" part="bar"/>
+                        <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
                     @endforeach
 
                     {{-- Events that didn't fall inside any recorded phase --}}
                     @if ($orphanRows !== [])
                         <div class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
                         @foreach ($orphanRows as $row)
-                            <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" part="bar"/>
+                            <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
                         @endforeach
                     @endif
                 </div>
@@ -181,6 +181,18 @@
                     <div class="flex shrink-0 items-center gap-1">
                         <template x-if="selected()?.type === 'query'">
                             <a :href="selected()?.queryUrl" title="View Query"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <template x-if="selected()?.type === 'notification'">
+                            <a :href="selected()?.notificationUrl" title="View Notification"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <template x-if="selected()?.type === 'mail'">
+                            <a :href="selected()?.mailUrl" title="View Mail"
                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>
@@ -241,6 +253,52 @@
                             <dt class="text-neutral-500 dark:text-neutral-400">Operation</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.subtype"></dd>
                         </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
+                        </div>
+                    </dl>
+                </template>
+
+                <template x-if="selected()?.type === 'notification'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Notification</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.notification" x-text="selected()?.label"></dd>
+                        </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Channel</dt>
+                            <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.channel"></dd>
+                        </div>
+                        <template x-if="selected()?.metadata?.notifiable">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Notifiable</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.notifiable" x-text="selected()?.metadata?.notifiable"></dd>
+                            </div>
+                        </template>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
+                        </div>
+                    </dl>
+                </template>
+
+                <template x-if="selected()?.type === 'mail'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Subject</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.subject" x-text="selected()?.metadata?.subject"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">To</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.to" x-text="selected()?.metadata?.to"></dd>
+                        </div>
+                        <template x-if="selected()?.metadata?.notification">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Via</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.notification" x-text="selected()?.metadata?.notification"></dd>
+                            </div>
+                        </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>

@@ -156,6 +156,126 @@ class MonitorTest extends TestCase
         ]);
     }
 
+    public function test_notification_recorder_measures_duration_and_stamps_a_correlation_id_for_mail_channel(): void
+    {
+        $notifiable = new class
+        {
+            public function getKey(): int
+            {
+                return 1;
+            }
+        };
+        $notification = new class {};
+
+        event(new \Illuminate\Notifications\Events\NotificationSending($notifiable, $notification, 'mail'));
+        usleep(2000);
+        event(new \Illuminate\Notifications\Events\NotificationSent($notifiable, $notification, 'mail'));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'notification')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('mail', $row->subtype);
+        $this->assertNotNull($row->duration);
+        $this->assertGreaterThan(0, $row->duration);
+
+        $payload = json_decode($row->payload, true);
+        $this->assertNotEmpty($payload['correlation_id'] ?? null);
+    }
+
+    public function test_notification_recorder_does_not_stamp_a_correlation_id_for_non_mail_channels(): void
+    {
+        $notifiable = new class {};
+        $notification = new class {};
+
+        event(new \Illuminate\Notifications\Events\NotificationSending($notifiable, $notification, 'database'));
+        event(new \Illuminate\Notifications\Events\NotificationSent($notifiable, $notification, 'database'));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'notification')->first();
+        $payload = json_decode($row->payload, true);
+
+        $this->assertArrayNotHasKey('correlation_id', $payload);
+    }
+
+    public function test_mail_recorder_tags_direct_and_notification_triggered_sends_differently(): void
+    {
+        $direct = $this->emailMessage('Direct mail', 'a@b.com');
+
+        event(new \Illuminate\Mail\Events\MessageSending($direct, ['__laravel_mailable' => 'App\\Mail\\InvoiceMail']));
+        event(new \Illuminate\Mail\Events\MessageSent($this->sentMessage($direct, 'a@b.com'), ['__laravel_mailable' => 'App\\Mail\\InvoiceMail']));
+
+        $viaNotification = $this->emailMessage('Notification mail', 'c@d.com');
+
+        event(new \Illuminate\Mail\Events\MessageSending($viaNotification, ['__laravel_notification' => 'App\\Notifications\\Welcome']));
+        event(new \Illuminate\Mail\Events\MessageSent($this->sentMessage($viaNotification, 'c@d.com'), ['__laravel_notification' => 'App\\Notifications\\Welcome']));
+
+        Monitor::flush();
+
+        // Grouped by mailable/notification class, not the subject — see
+        // Recorders\Mail::record()'s $groupKey.
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'mail',
+            'key' => 'App\\Mail\\InvoiceMail',
+            'subtype' => 'direct',
+        ]);
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'mail',
+            'key' => 'App\\Notifications\\Welcome',
+            'subtype' => 'notification',
+        ]);
+    }
+
+    public function test_notification_and_its_mail_send_share_the_same_correlation_id(): void
+    {
+        $notifiable = new class {};
+        $notification = new class {};
+
+        event(new \Illuminate\Notifications\Events\NotificationSending($notifiable, $notification, 'mail'));
+
+        $email = $this->emailMessage('Welcome email', 'a@b.com');
+        event(new \Illuminate\Mail\Events\MessageSending($email, ['__laravel_notification' => get_class($notification)]));
+        event(new \Illuminate\Mail\Events\MessageSent($this->sentMessage($email, 'a@b.com'), ['__laravel_notification' => get_class($notification)]));
+
+        event(new \Illuminate\Notifications\Events\NotificationSent($notifiable, $notification, 'mail'));
+
+        Monitor::flush();
+
+        $notificationPayload = json_decode(DB::table('monitor_entries')->where('type', 'notification')->first()->payload, true);
+        $mailPayload = json_decode(DB::table('monitor_entries')->where('type', 'mail')->first()->payload, true);
+
+        $this->assertNotEmpty($notificationPayload['correlation_id'] ?? null);
+        $this->assertSame($notificationPayload['correlation_id'], $mailPayload['correlation_id']);
+    }
+
+    private function emailMessage(string $subject, string $to): \Symfony\Component\Mime\Email
+    {
+        $email = new \Symfony\Component\Mime\Email;
+        $email->subject($subject)->to($to)->from('noreply@x.com')->text('hello');
+
+        return $email;
+    }
+
+    /**
+     * MessageSent's real (non-serialized) constructor argument is
+     * Illuminate\Mail\SentMessage, which wraps a Symfony\Component\Mailer\
+     * SentMessage — not the Symfony\Component\Mime\Email fed to
+     * MessageSending. Building that wrapper is what these events actually
+     * carry in production.
+     */
+    private function sentMessage(\Symfony\Component\Mime\Email $email, string $to): \Illuminate\Mail\SentMessage
+    {
+        $envelope = new \Symfony\Component\Mailer\Envelope(
+            new \Symfony\Component\Mime\Address('noreply@x.com'),
+            [new \Symfony\Component\Mime\Address($to)],
+        );
+
+        return new \Illuminate\Mail\SentMessage(new \Symfony\Component\Mailer\SentMessage($email, $envelope));
+    }
+
     /**
      * Builds a cache event instance by name, tolerant of the constructor
      * signature differing across Laravel versions — Laravel 11 added a
@@ -308,7 +428,7 @@ class MonitorTest extends TestCase
         Monitor::record('auth', 'a@b.c', ['guard' => 'web'], null, 'login', 1);
         Monitor::flush();
 
-        foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'users', 'logs'] as $tab) {
+        foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'notifications', 'users', 'logs'] as $tab) {
             $response = $this->get('/monitor/'.$tab)->assertOk();
 
             if (($dir = getenv('MONITOR_DUMP_HTML')) !== false) {
@@ -404,5 +524,153 @@ class MonitorTest extends TestCase
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $this->get('/monitor/requests/does-not-exist')->assertNotFound();
+    }
+
+    public function test_notification_detail_page_links_to_its_correlated_mail_send(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $notifiable = new class
+        {
+            public function getKey(): int
+            {
+                return 1;
+            }
+        };
+        $notification = new class {};
+
+        event(new \Illuminate\Notifications\Events\NotificationSending($notifiable, $notification, 'mail'));
+
+        $email = new \Symfony\Component\Mime\Email;
+        $email->subject('Welcome email')->to('a@b.com')->from('noreply@x.com')->text('hi');
+        $envelope = new \Symfony\Component\Mailer\Envelope(
+            new \Symfony\Component\Mime\Address('noreply@x.com'),
+            [new \Symfony\Component\Mime\Address('a@b.com')],
+        );
+        $sentMessage = new \Illuminate\Mail\SentMessage(new \Symfony\Component\Mailer\SentMessage($email, $envelope));
+        event(new \Illuminate\Mail\Events\MessageSending($email, ['__laravel_notification' => get_class($notification)]));
+        event(new \Illuminate\Mail\Events\MessageSent($sentMessage, ['__laravel_notification' => get_class($notification)]));
+
+        event(new \Illuminate\Notifications\Events\NotificationSent($notifiable, $notification, 'mail'));
+
+        Monitor::flush();
+
+        $notificationId = DB::table('monitor_entries')->where('type', 'notification')->value('id');
+        $mailId = DB::table('monitor_entries')->where('type', 'mail')->value('id');
+
+        $this->get('/monitor/notifications?key='.$notificationId)
+            ->assertOk()
+            ->assertSee('View sent email')
+            ->assertSee('mail?key='.$mailId, false);
+
+        $this->get('/monitor/mail?key='.$mailId)
+            ->assertOk()
+            ->assertSee('Sent via notification')
+            ->assertSee('notifications?key='.$notificationId, false);
+    }
+
+    public function test_notification_detail_page_shows_not_found_state_for_unknown_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/notifications?key=999999')
+            ->assertOk()
+            ->assertSee('could not be found');
+    }
+
+    public function test_notifications_list_groups_sends_by_class_and_class_detail_lists_each_one(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $key = 'App\\Notifications\\Welcome';
+        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'mail'], 10, 'mail');
+        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'mail'], 20, 'mail');
+        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'database'], null, 'database');
+        Monitor::flush();
+
+        // The list groups all three sends into one row for the class...
+        $this->get('/monitor/notifications')
+            ->assertOk()
+            ->assertSeeText('Welcome')
+            ->assertSeeText('3');
+
+        // ...and the class's own detail page lists each individual send.
+        $this->get('/monitor/notifications?key='.urlencode($key))
+            ->assertOk()
+            ->assertSeeText('3 Sends');
+    }
+
+    public function test_mail_list_groups_sends_by_mailable_class_and_class_detail_lists_each_one(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $key = 'App\\Mail\\InvoiceMail';
+        Monitor::record('mail', $key, ['subject' => 'Your invoice', 'to' => 'a@b.com', 'mailable' => $key], 5, 'direct');
+        Monitor::record('mail', $key, ['subject' => 'Your invoice', 'to' => 'c@d.com', 'mailable' => $key], 8, 'direct');
+        Monitor::flush();
+
+        $this->get('/monitor/mail')
+            ->assertOk()
+            ->assertSeeText('InvoiceMail')
+            ->assertSeeText('2');
+
+        $this->get('/monitor/mail?key='.urlencode($key))
+            ->assertOk()
+            ->assertSeeText('2 Sends');
+    }
+
+    public function test_job_attempt_timeline_correlates_and_displays_its_notification_and_mail(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $job = new \Illuminate\Queue\Jobs\SyncJob(
+            new \Illuminate\Container\Container,
+            json_encode([
+                'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+                'data' => ['commandName' => 'App\\Jobs\\SendWelcomeEmail', 'command' => 'x'],
+                'displayName' => 'App\\Jobs\\SendWelcomeEmail',
+            ]),
+            'sync',
+            'default',
+        );
+
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+
+        $notifiable = new class {};
+        $notification = new class {};
+
+        event(new \Illuminate\Notifications\Events\NotificationSending($notifiable, $notification, 'mail'));
+
+        $email = $this->emailMessage('Welcome email', 'a@b.com');
+        event(new \Illuminate\Mail\Events\MessageSending($email, ['__laravel_notification' => get_class($notification)]));
+        event(new \Illuminate\Mail\Events\MessageSent($this->sentMessage($email, 'a@b.com'), ['__laravel_notification' => get_class($notification)]));
+
+        event(new \Illuminate\Notifications\Events\NotificationSent($notifiable, $notification, 'mail'));
+
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
+
+        // recordProcessed() flushes on its own (long-running workers never
+        // hit the request lifecycle) — no manual Monitor::flush() needed.
+        $jobRow = DB::table('monitor_entries')->where('type', 'job')->first();
+        $notificationRow = DB::table('monitor_entries')->where('type', 'notification')->first();
+        $mailRow = DB::table('monitor_entries')->where('type', 'mail')->first();
+
+        $this->assertNotNull($jobRow);
+        $this->assertNotNull($jobRow->request_id);
+        $this->assertSame($jobRow->request_id, $notificationRow->request_id);
+        $this->assertSame($jobRow->request_id, $mailRow->request_id);
+
+        $this->get('/monitor/jobs/attempts/'.$jobRow->request_id)
+            ->assertOk()
+            ->assertSeeText('SendWelcomeEmail')
+            ->assertSeeText('NOTIFICATION')
+            ->assertSeeText('MAIL');
+    }
+
+    public function test_job_attempt_timeline_returns_404_for_unknown_attempt(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/jobs/attempts/does-not-exist')->assertNotFound();
     }
 }
