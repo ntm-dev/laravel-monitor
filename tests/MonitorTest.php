@@ -317,6 +317,28 @@ class MonitorTest extends TestCase
         }
     }
 
+    public function test_requests_list_colors_methods_and_shows_error_icons(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record('request', 'POST /users', ['status' => 201], 60, '2xx', 1);
+        Monitor::record('request', 'PUT /users/1', ['status' => 200], 70, '2xx', 1);
+        Monitor::record('request', 'PATCH /users/1', ['status' => 200], 40, '2xx', 1);
+        Monitor::record('request', 'DELETE /users/1', ['status' => 204], 30, '2xx', 1);
+        Monitor::record('request', 'GET /orders', ['status' => 404], 20, '4xx', 1);
+        Monitor::record('request', 'POST /payments', ['status' => 500], 90, '5xx', 1);
+        Monitor::flush();
+
+        $this->get('/monitor/requests')
+            ->assertOk()
+            ->assertSee('text-emerald-600', false)
+            ->assertSee('text-blue-500', false)
+            ->assertSee('text-rose-600', false)
+            ->assertSee('fill-amber-500', false)
+            ->assertSee('fill-rose-500', false);
+    }
+
     public function test_entries_recorded_during_a_request_are_correlated(): void
     {
         $monitor = app(\LaravelMonitor\Monitor::class);
