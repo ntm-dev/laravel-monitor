@@ -10,8 +10,8 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::jobs-chart-card
-            :queued="$queued" :processed="$processed" :failed="$failed"
-            :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets"
+            :queued="$queued" :processed="$processed" :failed="$failed" :released="$released"
+            :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets" :released-buckets="$releasedBuckets"
             :since="$since" :until="$until" height="h-[167px]"/>
         <x-monitor::duration-chart-card label="Job duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
     </div>
@@ -45,8 +45,12 @@
                                         'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
                                         'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'processed',
                                         'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' => $entry->subtype === 'queued',
+                                        'border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' => $entry->subtype === 'released',
                                         'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
                                     ])>{{ $entry->subtype }}</span>
+                                    @if (($entry->payload['attempts'] ?? null) !== null)
+                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" title="Attempt count">#{{ $entry->payload['attempts'] }}</span>
+                                    @endif
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
                             </tr>

@@ -23,6 +23,8 @@
                     @livewire('monitor.request-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'jobs' && filled($key))
                     @livewire('monitor.job-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'commands' && filled($key))
+                    @livewire('monitor.command-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'exceptions' && filled($key))
                     @livewire('monitor.exception-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'queries' && filled($key))

@@ -253,6 +253,18 @@
                             <dt class="text-neutral-500 dark:text-neutral-400">Operation</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.subtype"></dd>
                         </div>
+                        <template x-if="selected()?.metadata?.store">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Store</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.store"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.ttl">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">TTL</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.ttl + 's'"></dd>
+                            </div>
+                        </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
@@ -303,6 +315,25 @@
                             <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
                         </div>
+                    </dl>
+                </template>
+
+                <template x-if="selected()?.type === 'lazy_loading'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Model</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.model" x-text="selected()?.metadata?.model"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Relation</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.relation"></dd>
+                        </div>
+                        <template x-if="selected()?.metadata?.id">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Record ID</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.id"></dd>
+                            </div>
+                        </template>
                     </dl>
                 </template>
             </div>

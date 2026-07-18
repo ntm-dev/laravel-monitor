@@ -12,11 +12,12 @@
         'notifications' => ['label' => 'Notifications', 'icon' => Icons::NOTIFICATIONS],
         'jobs' => ['label' => 'Queued Jobs', 'icon' => Icons::JOBS],
         'outgoing' => ['label' => 'Outgoing Requests', 'icon' => Icons::OUTGOING],
+        'lazy_loading' => ['label' => 'Lazy Loads', 'icon' => Icons::EXCEPTIONS],
     ];
 
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
 @endphp
-<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
     @foreach ($cards as $key => $card)
         @php($stats = $summary[$key] ?? ['count' => 0, 'duration' => 0])
         <x-monitor::card class="p-3">

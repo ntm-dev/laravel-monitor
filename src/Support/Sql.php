@@ -25,4 +25,25 @@ class Sql
     {
         return self::isWrite($sql) ? 'write' : 'read';
     }
+
+    /**
+     * Collapses placeholder-count variance out of a query's shape before
+     * it's used as a grouping key — an `IN (?, ?, ?)` filtering 3 ids and
+     * the same query filtering 30 otherwise look like unrelated queries
+     * and split the Queries page into one row per distinct list length.
+     * Same idea for a multi-row `INSERT ... VALUES (?,?), (?,?), ...`
+     * bulk insert: every batch size collapses to one representative row.
+     */
+    public static function normalizeKey(string $sql): string
+    {
+        $sql = preg_replace('/\bin\b\s*\(\s*\?(?:\s*,\s*\?)+\s*\)/i', 'IN (?)', $sql) ?? $sql;
+
+        $sql = preg_replace_callback(
+            '/\bvalues\b(\s*\(\s*\?(?:\s*,\s*\?)*\s*\))(?:\s*,\s*\(\s*\?(?:\s*,\s*\?)*\s*\))+/i',
+            fn (array $matches) => 'VALUES'.$matches[1],
+            $sql,
+        ) ?? $sql;
+
+        return $sql;
+    }
 }

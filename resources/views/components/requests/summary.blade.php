@@ -27,13 +27,17 @@
         return number_format($scaled, 1).' TB';
     };
 
-    $general = [
+    $general = array_filter([
         'Date' => \LaravelMonitor\Support\Format::datetime($root->created_at).' '.$timezone,
         'Status Code' => $payload['status'] ?? '—',
+        'Route' => $payload['route_name'] ?? null,
+        'Action' => $payload['route_action'] ?? null,
+        'Domain' => $payload['route_domain'] ?? null,
         'Server' => $payload['server'] ?? '—',
         'Response Size' => $bytes($payload['response_size'] ?? null),
         'Peak Memory' => $bytes($payload['peak_memory'] ?? null),
-    ];
+        'Models Loaded' => isset($payload['model_count']) ? number_format($payload['model_count']) : null,
+    ], fn ($value) => $value !== null);
 
     $user = [
         'User' => $userName ?? ($root->user_id !== null ? 'User #'.$root->user_id : 'Guest'),

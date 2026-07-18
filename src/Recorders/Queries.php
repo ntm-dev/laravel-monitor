@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
+use LaravelMonitor\Support\Sql;
 
 class Queries extends Recorder
 {
@@ -46,7 +47,7 @@ class Queries extends Recorder
         // string) for what's otherwise a same-behavior rename.
         $this->monitor->record(
             type: 'slow_query',
-            key: $event->sql,
+            key: Sql::normalizeKey($event->sql),
             payload: [
                 'sql' => $event->sql,
                 'connection' => $event->connectionName,

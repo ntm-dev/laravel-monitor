@@ -7,6 +7,7 @@ return [
         'issues' => 'Issues',
         'requests' => 'Requests',
         'jobs' => 'Jobs',
+        'commands' => 'Commands',
         'schedule' => 'Scheduled Tasks',
         'exceptions' => 'Exceptions',
         'queries' => 'Queries',

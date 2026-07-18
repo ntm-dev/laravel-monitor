@@ -104,6 +104,10 @@ return [
         'period' => env('MONITOR_AGGREGATE_PERIOD', 60),
     ],
 
+    'issues' => [
+        'table' => 'monitor_issues',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Performance Thresholds
@@ -118,6 +122,7 @@ return [
     'thresholds' => [
         'request' => env('MONITOR_REQUEST_THRESHOLD', 1000),
         'job' => env('MONITOR_JOB_THRESHOLD', 1000),
+        'command' => env('MONITOR_COMMAND_THRESHOLD', 1000),
         'query' => env('MONITOR_QUERY_THRESHOLD', 500),
         'outgoing_request' => env('MONITOR_OUTGOING_REQUEST_THRESHOLD', 1000),
     ],
@@ -183,6 +188,18 @@ return [
 
         Recorders\ScheduledTasks::class => [
             'enabled' => env('MONITOR_SCHEDULE_ENABLED', true),
+        ],
+
+        Recorders\Commands::class => [
+            'enabled' => env('MONITOR_COMMANDS_ENABLED', true),
+        ],
+
+        // Hydrated-model counter (every request/job/command) plus lazy-
+        // loading (N+1) violations — the latter only ever fires for apps
+        // that already call Model::preventLazyLoading()/shouldBeStrict()
+        // themselves; see Recorders\Models.
+        Recorders\Models::class => [
+            'enabled' => env('MONITOR_MODELS_ENABLED', true),
         ],
 
         Recorders\CacheInteractions::class => [

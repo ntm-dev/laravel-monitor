@@ -47,15 +47,15 @@ class CacheInteractions extends Recorder
         $events->listen(WritingManyKeys::class, fn () => $this->startedAt = microtime(true));
         $events->listen(ForgettingKey::class, fn () => $this->startedAt = microtime(true));
 
-        $events->listen(CacheHit::class, fn (CacheHit $event) => $this->record($event->key, 'hit'));
-        $events->listen(CacheMissed::class, fn (CacheMissed $event) => $this->record($event->key, 'miss'));
-        $events->listen(KeyWritten::class, fn (KeyWritten $event) => $this->record($event->key, 'write'));
-        $events->listen(KeyForgotten::class, fn (KeyForgotten $event) => $this->record($event->key, 'forget'));
-        $events->listen(KeyWriteFailed::class, fn (KeyWriteFailed $event) => $this->record($event->key, 'write_failed'));
-        $events->listen(KeyForgetFailed::class, fn (KeyForgetFailed $event) => $this->record($event->key, 'forget_failed'));
+        $events->listen(CacheHit::class, fn (CacheHit $event) => $this->record($event->key, 'hit', $event->storeName));
+        $events->listen(CacheMissed::class, fn (CacheMissed $event) => $this->record($event->key, 'miss', $event->storeName));
+        $events->listen(KeyWritten::class, fn (KeyWritten $event) => $this->record($event->key, 'write', $event->storeName, $event->seconds));
+        $events->listen(KeyForgotten::class, fn (KeyForgotten $event) => $this->record($event->key, 'forget', $event->storeName));
+        $events->listen(KeyWriteFailed::class, fn (KeyWriteFailed $event) => $this->record($event->key, 'write_failed', $event->storeName, $event->seconds));
+        $events->listen(KeyForgetFailed::class, fn (KeyForgetFailed $event) => $this->record($event->key, 'forget_failed', $event->storeName));
     }
 
-    protected function record(string $key, string $interaction): void
+    protected function record(string $key, string $interaction, ?string $storeName = null, ?int $ttl = null): void
     {
         if ($this->matchesAny($key, $this->config['ignore_keys'] ?? [])) {
             return;
@@ -71,6 +71,10 @@ class CacheInteractions extends Recorder
         $this->monitor->record(
             type: 'cache',
             key: $key,
+            payload: array_filter([
+                'store' => $storeName,
+                'ttl' => $ttl,
+            ], fn ($value) => $value !== null),
             duration: $duration,
             subtype: $interaction,
         );

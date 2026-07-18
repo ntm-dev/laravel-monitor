@@ -5,31 +5,31 @@ namespace LaravelMonitor\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
-use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Timeline;
 
 /**
- * Renders the standalone Request Detail page for a single HTTP request:
- * header, general/user info, event summary and the lifecycle timeline.
- * Unlike the tab-based dashboard views, this page owns its own route
- * (`monitor.requests.show`) and fetches everything it needs itself.
+ * Renders the standalone Command Run Detail page: one artisan command
+ * execution and every event it triggered (queries, mail, notifications,
+ * cache, dispatched jobs), on the same waterfall timeline used for requests
+ * and job attempts. Owns its own route (`monitor.commands.runs.show`), same
+ * as RequestDetailController/JobAttemptController.
  */
-class RequestDetailController
+class CommandRunController
 {
-    use ResolvesUserNames;
-
     /**
-     * Recorder type => events-summary bucket key.
+     * Recorder type => events-summary bucket key. No 'command' entry —
+     * a command run's own timeline shouldn't summarise itself.
      */
     protected const SUMMARY_TYPES = [
         'slow_query' => 'queries',
         'cache' => 'cache',
         'mail' => 'mail',
         'notification' => 'notifications',
-        'job' => 'jobs',
         'outgoing_request' => 'outgoing',
+        'job' => 'jobs',
         'lazy_loading' => 'lazy_loading',
     ];
 
@@ -37,43 +37,38 @@ class RequestDetailController
     {
     }
 
-    public function __invoke(string $requestId): View
+    public function __invoke(string $runId): View
     {
         app()->setLocale(Preferences::locale());
 
-        $root = $this->storage->findByRequestId($requestId);
+        $root = $this->storage->findByRequestId($runId, 'command');
 
         abort_unless($root !== null, 404);
 
-        $children = $this->storage->timelineFor($requestId);
-
-        $userName = $root->user_id !== null
-            ? ($this->resolveNames([$root->user_id])[$root->user_id] ?? null)
-            : null;
+        $children = $this->storage->timelineFor($runId, 'command');
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        return view('monitor::request-detail-page', [
+        return view('monitor::command-run-page', [
             'root' => $root,
             'timeline' => Timeline::build($root, $children),
             'totalDuration' => max(1, (int) ($root->duration ?? 0)),
-            'summary' => $this->eventsSummary($root, $children),
-            'userName' => $userName,
+            'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'tab' => 'requests',
+            'tab' => 'commands',
             'range' => [],
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
-            'timezone' => \LaravelMonitor\Support\Format::timezone(),
-            'threshold' => (int) config('monitor.thresholds.request', 1000),
+            'timezone' => Format::timezone(),
+            'threshold' => (int) config('monitor.thresholds.command', 1000),
         ]);
     }
 
     /**
      * @return array<string, array{count: int, duration: float}>
      */
-    protected function eventsSummary(object $root, Collection $children): array
+    protected function eventsSummary(Collection $children): array
     {
         $summary = collect(self::SUMMARY_TYPES)
             ->flip()
@@ -89,16 +84,6 @@ class RequestDetailController
 
             $summary[$key]['count']++;
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
-        }
-
-        // `slow_query` rows only exist for queries at/above the configured
-        // threshold, so counting them undercounts (or, as often happens,
-        // shows zero for a request that ran several fast queries). The
-        // request payload carries a true total incremented on every query —
-        // fall back to the slow-query count for older rows recorded before
-        // that counter existed.
-        if (isset($root->payload['query_count'])) {
-            $summary['queries']['count'] = (int) $root->payload['query_count'];
         }
 
         return $summary;

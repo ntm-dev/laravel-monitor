@@ -727,6 +727,108 @@ class DatabaseStorage implements Storage
         return $first !== null ? CarbonImmutable::parse($first) : null;
     }
 
+    public function syncIssues(string $type, array $lastSeenByKey): void
+    {
+        if ($lastSeenByKey === []) {
+            return;
+        }
+
+        $existing = $this->issuesTable()
+            ->where('type', $type)
+            ->whereIn('key', array_keys($lastSeenByKey))
+            ->get(['key', 'status', 'resolved_at'])
+            ->keyBy('key');
+
+        $now = CarbonImmutable::now();
+
+        foreach ($lastSeenByKey as $key => $lastSeen) {
+            $lastSeenValue = CarbonImmutable::instance($lastSeen);
+            $row = $existing->get($key);
+
+            if ($row === null) {
+                $this->issuesTable()->insert([
+                    'type' => $type,
+                    'key' => $key,
+                    'status' => 'open',
+                    'first_seen' => $lastSeenValue,
+                    'last_seen' => $lastSeenValue,
+                    'resolved_at' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                continue;
+            }
+
+            $update = ['last_seen' => $lastSeenValue, 'updated_at' => $now];
+
+            // A resolved issue that keeps occurring reopens itself — mirrors
+            // Nightwatch. An ignored one stays ignored until the user
+            // manually reopens it; recurrence alone shouldn't override that.
+            if ($row->status === 'resolved'
+                && $row->resolved_at !== null
+                && $lastSeenValue->greaterThan(CarbonImmutable::parse($row->resolved_at))) {
+                $update['status'] = 'open';
+                $update['resolved_at'] = null;
+            }
+
+            $this->issuesTable()->where('type', $type)->where('key', $key)->update($update);
+        }
+    }
+
+    /**
+     * @param  string[]  $keys
+     */
+    public function issueStatuses(string $type, array $keys): Collection
+    {
+        if ($keys === []) {
+            return collect();
+        }
+
+        return $this->issuesTable()
+            ->where('type', $type)
+            ->whereIn('key', $keys)
+            ->get(['key', 'status', 'first_seen'])
+            ->keyBy('key')
+            ->map(fn ($row) => (object) [
+                'status' => $row->status,
+                'first_seen' => CarbonImmutable::parse($row->first_seen),
+            ]);
+    }
+
+    public function setIssueStatus(string $type, string $key, string $status): void
+    {
+        if (! in_array($status, ['open', 'resolved', 'ignored'], true)) {
+            return;
+        }
+
+        $now = CarbonImmutable::now();
+        $exists = $this->issuesTable()->where('type', $type)->where('key', $key)->exists();
+
+        if (! $exists) {
+            // An action performed on an issue syncIssues() hasn't recorded
+            // yet (edge case) — insert a fresh row rather than no-op.
+            $this->issuesTable()->insert([
+                'type' => $type,
+                'key' => $key,
+                'status' => $status,
+                'first_seen' => $now,
+                'last_seen' => $now,
+                'resolved_at' => $status === 'resolved' ? $now : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        $this->issuesTable()->where('type', $type)->where('key', $key)->update([
+            'status' => $status,
+            'resolved_at' => $status === 'resolved' ? $now : null,
+            'updated_at' => $now,
+        ]);
+    }
+
     /**
      * @return array{0: CarbonImmutable, 1: float}
      */
@@ -802,6 +904,11 @@ class DatabaseStorage implements Storage
     protected function aggregatesTable(): Builder
     {
         return $this->connection()->table(config('monitor.aggregates.table', 'monitor_aggregates'));
+    }
+
+    protected function issuesTable(): Builder
+    {
+        return $this->connection()->table(config('monitor.issues.table', 'monitor_issues'));
     }
 
     protected function connection(): ConnectionInterface

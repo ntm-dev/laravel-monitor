@@ -7,6 +7,7 @@ return [
         'issues' => 'Sự cố',
         'requests' => 'Requests',
         'jobs' => 'Jobs',
+        'commands' => 'Commands',
         'schedule' => 'Tác vụ định kỳ',
         'exceptions' => 'Ngoại lệ',
         'queries' => 'Truy vấn',

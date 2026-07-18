@@ -18,6 +18,7 @@
                     :request-headers="$root->payload['request_headers'] ?? []"
                     :response-headers="$root->payload['response_headers'] ?? []"
                 />
+                <x-monitor::requests.body-section :body="$root->payload['body'] ?? null"/>
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 

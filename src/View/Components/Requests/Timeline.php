@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\View\Component;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline as TimelineSupport;
 use LaravelMonitor\Support\TimelineEntry;
 
@@ -71,10 +72,13 @@ class Timeline extends Component
             'start' => $entry->start,
             'duration' => $entry->duration,
             'metadata' => $entry->metadata,
-            // Only queries have their own detail page; the SQL is that page's
-            // lookup key (see Recorders\Queries::record() and Livewire\Queries).
+            // Only queries have their own detail page. The stored group key
+            // is the normalized SQL shape (see Recorders\Queries::record()),
+            // not the raw per-call SQL text in metadata['sql'] — normalizing
+            // it again here the same way keeps this link matching the row
+            // QueryDetail's exact-equality lookup expects.
             'queryUrl' => $entry->type === 'query'
-                ? route('monitor.dashboard', ['tab' => 'queries', 'key' => $entry->metadata['sql'] ?? $entry->label])
+                ? route('monitor.dashboard', ['tab' => 'queries', 'key' => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label)])
                 : null,
             // The entry's own database id — see NotificationDetail/MailDetail —
             // for the full per-occurrence page (correlation link to the other

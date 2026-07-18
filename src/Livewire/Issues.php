@@ -4,6 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use LaravelMonitor\Contracts\Storage;
 
 class Issues extends Card
 {
@@ -17,11 +18,40 @@ class Issues extends Card
         'job' => ['badge' => 'Job', 'tab' => 'jobs', 'threshold' => 'job'],
         'slow_query' => ['badge' => 'Query', 'tab' => 'queries', 'threshold' => 'query'],
         'outgoing_request' => ['badge' => 'Outgoing', 'tab' => 'outgoing', 'threshold' => 'outgoing_request'],
+        'command' => ['badge' => 'Command', 'tab' => 'commands', 'threshold' => 'command'],
     ];
+
+    public const STATUSES = ['open', 'resolved', 'ignored'];
 
     public string $view = 'exceptions';
 
+    public string $status = 'open';
+
     public string $search = '';
+
+    public function resolve(string $type, string $key): void
+    {
+        $this->setStatus($type, $key, 'resolved');
+    }
+
+    public function ignore(string $type, string $key): void
+    {
+        $this->setStatus($type, $key, 'ignored');
+    }
+
+    public function reopen(string $type, string $key): void
+    {
+        $this->setStatus($type, $key, 'open');
+    }
+
+    protected function setStatus(string $type, string $key, string $status): void
+    {
+        if (! array_key_exists($type, self::PERFORMANCE_AREAS) && $type !== 'exception') {
+            return;
+        }
+
+        $this->storage()->setIssueStatus($type, $key, $status);
+    }
 
     protected function view(): string
     {
@@ -46,7 +76,23 @@ class Issues extends Card
             return $group;
         });
 
+        $storage->syncIssues('exception', $exceptions->pluck('last_seen', 'key')->filter()->all());
+        $exceptions = $this->attachIssueStatus($storage, 'exception', $exceptions);
+
         $performance = $this->performanceIssues($since, $until);
+
+        foreach ($performance->groupBy('type') as $type => $items) {
+            $storage->syncIssues($type, $items->pluck('last_seen', 'key')->filter()->all());
+        }
+
+        $performance = $performance->groupBy('type')
+            ->flatMap(fn ($items, $type) => $this->attachIssueStatus($storage, $type, $items))
+            ->values();
+
+        $status = in_array($this->status, self::STATUSES, true) ? $this->status : 'open';
+
+        $exceptions = $exceptions->where('status', $status)->values();
+        $performance = $performance->where('status', $status)->values();
 
         if ($this->search !== '') {
             $needle = $this->search;
@@ -65,7 +111,28 @@ class Issues extends Card
             'exceptionCount' => $exceptions->count(),
             'performance' => $performance,
             'performanceCount' => $performance->count(),
+            'status' => $status,
         ];
+    }
+
+    /**
+     * Attaches each item's persisted status + first_seen (defaulting to
+     * "open"/its own last_seen for one syncIssues() hasn't recorded yet —
+     * shouldn't happen in practice since data() always syncs immediately
+     * before calling this, but keeps the view safe either way).
+     */
+    protected function attachIssueStatus(Storage $storage, string $type, Collection $items): Collection
+    {
+        $statuses = $storage->issueStatuses($type, $items->pluck('key')->unique()->all());
+
+        return $items->map(function ($item) use ($statuses, $type) {
+            $found = $statuses->get($item->key);
+            $item->issue_type = $type;
+            $item->status = $found->status ?? 'open';
+            $item->first_seen = $found->first_seen ?? $item->last_seen;
+
+            return $item;
+        });
     }
 
     /**
@@ -96,6 +163,7 @@ class Issues extends Card
                         'key' => $row->key,
                         'count' => $row->count,
                         'max_duration' => $row->max_duration,
+                        'last_seen' => $row->last_seen,
                     ]);
                 });
         }

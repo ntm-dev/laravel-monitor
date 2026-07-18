@@ -11,6 +11,7 @@
                             <th class="pb-2 font-normal">Job</th>
                             <th class="pb-2 text-right font-normal">Queued</th>
                             <th class="pb-2 text-right font-normal">Processed</th>
+                            <th class="pb-2 text-right font-normal">Released</th>
                             <th class="pb-2 text-right font-normal">Failed</th>
                             <th class="pb-2 text-right font-normal">Avg</th>
                             <th class="w-8 pb-2"></th>
@@ -23,6 +24,7 @@
                                 <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $job->key }}">{{ class_basename($job->key) }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($job->queued) }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">{{ number_format($job->processed) }}</td>
+                                <td class="py-2 text-right font-mono text-xs {{ $job->released > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($job->released) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $job->failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($job->failed) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($job->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($job->avg_duration) }}</td>
                                 <td class="py-2 pl-2 text-right">

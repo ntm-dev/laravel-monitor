@@ -32,6 +32,7 @@ class JobAttemptController
         'mail' => 'mail',
         'notification' => 'notifications',
         'outgoing_request' => 'outgoing',
+        'lazy_loading' => 'lazy_loading',
     ];
 
     public function __construct(protected Storage $storage)

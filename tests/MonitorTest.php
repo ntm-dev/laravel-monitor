@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Support\Fingerprint;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
 use RuntimeException;
 
@@ -114,6 +115,44 @@ class MonitorTest extends TestCase
         ]);
     }
 
+    public function test_slow_query_recorder_normalizes_in_clauses_and_bulk_inserts_into_one_group(): void
+    {
+        event(new QueryExecuted('select * from users where id in (?, ?, ?)', [], 10.0, DB::connection()));
+        event(new QueryExecuted('select * from users where id in (?, ?, ?, ?, ?)', [], 20.0, DB::connection()));
+        event(new QueryExecuted('insert into logs (a, b) values (?, ?), (?, ?), (?, ?)', [], 5.0, DB::connection()));
+
+        Monitor::flush();
+
+        $keys = DB::table('monitor_entries')->where('type', 'slow_query')->pluck('key');
+
+        $this->assertSame(
+            ['insert into logs (a, b) VALUES (?, ?)', 'select * from users where id IN (?)'],
+            $keys->unique()->sort()->values()->all(),
+        );
+    }
+
+    /**
+     * @return array<int, array{0: string, 1: string}>
+     */
+    public static function sqlNormalizationProvider(): array
+    {
+        return [
+            'single placeholder IN is left alone' => ['select * from t where id in (?)', 'select * from t where id in (?)'],
+            'multi placeholder IN collapses' => ['select * from t where id in (?, ?, ?)', 'select * from t where id IN (?)'],
+            'NOT IN collapses too' => ['select * from t where id not in (?, ?)', 'select * from t where id not IN (?)'],
+            'IN with a subquery is untouched' => ['select * from t where id in (select id from u)', 'select * from t where id in (select id from u)'],
+            'single row VALUES is left alone' => ['insert into t (a) values (?)', 'insert into t (a) values (?)'],
+            'multi row VALUES collapses to one row' => ['insert into t (a, b) values (?, ?), (?, ?), (?, ?)', 'insert into t (a, b) VALUES (?, ?)'],
+            'unrelated word containing in is untouched' => ['select * from domains where name = ?', 'select * from domains where name = ?'],
+        ];
+    }
+
+    #[DataProvider('sqlNormalizationProvider')]
+    public function test_sql_normalize_key(string $input, string $expected): void
+    {
+        $this->assertSame($expected, \LaravelMonitor\Support\Sql::normalizeKey($input));
+    }
+
     public function test_slow_query_recorder_ignores_its_own_storage_table(): void
     {
         event(new QueryExecuted('select * from monitor_entries', [], 1.0, DB::connection()));
@@ -154,6 +193,34 @@ class MonitorTest extends TestCase
             'subtype' => 'miss',
             'duration' => null,
         ]);
+    }
+
+    public function test_cache_recorder_captures_store_name_and_ttl_on_write(): void
+    {
+        event($this->cacheEvent(\Illuminate\Cache\Events\KeyWritten::class, 'users:1', 'value', storeName: 'redis', seconds: 60));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'cache')->where('subtype', 'write')->first();
+
+        $this->assertNotNull($row);
+        $payload = json_decode($row->payload, true);
+        $this->assertSame('redis', $payload['store']);
+        $this->assertSame(60, $payload['ttl']);
+    }
+
+    public function test_cache_recorder_omits_store_and_ttl_when_not_provided(): void
+    {
+        event($this->cacheEvent(CacheHit::class, 'users:1', 'value'));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'cache')->where('subtype', 'hit')->first();
+
+        $this->assertNotNull($row);
+        $payload = json_decode($row->payload, true);
+        $this->assertArrayNotHasKey('store', $payload);
+        $this->assertArrayNotHasKey('ttl', $payload);
     }
 
     public function test_notification_recorder_measures_duration_and_stamps_a_correlation_id_for_mail_channel(): void
@@ -281,21 +348,131 @@ class MonitorTest extends TestCase
      * signature differing across Laravel versions — Laravel 11 added a
      * leading $storeName parameter that Laravel 10 doesn't have.
      */
-    private function cacheEvent(string $eventClass, string $key, mixed $value = null): object
+    private function cacheEvent(string $eventClass, string $key, mixed $value = null, ?string $storeName = null, mixed $seconds = null): object
     {
         $reflection = new ReflectionClass($eventClass);
 
         $arguments = array_map(
             fn ($parameter) => match ($parameter->getName()) {
-                'storeName' => null,
+                'storeName' => $storeName,
                 'key' => $key,
                 'value' => $value,
+                'seconds' => $seconds,
                 default => $parameter->getDefaultValue(),
             },
             $reflection->getConstructor()->getParameters(),
         );
 
         return $reflection->newInstanceArgs($arguments);
+    }
+
+    public function test_scheduled_task_recorder_captures_overlap_background_and_timezone_flags(): void
+    {
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $task = $schedule->command('inspire')->withoutOverlapping()->runInBackground()->timezone('UTC');
+
+        event(new \Illuminate\Console\Events\ScheduledTaskFinished($task, 12.5));
+
+        $row = DB::table('monitor_entries')->where('type', 'scheduled_task')->first();
+
+        $this->assertNotNull($row);
+
+        $payload = json_decode($row->payload, true);
+
+        $this->assertTrue($payload['without_overlapping']);
+        $this->assertTrue($payload['run_in_background']);
+        $this->assertSame('UTC', $payload['timezone']);
+    }
+
+    protected function commandEvents(string $command): array
+    {
+        return [
+            new \Symfony\Component\Console\Input\ArrayInput([]),
+            new \Symfony\Component\Console\Output\NullOutput(),
+        ];
+    }
+
+    public function test_command_recorder_captures_exit_code_and_duration(): void
+    {
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        usleep(1000);
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $row = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('app:sync-data', $row->key);
+        $this->assertSame('success', $row->subtype);
+        $this->assertNotNull($row->duration);
+        $this->assertGreaterThan(0, $row->duration);
+
+        $payload = json_decode($row->payload, true);
+        $this->assertSame(0, $payload['exit_code']);
+    }
+
+    public function test_command_recorder_tags_a_non_zero_exit_code_as_failed(): void
+    {
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 1));
+
+        $row = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->assertSame('failed', $row->subtype);
+        $this->assertSame(1, json_decode($row->payload, true)['exit_code']);
+    }
+
+    public function test_command_recorder_ignores_the_package_own_housekeeping_commands(): void
+    {
+        [$input, $output] = $this->commandEvents('monitor:aggregate');
+
+        event(new \Illuminate\Console\Events\CommandStarting('monitor:aggregate', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('monitor:aggregate', $input, $output, 0));
+
+        $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
+    public function test_command_recorder_correlates_queries_triggered_during_the_run(): void
+    {
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+        $queryRow = DB::table('monitor_entries')->where('type', 'slow_query')->first();
+
+        $this->assertNotNull($commandRow->request_id);
+        $this->assertSame($commandRow->request_id, $queryRow->request_id);
+    }
+
+    public function test_command_run_page_displays_its_correlated_query(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->get('/monitor/commands/runs/'.$commandRow->request_id)
+            ->assertOk()
+            ->assertSeeText('app:sync-data')
+            ->assertSeeText('QUERY');
+    }
+
+    public function test_command_run_page_returns_404_for_unknown_run(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/commands/runs/does-not-exist')->assertNotFound();
     }
 
     public function test_recording_can_be_disabled(): void
@@ -419,6 +596,7 @@ class MonitorTest extends TestCase
         Monitor::record('exception', 'RuntimeException', ['class' => 'RuntimeException', 'message' => 'boom', 'file' => 'app/X.php', 'line' => 1]);
         Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 250);
         Monitor::record('job', 'App\\Jobs\\SendEmail', ['queue' => 'default'], 40, 'processed');
+        Monitor::record('command', 'app:sync-data', ['exit_code' => 0], 15, 'success');
         Monitor::record('scheduled_task', 'inspire', ['command' => 'inspire'], 12, 'finished');
         Monitor::record('cache', 'users:1', [], null, 'hit');
         Monitor::record('outgoing_request', 'GET https://api.example.com', ['status' => 200], 90, 'success');
@@ -428,7 +606,7 @@ class MonitorTest extends TestCase
         Monitor::record('auth', 'a@b.c', ['guard' => 'web'], null, 'login', 1);
         Monitor::flush();
 
-        foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'notifications', 'users', 'logs'] as $tab) {
+        foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'commands', 'schedule', 'cache', 'outgoing', 'mail', 'notifications', 'users', 'logs'] as $tab) {
             $response = $this->get('/monitor/'.$tab)->assertOk();
 
             if (($dir = getenv('MONITOR_DUMP_HTML')) !== false) {
@@ -499,6 +677,44 @@ class MonitorTest extends TestCase
         $query = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'slow_query')->first();
 
         $this->assertSame($row->request_id, $query->request_id);
+    }
+
+    public function test_request_recorder_captures_route_identity_and_redacted_body(): void
+    {
+        \Illuminate\Support\Facades\Route::middleware('web')->post('/demo-login', function () {
+            return 'ok';
+        })->name('demo.login');
+
+        $this->post('/demo-login', ['email' => 'a@b.com', 'password' => 'secret123'])->assertOk();
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'request')->where('key', 'POST /demo-login')->first();
+
+        $this->assertNotNull($row);
+
+        $payload = json_decode($row->payload, true);
+
+        $this->assertSame('demo.login', $payload['route_name']);
+        $this->assertNotEmpty($payload['route_action']);
+        $this->assertSame('a@b.com', $payload['body']['email']);
+        $this->assertSame('••• redacted •••', $payload['body']['password']);
+    }
+
+    public function test_request_recorder_does_not_capture_a_body_for_get_requests(): void
+    {
+        \Illuminate\Support\Facades\Route::middleware('web')->get('/demo-search', function () {
+            return 'ok';
+        });
+
+        $this->get('/demo-search?q=hello')->assertOk();
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'request')->where('key', 'GET /demo-search')->first();
+
+        $this->assertNotNull($row);
+        $this->assertArrayNotHasKey('body', json_decode($row->payload, true));
     }
 
     public function test_request_detail_page_renders(): void
@@ -619,6 +835,94 @@ class MonitorTest extends TestCase
             ->assertSeeText('2 Sends');
     }
 
+    protected function syncJob(?string $jobId = null): \Illuminate\Queue\Jobs\SyncJob
+    {
+        $payload = json_encode([
+            'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+            'data' => ['commandName' => 'App\\Jobs\\SendWelcomeEmail', 'command' => 'x'],
+            'displayName' => 'App\\Jobs\\SendWelcomeEmail',
+        ]);
+
+        if ($jobId === null) {
+            return new \Illuminate\Queue\Jobs\SyncJob(new \Illuminate\Container\Container, $payload, 'sync', 'default');
+        }
+
+        return new class(new \Illuminate\Container\Container, $payload, 'sync', 'default', $jobId) extends \Illuminate\Queue\Jobs\SyncJob
+        {
+            public function __construct($container, $job, $connectionName, $queue, protected string $fakeJobId)
+            {
+                parent::__construct($container, $job, $connectionName, $queue);
+            }
+
+            public function getJobId()
+            {
+                return $this->fakeJobId;
+            }
+        };
+    }
+
+    public function test_job_recorder_correlates_queued_to_processed_via_job_id_and_captures_attempts(): void
+    {
+        $job = $this->syncJob('job-abc123');
+
+        event(new \Illuminate\Queue\Events\JobQueued('sync', 'default', 'job-abc123', $job, json_encode([]), null));
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
+
+        Monitor::flush();
+
+        $queuedPayload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->value('payload'), true);
+        $processedPayload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->value('payload'), true);
+
+        $this->assertSame('job-abc123', $queuedPayload['job_id']);
+        $this->assertSame('job-abc123', $processedPayload['job_id']);
+        $this->assertSame(1, $processedPayload['attempts']);
+    }
+
+    public function test_job_recorder_omits_job_id_for_sync_jobs_without_a_driver_assigned_id(): void
+    {
+        $job = $this->syncJob();
+
+        event(new \Illuminate\Queue\Events\JobQueued('sync', 'default', '', $job, json_encode([]), null));
+
+        Monitor::flush();
+
+        $payload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->value('payload'), true);
+
+        $this->assertArrayNotHasKey('job_id', $payload);
+    }
+
+    public function test_job_recorder_captures_released_status_distinct_from_failed(): void
+    {
+        $job = $this->syncJob();
+
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        event(new \Illuminate\Queue\Events\JobReleasedAfterException('sync', $job, 30));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'released')->first();
+
+        $this->assertNotNull($row);
+        $payload = json_decode($row->payload, true);
+        $this->assertSame(1, $payload['attempts']);
+        $this->assertSame(30, $payload['backoff']);
+    }
+
+    public function test_job_recorder_captures_attempts_on_failure(): void
+    {
+        $job = $this->syncJob();
+
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        event(new \Illuminate\Queue\Events\JobFailed('sync', $job, new RuntimeException('boom')));
+
+        Monitor::flush();
+
+        $payload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'failed')->value('payload'), true);
+
+        $this->assertSame(1, $payload['attempts']);
+    }
+
     public function test_job_attempt_timeline_correlates_and_displays_its_notification_and_mail(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
@@ -672,5 +976,100 @@ class MonitorTest extends TestCase
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $this->get('/monitor/jobs/attempts/does-not-exist')->assertNotFound();
+    }
+
+    public function test_model_recorder_counts_hydrated_models_during_a_request(): void
+    {
+        DB::table('monitor_entries')->insert([
+            ['type' => 'log', 'key' => 'a', 'created_at' => now()],
+            ['type' => 'log', 'key' => 'b', 'created_at' => now()],
+        ]);
+        Monitor::flush();
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $monitor->beginRequest();
+
+        LazyLoadingFixtureModel::query()->get();
+
+        Monitor::record('request', 'GET /x', ['method' => 'GET', 'path' => '/x', 'status' => 200], 50, '2xx');
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'request')->first();
+        $payload = json_decode($row->payload, true);
+
+        $this->assertGreaterThanOrEqual(2, $payload['model_count']);
+    }
+
+    public function test_model_recorder_counts_hydrated_models_during_a_job_attempt(): void
+    {
+        DB::table('monitor_entries')->insert([
+            ['type' => 'log', 'key' => 'a', 'created_at' => now()],
+        ]);
+        Monitor::flush();
+
+        $job = $this->syncJob();
+
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        LazyLoadingFixtureModel::query()->get();
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
+
+        $payload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->value('payload'), true);
+
+        $this->assertGreaterThanOrEqual(1, $payload['model_count']);
+    }
+
+    public function test_lazy_loading_violation_is_recorded_and_still_throws_by_default(): void
+    {
+        // Eloquent only flags an individual model instance for lazy-loading
+        // prevention when hydrating 2+ rows at once (Builder::hydrate()) —
+        // a lone ->first() row is never flagged, since there's no N+1
+        // pattern possible on a single model.
+        DB::table('monitor_entries')->insert([
+            ['type' => 'log', 'key' => 'a', 'created_at' => now()],
+            ['type' => 'log', 'key' => 'b', 'created_at' => now()],
+        ]);
+        Monitor::flush();
+
+        \Illuminate\Database\Eloquent\Model::preventLazyLoading();
+
+        $fixture = LazyLoadingFixtureModel::query()->get()->first();
+        $thrown = null;
+
+        try {
+            $fixture->related;
+        } catch (\Illuminate\Database\LazyLoadingViolationException $e) {
+            $thrown = $e;
+        } finally {
+            \Illuminate\Database\Eloquent\Model::preventLazyLoading(false);
+        }
+
+        $this->assertNotNull($thrown, 'expected the app-level default throw behaviour to still fire');
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'lazy_loading')->first();
+        $this->assertNotNull($row);
+
+        $payload = json_decode($row->payload, true);
+        $this->assertSame(LazyLoadingFixtureModel::class, $payload['model']);
+        $this->assertSame('related', $payload['relation']);
+    }
+}
+
+/**
+ * Minimal Eloquent model backed by the package's own monitor_entries table
+ * (already migrated in every test) purely to exercise the Models recorder's
+ * retrieved-count and lazy-loading-violation hooks — its `related` relation
+ * is never meant to resolve real data.
+ */
+class LazyLoadingFixtureModel extends \Illuminate\Database\Eloquent\Model
+{
+    protected $table = 'monitor_entries';
+
+    public $timestamps = false;
+
+    public function related(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(self::class, 'id', 'id');
     }
 }
