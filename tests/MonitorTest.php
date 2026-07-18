@@ -266,7 +266,7 @@ class MonitorTest extends TestCase
         ], null, 'unhandled', 1);
         Monitor::flush();
 
-        $this->get('/monitor?tab=exceptions&key='.$key)
+        $this->get('/monitor/exceptions?key='.$key)
             ->assertOk()
             ->assertSee('Boom')
             ->assertSee('Copy as Markdown')
@@ -309,7 +309,7 @@ class MonitorTest extends TestCase
         Monitor::flush();
 
         foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'schedule', 'cache', 'outgoing', 'mail', 'users', 'logs'] as $tab) {
-            $response = $this->get('/monitor?tab='.$tab)->assertOk();
+            $response = $this->get('/monitor/'.$tab)->assertOk();
 
             if (($dir = getenv('MONITOR_DUMP_HTML')) !== false) {
                 file_put_contents($dir.'/'.$tab.'.html', $response->getContent());
