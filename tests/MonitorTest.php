@@ -764,6 +764,8 @@ class MonitorTest extends TestCase
     public function test_setup_page_is_shown_when_no_users_exist(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
 
         $this->get('/monitor/setup')
             ->assertOk()
@@ -773,6 +775,8 @@ class MonitorTest extends TestCase
     public function test_setup_creates_the_first_user_as_owner_and_logs_them_in(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
 
         $this->post('/monitor/setup', [
             'name' => 'First Owner',
@@ -815,6 +819,7 @@ class MonitorTest extends TestCase
     public function test_login_page_is_shown(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
 
         \LaravelMonitor\Models\MonitorUser::create([
             'name' => 'Existing',
@@ -831,6 +836,7 @@ class MonitorTest extends TestCase
     public function test_login_with_correct_credentials_authenticates_and_redirects(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
 
         $user = \LaravelMonitor\Models\MonitorUser::create([
             'name' => 'Login Success',
@@ -850,6 +856,7 @@ class MonitorTest extends TestCase
     public function test_login_with_wrong_password_does_not_authenticate(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
 
         \LaravelMonitor\Models\MonitorUser::create([
             'name' => 'Login Failure',
@@ -883,5 +890,46 @@ class MonitorTest extends TestCase
         $this->post('/monitor/logout')->assertRedirect('/monitor/login');
 
         $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+    }
+
+    public function test_unauthenticated_visitor_is_redirected_to_setup_when_no_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $this->get('/monitor')->assertRedirect('/monitor/setup');
+    }
+
+    public function test_unauthenticated_visitor_is_redirected_to_login_when_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'redirect-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor')->assertRedirect('/monitor/login');
+    }
+
+    public function test_authenticated_visitor_passes_through_to_the_dashboard(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // TestCase::setUp() already logged in a default owner.
+        $this->get('/monitor')->assertOk();
+    }
+
+    public function test_the_gate_still_hard_aborts_regardless_of_auth_state(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => false);
+
+        // TestCase::setUp()'s default owner is authenticated, but the Gate
+        // is the outer, unconditional switch — it must still win.
+        $this->get('/monitor')->assertForbidden();
     }
 }
