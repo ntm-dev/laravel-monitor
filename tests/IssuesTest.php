@@ -3,9 +3,11 @@
 namespace LaravelMonitor\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\Issues;
 use Livewire\Livewire;
+use Ramsey\Uuid\Uuid;
 
 class IssuesTest extends TestCase
 {
@@ -127,5 +129,25 @@ class IssuesTest extends TestCase
         $open = Livewire::test(Issues::class)->set('view', 'performance')->viewData('performance');
 
         $this->assertCount(0, $open);
+    }
+
+    public function test_monitor_issues_has_uuid_and_priority_columns_with_defaults(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_issues', ['uuid', 'priority']));
+
+        DB::table('monitor_issues')->insert([
+            'type' => 'exception',
+            'key' => 'test-key',
+            'status' => 'open',
+            'uuid' => Uuid::uuid7()->toString(),
+            'first_seen' => now(),
+            'last_seen' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $row = DB::table('monitor_issues')->where('key', 'test-key')->first();
+
+        $this->assertSame('none', $row->priority);
     }
 }
