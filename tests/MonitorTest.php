@@ -760,4 +760,55 @@ class MonitorTest extends TestCase
         $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
         $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
     }
+
+    public function test_setup_page_is_shown_when_no_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/setup')
+            ->assertOk()
+            ->assertSeeText('Create the owner account');
+    }
+
+    public function test_setup_creates_the_first_user_as_owner_and_logs_them_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->post('/monitor/setup', [
+            'name' => 'First Owner',
+            'email' => 'first-owner@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor');
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'first-owner@example.com')->first();
+
+        $this->assertNotNull($user);
+        $this->assertSame('owner', $user->role);
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_setup_is_unreachable_once_a_user_already_exists(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'existing@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor/setup')->assertRedirect('/monitor/login');
+
+        $this->post('/monitor/setup', [
+            'name' => 'Second Owner',
+            'email' => 'second-owner@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor/login');
+
+        $this->assertNull(\LaravelMonitor\Models\MonitorUser::where('email', 'second-owner@example.com')->first());
+    }
 }

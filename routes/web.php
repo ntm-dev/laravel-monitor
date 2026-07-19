@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use LaravelMonitor\Http\Controllers\Auth\SetupController;
 use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
@@ -11,6 +12,8 @@ Route::domain(config('monitor.domain'))
     ->middleware(array_merge(config('monitor.middleware', ['web']), [Authorize::class]))
     ->prefix(config('monitor.path', 'monitor'))
     ->group(function () {
+        Route::get('/setup', [SetupController::class, 'show'])->name('monitor.setup');
+        Route::post('/setup', [SetupController::class, 'store'])->name('monitor.setup.store');
         Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
         Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
         Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');
