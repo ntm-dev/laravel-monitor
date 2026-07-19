@@ -150,4 +150,63 @@ class IssuesTest extends TestCase
 
         $this->assertSame('none', $row->priority);
     }
+
+    public function test_set_issue_priority_persists_and_creates_the_row_if_missing(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+
+        $storage->setIssuePriority('exception', 'App\\Exceptions\\Boom', 'high');
+
+        $statuses = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom']);
+
+        $this->assertSame('high', $statuses->get('App\\Exceptions\\Boom')->priority);
+        $this->assertNotNull($statuses->get('App\\Exceptions\\Boom')->uuid);
+    }
+
+    public function test_set_issue_priority_rejects_an_invalid_value(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+
+        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::flush();
+
+        Livewire::test(Issues::class)->set('view', 'exceptions'); // triggers syncIssues() for the row above
+
+        $storage->setIssuePriority('exception', 'App\\Exceptions\\Boom', 'not-a-real-priority');
+
+        $this->assertSame('none', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->priority);
+    }
+
+    public function test_find_issue_by_uuid_returns_the_matching_row(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        $found = $storage->findIssueByUuid($uuid);
+
+        $this->assertNotNull($found);
+        $this->assertSame('exception', $found->type);
+        $this->assertSame('App\\Exceptions\\Boom', $found->key);
+    }
+
+    public function test_find_issue_by_uuid_returns_null_for_an_unknown_uuid(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+
+        $this->assertNull($storage->findIssueByUuid((string) \Illuminate\Support\Str::uuid()));
+    }
+
+    public function test_sync_issues_assigns_a_uuid_to_newly_created_rows(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+
+        $storage->syncIssues('exception', ['App\\Exceptions\\Boom' => now()]);
+
+        $status = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom');
+
+        $this->assertNotNull($status->uuid);
+        $this->assertSame(36, strlen($status->uuid));
+    }
 }

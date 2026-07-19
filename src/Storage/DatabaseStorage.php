@@ -8,7 +8,10 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Support\Format;
+use Ramsey\Uuid\Uuid;
 
 class DatabaseStorage implements Storage
 {
@@ -749,6 +752,7 @@ class DatabaseStorage implements Storage
                 $this->issuesTable()->insert([
                     'type' => $type,
                     'key' => $key,
+                    'uuid' => Uuid::uuid7()->toString(),
                     'status' => 'open',
                     'first_seen' => $lastSeenValue,
                     'last_seen' => $lastSeenValue,
@@ -788,10 +792,13 @@ class DatabaseStorage implements Storage
         return $this->issuesTable()
             ->where('type', $type)
             ->whereIn('key', $keys)
-            ->get(['key', 'status', 'first_seen'])
+            ->get(['id', 'uuid', 'key', 'status', 'priority', 'first_seen'])
             ->keyBy('key')
             ->map(fn ($row) => (object) [
+                'id' => (int) $row->id,
+                'uuid' => $row->uuid,
                 'status' => $row->status,
+                'priority' => $row->priority,
                 'first_seen' => CarbonImmutable::parse($row->first_seen),
             ]);
     }
@@ -811,6 +818,7 @@ class DatabaseStorage implements Storage
             $this->issuesTable()->insert([
                 'type' => $type,
                 'key' => $key,
+                'uuid' => Uuid::uuid7()->toString(),
                 'status' => $status,
                 'first_seen' => $now,
                 'last_seen' => $now,
@@ -832,6 +840,58 @@ class DatabaseStorage implements Storage
     public function openIssueCount(): int
     {
         return $this->issuesTable()->where('status', 'open')->count();
+    }
+
+    public function setIssuePriority(string $type, string $key, string $priority): void
+    {
+        if (! array_key_exists($priority, Format::PRIORITIES)) {
+            return;
+        }
+
+        $now = CarbonImmutable::now();
+        $exists = $this->issuesTable()->where('type', $type)->where('key', $key)->exists();
+
+        if (! $exists) {
+            $this->issuesTable()->insert([
+                'type' => $type,
+                'key' => $key,
+                'uuid' => Uuid::uuid7()->toString(),
+                'status' => 'open',
+                'priority' => $priority,
+                'first_seen' => $now,
+                'last_seen' => $now,
+                'resolved_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        $this->issuesTable()->where('type', $type)->where('key', $key)->update([
+            'priority' => $priority,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function findIssueByUuid(string $uuid): ?object
+    {
+        $row = $this->issuesTable()->where('uuid', $uuid)->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return (object) [
+            'id' => (int) $row->id,
+            'uuid' => $row->uuid,
+            'type' => $row->type,
+            'key' => $row->key,
+            'status' => $row->status,
+            'priority' => $row->priority,
+            'first_seen' => CarbonImmutable::parse($row->first_seen),
+            'last_seen' => CarbonImmutable::parse($row->last_seen),
+        ];
     }
 
     /**

@@ -268,12 +268,13 @@ interface Storage
     public function syncIssues(string $type, array $lastSeenByKey): void;
 
     /**
-     * Status + first_seen for each of the given keys of a type, keyed by key
-     * — batches what would otherwise be one lookup per row on the Issues
-     * page. A key with no matching row (not yet synced) is simply absent.
+     * Status + priority + first_seen for each of the given keys of a type,
+     * keyed by key — batches what would otherwise be one lookup per row on
+     * the Issues page. A key with no matching row (not yet synced) is
+     * simply absent.
      *
      * @param  string[]  $keys
-     * @return Collection<string, object{status: string, first_seen: CarbonImmutable}>
+     * @return Collection<string, object{id: int, uuid: string, status: string, priority: string, first_seen: CarbonImmutable}>
      */
     public function issueStatuses(string $type, array $keys): Collection;
 
@@ -290,4 +291,18 @@ interface Storage
      * records synced by syncIssues(), not a windowed event count.
      */
     public function openIssueCount(): int;
+
+    /**
+     * Set an issue's priority (one of Format::PRIORITIES' keys) — silently
+     * no-ops on an invalid value. Creates the row if syncIssues() hasn't
+     * seen this key yet, same as setIssueStatus().
+     */
+    public function setIssuePriority(string $type, string $key, string $priority): void;
+
+    /**
+     * Resolve a monitor_issues row by its uuid — the /monitor/issues/{uuid}
+     * detail route uses this to find the [type, key] pair to fetch the
+     * underlying exception/performance data for.
+     */
+    public function findIssueByUuid(string $uuid): ?object;
 }
