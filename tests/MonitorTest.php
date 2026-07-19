@@ -205,7 +205,14 @@ class MonitorTest extends TestCase
 
         $this->assertNotNull($row);
         $payload = json_decode($row->payload, true);
-        $this->assertSame('redis', $payload['store']);
+
+        // storeName only exists on this event from Laravel 11 onward (#49754).
+        if (property_exists(\Illuminate\Cache\Events\KeyWritten::class, 'storeName')) {
+            $this->assertSame('redis', $payload['store']);
+        } else {
+            $this->assertArrayNotHasKey('store', $payload);
+        }
+
         $this->assertSame(60, $payload['ttl']);
     }
 
