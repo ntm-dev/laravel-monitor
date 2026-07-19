@@ -209,4 +209,60 @@ class IssuesTest extends TestCase
         $this->assertNotNull($status->uuid);
         $this->assertSame(36, strlen($status->uuid));
     }
+
+    public function test_exception_rows_carry_id_uuid_and_priority(): void
+    {
+        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::flush();
+
+        $row = Livewire::test(Issues::class)->set('view', 'exceptions')->viewData('exceptions')->first();
+
+        $this->assertNotNull($row->id);
+        $this->assertSame(36, strlen($row->uuid));
+        $this->assertSame('none', $row->priority);
+    }
+
+    public function test_bulk_resolving_selected_exceptions_moves_them_out_of_the_open_tab(): void
+    {
+        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record('exception', 'App\\Exceptions\\Bang', ['class' => 'App\\Exceptions\\Bang', 'message' => 'bang'], null, 'unhandled');
+        Monitor::flush();
+
+        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
+        $this->assertCount(2, $component->viewData('exceptions'));
+
+        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
+        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Bang');
+        $this->assertSame(2, $component->instance()->selectedCount());
+
+        $component->call('resolveSelected');
+
+        $this->assertCount(0, $component->viewData('exceptions'));
+        $this->assertSame(0, $component->instance()->selectedCount());
+
+        $resolved = $component->set('status', 'resolved')->viewData('exceptions');
+        $this->assertCount(2, $resolved);
+    }
+
+    public function test_toggling_the_same_row_twice_deselects_it(): void
+    {
+        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
+
+        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
+        $this->assertSame(1, $component->instance()->selectedCount());
+
+        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
+        $this->assertSame(0, $component->instance()->selectedCount());
+    }
+
+    public function test_select_all_selects_every_given_pair_and_switching_view_clears_selection(): void
+    {
+        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
+
+        $component->call('selectAll', [['exception', 'App\\Exceptions\\Boom'], ['exception', 'App\\Exceptions\\Bang']]);
+        $this->assertSame(2, $component->instance()->selectedCount());
+
+        $component->set('view', 'performance');
+        $this->assertSame(0, $component->instance()->selectedCount());
+    }
 }

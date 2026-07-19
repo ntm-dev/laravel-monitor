@@ -13,7 +13,7 @@ class Issues extends Card
      * Performance tab, in the order rows fall back to when max durations tie.
      * type => the monitor_entries `type`; tab => dashboard tab a row links to.
      */
-    protected const PERFORMANCE_AREAS = [
+    public const PERFORMANCE_AREAS = [
         'request' => ['badge' => 'Request', 'tab' => 'requests', 'threshold' => 'request'],
         'job' => ['badge' => 'Job', 'tab' => 'jobs', 'threshold' => 'job'],
         'slow_query' => ['badge' => 'Query', 'tab' => 'queries', 'threshold' => 'query'],
@@ -29,6 +29,8 @@ class Issues extends Card
 
     public string $search = '';
 
+    public array $selected = [];
+
     public function resolve(string $type, string $key): void
     {
         $this->setStatus($type, $key, 'resolved');
@@ -42,6 +44,73 @@ class Issues extends Card
     public function reopen(string $type, string $key): void
     {
         $this->setStatus($type, $key, 'open');
+    }
+
+    /**
+     * @param  array<int, array{0: string, 1: string}>  $pairs
+     */
+    public function selectAll(array $pairs): void
+    {
+        foreach ($pairs as [$type, $key]) {
+            $this->selected[$type][$key] = true;
+        }
+    }
+
+    public function deselectAll(): void
+    {
+        $this->selected = [];
+    }
+
+    public function toggleSelected(string $type, string $key): void
+    {
+        if (isset($this->selected[$type][$key])) {
+            unset($this->selected[$type][$key]);
+
+            if ($this->selected[$type] === []) {
+                unset($this->selected[$type]);
+            }
+
+            return;
+        }
+
+        $this->selected[$type][$key] = true;
+    }
+
+    public function selectedCount(): int
+    {
+        return array_sum(array_map('count', $this->selected));
+    }
+
+    public function resolveSelected(): void
+    {
+        $this->applyStatusToSelected('resolved');
+    }
+
+    public function ignoreSelected(): void
+    {
+        $this->applyStatusToSelected('ignored');
+    }
+
+    /**
+     * Livewire lifecycle hook — fires automatically whenever the public
+     * $view property changes (the Exceptions/Performance toggle), since a
+     * selection made while looking at one sub-tab shouldn't silently apply
+     * to rows the viewer can no longer see.
+     */
+    public function updatedView(): void
+    {
+        $this->selected = [];
+    }
+
+    protected function applyStatusToSelected(string $status): void
+    {
+        foreach ($this->selected as $type => $keys) {
+            foreach (array_keys($keys) as $key) {
+                $this->setStatus($type, $key, $status);
+            }
+        }
+
+        $this->selected = [];
     }
 
     protected function setStatus(string $type, string $key, string $status): void
@@ -111,6 +180,7 @@ class Issues extends Card
             'exceptionCount' => $exceptions->count(),
             'performance' => $performance,
             'performanceCount' => $performance->count(),
+            'selected' => $this->selected,
             'status' => $status,
         ];
     }
@@ -128,6 +198,9 @@ class Issues extends Card
         return $items->map(function ($item) use ($statuses, $type) {
             $found = $statuses->get($item->key);
             $item->issue_type = $type;
+            $item->id = $found->id ?? null;
+            $item->uuid = $found->uuid ?? null;
+            $item->priority = $found->priority ?? 'none';
             $item->status = $found->status ?? 'open';
             $item->first_seen = $found->first_seen ?? $item->last_seen;
 
