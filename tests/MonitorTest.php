@@ -861,11 +861,33 @@ class MonitorTest extends TestCase
         };
     }
 
+    /**
+     * Illuminate\Queue\Events\JobQueued's constructor gained the `queue`
+     * and `delay` parameters after Laravel 10.0.0 (which only accepts
+     * connectionName/id/job/payload) — the CI matrix's prefer-lowest run
+     * resolves that early signature, and positional args silently shift
+     * (e.g. `id` lands in the `queue` slot) instead of erroring. Build the
+     * event via named args limited to whatever parameters the installed
+     * version actually declares.
+     */
+    protected function jobQueuedEvent(string $connectionName, string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
+    {
+        $class = \Illuminate\Queue\Events\JobQueued::class;
+
+        $available = collect((new ReflectionClass($class))->getConstructor()->getParameters())->pluck('name');
+
+        $args = collect(compact('connectionName', 'queue', 'id', 'job', 'payload', 'delay'))
+            ->only($available)
+            ->all();
+
+        return new $class(...$args);
+    }
+
     public function test_job_recorder_correlates_queued_to_processed_via_job_id_and_captures_attempts(): void
     {
         $job = $this->syncJob('job-abc123');
 
-        event(new \Illuminate\Queue\Events\JobQueued('sync', 'default', 'job-abc123', $job, json_encode([]), null));
+        event($this->jobQueuedEvent('sync', 'default', 'job-abc123', $job, json_encode([])));
         event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
         event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
 
@@ -883,7 +905,7 @@ class MonitorTest extends TestCase
     {
         $job = $this->syncJob();
 
-        event(new \Illuminate\Queue\Events\JobQueued('sync', 'default', '', $job, json_encode([]), null));
+        event($this->jobQueuedEvent('sync', 'default', '', $job, json_encode([])));
 
         Monitor::flush();
 
