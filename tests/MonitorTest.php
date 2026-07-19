@@ -862,25 +862,31 @@ class MonitorTest extends TestCase
     }
 
     /**
-     * Illuminate\Queue\Events\JobQueued's constructor gained the `queue`
-     * and `delay` parameters after Laravel 10.0.0 (which only accepts
-     * connectionName/id/job/payload) — the CI matrix's prefer-lowest run
-     * resolves that early signature, and positional args silently shift
-     * (e.g. `id` lands in the `queue` slot) instead of erroring. Build the
-     * event via named args limited to whatever parameters the installed
-     * version actually declares.
+     * Several Illuminate queue/cache events gained extra constructor
+     * parameters in later Laravel versions than the package's declared
+     * minimum (e.g. JobQueued's `queue`/`delay` post-10.0.0). The CI
+     * matrix's prefer-lowest run resolves the early signature, and extra
+     * positional args silently shift into the wrong slot instead of
+     * erroring. Build the event via named args limited to whatever
+     * parameters the installed version actually declares.
      */
-    protected function jobQueuedEvent(string $connectionName, string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
+    protected function constructEventCompatibly(string $class, array $namedArgs): object
     {
-        $class = \Illuminate\Queue\Events\JobQueued::class;
-
         $available = collect((new ReflectionClass($class))->getConstructor()->getParameters())->pluck('name');
 
-        $args = collect(compact('connectionName', 'queue', 'id', 'job', 'payload', 'delay'))
-            ->only($available)
-            ->all();
+        $args = collect($namedArgs)->only($available)->all();
 
         return new $class(...$args);
+    }
+
+    protected function jobQueuedEvent(string $connectionName, string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
+    {
+        return $this->constructEventCompatibly(\Illuminate\Queue\Events\JobQueued::class, compact('connectionName', 'queue', 'id', 'job', 'payload', 'delay'));
+    }
+
+    protected function jobReleasedAfterExceptionEvent(string $connectionName, $job, ?int $backoff = null): \Illuminate\Queue\Events\JobReleasedAfterException
+    {
+        return $this->constructEventCompatibly(\Illuminate\Queue\Events\JobReleasedAfterException::class, compact('connectionName', 'job', 'backoff'));
     }
 
     public function test_job_recorder_correlates_queued_to_processed_via_job_id_and_captures_attempts(): void
@@ -919,7 +925,7 @@ class MonitorTest extends TestCase
         $job = $this->syncJob();
 
         event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
-        event(new \Illuminate\Queue\Events\JobReleasedAfterException('sync', $job, 30));
+        event($this->jobReleasedAfterExceptionEvent('sync', $job, 30));
 
         Monitor::flush();
 
@@ -928,7 +934,13 @@ class MonitorTest extends TestCase
         $this->assertNotNull($row);
         $payload = json_decode($row->payload, true);
         $this->assertSame(1, $payload['attempts']);
-        $this->assertSame(30, $payload['backoff']);
+
+        // backoff only exists on this event from Laravel 12 onward (#58414).
+        if (property_exists(\Illuminate\Queue\Events\JobReleasedAfterException::class, 'backoff')) {
+            $this->assertSame(30, $payload['backoff']);
+        } else {
+            $this->assertArrayNotHasKey('backoff', $payload);
+        }
     }
 
     public function test_job_recorder_captures_attempts_on_failure(): void

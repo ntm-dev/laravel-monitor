@@ -121,7 +121,9 @@ class Jobs extends Recorder
                 'job_id' => $this->jobId($event->job->getJobId()),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
-                'backoff' => $event->backoff,
+                // backoff only exists on this event from Laravel 12 onward (#58414);
+                // `??` avoids an "Undefined property" error under E_ALL on older versions.
+                'backoff' => $event->backoff ?? null,
             ], fn ($value) => $value !== null),
             duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
             subtype: 'released',

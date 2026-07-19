@@ -47,12 +47,15 @@ class CacheInteractions extends Recorder
         $events->listen(WritingManyKeys::class, fn () => $this->startedAt = microtime(true));
         $events->listen(ForgettingKey::class, fn () => $this->startedAt = microtime(true));
 
-        $events->listen(CacheHit::class, fn (CacheHit $event) => $this->record($event->key, 'hit', $event->storeName));
-        $events->listen(CacheMissed::class, fn (CacheMissed $event) => $this->record($event->key, 'miss', $event->storeName));
-        $events->listen(KeyWritten::class, fn (KeyWritten $event) => $this->record($event->key, 'write', $event->storeName, $event->seconds));
-        $events->listen(KeyForgotten::class, fn (KeyForgotten $event) => $this->record($event->key, 'forget', $event->storeName));
-        $events->listen(KeyWriteFailed::class, fn (KeyWriteFailed $event) => $this->record($event->key, 'write_failed', $event->storeName, $event->seconds));
-        $events->listen(KeyForgetFailed::class, fn (KeyForgetFailed $event) => $this->record($event->key, 'forget_failed', $event->storeName));
+        // storeName was only added to these events in Laravel 11 (#49754) —
+        // `??` (not property_exists) both reads it when present and avoids
+        // an "Undefined property" error under E_ALL on Laravel 10.
+        $events->listen(CacheHit::class, fn (CacheHit $event) => $this->record($event->key, 'hit', $event->storeName ?? null));
+        $events->listen(CacheMissed::class, fn (CacheMissed $event) => $this->record($event->key, 'miss', $event->storeName ?? null));
+        $events->listen(KeyWritten::class, fn (KeyWritten $event) => $this->record($event->key, 'write', $event->storeName ?? null, $event->seconds));
+        $events->listen(KeyForgotten::class, fn (KeyForgotten $event) => $this->record($event->key, 'forget', $event->storeName ?? null));
+        $events->listen(KeyWriteFailed::class, fn (KeyWriteFailed $event) => $this->record($event->key, 'write_failed', $event->storeName ?? null, $event->seconds));
+        $events->listen(KeyForgetFailed::class, fn (KeyForgetFailed $event) => $this->record($event->key, 'forget_failed', $event->storeName ?? null));
     }
 
     protected function record(string $key, string $interaction, ?string $storeName = null, ?int $ttl = null): void
