@@ -932,4 +932,49 @@ class MonitorTest extends TestCase
         // is the outer, unconditional switch — it must still win.
         $this->get('/monitor')->assertForbidden();
     }
+
+    public function test_a_viewer_cannot_post_settings_system(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->post('/monitor/settings/system', [])->assertForbidden();
+    }
+
+    public function test_a_viewer_cannot_post_settings_reset(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-reset-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->post('/monitor/settings/reset')->assertForbidden();
+    }
+
+    public function test_an_admin_can_post_settings_reset(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin',
+            'email' => 'settings-admin@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'admin',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        $this->post('/monitor/settings/reset')->assertRedirect();
+    }
 }
