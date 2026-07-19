@@ -51,6 +51,7 @@ class Timeline extends Component
     public function __construct(
         public array $entries,
         public int $totalDuration,
+        public string $rootLabel = 'REQUEST',
     ) {
         $byId = collect($entries)->keyBy('id');
         $byParent = collect($entries)->groupBy(fn (TimelineEntry $entry) => $entry->parentId ?? 'request');
@@ -74,6 +75,15 @@ class Timeline extends Component
             // lookup key (see Recorders\Queries::record() and Livewire\Queries).
             'queryUrl' => $entry->type === 'query'
                 ? route('monitor.dashboard', ['tab' => 'queries', 'key' => $entry->metadata['sql'] ?? $entry->label])
+                : null,
+            // The entry's own database id — see NotificationDetail/MailDetail —
+            // for the full per-occurrence page (correlation link to the other
+            // one included), which this inline panel only summarises.
+            'notificationUrl' => $entry->type === 'notification'
+                ? route('monitor.dashboard', ['tab' => 'notifications', 'key' => $entry->id])
+                : null,
+            'mailUrl' => $entry->type === 'mail'
+                ? route('monitor.dashboard', ['tab' => 'mail', 'key' => $entry->id])
                 : null,
         ]])->all())->toHtml();
     }

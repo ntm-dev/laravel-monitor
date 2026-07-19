@@ -37,6 +37,19 @@ class Monitor
     /** The buffered root `request` entry, finalised (phases, duration) on flush. */
     protected ?Entry $pendingRequest = null;
 
+    /**
+     * State of the queued job attempt currently being processed, or null
+     * outside one — same shape/purpose as $request but for jobs, so
+     * everything a job's handle() triggers (queries, mail, notifications)
+     * can be correlated onto a job attempt timeline the same way request
+     * children are. A worker process handles jobs one at a time and never
+     * concurrently with an HTTP request, so at most one of $request/$job is
+     * ever set.
+     *
+     * @var array{id: string, start: float}|null
+     */
+    protected ?array $job = null;
+
     /** The artisan command currently running, or null outside a console command. */
     protected ?string $command = null;
 
@@ -67,7 +80,7 @@ class Monitor
             $duration,
             $subtype,
             $userId,
-            $this->request['id'] ?? null,
+            $this->request['id'] ?? $this->job['id'] ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -91,15 +104,25 @@ class Monitor
      */
     protected function startOffsetFor(string $type, ?float $duration): ?float
     {
-        if ($this->request === null) {
-            return null;
+        if ($this->request !== null) {
+            if ($type === 'request') {
+                return 0.0;
+            }
+
+            return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
         }
 
-        if ($type === 'request') {
-            return 0.0;
+        if ($this->job !== null) {
+            if ($type === 'job') {
+                return 0.0;
+            }
+
+            $elapsed = max(0.0, round((microtime(true) - $this->job['start']) * 1000, 3));
+
+            return max(0.0, round($elapsed - ($duration ?? 0), 3));
         }
 
-        return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
+        return null;
     }
 
     public function enabled(): bool
@@ -140,6 +163,32 @@ class Monitor
         return $this->request['id'] ?? null;
     }
 
+    /**
+     * Starts tracking a queued job attempt. Called by the Jobs recorder on
+     * JobProcessing, before the job's own handle() runs — everything it
+     * triggers (queries, mail, notifications, cache) picks up this id via
+     * record()'s request_id fallback, the same way an HTTP request's
+     * children do.
+     */
+    public function beginJobAttempt(): void
+    {
+        $this->job = [
+            'id' => (string) Str::uuid(),
+            'start' => microtime(true),
+        ];
+    }
+
+    public function jobAttemptId(): ?string
+    {
+        return $this->job['id'] ?? null;
+    }
+
+    /** Called by the Jobs recorder once the attempt's own `job` entry has been recorded. */
+    public function endJobAttempt(): void
+    {
+        $this->job = null;
+    }
+
     /** Set by the CommandStarting listener; used to label queries recorded outside a request. */
     public function setCommand(?string $command): void
     {
@@ -149,6 +198,38 @@ class Monitor
     public function commandName(): ?string
     {
         return $this->command;
+    }
+
+    /**
+     * Correlation id shared between a mail-channel notification's own entry
+     * and the `mail` entry its send produces, set while that channel's send
+     * is in flight (between `NotificationSending` and `NotificationSent`).
+     * One scalar is enough — same reasoning as CacheInteractions'
+     * `$startedAt`: Laravel dispatches a notification's channels
+     * sequentially within a single request/job, never concurrently, so
+     * nothing else can interleave and overwrite it mid-flight.
+     */
+    protected ?string $pendingNotificationCorrelationId = null;
+
+    /**
+     * Starts a new correlation window for a mail-channel notification about
+     * to be sent, returning the id both the Notifications and Mail
+     * recorders should stamp onto their respective entries.
+     */
+    public function beginNotificationDispatch(): string
+    {
+        return $this->pendingNotificationCorrelationId = (string) Str::uuid();
+    }
+
+    /** The in-flight correlation id, or null outside a mail-channel notification dispatch. */
+    public function pendingNotificationCorrelationId(): ?string
+    {
+        return $this->pendingNotificationCorrelationId;
+    }
+
+    public function endNotificationDispatch(): void
+    {
+        $this->pendingNotificationCorrelationId = null;
     }
 
     /**

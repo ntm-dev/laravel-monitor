@@ -27,6 +27,18 @@
                     @livewire('monitor.exception-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'queries' && filled($key))
                     @livewire('monitor.query-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'notifications' && filled($key) && ctype_digit($key))
+                    {{-- $key is one send's own database id (per-occurrence) --}}
+                    @livewire('monitor.notification-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'notifications' && filled($key))
+                    {{-- $key is the notification class (aggregate across all its sends) --}}
+                    @livewire('monitor.notification-class-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'mail' && filled($key) && ctype_digit($key))
+                    {{-- $key is one send's own database id (per-occurrence) --}}
+                    @livewire('monitor.mail-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'mail' && filled($key))
+                    {{-- $key is the mailable/notification class (aggregate across all its sends) --}}
+                    @livewire('monitor.mail-class-detail', $rangeProps + ['key' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif

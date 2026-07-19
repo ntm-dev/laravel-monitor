@@ -45,7 +45,7 @@ class TimelineRow extends Component
     public const SLOW_BAR = 'border border-amber-500 bg-amber-500/20 dark:border-amber-400 dark:bg-amber-400/20';
 
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
-    protected const DETAILABLE_TYPES = ['query', 'cache'];
+    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification'];
 
     /** Bar left edge / width as percentages of the total duration. */
     public float $left;
@@ -88,6 +88,8 @@ class TimelineRow extends Component
          * is built twice — once per pane — from this one component.
          */
         public string $part = 'bar',
+        /** "REQUEST" for the Request Detail timeline, "JOB" for a job attempt's — see JobAttemptController. */
+        public string $rootLabel = 'REQUEST',
     ) {
         $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
         $this->width = $total > 0 ? min(100 - $this->left, max(0.15, ($entry->duration / $total) * 100)) : 0.15;
