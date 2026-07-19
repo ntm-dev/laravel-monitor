@@ -829,6 +829,11 @@ class DatabaseStorage implements Storage
         ]);
     }
 
+    public function openIssueCount(): int
+    {
+        return $this->issuesTable()->where('status', 'open')->count();
+    }
+
     /**
      * @return array{0: CarbonImmutable, 1: float}
      */

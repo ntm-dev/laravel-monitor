@@ -46,7 +46,7 @@
                         <div class="flex items-center gap-2 p-3.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                             <a href="{{ route('monitor.dashboard', ['tab' => 'exceptions'] + $range) }}" class="block min-w-0 flex-1">
                                 <div class="flex items-start justify-between gap-2">
-                                    <p class="break-all font-mono text-xs font-medium text-rose-600 dark:text-rose-400">{{ class_basename($exception->key) }}</p>
+                                    <p class="break-all font-mono text-xs font-medium text-rose-600 dark:text-rose-400">{{ class_basename($exception->latest['class'] ?? $exception->key) }}</p>
                                     <span class="shrink-0 rounded border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-1.5 py-0.5 font-mono text-xs text-rose-600 dark:text-rose-400">{{ number_format($exception->count) }}×</span>
                                 </div>
                                 @if (($exception->latest['message'] ?? '') !== '')

@@ -283,4 +283,11 @@ interface Storage
      * syncIssues() hasn't seen this key yet rather than silently no-op-ing.
      */
     public function setIssueStatus(string $type, string $key, string $status): void;
+
+    /**
+     * Count of issues currently "open" — powers the sidebar badge. Not
+     * scoped to the viewer's selected time range: issues are persistent
+     * records synced by syncIssues(), not a windowed event count.
+     */
+    public function openIssueCount(): int;
 }

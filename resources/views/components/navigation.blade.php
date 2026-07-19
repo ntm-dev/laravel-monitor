@@ -1,6 +1,6 @@
 {{-- Desktop sidebar: app identity, grouped tab links and footer entries.
      All data is prepared by Http\Controllers\DashboardController. --}}
-@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial'])
+@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'openIssueCount' => 0])
 <aside class="sticky top-0 hidden h-screen w-[228px] shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
     <div class="p-2">
         <div class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5">
@@ -27,7 +27,10 @@
                            'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $tab !== $tabKey,
                        ])>
                         <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300' }}"/>
-                        {{ $item['label'] }}
+                        <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        @if ($tabKey === 'issues' && $openIssueCount > 0)
+                            <span class="shrink-0 rounded-full border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] leading-none text-rose-600 dark:text-rose-400">{{ $openIssueCount > 99 ? '99+' : $openIssueCount }}</span>
+                        @endif
                     </a>
                 @endforeach
             </div>

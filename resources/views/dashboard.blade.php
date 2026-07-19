@@ -3,7 +3,7 @@
      Http\Controllers\DashboardController. --}}
 <x-monitor::layout :title="$pageTitle">
     <div class="flex min-h-screen">
-        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
+        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :open-issue-count="$openIssueCount"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
             <x-monitor::header :tab="$tab" :tabs="$tabs" :groups="$groups" :title="$title" :detail="$detail" :key="$key" :range="$range"
