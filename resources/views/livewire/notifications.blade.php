@@ -21,8 +21,6 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
-
             <x-monitor::card class="flex flex-col p-4">
                 <x-monitor::metric label="Notifications" :value="number_format($total)">
                     @foreach ($channels as $channel)
@@ -34,6 +32,8 @@
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>
             </x-monitor::card>
+
+            <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
         </div>
 
         {{-- Grouped by notification class --}}
