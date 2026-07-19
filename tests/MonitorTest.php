@@ -714,4 +714,32 @@ class MonitorTest extends TestCase
 
         $this->assertSame('viewer', $row->role);
     }
+
+    public function test_monitor_user_role_helpers_reflect_the_stored_role(): void
+    {
+        $owner = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Owner',
+            'email' => 'owner-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin',
+            'email' => 'admin-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'admin',
+        ]);
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'viewer-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+
+        $this->assertTrue($owner->canManageSettings());
+        $this->assertTrue($admin->canManageSettings());
+        $this->assertFalse($viewer->canManageSettings());
+
+        $this->assertSame('monitor', \LaravelMonitor\Models\MonitorUser::guardName());
+    }
 }
