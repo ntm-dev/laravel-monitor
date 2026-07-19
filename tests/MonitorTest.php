@@ -1095,6 +1095,17 @@ class MonitorTest extends TestCase
         $this->assertSame(LazyLoadingFixtureModel::class, $payload['model']);
         $this->assertSame('related', $payload['relation']);
     }
+
+    public function test_format_priority_label_returns_the_human_label(): void
+    {
+        $this->assertSame('No priority', \LaravelMonitor\Support\Format::priorityLabel('none'));
+        $this->assertSame('Urgent', \LaravelMonitor\Support\Format::priorityLabel('urgent'));
+    }
+
+    public function test_format_priority_label_falls_back_to_no_priority_for_an_unknown_value(): void
+    {
+        $this->assertSame('No priority', \LaravelMonitor\Support\Format::priorityLabel('made-up'));
+    }
 }
 
 /**

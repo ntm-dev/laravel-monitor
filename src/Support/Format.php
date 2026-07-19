@@ -19,6 +19,18 @@ class Format
     public const RANGE = 'Y-m-d\TH:i';
 
     /**
+     * Manual issue-priority levels, value => human label — mirrors
+     * Nightwatch's five-level priority field on an Issue.
+     */
+    public const PRIORITIES = [
+        'none' => 'No priority',
+        'low' => 'Low',
+        'medium' => 'Medium',
+        'high' => 'High',
+        'urgent' => 'Urgent',
+    ];
+
+    /**
      * Render a millisecond duration the way Nightwatch does: "918ms", "1.73s".
      */
     public static function duration(int|float|null $milliseconds, string $fallback = '—'): string
@@ -42,5 +54,10 @@ class Format
     public static function timezone(): string
     {
         return strtoupper(Preferences::timezone());
+    }
+
+    public static function priorityLabel(string $priority): string
+    {
+        return self::PRIORITIES[$priority] ?? self::PRIORITIES['none'];
     }
 }
