@@ -1106,6 +1106,95 @@ class MonitorTest extends TestCase
     {
         $this->assertSame('No priority', \LaravelMonitor\Support\Format::priorityLabel('made-up'));
     }
+
+    public function test_issue_detail_page_renders_an_exception_issue(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+        ], null, 'unhandled');
+        Monitor::flush();
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->syncIssues('exception', [$key => now()]);
+        $uuid = $storage->issueStatuses('exception', [$key])->get($key)->uuid;
+
+        $this->get('/monitor/issues/'.$uuid)
+            ->assertOk()
+            ->assertSeeText('Boom')
+            ->assertSeeText('Kaboom')
+            ->assertSeeText('Manage');
+    }
+
+    public function test_issue_detail_page_renders_a_performance_issue(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record('slow_query', 'select * from big_table', [], 600);
+        Monitor::flush();
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->syncIssues('slow_query', ['select * from big_table' => now()]);
+        $uuid = $storage->issueStatuses('slow_query', ['select * from big_table'])->get('select * from big_table')->uuid;
+
+        $this->get('/monitor/issues/'.$uuid)
+            ->assertOk()
+            ->assertSeeText('Query')
+            ->assertSeeText('Manage');
+    }
+
+    public function test_issue_detail_page_returns_404_for_an_unknown_uuid(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/issues/'.(string) \Illuminate\Support\Str::uuid())->assertNotFound();
+    }
+
+    public function test_updating_issue_status_persists_and_redirects_back(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        $this->post('/monitor/issues/'.$uuid.'/status', ['status' => 'resolved'])
+            ->assertRedirect('/monitor/issues/'.$uuid);
+
+        $this->assertSame('resolved', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->status);
+    }
+
+    public function test_updating_issue_priority_persists_and_redirects_back(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        $this->post('/monitor/issues/'.$uuid.'/priority', ['priority' => 'urgent'])
+            ->assertRedirect('/monitor/issues/'.$uuid);
+
+        $this->assertSame('urgent', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->priority);
+    }
+
+    public function test_updating_issue_status_rejects_an_invalid_value(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        $this->post('/monitor/issues/'.$uuid.'/status', ['status' => 'not-a-status'])
+            ->assertSessionHasErrors('status');
+    }
 }
 
 /**
