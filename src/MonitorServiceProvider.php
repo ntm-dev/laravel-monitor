@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire as Cards;
+use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
 
 class MonitorServiceProvider extends ServiceProvider
@@ -27,6 +28,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerCommandTracking();
         $this->registerLivewireComponents();
         $this->registerAuthorization();
+        $this->registerAuth();
 
         $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
     }
@@ -207,6 +209,31 @@ class MonitorServiceProvider extends ServiceProvider
     {
         if (! Gate::has('viewMonitor')) {
             Gate::define('viewMonitor', fn ($user = null) => $this->app->environment('local'));
+        }
+    }
+
+    /**
+     * Register the package's own `monitor` guard/provider pair, unless the
+     * host app already defined one under the same name — mirrors
+     * registerAuthorization()'s "don't clobber a host override" rule for
+     * the viewMonitor Gate.
+     */
+    protected function registerAuth(): void
+    {
+        $guard = MonitorUser::guardName();
+
+        if (! $this->app['config']->has("auth.guards.{$guard}")) {
+            $this->app['config']->set("auth.guards.{$guard}", [
+                'driver' => 'session',
+                'provider' => 'monitor_users',
+            ]);
+        }
+
+        if (! $this->app['config']->has('auth.providers.monitor_users')) {
+            $this->app['config']->set('auth.providers.monitor_users', [
+                'driver' => 'eloquent',
+                'model' => MonitorUser::class,
+            ]);
         }
     }
 

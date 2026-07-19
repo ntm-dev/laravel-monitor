@@ -742,4 +742,22 @@ class MonitorTest extends TestCase
 
         $this->assertSame('monitor', \LaravelMonitor\Models\MonitorUser::guardName());
     }
+
+    public function test_the_monitor_guard_is_registered_and_backed_by_monitor_user(): void
+    {
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Guard Test',
+            'email' => 'guard-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->attempt([
+            'email' => 'guard-test@example.com',
+            'password' => 'password',
+        ]));
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
 }
