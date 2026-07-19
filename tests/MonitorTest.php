@@ -811,4 +811,77 @@ class MonitorTest extends TestCase
 
         $this->assertNull(\LaravelMonitor\Models\MonitorUser::where('email', 'second-owner@example.com')->first());
     }
+
+    public function test_login_page_is_shown(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'login-page-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor/login')
+            ->assertOk()
+            ->assertSeeText('Sign in');
+    }
+
+    public function test_login_with_correct_credentials_authenticates_and_redirects(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Success',
+            'email' => 'login-success@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-success@example.com',
+            'password' => 'correct-password',
+        ])->assertRedirect('/monitor');
+
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_login_with_wrong_password_does_not_authenticate(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Failure',
+            'email' => 'login-failure@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-failure@example.com',
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+    }
+
+    public function test_logout_clears_the_monitor_guard_session(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Logout Test',
+            'email' => 'logout-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->actingAs($user, 'monitor');
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+
+        $this->post('/monitor/logout')->assertRedirect('/monitor/login');
+
+        $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+    }
 }
