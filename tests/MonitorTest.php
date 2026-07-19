@@ -695,4 +695,23 @@ class MonitorTest extends TestCase
 
         $this->get('/monitor/jobs/attempts/does-not-exist')->assertNotFound();
     }
+
+    public function test_monitor_users_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_users', [
+            'id', 'name', 'email', 'password', 'role', 'created_at', 'updated_at',
+        ]));
+
+        \Illuminate\Support\Facades\DB::table('monitor_users')->insert([
+            'name' => 'Test User',
+            'email' => 'test-user@example.com',
+            'password' => 'irrelevant-for-this-test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $row = \Illuminate\Support\Facades\DB::table('monitor_users')->where('email', 'test-user@example.com')->first();
+
+        $this->assertSame('viewer', $row->role);
+    }
 }

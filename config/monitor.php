@@ -71,6 +71,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Authentication
+    |--------------------------------------------------------------------------
+    |
+    | The package's own login system for the dashboard — independent of the
+    | host app's own Auth guards (Laravel isolates session state per guard
+    | name automatically). `table` names the users table, auto-migrated
+    | alongside the rest of the package's tables.
+    |
+    */
+
+    'auth' => [
+        'guard' => 'monitor',
+        'table' => 'monitor_users',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention
     |--------------------------------------------------------------------------
     |
