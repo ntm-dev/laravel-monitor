@@ -4,7 +4,9 @@ namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use LaravelMonitor\Mail\EmailChangeVerificationMail;
 use LaravelMonitor\Mail\TeamInvitationMail;
+use LaravelMonitor\Models\MonitorEmailChange;
 use LaravelMonitor\Models\MonitorInvitation;
 use LaravelMonitor\Models\MonitorUser;
 
@@ -69,6 +71,27 @@ class Team extends Card
         }
 
         $invitation->delete();
+    }
+
+    public function requestEmailChange(string $newEmail): void
+    {
+        $actor = $this->actor();
+
+        if (! filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            $this->addError('newEmail', 'Please enter a valid email address.');
+
+            return;
+        }
+
+        if (MonitorUser::query()->where('email', $newEmail)->where('id', '!=', $actor->id)->exists()) {
+            $this->addError('newEmail', 'This email is already in use.');
+
+            return;
+        }
+
+        ['plainToken' => $plainToken] = MonitorEmailChange::createFor($actor, $newEmail);
+
+        Mail::to($newEmail)->send(new EmailChangeVerificationMail($plainToken));
     }
 
     public function changeRole(int $memberId, string $role): void

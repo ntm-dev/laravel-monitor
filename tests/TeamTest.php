@@ -6,7 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use LaravelMonitor\Livewire\Team;
+use LaravelMonitor\Mail\EmailChangeVerificationMail;
 use LaravelMonitor\Mail\TeamInvitationMail;
+use LaravelMonitor\Models\MonitorEmailChange;
 use LaravelMonitor\Models\MonitorInvitation;
 use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
@@ -244,5 +246,46 @@ class TeamTest extends TestCase
         Livewire::test(Team::class)->call('transferOwnership', $viewer->id)->assertForbidden();
 
         $this->assertSame('viewer', $viewer->fresh()->role);
+    }
+
+    public function test_any_role_can_request_an_email_change_for_themself(): void
+    {
+        Mail::fake();
+
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'email-change-requester@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        Livewire::test(Team::class)->call('requestEmailChange', 'new-for-viewer@example.com');
+
+        $this->assertDatabaseHas('monitor_email_changes', ['user_id' => $viewer->id, 'new_email' => 'new-for-viewer@example.com']);
+        Mail::assertSent(EmailChangeVerificationMail::class);
+    }
+
+    public function test_requesting_an_invalid_email_change_does_not_create_a_request(): void
+    {
+        Mail::fake();
+
+        Livewire::test(Team::class)->call('requestEmailChange', 'not-an-email')->assertHasErrors('newEmail');
+
+        $this->assertSame(0, MonitorEmailChange::count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_requesting_an_email_change_to_an_email_already_in_use_is_rejected(): void
+    {
+        Mail::fake();
+
+        MonitorUser::create([
+            'name' => 'Existing', 'email' => 'already-taken@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        Livewire::test(Team::class)->call('requestEmailChange', 'already-taken@example.com')->assertHasErrors('newEmail');
+
+        $this->assertSame(0, MonitorEmailChange::count());
+        Mail::assertNothingSent();
     }
 }
