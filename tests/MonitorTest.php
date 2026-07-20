@@ -1157,4 +1157,66 @@ class MonitorTest extends TestCase
 
         $this->assertSame(1, \LaravelMonitor\Models\MonitorUser::where('email', 'double-submit@example.com')->count());
     }
+
+    public function test_monitor_password_reset_create_for_hashes_the_token_and_refreshes_on_repeat_request(): void
+    {
+        ['reset' => $first, 'plainToken' => $firstToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('reset-test@example.com');
+        ['reset' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('reset-test@example.com');
+
+        $this->assertSame($first->id, $second->id, 'a repeat request should refresh the same row, not create a second one');
+        $this->assertNotSame($firstToken, $secondToken);
+        $this->assertNotSame($firstToken, $second->token, 'the stored token must be hashed, not the plain value');
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorPasswordReset::findByPlainToken($secondToken));
+        $this->assertNull(\LaravelMonitor\Models\MonitorPasswordReset::findByPlainToken($firstToken), 'the old token must stop working once refreshed');
+    }
+
+    public function test_monitor_password_reset_is_expired_after_60_minutes(): void
+    {
+        ['reset' => $reset] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('expiry-test@example.com');
+        $this->assertFalse($reset->isExpired());
+
+        $reset->forceFill(['created_at' => now()->subMinutes(61)])->save();
+        $this->assertTrue($reset->fresh()->isExpired());
+    }
+
+    public function test_monitor_email_change_create_for_hashes_the_token_and_is_unverified_by_default(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'new-address@example.com');
+
+        $this->assertSame($requester->id, $emailChange->user_id);
+        $this->assertSame('new-address@example.com', $emailChange->new_email);
+        $this->assertNotSame($plainToken, $emailChange->token);
+        $this->assertFalse($emailChange->isVerified());
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorEmailChange::findByPlainToken($plainToken));
+        $this->assertSame($requester->id, $emailChange->user->id);
+    }
+
+    public function test_monitor_email_change_repeat_request_resets_verification(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['emailChange' => $first] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'first-address@example.com');
+        $first->forceFill(['verified_at' => now()])->save();
+
+        ['emailChange' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'second-address@example.com');
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorEmailChange::where('user_id', $requester->id)->count());
+        $this->assertSame('second-address@example.com', $second->fresh()->new_email);
+        $this->assertFalse($second->fresh()->isVerified(), 'requesting again must reset verification on the refreshed row');
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorEmailChange::findByPlainToken($secondToken));
+    }
+
+    public function test_monitor_email_change_is_expired_after_60_minutes(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'expiry-change-test@example.com');
+
+        $this->assertFalse($emailChange->isExpired());
+
+        $emailChange->forceFill(['expires_at' => now()->subHour()])->save();
+        $this->assertTrue($emailChange->fresh()->isExpired());
+    }
 }
