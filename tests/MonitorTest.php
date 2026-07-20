@@ -1240,4 +1240,93 @@ class MonitorTest extends TestCase
 
         $this->assertStringContainsString('/monitor/email-changes/'.$plainToken, $rendered);
     }
+
+    public function test_forgot_password_page_is_shown(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/forgot-password')->assertOk();
+    }
+
+    public function test_requesting_a_reset_for_a_known_email_sends_the_mail(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $this->post('/monitor/forgot-password', ['email' => 'owner@example.com'])->assertRedirect();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\LaravelMonitor\Mail\PasswordResetMail::class);
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorPasswordReset::where('email', 'owner@example.com')->first());
+    }
+
+    public function test_requesting_a_reset_for_an_unknown_email_sends_nothing_but_still_redirects_the_same_way(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $knownResponse = $this->post('/monitor/forgot-password', ['email' => 'owner@example.com']);
+        $unknownResponse = $this->post('/monitor/forgot-password', ['email' => 'unknown-nobody@example.com']);
+
+        $unknownResponse->assertRedirect();
+        $this->assertSame($knownResponse->headers->get('Location'), $unknownResponse->headers->get('Location'), 'the response must not reveal whether the email exists');
+        \Illuminate\Support\Facades\Mail::assertSent(\LaravelMonitor\Mail\PasswordResetMail::class, 1);
+        $this->assertNull(\LaravelMonitor\Models\MonitorPasswordReset::where('email', 'unknown-nobody@example.com')->first());
+    }
+
+    public function test_reset_password_page_is_shown_for_a_valid_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $this->get('/monitor/reset-password/'.$plainToken)->assertOk();
+    }
+
+    public function test_reset_password_returns_404_for_an_unknown_or_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/reset-password/not-a-real-token')->assertNotFound();
+
+        ['reset' => $reset, 'plainToken' => $expiredToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('expired-reset-test@example.com');
+        $reset->forceFill(['created_at' => now()->subMinutes(61)])->save();
+
+        $this->get('/monitor/reset-password/'.$expiredToken)->assertNotFound();
+    }
+
+    public function test_resetting_the_password_updates_it_and_logs_the_user_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $this->post('/monitor/reset-password/'.$plainToken, [
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ])->assertRedirect('/monitor');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-123', $user->fresh()->password));
+    }
+
+    public function test_resetting_an_already_consumed_password_reset_token_returns_404_instead_of_erroring(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $payload = ['password' => 'new-password-123', 'password_confirmation' => 'new-password-123'];
+
+        $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertRedirect('/monitor');
+        $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertNotFound();
+    }
 }

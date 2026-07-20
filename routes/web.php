@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use LaravelMonitor\Http\Controllers\Auth\InvitationController;
 use LaravelMonitor\Http\Controllers\Auth\LoginController;
+use LaravelMonitor\Http\Controllers\Auth\PasswordResetController;
 use LaravelMonitor\Http\Controllers\Auth\SetupController;
 use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
@@ -22,6 +23,10 @@ Route::domain(config('monitor.domain'))
         Route::post('/logout', [LoginController::class, 'destroy'])->name('monitor.logout');
         Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('monitor.invitations.show');
         Route::post('/invitations/{token}', [InvitationController::class, 'store'])->name('monitor.invitations.store');
+        Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('monitor.password.request');
+        Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('monitor.password.request.store');
+        Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('monitor.password.reset');
+        Route::post('/reset-password/{token}', [PasswordResetController::class, 'resetPassword'])->name('monitor.password.reset.store');
 
         Route::middleware(EnsureMonitorAuthenticated::class)->group(function () {
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
