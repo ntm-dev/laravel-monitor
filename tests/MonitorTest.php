@@ -894,6 +894,29 @@ class MonitorTest extends TestCase
         $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
     }
 
+    public function test_login_with_wrong_password_records_a_failed_auth_entry(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Failure',
+            'email' => 'login-failure-recorded@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-failure-recorded@example.com',
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'auth',
+            'subtype' => 'failed',
+        ]);
+    }
+
     public function test_logout_clears_the_monitor_guard_session(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);

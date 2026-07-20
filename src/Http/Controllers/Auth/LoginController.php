@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Http\Controllers\Auth;
 
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,8 @@ class LoginController
         $user = MonitorUser::query()->where('email', $credentials['email'])->first();
 
         if ($user === null || ! Auth::guard(MonitorUser::guardName())->validate($credentials)) {
+            event(new Failed(MonitorUser::guardName(), $user, $credentials));
+
             throw ValidationException::withMessages([
                 'email' => 'These credentials do not match our records.',
             ]);
