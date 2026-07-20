@@ -85,6 +85,8 @@ return [
         'guard' => 'monitor',
         'table' => 'monitor_users',
         'invitations_table' => 'monitor_invitations',
+        'password_resets_table' => 'monitor_password_resets',
+        'email_changes_table' => 'monitor_email_changes',
     ],
 
     /*

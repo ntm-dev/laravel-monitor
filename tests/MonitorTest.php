@@ -722,6 +722,20 @@ class MonitorTest extends TestCase
         ]));
     }
 
+    public function test_monitor_password_resets_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_password_resets', [
+            'id', 'email', 'token', 'created_at', 'updated_at',
+        ]));
+    }
+
+    public function test_monitor_email_changes_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_email_changes', [
+            'id', 'user_id', 'new_email', 'token', 'verified_at', 'expires_at', 'created_at', 'updated_at',
+        ]));
+    }
+
     public function test_monitor_user_role_helpers_reflect_the_stored_role(): void
     {
         $owner = \LaravelMonitor\Models\MonitorUser::create([
