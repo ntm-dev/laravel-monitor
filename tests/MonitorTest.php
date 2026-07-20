@@ -1219,4 +1219,25 @@ class MonitorTest extends TestCase
         $emailChange->forceFill(['expires_at' => now()->subHour()])->save();
         $this->assertTrue($emailChange->fresh()->isExpired());
     }
+
+    public function test_password_reset_mail_links_to_the_reset_url_with_the_plain_token(): void
+    {
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('mail-reset-test@example.com');
+
+        $mail = new \LaravelMonitor\Mail\PasswordResetMail($plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/reset-password/'.$plainToken, $rendered);
+    }
+
+    public function test_email_change_verification_mail_links_to_the_verify_url_with_the_plain_token(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'mail-verify-test@example.com');
+
+        $mail = new \LaravelMonitor\Mail\EmailChangeVerificationMail($plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/email-changes/'.$plainToken, $rendered);
+    }
 }
