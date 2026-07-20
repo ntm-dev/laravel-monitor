@@ -1601,7 +1601,10 @@ git commit -m "feat: add Team::approveEmailChange and rejectEmailChange"
 
 **Interfaces:**
 - Consumes: `Team::requestEmailChange()` (Task 5),
-  `Team::approveEmailChange()`/`rejectEmailChange()` (Task 7).
+  `Team::approveEmailChange()`/`rejectEmailChange()`/`canDecideEmailChange()`
+  (Task 7) — `canDecideEmailChange()` is reused here (not reimplemented)
+  to precompute a per-row `canDecide` flag, so the permission rule stays
+  defined in exactly one place.
 - Produces: an unconditional "Change your email" form and a "Pending
   email changes" section (verified rows only) on the Team page, with
   Approve/Reject visible only per the same role rule enforced server-side
@@ -1634,6 +1637,12 @@ Expected: FAIL — `viewData('pendingEmailChanges')` doesn't exist yet
 
 - [ ] **Step 3: Add `pendingEmailChanges` to `Team::data()`**
 
+`canDecideEmailChange()` (added in Task 7) is `protected`, so `data()` —
+a method on the same class — can call it directly to precompute a
+`canDecide` flag per row. This keeps the permission rule defined in
+exactly one place; the view only ever reads the precomputed flag, it
+never re-derives the rule.
+
 In `src/Livewire/Team.php`, change `data()` from:
 
 ```php
@@ -1654,36 +1663,33 @@ to:
 ```php
     protected function data(): array
     {
+        $actor = $this->actor();
+
+        $pendingEmailChanges = MonitorEmailChange::query()
+            ->whereNotNull('verified_at')
+            ->with('user')
+            ->orderByDesc('created_at')
+            ->get()
+            ->each(function (MonitorEmailChange $emailChange) use ($actor) {
+                $emailChange->canDecide = $this->canDecideEmailChange($actor, $emailChange->user);
+            });
+
         return [
             'members' => MonitorUser::query()->orderBy('created_at')->get(),
             'pendingInvitations' => MonitorInvitation::query()
                 ->where('expires_at', '>', now())
                 ->orderByDesc('created_at')
                 ->get(),
-            'pendingEmailChanges' => MonitorEmailChange::query()
-                ->whereNotNull('verified_at')
-                ->with('user')
-                ->orderByDesc('created_at')
-                ->get(),
+            'pendingEmailChanges' => $pendingEmailChanges,
         ];
     }
 ```
 
 - [ ] **Step 4: Add the "Change email" form and "Pending email changes" section**
 
-In `resources/views/livewire/team.blade.php`, add this closure to the
-top `@php` block, alongside the existing `$roleBadge`:
-
-```php
-    $canDecideEmailChange = fn ($requester) => match ($requester->role) {
-        'admin' => $actor->isOwner(),
-        'viewer' => $actor->canManageTeam(),
-        default => false,
-    };
-```
-
-Then, immediately after the closing `@endif` of the existing "Invite a
-member" card (the `@if ($actor->canManageTeam())` block) and before the
+In `resources/views/livewire/team.blade.php`, immediately after the
+closing `@endif` of the existing "Invite a member" card (the
+`@if ($actor->canManageTeam())` block) and before the
 `@if ($pendingInvitations->isNotEmpty())` block, insert:
 
 ```php
@@ -1720,7 +1726,7 @@ heading), insert:
                                 <p class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ $emailChange->user->name }}</p>
                                 <p class="truncate font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $emailChange->user->email }} &rarr; {{ $emailChange->new_email }}</p>
                             </div>
-                            @if ($canDecideEmailChange($emailChange->user))
+                            @if ($emailChange->canDecide)
                                 <button type="button" wire:click="approveEmailChange({{ $emailChange->id }})"
                                         class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Approve</button>
                                 <button type="button" wire:click="rejectEmailChange({{ $emailChange->id }})" wire:confirm="Reject this email change?"

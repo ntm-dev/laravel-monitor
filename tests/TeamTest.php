@@ -426,4 +426,52 @@ class TeamTest extends TestCase
 
         $this->assertTrue($component->viewData('pendingEmailChanges')->isEmpty());
     }
+
+    public function test_the_team_page_renders_when_a_verified_email_changes_requester_no_longer_exists(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'orphan-visibility-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'orphan-new-email@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        $admin->delete();
+
+        $component = Livewire::test(Team::class);
+
+        $this->assertTrue($component->viewData('pendingEmailChanges')->isEmpty());
+    }
+
+    public function test_approving_an_email_change_whose_requester_no_longer_exists_deletes_it_without_erroring(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'orphan-approve-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'orphan-approve-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        $admin->delete();
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id);
+
+        $this->assertNull(MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_rejecting_an_email_change_whose_requester_no_longer_exists_deletes_it_without_erroring(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'orphan-reject-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'orphan-reject-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        $admin->delete();
+
+        Livewire::test(Team::class)->call('rejectEmailChange', $emailChange->id);
+
+        $this->assertNull(MonitorEmailChange::find($emailChange->id));
+    }
 }

@@ -26,9 +26,11 @@ class Team extends Card
             ->with('user')
             ->orderByDesc('created_at')
             ->get()
+            ->filter(fn (MonitorEmailChange $emailChange) => $emailChange->user !== null)
             ->each(function (MonitorEmailChange $emailChange) use ($actor) {
                 $emailChange->canDecide = $this->canDecideEmailChange($actor, $emailChange->user);
-            });
+            })
+            ->values();
 
         return [
             'members' => MonitorUser::query()->orderBy('created_at')->get(),
@@ -117,6 +119,12 @@ class Team extends Card
 
         $requester = $emailChange->user;
 
+        if ($requester === null) {
+            $emailChange->delete();
+
+            return;
+        }
+
         if (! $this->canDecideEmailChange($actor, $requester)) {
             abort(403);
         }
@@ -140,7 +148,7 @@ class Team extends Card
             return;
         }
 
-        if (! $this->canDecideEmailChange($actor, $emailChange->user)) {
+        if ($emailChange->user !== null && ! $this->canDecideEmailChange($actor, $emailChange->user)) {
             abort(403);
         }
 
