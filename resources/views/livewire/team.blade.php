@@ -66,10 +66,29 @@
                             <p class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ $member->name }}</p>
                             <p class="truncate font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $member->email }}</p>
                         </div>
-                        <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($member->role) }}">{{ $member->role }}</span>
+                        @if ($actor->isOwner() && $member->id !== $actor->id)
+                            <select wire:change="changeRole({{ $member->id }}, $event.target.value)"
+                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-1.5 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                <option value="admin" @selected($member->role === 'admin')>Admin</option>
+                                <option value="viewer" @selected($member->role === 'viewer')>Viewer</option>
+                            </select>
+                            <button type="button" wire:click="transferOwnership({{ $member->id }})" wire:confirm="Make {{ $member->name }} the owner? You'll become an admin."
+                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Make owner</button>
+                            <button type="button" wire:click="removeMember({{ $member->id }})" wire:confirm="Remove {{ $member->name }} from the team?"
+                                    class="shrink-0 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">Remove</button>
+                        @else
+                            <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($member->role) }}">{{ $member->role }}</span>
+                        @endif
+                        @if ($member->id === $actor->id)
+                            <button type="button" wire:click="leave" wire:confirm="Leave the team?"
+                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Leave</button>
+                        @endif
                     </div>
                 @endforeach
             </div>
+            @error('leave')
+                <p class="mt-3 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+            @enderror
         </x-monitor::card>
     </x-monitor::section>
 </div>
