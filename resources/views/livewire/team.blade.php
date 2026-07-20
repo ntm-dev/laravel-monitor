@@ -1,13 +1,75 @@
-<div>
-    {{-- Minimal placeholder: Task 6 builds out the real Team dashboard view. --}}
-    <ul>
-        @foreach ($members as $member)
-            <li>{{ $member->email }}</li>
-        @endforeach
-    </ul>
-    <ul>
-        @foreach ($pendingInvitations as $invitation)
-            <li>{{ $invitation->email }}</li>
-        @endforeach
-    </ul>
+@php
+    use LaravelMonitor\Support\Icons;
+
+    $actor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
+    $roleBadge = fn (string $role) => match ($role) {
+        'owner' => 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        'admin' => 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+        default => 'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-500 dark:text-neutral-400',
+    };
+@endphp
+<div wire:poll.{{ $refresh }}s>
+    <x-monitor::section :icon="Icons::TEAM" title="Team">
+        @if ($actor->canManageTeam())
+            <x-monitor::card class="p-4">
+                <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Invite a member</p>
+                <form wire:submit="invite($refs.email.value, $refs.role.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                    <div class="min-w-0 flex-1">
+                        <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Email</label>
+                        <input type="email" x-ref="email" required
+                               class="mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Role</label>
+                        <select x-ref="role" class="mt-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Send invite</button>
+                </form>
+                @error('email')
+                    <p class="mt-2 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                @enderror
+            </x-monitor::card>
+        @endif
+
+        @if ($pendingInvitations->isNotEmpty())
+            <div class="mt-4 flex items-center gap-2 px-1 pb-3">
+                <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingInvitations->count()) }} Pending {{ $pendingInvitations->count() === 1 ? 'Invite' : 'Invites' }}</h3>
+            </div>
+            <x-monitor::card class="p-4">
+                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    @foreach ($pendingInvitations as $invitation)
+                        <div class="flex items-center gap-3 py-2.5">
+                            <span class="min-w-0 flex-1 truncate font-mono text-sm text-neutral-700 dark:text-neutral-200">{{ $invitation->email }}</span>
+                            <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($invitation->role) }}">{{ $invitation->role }}</span>
+                            <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">expires {{ $invitation->expires_at->diffForHumans() }}</span>
+                            @if ($actor->isOwner() || $invitation->invited_by === $actor->id)
+                                <button type="button" wire:click="cancelInvite({{ $invitation->id }})"
+                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Cancel</button>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </x-monitor::card>
+        @endif
+
+        <div class="mt-4 flex items-center gap-2 px-1 pb-3">
+            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($members->count()) }} {{ $members->count() === 1 ? 'Member' : 'Members' }}</h3>
+        </div>
+        <x-monitor::card class="p-4">
+            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                @foreach ($members as $member)
+                    <div class="flex items-center gap-3 py-2.5">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ $member->name }}</p>
+                            <p class="truncate font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $member->email }}</p>
+                        </div>
+                        <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($member->role) }}">{{ $member->role }}</span>
+                    </div>
+                @endforeach
+            </div>
+        </x-monitor::card>
+    </x-monitor::section>
 </div>
