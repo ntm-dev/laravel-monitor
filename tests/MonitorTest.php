@@ -984,4 +984,66 @@ class MonitorTest extends TestCase
 
         $this->post('/monitor/settings/reset')->assertRedirect();
     }
+
+    public function test_monitor_user_gains_isowner_and_canmanageteam_helpers(): void
+    {
+        $owner = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Owner', 'email' => 'owner-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'owner',
+        ]);
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin', 'email' => 'admin-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'viewer-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        $this->assertTrue($owner->isOwner());
+        $this->assertFalse($admin->isOwner());
+        $this->assertFalse($viewer->isOwner());
+
+        $this->assertTrue($owner->canManageTeam());
+        $this->assertTrue($admin->canManageTeam());
+        $this->assertFalse($viewer->canManageTeam());
+    }
+
+    public function test_monitor_invitation_create_for_generates_a_findable_token_and_expires_in_two_hours(): void
+    {
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('invitee@example.com', 'viewer', $inviter);
+
+        $this->assertSame('invitee@example.com', $invitation->email);
+        $this->assertSame('viewer', $invitation->role);
+        $this->assertSame($inviter->id, $invitation->invited_by);
+        $this->assertNotSame($plainToken, $invitation->token, 'the stored token must be hashed, not the plain value');
+        $this->assertTrue($invitation->expires_at->between(now()->addMinutes(119), now()->addMinutes(121)));
+        $this->assertFalse($invitation->isExpired());
+
+        $found = \LaravelMonitor\Models\MonitorInvitation::findByPlainToken($plainToken);
+        $this->assertNotNull($found);
+        $this->assertSame($invitation->id, $found->id);
+
+        $this->assertNull(\LaravelMonitor\Models\MonitorInvitation::findByPlainToken('not-a-real-token'));
+    }
+
+    public function test_monitor_invitation_create_for_refreshes_an_existing_pending_invite_to_the_same_email(): void
+    {
+        $firstInviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $secondInviter = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Second Admin', 'email' => 'second-inviter-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+
+        ['invitation' => $first] = \LaravelMonitor\Models\MonitorInvitation::createFor('re-invited@example.com', 'viewer', $firstInviter);
+        ['invitation' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('re-invited@example.com', 'admin', $secondInviter);
+
+        $this->assertSame($first->id, $second->id, 'refreshing should update the same row, not create a second one');
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorInvitation::where('email', 're-invited@example.com')->count());
+        $this->assertSame('admin', $second->fresh()->role);
+        $this->assertSame($secondInviter->id, $second->fresh()->invited_by);
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorInvitation::findByPlainToken($secondToken));
+    }
 }

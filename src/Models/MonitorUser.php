@@ -31,6 +31,16 @@ class MonitorUser extends Authenticatable
         return in_array($this->role, ['owner', 'admin'], true);
     }
 
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    public function canManageTeam(): bool
+    {
+        return in_array($this->role, ['owner', 'admin'], true);
+    }
+
     public static function guardName(): string
     {
         return config('monitor.auth.guard', 'monitor');
