@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Livewire;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use LaravelMonitor\Mail\TeamInvitationMail;
 use LaravelMonitor\Models\MonitorInvitation;
@@ -62,6 +63,77 @@ class Team extends Card
         }
 
         $invitation->delete();
+    }
+
+    public function changeRole(int $memberId, string $role): void
+    {
+        $actor = $this->actor();
+
+        if (! $actor->isOwner()) {
+            abort(403);
+        }
+
+        if (! in_array($role, ['admin', 'viewer'], true)) {
+            return;
+        }
+
+        $member = MonitorUser::query()->find($memberId);
+
+        if ($member === null || $member->id === $actor->id) {
+            return;
+        }
+
+        $member->update(['role' => $role]);
+    }
+
+    public function removeMember(int $memberId): void
+    {
+        $actor = $this->actor();
+
+        if (! $actor->isOwner()) {
+            abort(403);
+        }
+
+        if ($memberId === $actor->id) {
+            abort(403);
+        }
+
+        MonitorUser::query()->find($memberId)?->delete();
+    }
+
+    public function leave(): void
+    {
+        $actor = $this->actor();
+
+        if ($actor->isOwner() && MonitorUser::query()->where('role', 'owner')->count() <= 1) {
+            $this->addError('leave', 'Transfer ownership to someone else before leaving — a team always needs an owner.');
+
+            return;
+        }
+
+        $actor->delete();
+
+        Auth::guard(MonitorUser::guardName())->logout();
+
+        $this->redirectRoute('monitor.login');
+    }
+
+    public function transferOwnership(int $memberId): void
+    {
+        $actor = $this->actor();
+
+        if (! $actor->isOwner()) {
+            abort(403);
+        }
+
+        $newOwner = MonitorUser::query()->find($memberId);
+
+        if ($newOwner === null || $newOwner->id === $actor->id) {
+            return;
+        }
+
+        $newOwner->update(['role' => 'owner']);
+        $actor->update(['role' => 'admin']);
     }
 
     protected function actor(): MonitorUser

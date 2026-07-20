@@ -116,4 +116,123 @@ class TeamTest extends TestCase
         Livewire::test(Team::class)->call('cancelInvite', $adminsInvitation->id);
         $this->assertDatabaseMissing('monitor_invitations', ['id' => $adminsInvitation->id]);
     }
+
+    public function test_owner_can_change_a_members_role(): void
+    {
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'role-change-target@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        Livewire::test(Team::class)->call('changeRole', $viewer->id, 'admin');
+
+        $this->assertSame('admin', $viewer->fresh()->role);
+    }
+
+    public function test_admin_cannot_change_a_members_role(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'non-role-changing-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'protected-role-target@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        Livewire::test(Team::class)->call('changeRole', $viewer->id, 'admin')->assertForbidden();
+
+        $this->assertSame('viewer', $viewer->fresh()->role);
+    }
+
+    public function test_owner_can_remove_a_member(): void
+    {
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'to-be-removed@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        Livewire::test(Team::class)->call('removeMember', $viewer->id);
+
+        $this->assertNull(MonitorUser::find($viewer->id));
+    }
+
+    public function test_owner_cannot_remove_themself(): void
+    {
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        Livewire::test(Team::class)->call('removeMember', $owner->id)->assertForbidden();
+
+        $this->assertNotNull(MonitorUser::find($owner->id));
+    }
+
+    public function test_admin_cannot_remove_a_member(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'non-removing-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'protected-from-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        Livewire::test(Team::class)->call('removeMember', $viewer->id)->assertForbidden();
+
+        $this->assertNotNull(MonitorUser::find($viewer->id));
+    }
+
+    public function test_a_non_sole_owner_member_can_leave(): void
+    {
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'leaving-viewer@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        Livewire::test(Team::class)->call('leave')->assertRedirect('/monitor/login');
+
+        $this->assertNull(MonitorUser::find($viewer->id));
+    }
+
+    public function test_the_sole_owner_cannot_leave(): void
+    {
+        Livewire::test(Team::class)->call('leave');
+
+        $owner = MonitorUser::where('email', 'owner@example.com')->first();
+        $this->assertNotNull($owner, 'the sole owner must still exist — leave() must have been blocked');
+    }
+
+    public function test_owner_can_transfer_ownership_and_becomes_admin(): void
+    {
+        $viewer = MonitorUser::create([
+            'name' => 'Future Owner', 'email' => 'future-owner@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $originalOwner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        Livewire::test(Team::class)->call('transferOwnership', $viewer->id);
+
+        $this->assertSame('owner', $viewer->fresh()->role);
+        $this->assertSame('admin', $originalOwner->fresh()->role);
+    }
+
+    public function test_admin_cannot_transfer_ownership(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'non-transferring-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'not-getting-owner@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        Livewire::test(Team::class)->call('transferOwnership', $viewer->id)->assertForbidden();
+
+        $this->assertSame('viewer', $viewer->fresh()->role);
+    }
 }
