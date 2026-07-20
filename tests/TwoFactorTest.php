@@ -216,4 +216,19 @@ class TwoFactorTest extends TestCase
 
         $this->assertTrue($member->refresh()->hasTotpEnabled());
     }
+
+    public function test_owner_cannot_disable_own_totp_via_member_disable(): void
+    {
+        $owner = $this->actingAsOwner();
+        $owner->update([
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => [],
+        ]);
+
+        Livewire::test(Team::class)->call('disableMemberTotp', $owner->id)
+            ->assertForbidden();
+
+        $this->assertTrue($owner->refresh()->hasTotpEnabled());
+    }
 }

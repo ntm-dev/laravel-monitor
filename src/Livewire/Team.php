@@ -220,6 +220,10 @@ class Team extends Card
             abort(403);
         }
 
+        if ($memberId === $actor->id) {
+            abort(403);
+        }
+
         MonitorUser::query()->find($memberId)?->update([
             'totp_secret' => null,
             'totp_enabled_at' => null,
