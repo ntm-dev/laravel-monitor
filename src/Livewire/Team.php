@@ -11,6 +11,7 @@ use LaravelMonitor\Mail\TeamInvitationMail;
 use LaravelMonitor\Models\MonitorEmailChange;
 use LaravelMonitor\Models\MonitorInvitation;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Models\MonitorWebauthnCredential;
 use LaravelMonitor\Support\OptionalAuthMethod;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -43,6 +44,7 @@ class Team extends Card
                 ->orderByDesc('created_at')
                 ->get(),
             'pendingEmailChanges' => $pendingEmailChanges,
+            'passkeys' => MonitorWebauthnCredential::query()->where('user_id', $actor->id)->get(),
         ];
     }
 
@@ -309,6 +311,16 @@ class Team extends Card
 
         $newOwner->update(['role' => 'owner']);
         $actor->update(['role' => 'admin']);
+    }
+
+    public function removePasskey(int $credentialId): void
+    {
+        $actor = $this->actor();
+
+        MonitorWebauthnCredential::query()
+            ->where('id', $credentialId)
+            ->where('user_id', $actor->id)
+            ->delete();
     }
 
     protected function actor(): MonitorUser

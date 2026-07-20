@@ -7,6 +7,7 @@ use LaravelMonitor\Http\Controllers\Auth\LoginController;
 use LaravelMonitor\Http\Controllers\Auth\PasswordResetController;
 use LaravelMonitor\Http\Controllers\Auth\SetupController;
 use LaravelMonitor\Http\Controllers\Auth\TwoFactorChallengeController;
+use LaravelMonitor\Http\Controllers\Auth\WebauthnController;
 use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
@@ -39,6 +40,8 @@ Route::domain(config('monitor.domain'))
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');
             Route::post('/settings/reset', [SettingsController::class, 'reset'])->name('monitor.settings.reset');
+            Route::post('/webauthn/register/options', [WebauthnController::class, 'registerOptions'])->name('monitor.webauthn.register.options');
+            Route::post('/webauthn/register', [WebauthnController::class, 'register'])->name('monitor.webauthn.register.store');
             Route::get('/{tab?}', DashboardController::class)->name('monitor.dashboard');
         });
     });

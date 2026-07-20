@@ -87,6 +87,83 @@
             @endif
         </x-monitor::card>
 
+        <x-monitor::card class="mt-4 p-4">
+            <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Passkeys</p>
+            @if (! \LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable())
+                <p class="mt-2 text-sm text-neutral-400 dark:text-neutral-500">Install <code class="font-mono text-xs">web-auth/webauthn-lib</code> to enable this.</p>
+            @else
+                <div class="mt-3 divide-y divide-neutral-100 dark:divide-neutral-800">
+                    @foreach ($passkeys as $passkey)
+                        <div class="flex items-center gap-3 py-2">
+                            <span class="min-w-0 flex-1 truncate text-sm text-neutral-700 dark:text-neutral-200">{{ $passkey->label }}</span>
+                            <button type="button" wire:click="removePasskey({{ $passkey->id }})" wire:confirm="Remove this passkey?"
+                                    class="shrink-0 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">Remove</button>
+                        </div>
+                    @endforeach
+                </div>
+                <button type="button" id="add-passkey-button" class="mt-3 h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Add a passkey</button>
+                <script>
+                    // The server's JSON (registerOptions()) and the browser's WebAuthn API disagree
+                    // on wire format: the API wants ArrayBuffers for challenge/user.id/credential ids,
+                    // while the JSON we fetch (and the JSON we POST back) carries base64url strings.
+                    // These two helpers bridge that gap in both directions.
+                    function base64UrlToArrayBuffer(base64Url) {
+                        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                        const binary = atob(base64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        return bytes.buffer;
+                    }
+
+                    function arrayBufferToBase64Url(buffer) {
+                        const bytes = new Uint8Array(buffer);
+                        let binary = '';
+                        for (let i = 0; i < bytes.length; i++) {
+                            binary += String.fromCharCode(bytes[i]);
+                        }
+                        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                    }
+
+                    document.getElementById('add-passkey-button')?.addEventListener('click', async () => {
+                        const options = await (await fetch('{{ route('monitor.webauthn.register.options') }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        })).json();
+
+                        options.challenge = base64UrlToArrayBuffer(options.challenge);
+                        options.user.id = base64UrlToArrayBuffer(options.user.id);
+                        (options.excludeCredentials ?? []).forEach((credential) => {
+                            credential.id = base64UrlToArrayBuffer(credential.id);
+                        });
+
+                        const credential = await navigator.credentials.create({ publicKey: options });
+                        const label = prompt('Name this passkey', 'My device') || 'Passkey';
+
+                        await fetch('{{ route('monitor.webauthn.register.store') }}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify({
+                                label,
+                                response: {
+                                    id: credential.id,
+                                    rawId: arrayBufferToBase64Url(credential.rawId),
+                                    type: credential.type,
+                                    response: {
+                                        clientDataJSON: arrayBufferToBase64Url(credential.response.clientDataJSON),
+                                        attestationObject: arrayBufferToBase64Url(credential.response.attestationObject),
+                                    },
+                                },
+                            }),
+                        });
+
+                        window.location.reload();
+                    });
+                </script>
+            @endif
+        </x-monitor::card>
+
         <div x-data="{ codes: null }" x-on:totp-enabled.window="codes = $event.detail.recoveryCodes" x-show="codes" x-cloak>
             <x-monitor::card class="mt-4 p-4">
                 <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Recovery codes — save these now, they won't be shown again</p>
