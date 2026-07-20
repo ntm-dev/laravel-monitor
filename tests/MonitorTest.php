@@ -715,6 +715,13 @@ class MonitorTest extends TestCase
         $this->assertSame('viewer', $row->role);
     }
 
+    public function test_monitor_invitations_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_invitations', [
+            'id', 'email', 'role', 'token', 'invited_by', 'expires_at', 'created_at', 'updated_at',
+        ]));
+    }
+
     public function test_monitor_user_role_helpers_reflect_the_stored_role(): void
     {
         $owner = \LaravelMonitor\Models\MonitorUser::create([

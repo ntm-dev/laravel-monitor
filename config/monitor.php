@@ -84,6 +84,7 @@ return [
     'auth' => [
         'guard' => 'monitor',
         'table' => 'monitor_users',
+        'invitations_table' => 'monitor_invitations',
     ],
 
     /*
