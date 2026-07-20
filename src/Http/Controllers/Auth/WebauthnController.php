@@ -54,14 +54,31 @@ class WebauthnController
         $repository = $this->repository();
         $serializer = $repository->serializer();
 
+        $storedOptions = $request->session()->get('monitor_webauthn_creation_options');
+
+        // Session expired (or was never populated) between fetching registration
+        // options and submitting the response — deserialize() would otherwise be
+        // handed null and throw a TypeError before any validation runs.
+        abort_if($storedOptions === null, 422);
+
         $options = $serializer->deserialize(
-            $request->session()->get('monitor_webauthn_creation_options'),
+            $storedOptions,
             PublicKeyCredentialCreationOptions::class,
             'json',
         );
-        $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
 
-        abort_unless($credential->response instanceof AuthenticatorAttestationResponse, 422);
+        try {
+            $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
+        } catch (\Throwable $e) {
+            // The "response" payload is attacker/client-controlled and can be malformed
+            // in ways that throw before we ever reach a validation guard — e.g.
+            // Symfony\Component\Serializer\Exception\* for the wrong shape, or
+            // Webauthn\Exception\InvalidDataException for a mismatched id/rawId. Treat
+            // any deserialization failure as a plain 422, same as the guard below.
+            abort(422);
+        }
+
+        abort_unless($credential instanceof PublicKeyCredential && $credential->response instanceof AuthenticatorAttestationResponse, 422);
 
         $credentialRecord = AuthenticatorAttestationResponseValidator::create($this->ceremonyStepManagerFactory($request)->creationCeremony())
             ->check($credential->response, $options, $request->getHost());

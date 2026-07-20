@@ -29,18 +29,28 @@ class WebauthnCredentialRepository
 
     public function saveNewCredentialRecord(CredentialRecord $credentialRecord, string $label): void
     {
-        // `created_at` is not in MonitorWebauthnCredential::$fillable (the model has
-        // $timestamps = false and no DB default for the column), so it's set via direct
-        // property assignment below rather than through the mass-assigned array.
-        $credential = new MonitorWebauthnCredential([
+        // updateOrCreate() keyed on the unique credential_id (rather than create()) so a
+        // replayed/duplicate registration for the same authenticator (e.g. a double-click
+        // or network retry re-submitting the same attestation) updates the existing row
+        // instead of throwing an uncaught unique-constraint QueryException.
+        $attributes = ['credential_id' => base64_encode($credentialRecord->publicKeyCredentialId)];
+
+        $values = [
             'user_id' => $credentialRecord->userHandle,
-            'credential_id' => base64_encode($credentialRecord->publicKeyCredentialId),
             'public_key' => $this->serializer()->serialize($credentialRecord, 'json'),
             'sign_count' => $credentialRecord->counter,
             'label' => $label,
-        ]);
-        $credential->created_at = now();
-        $credential->save();
+        ];
+
+        // `created_at` has no DB default and the model has $timestamps = false, so
+        // updateOrCreate()'s save() won't populate it automatically — set it explicitly
+        // in $values, but only for a genuinely new row, so a duplicate registration
+        // doesn't reset an existing credential's created_at.
+        if (! MonitorWebauthnCredential::query()->where($attributes)->exists()) {
+            $values['created_at'] = now();
+        }
+
+        MonitorWebauthnCredential::query()->updateOrCreate($attributes, $values);
     }
 
     public function updateCredentialRecord(CredentialRecord $credentialRecord): void

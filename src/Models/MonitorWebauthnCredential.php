@@ -9,7 +9,7 @@ class MonitorWebauthnCredential extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['user_id', 'credential_id', 'public_key', 'label', 'sign_count'];
+    protected $fillable = ['user_id', 'credential_id', 'public_key', 'label', 'sign_count', 'created_at'];
 
     public function getTable(): string
     {

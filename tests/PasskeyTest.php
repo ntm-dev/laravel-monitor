@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use LaravelMonitor\Livewire\Team;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Models\MonitorWebauthnCredential;
+use LaravelMonitor\Support\WebauthnCredentialRepository;
 use Livewire\Livewire;
 use ParagonIE\ConstantTime\Base64UrlSafe;
 
@@ -43,6 +44,65 @@ class PasskeyTest extends TestCase
         $this->assertDatabaseHas((new MonitorWebauthnCredential())->getTable(), [
             'user_id' => $owner->id,
             'label' => 'Test device',
+        ]);
+    }
+
+    public function test_registration_with_no_pending_session_options_returns_a_4xx_not_a_500(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // No prior call to /monitor/webauthn/register/options — the session never had
+        // (or had and lost, e.g. via expiry) monitor_webauthn_creation_options.
+        $this->postJson('/monitor/webauthn/register', [
+            'label' => 'Test device',
+            'response' => ['id' => 'anything'],
+        ])->assertStatus(422);
+    }
+
+    public function test_registration_with_a_malformed_response_payload_returns_422(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->postJson('/monitor/webauthn/register/options')->assertOk();
+
+        $this->postJson('/monitor/webauthn/register', [
+            'label' => 'Test device',
+            'response' => ['not' => 'a valid webauthn response', 'at' => ['all']],
+        ])->assertStatus(422);
+    }
+
+    /**
+     * A genuine double-click/network-retry replay resubmits the exact same attestation
+     * for a session whose stored creation options are single-use — the controller
+     * forgets them from the session as soon as the first submission succeeds, so a
+     * second identical HTTP call would instead hit the session-expiry guard (case 1),
+     * never reaching the repository. This exercises the repository fix (case 3)
+     * directly: saving the same credential record twice must update the existing row
+     * rather than throwing a unique-constraint QueryException.
+     */
+    public function test_registering_the_same_credential_twice_does_not_throw(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $owner = MonitorUser::query()->where('email', 'owner@example.com')->firstOrFail();
+
+        $optionsResponse = $this->postJson('/monitor/webauthn/register/options')->json();
+        [$attestationResponse, $credentialId] = $this->fakeAttestationResponseFor($optionsResponse);
+
+        $this->postJson('/monitor/webauthn/register', [
+            'label' => 'First registration',
+            'response' => $attestationResponse,
+        ])->assertOk();
+
+        $repository = new WebauthnCredentialRepository();
+        $credentialRecord = $repository->findOneByCredentialId(Base64UrlSafe::decodeNoPadding($credentialId));
+
+        $repository->saveNewCredentialRecord($credentialRecord, 'Second registration');
+
+        $this->assertDatabaseCount((new MonitorWebauthnCredential())->getTable(), 1);
+        $this->assertDatabaseHas((new MonitorWebauthnCredential())->getTable(), [
+            'user_id' => $owner->id,
+            'label' => 'Second registration',
         ]);
     }
 
