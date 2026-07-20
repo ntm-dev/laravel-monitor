@@ -305,7 +305,7 @@ class OptionalAuthMethod
 
     public static function passkeysAvailable(): bool
     {
-        return class_exists(\Webauthn\Server::class);
+        return class_exists(\Webauthn\CeremonyStep\CeremonyStepManagerFactory::class);
     }
 
     public static function oauthAvailable(string $provider): bool
@@ -380,11 +380,11 @@ Expected: full suite passes, 125 + 5 = 130 tests. (`monitor_users` gained 3 null
 - [ ] **Step 8: Commit**
 
 ```bash
-git add database/migrations/2026_01_01_000000_create_monitor_table.php config/monitor.php composer.json composer.lock src/Models/MonitorUser.php src/Support/OptionalAuthMethod.php src/Models/MonitorWebauthnCredential.php src/Models/MonitorOauthAccount.php tests/OptionalAuthMethodTest.php
+git add database/migrations/2026_01_01_000000_create_monitor_table.php config/monitor.php composer.json src/Models/MonitorUser.php src/Support/OptionalAuthMethod.php src/Models/MonitorWebauthnCredential.php src/Models/MonitorOauthAccount.php tests/OptionalAuthMethodTest.php
 git commit -m "feat: add schema, config, and optional-dependency plumbing for TOTP/Passkey/OAuth"
 ```
 
-Run `composer update pragmarx/google2fa bacon/bacon-qr-code web-auth/webauthn-lib laravel/socialite socialiteproviders/apple` (or `composer install`) before running tests, so `composer.lock` reflects the new `require-dev` entries and is staged in the same commit.
+Run `composer update pragmarx/google2fa bacon/bacon-qr-code web-auth/webauthn-lib laravel/socialite socialiteproviders/apple` (or `composer install`) before running tests, so the new `require-dev` entries are actually installed. `composer.lock` is gitignored in this repo (`.gitignore` line 2) — do not `git add` it; this is a library package, not an application, so consumers resolve their own lock file.
 
 ---
 
@@ -1084,9 +1084,14 @@ git commit -m "feat: add self-service and admin-override TOTP disable"
 
 **Interfaces:**
 - Consumes: `MonitorWebauthnCredential` model, `OptionalAuthMethod::passkeysAvailable()` (Task 1).
-- Produces: `WebauthnCredentialRepository` implementing `Webauthn\PublicKeyCredentialSourceRepository` (Task 6's authentication flow uses the same repository to look up a credential by ID); `POST /monitor/webauthn/register/options` and `POST /monitor/webauthn/register` routes; `Team::removePasskey(int $credentialId): void`.
+- Produces: `WebauthnCredentialRepository` (Task 6's authentication flow uses the same repository to look up and update a credential); `POST /monitor/webauthn/register/options` and `POST /monitor/webauthn/register` routes; `Team::removePasskey(int $credentialId): void`.
 
-**Before starting:** `web-auth/webauthn-lib`'s exact API can shift between major versions. Once `composer install` has pulled it in (Task 1), read `vendor/web-auth/webauthn-lib/src/Server.php` and `vendor/web-auth/webauthn-lib/src/PublicKeyCredentialSourceRepository.php` directly to confirm the method names/signatures below still match the installed version before writing the controller — adjust names if they've drifted, the ceremony's shape (options → client ceremony → verify → persist) will not have changed.
+**Before starting — read this, the installed API differs from older guides:** the installed version (`web-auth/webauthn-lib` 5.x, confirmed via `vendor/web-auth/webauthn-lib/composer.json`) has **no** `Webauthn\Server` facade and **no** `PublicKeyCredentialSourceRepository` interface — both existed in much older releases (pre-4.x) and plenty of blog posts/AI-generated snippets still show them, but they are not present in the installed source. The real building blocks, verified directly against `vendor/web-auth/webauthn-lib/src/` in this repo:
+- `Webauthn\CeremonyStep\CeremonyStepManagerFactory` — no-arg constructor; call `->setAllowedOrigins([...])`, then `->creationCeremony()` / `->requestCeremony()` to get a `CeremonyStepManager`.
+- `Webauthn\AuthenticatorAttestationResponseValidator::create($ceremonyStepManager)->check($response, $creationOptions, $host): CredentialRecord` (registration) and `Webauthn\AuthenticatorAssertionResponseValidator::create($ceremonyStepManager)->check($credentialRecord, $response, $requestOptions, $host, $userHandle): CredentialRecord` (login, Task 6) — both confirmed via `vendor/web-auth/webauthn-lib/src/Authenticator*ResponseValidator.php`.
+- `Webauthn\CredentialRecord` (base class; `Webauthn\PublicKeyCredentialSource extends CredentialRecord`) has public properties `publicKeyCredentialId`, `userHandle`, `counter` and no built-in storage — you write a plain repository class with whatever methods you need (there is no interface to implement).
+- `Webauthn\Denormalizer\WebauthnSerializerFactory` (constructor takes a `Webauthn\AttestationStatement\AttestationStatementSupportManager`) builds a Symfony `SerializerInterface` — use it to both (a) decode the browser's JSON response into `Webauthn\PublicKeyCredential`, and (b) encode/decode `CredentialRecord` and the options objects to/from JSON for your own storage (session, database) — there is no need for raw PHP `serialize()`.
+- If any signature below has still drifted further by the time you implement this (composer version ranges float), these are exactly the classes/methods to re-check — the shape (options → client ceremony → verify → persist) is stable even if a method gets renamed again.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1161,28 +1166,56 @@ class PasskeyTest extends TestCase
     }
 
     /**
-     * A registration ceremony's attestation response is a signed, CBOR-encoded
-     * byte structure that cannot be hand-authored — find a working
-     * registration fixture (options + matching client response pair) in
-     * vendor/web-auth/webauthn-lib/tests/ (its own Functional/Unit test
-     * suite ships exactly this kind of fixture for its own assertions) and
-     * adapt it here: swap in the challenge from $optionsResponse and this
-     * test's own RP ID/origin so it verifies against options this test
-     * actually generated. Return [the decoded JSON response body the
-     * browser would post, the credential's base64url ID].
+     * There is no bundled fixture generator for a full registration
+     * ceremony (Webauthn\FakeCredentialGenerator, if you find it, is for
+     * decoy username-enumeration-resistance credentials, not this — do
+     * not use it here). Build a minimal "software authenticator" instead:
      *
-     * Alternative if no usable fixture is found: extract the
-     * `$this->server()->loadAndCheckAttestationResponse(...)` call in
-     * WebauthnController::register() behind a small injectable class this
-     * package owns (bind it in MonitorServiceProvider, inject it into the
-     * controller), then swap that binding for a fake in this test that
-     * returns a hand-constructed PublicKeyCredentialSource directly,
-     * skipping real signature verification entirely. Prefer the fixture
-     * approach first — it also exercises the real verification path.
+     * 1. Decode $optionsResponse['challenge'] (base64url) back to raw
+     *    bytes — that's the challenge your fake response must echo.
+     * 2. Build a clientDataJSON: `json_encode(['type' => 'webauthn.create',
+     *    'challenge' => <base64url of the raw challenge bytes>, 'origin' =>
+     *    'http://localhost'])` (match whatever host this test's requests
+     *    actually use — check `$this->app['request']` or just use the
+     *    default Testbench host).
+     * 3. Generate an ES256 keypair with
+     *    `openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC])`
+     *    and export the public key coordinates (x, y) from
+     *    `openssl_pkey_get_details()`.
+     * 4. Build a minimal authenticatorData byte string: 32-byte SHA-256 of
+     *    the RP ID + 1 flags byte (0x41 = user present + attested
+     *    credential data included) + 4-byte counter (0x00000001) +
+     *    16-byte AAGUID (all zeros is fine) + 2-byte credential ID length +
+     *    the credential ID bytes (any random bytes you choose, e.g.
+     *    `random_bytes(16)`) + a CBOR-encoded COSE EC2 public key map
+     *    (`spomky-labs/cbor-php`, already installed transitively, has the
+     *    encoder you need — `CBOR\Encoder`/`CBOR\MapObject` etc; check
+     *    `vendor/spomky-labs/cbor-php/src` for its exact API).
+     * 5. Sign `$authenticatorData . hash('sha256', $clientDataJSON, true)`
+     *    with `openssl_sign(..., OPENSSL_ALGO_SHA256)` using the private key
+     *    from step 3.
+     * 6. CBOR-encode the attestationObject map: `['fmt' => 'none', 'attStmt'
+     *    => [], 'authData' => $authenticatorData]`.
+     * 7. Assemble the JSON body a browser would actually POST:
+     *    `['id' => <base64url credential id>, 'rawId' => <base64url
+     *    credential id>, 'type' => 'public-key', 'response' =>
+     *    ['clientDataJSON' => <base64 clientDataJSON>, 'attestationObject'
+     *    => <base64 attestationObject>]]`.
+     *
+     * This is genuinely fiddly to get exactly right on the first pass —
+     * iterate against the real validator's exception messages (it will
+     * tell you exactly which check failed: challenge mismatch, origin,
+     * signature, etc.) rather than trying to get every byte right blind.
+     * Keep the keypair from step 3 around (return it too) — Task 6's
+     * fakeAssertionResponseFor() needs to sign with the same private key
+     * to authenticate as this same fake credential.
+     *
+     * Return [the assembled JSON-decodable array from step 7, the
+     * credential's base64url ID].
      */
     protected function fakeAttestationResponseFor(array $optionsResponse): array
     {
-        // Implement using a vendor/web-auth/webauthn-lib test fixture — see docblock above.
+        // Build a fake ES256 "software authenticator" response — see docblock above.
     }
 }
 ```
@@ -1202,51 +1235,54 @@ Create `src/Support/WebauthnCredentialRepository.php`:
 namespace LaravelMonitor\Support;
 
 use LaravelMonitor\Models\MonitorWebauthnCredential;
-use Webauthn\PublicKeyCredentialSource;
-use Webauthn\PublicKeyCredentialSourceRepository;
-use Webauthn\PublicKeyCredentialUserEntity;
+use Symfony\Component\Serializer\SerializerInterface;
+use Webauthn\AttestationStatement\AttestationStatementSupportManager;
+use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
+use Webauthn\CredentialRecord;
+use Webauthn\Denormalizer\WebauthnSerializerFactory;
 
-class WebauthnCredentialRepository implements PublicKeyCredentialSourceRepository
+class WebauthnCredentialRepository
 {
-    public function findOneByCredentialId(string $publicKeyCredentialId): ?PublicKeyCredentialSource
+    public function serializer(): SerializerInterface
+    {
+        return (new WebauthnSerializerFactory(
+            new AttestationStatementSupportManager([new NoneAttestationStatementSupport()]),
+        ))->create();
+    }
+
+    public function findOneByCredentialId(string $publicKeyCredentialId): ?CredentialRecord
     {
         $credential = MonitorWebauthnCredential::query()
             ->where('credential_id', base64_encode($publicKeyCredentialId))
             ->first();
 
-        return $credential === null ? null : $this->toSource($credential);
+        return $credential === null ? null : $this->serializer()->deserialize($credential->public_key, CredentialRecord::class, 'json');
     }
 
-    public function findAllForUserEntity(PublicKeyCredentialUserEntity $userEntity): array
+    public function saveNewCredentialRecord(CredentialRecord $credentialRecord, string $label): void
     {
-        return MonitorWebauthnCredential::query()
-            ->where('user_id', $userEntity->id)
-            ->get()
-            ->map(fn (MonitorWebauthnCredential $credential) => $this->toSource($credential))
-            ->all();
+        MonitorWebauthnCredential::create([
+            'user_id' => $credentialRecord->userHandle,
+            'credential_id' => base64_encode($credentialRecord->publicKeyCredentialId),
+            'public_key' => $this->serializer()->serialize($credentialRecord, 'json'),
+            'sign_count' => $credentialRecord->counter,
+            'label' => $label,
+        ]);
     }
 
-    public function saveCredentialSource(PublicKeyCredentialSource $publicKeyCredentialSource): void
+    public function updateCredentialRecord(CredentialRecord $credentialRecord): void
     {
-        MonitorWebauthnCredential::query()->updateOrCreate(
-            ['credential_id' => base64_encode($publicKeyCredentialSource->publicKeyCredentialId)],
-            [
-                'user_id' => $publicKeyCredentialSource->userHandle,
-                'public_key' => base64_encode(serialize($publicKeyCredentialSource)),
-                'sign_count' => $publicKeyCredentialSource->counter,
-                'label' => request()->input('label', 'Passkey'),
-            ],
-        );
-    }
-
-    protected function toSource(MonitorWebauthnCredential $credential): PublicKeyCredentialSource
-    {
-        return unserialize(base64_decode($credential->public_key));
+        MonitorWebauthnCredential::query()
+            ->where('credential_id', base64_encode($credentialRecord->publicKeyCredentialId))
+            ->update([
+                'public_key' => $this->serializer()->serialize($credentialRecord, 'json'),
+                'sign_count' => $credentialRecord->counter,
+            ]);
     }
 }
 ```
 
-Note: storing the whole serialized `PublicKeyCredentialSource` in `public_key` (rather than just the raw public key bytes) is deliberate — the object also carries the attestation type, transports, and AAGUID that the library's own assertion verification expects back unchanged. Confirm `PublicKeyCredentialSource` is `Serializable`/safe to `serialize()` against the installed version (per this task's "Before starting" note) — if the installed version instead documents its own `WebauthnSerializerFactory` for this, use that to encode/decode instead of raw PHP `serialize()`.
+Note: `CredentialRecord`'s `publicKeyCredentialId`/`userHandle`/`counter` public properties, and `WebauthnSerializerFactory`'s constructor/`create()` method, were confirmed directly against `vendor/web-auth/webauthn-lib/src/CredentialRecord.php` and `vendor/web-auth/webauthn-lib/src/Denormalizer/WebauthnSerializerFactory.php` in this repo — re-check those two files if anything below doesn't match.
 
 - [ ] **Step 4: Create `WebauthnController`**
 
@@ -1257,14 +1293,20 @@ Create `src/Http/Controllers/Auth/WebauthnController.php`:
 
 namespace LaravelMonitor\Http\Controllers\Auth;
 
+use Cose\Algorithm\Signature\ECDSA\ES256;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\OptionalAuthMethod;
 use LaravelMonitor\Support\WebauthnCredentialRepository;
+use Webauthn\AuthenticatorAttestationResponse;
+use Webauthn\AuthenticatorAttestationResponseValidator;
+use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
+use Webauthn\PublicKeyCredential;
+use Webauthn\PublicKeyCredentialCreationOptions;
+use Webauthn\PublicKeyCredentialParameters;
 use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialUserEntity;
-use Webauthn\Server;
 
 class WebauthnController
 {
@@ -1273,11 +1315,18 @@ class WebauthnController
         abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
 
         $actor = $request->user(MonitorUser::guardName());
-        $options = $this->server()->generatePublicKeyCredentialCreationOptions(
-            new PublicKeyCredentialUserEntity($actor->email, (string) $actor->id, $actor->name),
+
+        $options = PublicKeyCredentialCreationOptions::create(
+            PublicKeyCredentialRpEntity::create(config('app.name', 'Laravel Monitor'), $request->getHost()),
+            PublicKeyCredentialUserEntity::create($actor->email, (string) $actor->id, $actor->name),
+            random_bytes(32),
+            pubKeyCredParams: [PublicKeyCredentialParameters::createPk(ES256::ID)],
         );
 
-        $request->session()->put('monitor_webauthn_creation_options', serialize($options));
+        $request->session()->put(
+            'monitor_webauthn_creation_options',
+            $this->repository()->serializer()->serialize($options, 'json'),
+        );
 
         return response()->json($options);
     }
@@ -1287,28 +1336,43 @@ class WebauthnController
         abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
 
         $validated = $request->validate(['label' => ['required', 'string', 'max:255'], 'response' => ['required']]);
-        $options = unserialize($request->session()->get('monitor_webauthn_creation_options'));
+        $repository = $this->repository();
+        $serializer = $repository->serializer();
 
-        $this->server()->loadAndCheckAttestationResponse(
-            json_encode($validated['response']),
-            $options,
-            $request,
+        $options = $serializer->deserialize(
+            $request->session()->get('monitor_webauthn_creation_options'),
+            PublicKeyCredentialCreationOptions::class,
+            'json',
         );
+        $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
 
+        abort_unless($credential->response instanceof AuthenticatorAttestationResponse, 422);
+
+        $credentialRecord = AuthenticatorAttestationResponseValidator::create($this->ceremonyStepManagerFactory($request)->creationCeremony())
+            ->check($credential->response, $options, $request->getHost());
+
+        $repository->saveNewCredentialRecord($credentialRecord, $validated['label']);
         $request->session()->forget('monitor_webauthn_creation_options');
 
         return response()->json(['status' => 'ok']);
     }
 
-    protected function server(): Server
+    protected function repository(): WebauthnCredentialRepository
     {
-        return new Server(
-            new PublicKeyCredentialRpEntity(config('app.name', 'Laravel Monitor')),
-            new WebauthnCredentialRepository(),
-        );
+        return new WebauthnCredentialRepository();
+    }
+
+    protected function ceremonyStepManagerFactory(Request $request): CeremonyStepManagerFactory
+    {
+        $factory = new CeremonyStepManagerFactory();
+        $factory->setAllowedOrigins([$request->getSchemeAndHttpHost()]);
+
+        return $factory;
     }
 }
 ```
+
+(`ceremonyStepManagerFactory()` and `repository()` are shared with Task 6's authentication methods, added to this same class.)
 
 - [ ] **Step 5: Add the routes**
 
@@ -1441,17 +1505,25 @@ Append to `tests/PasskeyTest.php`:
     }
 
     /**
-     * Same constraint as fakeAttestationResponseFor() above — an assertion
-     * response is a signed byte structure. Register a real credential for
-     * $user first (reuse fakeAttestationResponseFor()'s fixture via the
-     * register routes), then produce the matching assertion response from
-     * vendor/web-auth/webauthn-lib/tests/ fixtures for that same credential.
-     * Same container-binding fallback as fakeAttestationResponseFor() also
-     * applies here if no usable fixture pair is found.
+     * Same "software authenticator" approach as fakeAttestationResponseFor()
+     * (Task 5) — reuse it: register a real credential for $user first by
+     * calling that method and posting its result to the register routes
+     * (as an authenticated request for $user), keeping the ES256 private
+     * key and credential ID it generated. Then build the assertion
+     * response: a new clientDataJSON with `type: 'webauthn.get'` and this
+     * ceremony's own challenge from $optionsResponse, an authenticatorData
+     * byte string (same shape as registration minus the attested-credential
+     * block: RP ID hash + flags byte 0x01 (user present only) + 4-byte
+     * counter), sign `$authenticatorData . hash('sha256', $clientDataJSON, true)`
+     * with the SAME private key from registration, and assemble
+     * `['id' => ..., 'rawId' => ..., 'type' => 'public-key', 'response' =>
+     * ['clientDataJSON' => ..., 'authenticatorData' => ..., 'signature' =>
+     * ..., 'userHandle' => null]]` (all binary fields base64-encoded).
+     * Return [that assembled array].
      */
     protected function fakeAssertionResponseFor(array $optionsResponse, MonitorUser $user): array
     {
-        // Implement using a vendor/web-auth/webauthn-lib test fixture — see docblock above.
+        // Build a fake ES256 "software authenticator" response — see docblock above.
     }
 ```
 
@@ -1466,38 +1538,62 @@ Expected: FAIL — the two new routes don't exist yet.
 
 Add to `src/Http/Controllers/Auth/WebauthnController.php`:
 
+Add these imports to `src/Http/Controllers/Auth/WebauthnController.php` (alongside the ones added in Task 5):
+
+```php
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
+use Webauthn\AuthenticatorAssertionResponse;
+use Webauthn\AuthenticatorAssertionResponseValidator;
+use Webauthn\PublicKeyCredentialRequestOptions;
+```
+
 ```php
     public function authenticateOptions(Request $request): JsonResponse
     {
         abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
 
-        $options = $this->server()->generatePublicKeyCredentialRequestOptions(
-            \Webauthn\PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
+        $options = PublicKeyCredentialRequestOptions::create(
+            random_bytes(32),
+            userVerification: PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
         );
 
-        $request->session()->put('monitor_webauthn_request_options', serialize($options));
+        $request->session()->put(
+            'monitor_webauthn_request_options',
+            $this->repository()->serializer()->serialize($options, 'json'),
+        );
 
         return response()->json($options);
     }
 
-    public function authenticate(Request $request): \Illuminate\Http\RedirectResponse
+    public function authenticate(Request $request): RedirectResponse
     {
         abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
 
         $validated = $request->validate(['response' => ['required']]);
-        $options = unserialize($request->session()->get('monitor_webauthn_request_options'));
+        $repository = $this->repository();
+        $serializer = $repository->serializer();
 
-        $source = $this->server()->loadAndCheckAssertionResponse(
-            json_encode($validated['response']),
-            $options,
-            null,
-            $request,
+        $options = $serializer->deserialize(
+            $request->session()->get('monitor_webauthn_request_options'),
+            PublicKeyCredentialRequestOptions::class,
+            'json',
         );
+        $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
 
+        abort_unless($credential->response instanceof AuthenticatorAssertionResponse, 422);
+
+        $existingRecord = $repository->findOneByCredentialId($credential->rawId);
+        abort_if($existingRecord === null, 422);
+
+        $credentialRecord = AuthenticatorAssertionResponseValidator::create($this->ceremonyStepManagerFactory($request)->requestCeremony())
+            ->check($existingRecord, $credential->response, $options, $request->getHost(), null);
+
+        $repository->updateCredentialRecord($credentialRecord);
         $request->session()->forget('monitor_webauthn_request_options');
 
-        $user = MonitorUser::query()->findOrFail($source->userHandle);
-        \Illuminate\Support\Facades\Auth::guard(MonitorUser::guardName())->login($user);
+        $user = MonitorUser::query()->findOrFail($credentialRecord->userHandle);
+        Auth::guard(MonitorUser::guardName())->login($user);
         $request->session()->regenerate();
 
         return redirect()->route('monitor.dashboard');
