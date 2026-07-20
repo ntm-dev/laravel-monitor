@@ -149,4 +149,71 @@ class TwoFactorTest extends TestCase
             'totp_recovery_codes' => [],
         ]);
     }
+
+    public function test_disabling_totp_requires_the_correct_current_password(): void
+    {
+        $owner = $this->actingAsOwner();
+        $owner->update([
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => [],
+        ]);
+
+        Livewire::test(Team::class)->call('disableTotp', 'wrong-password');
+
+        $this->assertTrue($owner->refresh()->hasTotpEnabled());
+    }
+
+    public function test_disabling_totp_with_the_correct_password_clears_it(): void
+    {
+        $owner = $this->actingAsOwner();
+        $owner->update([
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => ['a-hash'],
+        ]);
+
+        Livewire::test(Team::class)->call('disableTotp', 'password');
+
+        $owner->refresh();
+        $this->assertFalse($owner->hasTotpEnabled());
+        $this->assertNull($owner->totp_secret);
+        $this->assertNull($owner->totp_recovery_codes);
+    }
+
+    public function test_owner_can_disable_another_members_totp(): void
+    {
+        $this->actingAsOwner();
+        $member = MonitorUser::create([
+            'name' => 'Locked Out', 'email' => 'locked-out@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(), 'totp_recovery_codes' => [],
+        ]);
+
+        Livewire::test(Team::class)->call('disableMemberTotp', $member->id);
+
+        $this->assertFalse($member->refresh()->hasTotpEnabled());
+    }
+
+    public function test_admin_cannot_disable_another_members_totp(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'admin-2fa-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $this->actingAs($admin, MonitorUser::guardName());
+
+        $member = MonitorUser::create([
+            'name' => 'Locked Out 2', 'email' => 'locked-out-2@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(), 'totp_recovery_codes' => [],
+        ]);
+
+        Livewire::test(Team::class)->call('disableMemberTotp', $member->id)
+            ->assertForbidden();
+
+        $this->assertTrue($member->refresh()->hasTotpEnabled());
+    }
 }

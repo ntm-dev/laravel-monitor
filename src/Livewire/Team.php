@@ -199,6 +199,34 @@ class Team extends Card
         $this->dispatch('totp-enabled', recoveryCodes: $recoveryCodes->all());
     }
 
+    public function disableTotp(string $currentPassword): void
+    {
+        $actor = $this->actor();
+
+        if (! Hash::check($currentPassword, $actor->password)) {
+            $this->addError('totp', 'Your current password was incorrect.');
+
+            return;
+        }
+
+        $actor->update(['totp_secret' => null, 'totp_enabled_at' => null, 'totp_recovery_codes' => null]);
+    }
+
+    public function disableMemberTotp(int $memberId): void
+    {
+        $actor = $this->actor();
+
+        if (! $actor->isOwner()) {
+            abort(403);
+        }
+
+        MonitorUser::query()->find($memberId)?->update([
+            'totp_secret' => null,
+            'totp_enabled_at' => null,
+            'totp_recovery_codes' => null,
+        ]);
+    }
+
     protected function canDecideEmailChange(MonitorUser $actor, MonitorUser $requester): bool
     {
         return match ($requester->role) {

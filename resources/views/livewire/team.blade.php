@@ -55,6 +55,17 @@
                 <p class="mt-2 text-sm text-neutral-400 dark:text-neutral-500">Install <code class="font-mono text-xs">pragmarx/google2fa bacon/bacon-qr-code</code> to enable this.</p>
             @elseif ($actor->hasTotpEnabled())
                 <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Enabled for your account.</p>
+                <form wire:submit="disableTotp($refs.currentPassword.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                    <div class="min-w-0 flex-1">
+                        <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Current password</label>
+                        <input type="password" x-ref="currentPassword" required
+                               class="mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                    </div>
+                    <button type="submit" class="h-8 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">Disable</button>
+                </form>
+                @error('totp')
+                    <p class="mt-2 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                @enderror
             @elseif ($totpSecret === null)
                 <button type="button" wire:click="startEnrollingTotp" class="mt-3 h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Enable</button>
             @else
@@ -154,6 +165,10 @@
                             </select>
                             <button type="button" wire:click="transferOwnership({{ $member->id }})" wire:confirm="Make {{ $member->name }} the owner? You'll become an admin."
                                     class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Make owner</button>
+                            @if ($member->hasTotpEnabled())
+                                <button type="button" wire:click="disableMemberTotp({{ $member->id }})" wire:confirm="Disable two-factor authentication for {{ $member->name }}?"
+                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Disable 2FA</button>
+                            @endif
                             <button type="button" wire:click="removeMember({{ $member->id }})" wire:confirm="Remove {{ $member->name }} from the team?"
                                     class="shrink-0 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">Remove</button>
                         @else
