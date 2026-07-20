@@ -1123,4 +1123,24 @@ class MonitorTest extends TestCase
         $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
         $this->assertNull(\LaravelMonitor\Models\MonitorInvitation::find($invitation->id));
     }
+
+    public function test_accepting_an_already_consumed_invitation_returns_404_instead_of_erroring(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('double-submit@example.com', 'viewer', $inviter);
+
+        $payload = [
+            'name' => 'Double Submit',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        $this->post('/monitor/invitations/'.$plainToken, $payload)->assertRedirect('/monitor');
+        $this->post('/monitor/invitations/'.$plainToken, $payload)->assertNotFound();
+
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorUser::where('email', 'double-submit@example.com')->count());
+    }
 }

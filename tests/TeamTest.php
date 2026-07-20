@@ -75,6 +75,16 @@ class TeamTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_inviting_an_invalid_email_does_not_create_an_invitation(): void
+    {
+        Mail::fake();
+
+        Livewire::test(Team::class)->call('invite', 'not-an-email', 'viewer')->assertHasErrors('email');
+
+        $this->assertSame(0, MonitorInvitation::where('email', 'not-an-email')->count());
+        Mail::assertNothingSent();
+    }
+
     public function test_inviting_an_existing_members_email_does_not_create_an_invitation(): void
     {
         Mail::fake();

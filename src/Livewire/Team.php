@@ -38,6 +38,12 @@ class Team extends Card
             return;
         }
 
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->addError('email', 'Please enter a valid email address.');
+
+            return;
+        }
+
         if (MonitorUser::query()->where('email', $email)->exists()) {
             $this->addError('email', 'This email is already a member.');
 

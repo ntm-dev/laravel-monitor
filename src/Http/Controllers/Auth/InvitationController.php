@@ -37,14 +37,16 @@ class InvitationController
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
+        $claimed = MonitorInvitation::query()->where('id', $invitation->id)->delete();
+
+        abort_if($claimed === 0, 404);
+
         $user = MonitorUser::create([
             'name' => $validated['name'],
             'email' => $invitation->email,
             'password' => Hash::make($validated['password']),
             'role' => $invitation->role,
         ]);
-
-        $invitation->delete();
 
         Auth::guard(MonitorUser::guardName())->login($user);
 
