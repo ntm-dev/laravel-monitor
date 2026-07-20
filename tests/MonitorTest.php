@@ -1066,4 +1066,61 @@ class MonitorTest extends TestCase
         $this->assertArrayHasKey('team', $footer);
         $this->assertSame('monitor.team', $footer['team']['component']);
     }
+
+    public function test_accept_invitation_page_is_shown_for_a_valid_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('accept-page-test@example.com', 'viewer', $inviter);
+
+        $this->get('/monitor/invitations/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('accept-page-test@example.com');
+    }
+
+    public function test_accept_invitation_returns_404_for_an_unknown_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/invitations/not-a-real-token')->assertNotFound();
+    }
+
+    public function test_accept_invitation_shows_an_expired_message_for_an_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('expired-test@example.com', 'viewer', $inviter);
+        $invitation->forceFill(['expires_at' => now()->subHour()])->save();
+
+        $this->get('/monitor/invitations/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('expired');
+    }
+
+    public function test_accepting_an_invitation_creates_the_user_with_the_invited_role_and_logs_them_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('accepting@example.com', 'admin', $inviter);
+
+        $this->post('/monitor/invitations/'.$plainToken, [
+            'name' => 'Accepted Member',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor');
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'accepting@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertSame('admin', $user->role);
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+        $this->assertNull(\LaravelMonitor\Models\MonitorInvitation::find($invitation->id));
+    }
 }
