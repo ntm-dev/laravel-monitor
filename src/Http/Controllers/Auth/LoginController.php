@@ -23,12 +23,21 @@ class LoginController
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::guard(MonitorUser::guardName())->attempt($credentials)) {
+        $user = MonitorUser::query()->where('email', $credentials['email'])->first();
+
+        if ($user === null || ! Auth::guard(MonitorUser::guardName())->validate($credentials)) {
             throw ValidationException::withMessages([
                 'email' => 'These credentials do not match our records.',
             ]);
         }
 
+        if ($user->hasTotpEnabled()) {
+            $request->session()->put('monitor_2fa_challenge_user_id', $user->id);
+
+            return redirect()->route('monitor.two-factor.challenge');
+        }
+
+        Auth::guard(MonitorUser::guardName())->login($user);
         $request->session()->regenerate();
 
         return redirect()->route('monitor.dashboard');

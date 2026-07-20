@@ -6,6 +6,7 @@ use LaravelMonitor\Http\Controllers\Auth\InvitationController;
 use LaravelMonitor\Http\Controllers\Auth\LoginController;
 use LaravelMonitor\Http\Controllers\Auth\PasswordResetController;
 use LaravelMonitor\Http\Controllers\Auth\SetupController;
+use LaravelMonitor\Http\Controllers\Auth\TwoFactorChallengeController;
 use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
@@ -22,6 +23,8 @@ Route::domain(config('monitor.domain'))
         Route::get('/login', [LoginController::class, 'show'])->name('monitor.login');
         Route::post('/login', [LoginController::class, 'store'])->name('monitor.login.store');
         Route::post('/logout', [LoginController::class, 'destroy'])->name('monitor.logout');
+        Route::get('/two-factor-challenge', [TwoFactorChallengeController::class, 'show'])->name('monitor.two-factor.challenge');
+        Route::post('/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->name('monitor.two-factor.challenge.store');
         Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('monitor.invitations.show');
         Route::post('/invitations/{token}', [InvitationController::class, 'store'])->name('monitor.invitations.store');
         Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('monitor.password.request');

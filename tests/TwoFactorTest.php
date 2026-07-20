@@ -3,6 +3,8 @@
 namespace LaravelMonitor\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use LaravelMonitor\Livewire\Team;
 use LaravelMonitor\Models\MonitorUser;
@@ -53,5 +55,98 @@ class TwoFactorTest extends TestCase
     {
         // TestCase::setUp() already created and logged in "Test Owner" — reuse it directly.
         return MonitorUser::query()->where('email', 'owner@example.com')->firstOrFail();
+    }
+
+    public function test_logging_in_a_totp_enabled_user_redirects_to_the_challenge_instead_of_the_dashboard(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+
+        $this->post('/monitor/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect('/monitor/two-factor-challenge');
+
+        $this->assertFalse(Auth::guard('monitor')->check());
+    }
+
+    public function test_a_correct_totp_code_on_the_challenge_completes_login(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+
+        $code = (new Google2FA())->getCurrentOtp(decrypt($user->getRawOriginal('totp_secret'), false));
+
+        $this->post('/monitor/two-factor-challenge', ['code' => $code])
+            ->assertRedirect('/monitor');
+
+        $this->assertTrue(Auth::guard('monitor')->check());
+        $this->assertSame($user->id, Auth::guard('monitor')->id());
+    }
+
+    public function test_a_wrong_totp_code_on_the_challenge_does_not_log_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+
+        $this->post('/monitor/two-factor-challenge', ['code' => '000000'])
+            ->assertSessionHasErrors('code');
+
+        $this->assertFalse(Auth::guard('monitor')->check());
+    }
+
+    public function test_a_correct_recovery_code_logs_in_and_is_removed_from_the_stored_list(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+        $plainRecoveryCode = 'RECOVERY01';
+        $user->update(['totp_recovery_codes' => [Hash::make($plainRecoveryCode), Hash::make('OTHERCODE')]]);
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+
+        $this->post('/monitor/two-factor-challenge', ['code' => $plainRecoveryCode])
+            ->assertRedirect('/monitor');
+
+        $this->assertTrue(Auth::guard('monitor')->check());
+        $this->assertCount(1, $user->refresh()->totp_recovery_codes);
+    }
+
+    public function test_reusing_a_spent_recovery_code_fails(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+        $user->update(['totp_recovery_codes' => [Hash::make('ONETIME01')]]);
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/two-factor-challenge', ['code' => 'ONETIME01']);
+        $this->withoutMonitorAuth();
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/two-factor-challenge', ['code' => 'ONETIME01'])
+            ->assertSessionHasErrors('code');
+
+        $this->assertFalse(Auth::guard('monitor')->check());
+    }
+
+    protected function createTotpEnabledUser(): MonitorUser
+    {
+        return MonitorUser::create([
+            'name' => 'Totp User',
+            'email' => 'totp-user@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'admin',
+            'totp_secret' => (new Google2FA())->generateSecretKey(),
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => [],
+        ]);
     }
 }
