@@ -1058,4 +1058,12 @@ class MonitorTest extends TestCase
         $this->assertStringContainsString('/monitor/invitations/'.$plainToken, $rendered);
         $this->assertStringContainsString($inviter->name, $rendered);
     }
+
+    public function test_team_tab_is_registered_in_the_footer_group(): void
+    {
+        [, $footer] = \LaravelMonitor\Support\Nav::grouped();
+
+        $this->assertArrayHasKey('team', $footer);
+        $this->assertSame('monitor.team', $footer['team']['component']);
+    }
 }

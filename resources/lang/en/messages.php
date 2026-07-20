@@ -15,6 +15,7 @@ return [
         'cache' => 'Cache',
         'outgoing' => 'Outgoing Requests',
         'users' => 'Users',
+        'team' => 'Team',
         'logs' => 'Logs',
         'settings' => 'Settings',
         'support' => 'Support',

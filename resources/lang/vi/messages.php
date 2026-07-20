@@ -15,6 +15,7 @@ return [
         'cache' => 'Cache',
         'outgoing' => 'Requests gửi đi',
         'users' => 'Người dùng',
+        'team' => 'Nhóm',
         'logs' => 'Nhật ký',
         'settings' => 'Cài đặt',
         'support' => 'Hỗ trợ',
