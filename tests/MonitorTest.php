@@ -1046,4 +1046,16 @@ class MonitorTest extends TestCase
         $this->assertSame($secondInviter->id, $second->fresh()->invited_by);
         $this->assertNotNull(\LaravelMonitor\Models\MonitorInvitation::findByPlainToken($secondToken));
     }
+
+    public function test_team_invitation_mail_links_to_the_accept_url_with_the_plain_token(): void
+    {
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('mail-test@example.com', 'viewer', $inviter);
+
+        $mail = new \LaravelMonitor\Mail\TeamInvitationMail($invitation, $plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/invitations/'.$plainToken, $rendered);
+        $this->assertStringContainsString($inviter->name, $rendered);
+    }
 }

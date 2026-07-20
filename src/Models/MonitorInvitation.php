@@ -34,6 +34,11 @@ class MonitorInvitation extends Model
         return config('monitor.storage.database.connection');
     }
 
+    public function invitedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(MonitorUser::class, 'invited_by');
+    }
+
     /**
      * @return array{invitation: self, plainToken: string}
      */
