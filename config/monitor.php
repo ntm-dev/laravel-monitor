@@ -87,6 +87,23 @@ return [
         'invitations_table' => 'monitor_invitations',
         'password_resets_table' => 'monitor_password_resets',
         'email_changes_table' => 'monitor_email_changes',
+        'webauthn_table' => 'monitor_webauthn_credentials',
+        'oauth_accounts_table' => 'monitor_oauth_accounts',
+        'oauth' => [
+            'google' => [
+                'client_id' => env('MONITOR_GOOGLE_CLIENT_ID'),
+                'client_secret' => env('MONITOR_GOOGLE_CLIENT_SECRET'),
+                'redirect' => env('MONITOR_GOOGLE_REDIRECT_URI'),
+            ],
+            'apple' => [
+                'client_id' => env('MONITOR_APPLE_CLIENT_ID'),
+                'client_secret' => env('MONITOR_APPLE_CLIENT_SECRET'),
+                'key_id' => env('MONITOR_APPLE_KEY_ID'),
+                'team_id' => env('MONITOR_APPLE_TEAM_ID'),
+                'private_key' => env('MONITOR_APPLE_PRIVATE_KEY'),
+                'redirect' => env('MONITOR_APPLE_REDIRECT_URI'),
+            ],
+        ],
     ],
 
     /*

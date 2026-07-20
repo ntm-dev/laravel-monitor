@@ -105,6 +105,9 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->string('role', 16)->default('viewer');
+            $table->text('totp_secret')->nullable();
+            $table->timestamp('totp_enabled_at')->nullable();
+            $table->json('totp_recovery_codes')->nullable();
             $table->timestamps();
         });
 
@@ -137,10 +140,35 @@ return new class extends Migration
             $table->timestamp('expires_at');
             $table->timestamps();
         });
+
+        Schema::create($this->webauthnCredentialsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('credential_id')->unique();
+            $table->text('public_key');
+            $table->string('label');
+            $table->unsignedInteger('sign_count')->default(0);
+            $table->timestamp('created_at');
+
+            $table->index('user_id');
+        });
+
+        Schema::create($this->oauthAccountsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('provider', 16);
+            $table->string('provider_user_id');
+            $table->timestamps();
+
+            $table->unique(['provider', 'provider_user_id']);
+            $table->index('user_id');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists($this->oauthAccountsTable());
+        Schema::dropIfExists($this->webauthnCredentialsTable());
         Schema::dropIfExists($this->emailChangesTable());
         Schema::dropIfExists($this->passwordResetsTable());
         Schema::dropIfExists($this->invitationsTable());
@@ -177,5 +205,15 @@ return new class extends Migration
     protected function emailChangesTable(): string
     {
         return config('monitor.auth.email_changes_table', 'monitor_email_changes');
+    }
+
+    protected function webauthnCredentialsTable(): string
+    {
+        return config('monitor.auth.webauthn_table', 'monitor_webauthn_credentials');
+    }
+
+    protected function oauthAccountsTable(): string
+    {
+        return config('monitor.auth.oauth_accounts_table', 'monitor_oauth_accounts');
     }
 };

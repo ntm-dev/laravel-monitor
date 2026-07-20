@@ -12,9 +12,15 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  */
 class MonitorUser extends Authenticatable
 {
-    protected $fillable = ['name', 'email', 'password', 'role'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'totp_secret', 'totp_enabled_at', 'totp_recovery_codes'];
 
-    protected $hidden = ['password'];
+    protected $hidden = ['password', 'totp_secret', 'totp_recovery_codes'];
+
+    protected $casts = [
+        'totp_enabled_at' => 'datetime',
+        'totp_secret' => 'encrypted',
+        'totp_recovery_codes' => 'array',
+    ];
 
     public function getTable(): string
     {
@@ -39,6 +45,11 @@ class MonitorUser extends Authenticatable
     public function canManageTeam(): bool
     {
         return in_array($this->role, ['owner', 'admin'], true);
+    }
+
+    public function hasTotpEnabled(): bool
+    {
+        return $this->totp_enabled_at !== null;
     }
 
     public static function guardName(): string
