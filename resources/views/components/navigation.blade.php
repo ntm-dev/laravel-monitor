@@ -59,6 +59,14 @@
             <span class="ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" title="Live · refreshes every {{ $refresh }}s">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
             </span>
+            <form method="POST" action="{{ route('monitor.logout') }}">
+                @csrf
+                <button type="submit" title="Sign out"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-100">
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::OUTGOING" class="h-4 w-4 shrink-0"/>
+                    <span class="sr-only">Sign out</span>
+                </button>
+            </form>
         </div>
     </div>
 </aside>
