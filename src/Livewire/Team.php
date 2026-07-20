@@ -94,6 +94,56 @@ class Team extends Card
         Mail::to($newEmail)->send(new EmailChangeVerificationMail($plainToken));
     }
 
+    public function approveEmailChange(int $emailChangeId): void
+    {
+        $actor = $this->actor();
+        $emailChange = MonitorEmailChange::query()->find($emailChangeId);
+
+        if ($emailChange === null || ! $emailChange->isVerified()) {
+            return;
+        }
+
+        $requester = $emailChange->user;
+
+        if (! $this->canDecideEmailChange($actor, $requester)) {
+            abort(403);
+        }
+
+        if (MonitorUser::query()->where('email', $emailChange->new_email)->where('id', '!=', $requester->id)->exists()) {
+            $this->addError('emailChange', 'That email is no longer available.');
+
+            return;
+        }
+
+        $requester->update(['email' => $emailChange->new_email]);
+        $emailChange->delete();
+    }
+
+    public function rejectEmailChange(int $emailChangeId): void
+    {
+        $actor = $this->actor();
+        $emailChange = MonitorEmailChange::query()->find($emailChangeId);
+
+        if ($emailChange === null || ! $emailChange->isVerified()) {
+            return;
+        }
+
+        if (! $this->canDecideEmailChange($actor, $emailChange->user)) {
+            abort(403);
+        }
+
+        $emailChange->delete();
+    }
+
+    protected function canDecideEmailChange(MonitorUser $actor, MonitorUser $requester): bool
+    {
+        return match ($requester->role) {
+            'admin' => $actor->isOwner(),
+            'viewer' => $actor->canManageTeam(),
+            default => false,
+        };
+    }
+
     public function changeRole(int $memberId, string $role): void
     {
         $actor = $this->actor();

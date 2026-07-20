@@ -288,4 +288,129 @@ class TeamTest extends TestCase
         $this->assertSame(0, MonitorEmailChange::count());
         Mail::assertNothingSent();
     }
+
+    public function test_owner_can_approve_an_admins_verified_email_change(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'approve-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'admin-approved-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id);
+
+        $this->assertSame('admin-approved-new@example.com', $admin->fresh()->email);
+        $this->assertNull(MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_admin_cannot_approve_another_admins_verified_email_change(): void
+    {
+        $requestingAdmin = MonitorUser::create([
+            'name' => 'Requesting Admin', 'email' => 'requesting-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $decidingAdmin = MonitorUser::create([
+            'name' => 'Deciding Admin', 'email' => 'deciding-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($requestingAdmin, 'blocked-admin-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+        $this->actingAs($decidingAdmin, 'monitor');
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id)->assertForbidden();
+
+        $this->assertSame('requesting-admin-test@example.com', $requestingAdmin->fresh()->email);
+    }
+
+    public function test_owner_or_admin_can_approve_a_viewers_verified_email_change(): void
+    {
+        $viewer = MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'approve-viewer-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($viewer, 'viewer-approved-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        $admin = MonitorUser::create([
+            'name' => 'Approving Admin', 'email' => 'approving-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id);
+
+        $this->assertSame('viewer-approved-new@example.com', $viewer->fresh()->email);
+    }
+
+    public function test_viewer_cannot_approve_or_reject_another_viewers_email_change(): void
+    {
+        $requestingViewer = MonitorUser::create([
+            'name' => 'Requesting Viewer', 'email' => 'requesting-viewer-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($requestingViewer, 'blocked-viewer-new@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        $decidingViewer = MonitorUser::create([
+            'name' => 'Deciding Viewer', 'email' => 'deciding-viewer-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        $this->actingAs($decidingViewer, 'monitor');
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id)->assertForbidden();
+        Livewire::test(Team::class)->call('rejectEmailChange', $emailChange->id)->assertForbidden();
+
+        $this->assertNotNull(MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_rejecting_an_email_change_deletes_it_without_changing_the_email(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'reject-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'rejected-new-email@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        Livewire::test(Team::class)->call('rejectEmailChange', $emailChange->id);
+
+        $this->assertSame('reject-admin-test@example.com', $admin->fresh()->email);
+        $this->assertNull(MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_approving_an_unverified_email_change_does_nothing(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'unverified-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'unverified-new@example.com');
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id);
+
+        $this->assertSame('unverified-admin-test@example.com', $admin->fresh()->email);
+        $this->assertNotNull(MonitorEmailChange::find($emailChange->id), 'an unverified request must not be silently deleted either');
+    }
+
+    public function test_approving_an_email_change_whose_target_email_was_claimed_meanwhile_fails_cleanly(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'race-admin-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange] = MonitorEmailChange::createFor($admin, 'claimed-meanwhile@example.com');
+        $emailChange->forceFill(['verified_at' => now()])->save();
+
+        // Someone else claims the target email between verification and approval.
+        MonitorUser::create([
+            'name' => 'Someone Else', 'email' => 'claimed-meanwhile@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        Livewire::test(Team::class)->call('approveEmailChange', $emailChange->id)->assertHasErrors('emailChange');
+
+        $this->assertSame('race-admin-test@example.com', $admin->fresh()->email, 'approval must not overwrite the requester\'s email once the target is taken');
+        $this->assertNotNull(MonitorEmailChange::find($emailChange->id), 'the pending row must survive a failed approval so it can be re-decided');
+    }
 }
