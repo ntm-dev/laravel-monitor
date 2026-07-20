@@ -3,12 +3,16 @@
 namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use LaravelMonitor\Mail\EmailChangeVerificationMail;
 use LaravelMonitor\Mail\TeamInvitationMail;
 use LaravelMonitor\Models\MonitorEmailChange;
 use LaravelMonitor\Models\MonitorInvitation;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Support\OptionalAuthMethod;
+use PragmaRX\Google2FA\Google2FA;
 
 class Team extends Card
 {
@@ -153,6 +157,46 @@ class Team extends Card
         }
 
         $emailChange->delete();
+    }
+
+    public ?string $totpSecret = null;
+
+    public function startEnrollingTotp(): void
+    {
+        if (! OptionalAuthMethod::totpAvailable()) {
+            return;
+        }
+
+        $this->totpSecret = (new Google2FA())->generateSecretKey();
+    }
+
+    public function confirmTotp(string $code): void
+    {
+        if ($this->totpSecret === null) {
+            return;
+        }
+
+        $google2fa = new Google2FA();
+
+        if (! $google2fa->verifyKey($this->totpSecret, $code)) {
+            $this->addError('totp', 'That code did not match. Please try again.');
+
+            return;
+        }
+
+        $actor = $this->actor();
+        $recoveryCodes = collect(range(1, 8))
+            ->map(fn () => Str::upper(Str::random(10)))
+            ->values();
+
+        $actor->update([
+            'totp_secret' => $this->totpSecret,
+            'totp_enabled_at' => now(),
+            'totp_recovery_codes' => $recoveryCodes->map(fn (string $code) => Hash::make($code))->all(),
+        ]);
+
+        $this->totpSecret = null;
+        $this->dispatch('totp-enabled', recoveryCodes: $recoveryCodes->all());
     }
 
     protected function canDecideEmailChange(MonitorUser $actor, MonitorUser $requester): bool

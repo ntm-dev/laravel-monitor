@@ -49,6 +49,44 @@
             @enderror
         </x-monitor::card>
 
+        <x-monitor::card class="p-4">
+            <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Two-factor authentication</p>
+            @if (! \LaravelMonitor\Support\OptionalAuthMethod::totpAvailable())
+                <p class="mt-2 text-sm text-neutral-400 dark:text-neutral-500">Install <code class="font-mono text-xs">pragmarx/google2fa bacon/bacon-qr-code</code> to enable this.</p>
+            @elseif ($actor->hasTotpEnabled())
+                <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Enabled for your account.</p>
+            @elseif ($totpSecret === null)
+                <button type="button" wire:click="startEnrollingTotp" class="mt-3 h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Enable</button>
+            @else
+                <div class="mt-3">
+                    {!! (new BaconQrCode\Writer(new BaconQrCode\Renderer\ImageRenderer(new BaconQrCode\Renderer\RendererStyle\RendererStyle(200), new BaconQrCode\Renderer\Image\SvgImageBackEnd())))->writeString((new PragmaRX\Google2FA\Google2FA())->getQRCodeUrl(config('app.name', 'Laravel'), $actor->email, $totpSecret)) !!}
+                    <p class="mt-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $totpSecret }}</p>
+                </div>
+                <form wire:submit="confirmTotp($refs.totpCode.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                    <div class="min-w-0 flex-1">
+                        <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Enter the 6-digit code</label>
+                        <input type="text" x-ref="totpCode" required inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                               class="mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                    </div>
+                    <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Confirm</button>
+                </form>
+                @error('totp')
+                    <p class="mt-2 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                @enderror
+            @endif
+        </x-monitor::card>
+
+        <div x-data="{ codes: null }" x-on:totp-enabled.window="codes = $event.detail.recoveryCodes" x-show="codes" x-cloak>
+            <x-monitor::card class="mt-4 p-4">
+                <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Recovery codes — save these now, they won't be shown again</p>
+                <ul class="mt-3 grid grid-cols-2 gap-1 font-mono text-sm text-neutral-700 dark:text-neutral-200">
+                    <template x-for="code in codes" :key="code">
+                        <li x-text="code"></li>
+                    </template>
+                </ul>
+            </x-monitor::card>
+        </div>
+
         @if ($pendingInvitations->isNotEmpty())
             <div class="mt-4 flex items-center gap-2 px-1 pb-3">
                 <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingInvitations->count()) }} Pending {{ $pendingInvitations->count() === 1 ? 'Invite' : 'Invites' }}</h3>
