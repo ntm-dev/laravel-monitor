@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use LaravelMonitor\Http\Controllers\Auth\EmailChangeController;
 use LaravelMonitor\Http\Controllers\Auth\InvitationController;
 use LaravelMonitor\Http\Controllers\Auth\LoginController;
 use LaravelMonitor\Http\Controllers\Auth\PasswordResetController;
@@ -27,6 +28,8 @@ Route::domain(config('monitor.domain'))
         Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('monitor.password.request.store');
         Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('monitor.password.reset');
         Route::post('/reset-password/{token}', [PasswordResetController::class, 'resetPassword'])->name('monitor.password.reset.store');
+        Route::get('/email-changes/{token}', [EmailChangeController::class, 'show'])->name('monitor.email-changes.show');
+        Route::post('/email-changes/{token}', [EmailChangeController::class, 'store'])->name('monitor.email-changes.store');
 
         Route::middleware(EnsureMonitorAuthenticated::class)->group(function () {
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');

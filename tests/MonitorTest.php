@@ -1329,4 +1329,76 @@ class MonitorTest extends TestCase
         $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertRedirect('/monitor');
         $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertNotFound();
     }
+
+    public function test_email_change_show_page_is_shown_for_a_valid_unverified_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'verify-show-test@example.com');
+
+        $this->get('/monitor/email-changes/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('verify-show-test@example.com');
+    }
+
+    public function test_email_change_show_returns_404_for_an_unknown_or_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/email-changes/not-a-real-token')->assertNotFound();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange, 'plainToken' => $expiredToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'expired-verify-test@example.com');
+        $emailChange->forceFill(['expires_at' => now()->subHour()])->save();
+
+        $this->get('/monitor/email-changes/'.$expiredToken)->assertNotFound();
+    }
+
+    public function test_verifying_an_owners_email_change_applies_it_immediately(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'owner-new-email@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('owner-new-email@example.com');
+
+        $this->assertSame('owner-new-email@example.com', $owner->fresh()->email);
+        $this->assertNull(\LaravelMonitor\Models\MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_verifying_a_non_owners_email_change_leaves_it_pending_for_approval(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin', 'email' => 'pending-change-admin@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($admin, 'admin-new-email@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)->assertOk();
+
+        $this->assertSame('pending-change-admin@example.com', $admin->fresh()->email, 'a non-owner change must not apply until approved');
+        $this->assertNotNull($emailChange->fresh()->verified_at);
+    }
+
+    public function test_verifying_an_already_applied_email_change_returns_404(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'double-submit-verify@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)->assertOk();
+        $this->post('/monitor/email-changes/'.$plainToken)->assertNotFound();
+    }
 }
