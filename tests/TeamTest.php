@@ -413,4 +413,17 @@ class TeamTest extends TestCase
         $this->assertSame('race-admin-test@example.com', $admin->fresh()->email, 'approval must not overwrite the requester\'s email once the target is taken');
         $this->assertNotNull(MonitorEmailChange::find($emailChange->id), 'the pending row must survive a failed approval so it can be re-decided');
     }
+
+    public function test_an_unverified_email_change_never_appears_in_pending_email_changes(): void
+    {
+        $admin = MonitorUser::create([
+            'name' => 'Admin', 'email' => 'unverified-visibility-test@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        MonitorEmailChange::createFor($admin, 'not-yet-verified@example.com');
+
+        $component = Livewire::test(Team::class);
+
+        $this->assertTrue($component->viewData('pendingEmailChanges')->isEmpty());
+    }
 }

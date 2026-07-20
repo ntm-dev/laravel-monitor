@@ -19,12 +19,24 @@ class Team extends Card
 
     protected function data(): array
     {
+        $actor = $this->actor();
+
+        $pendingEmailChanges = MonitorEmailChange::query()
+            ->whereNotNull('verified_at')
+            ->with('user')
+            ->orderByDesc('created_at')
+            ->get()
+            ->each(function (MonitorEmailChange $emailChange) use ($actor) {
+                $emailChange->canDecide = $this->canDecideEmailChange($actor, $emailChange->user);
+            });
+
         return [
             'members' => MonitorUser::query()->orderBy('created_at')->get(),
             'pendingInvitations' => MonitorInvitation::query()
                 ->where('expires_at', '>', now())
                 ->orderByDesc('created_at')
                 ->get(),
+            'pendingEmailChanges' => $pendingEmailChanges,
         ];
     }
 

@@ -34,6 +34,21 @@
             </x-monitor::card>
         @endif
 
+        <x-monitor::card class="p-4">
+            <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Change your email</p>
+            <form wire:submit="requestEmailChange($refs.newEmail.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                <div class="min-w-0 flex-1">
+                    <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">New email</label>
+                    <input type="email" x-ref="newEmail" required
+                           class="mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                </div>
+                <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">Send verification email</button>
+            </form>
+            @error('newEmail')
+                <p class="mt-2 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+            @enderror
+        </x-monitor::card>
+
         @if ($pendingInvitations->isNotEmpty())
             <div class="mt-4 flex items-center gap-2 px-1 pb-3">
                 <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingInvitations->count()) }} Pending {{ $pendingInvitations->count() === 1 ? 'Invite' : 'Invites' }}</h3>
@@ -52,6 +67,33 @@
                         </div>
                     @endforeach
                 </div>
+            </x-monitor::card>
+        @endif
+
+        @if ($pendingEmailChanges->isNotEmpty())
+            <div class="mt-4 flex items-center gap-2 px-1 pb-3">
+                <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingEmailChanges->count()) }} Pending Email {{ $pendingEmailChanges->count() === 1 ? 'Change' : 'Changes' }}</h3>
+            </div>
+            <x-monitor::card class="p-4">
+                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    @foreach ($pendingEmailChanges as $emailChange)
+                        <div class="flex items-center gap-3 py-2.5">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{{ $emailChange->user->name }}</p>
+                                <p class="truncate font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $emailChange->user->email }} &rarr; {{ $emailChange->new_email }}</p>
+                            </div>
+                            @if ($emailChange->canDecide)
+                                <button type="button" wire:click="approveEmailChange({{ $emailChange->id }})"
+                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">Approve</button>
+                                <button type="button" wire:click="rejectEmailChange({{ $emailChange->id }})" wire:confirm="Reject this email change?"
+                                        class="shrink-0 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">Reject</button>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                @error('emailChange')
+                    <p class="mt-3 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                @enderror
             </x-monitor::card>
         @endif
 
