@@ -13,7 +13,7 @@
         @if ($actor->canManageTeam())
             <x-monitor::card class="p-4">
                 <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Invite a member</p>
-                <form wire:submit="invite($refs.email.value, $refs.role.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                <form x-on:submit.prevent="$wire.invite($refs.email.value, $refs.role.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
                     <div class="min-w-0 flex-1">
                         <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Email</label>
                         <input type="email" x-ref="email" required
@@ -36,7 +36,7 @@
 
         <x-monitor::card class="p-4">
             <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Change your email</p>
-            <form wire:submit="requestEmailChange($refs.newEmail.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+            <form x-on:submit.prevent="$wire.requestEmailChange($refs.newEmail.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
                 <div class="min-w-0 flex-1">
                     <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">New email</label>
                     <input type="email" x-ref="newEmail" required
@@ -55,7 +55,7 @@
                 <p class="mt-2 text-sm text-neutral-400 dark:text-neutral-500">Install <code class="font-mono text-xs">pragmarx/google2fa bacon/bacon-qr-code</code> to enable this.</p>
             @elseif ($actor->hasTotpEnabled())
                 <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Enabled for your account.</p>
-                <form wire:submit="disableTotp($refs.currentPassword.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                <form x-on:submit.prevent="$wire.disableTotp($refs.currentPassword.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
                     <div class="min-w-0 flex-1">
                         <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Current password</label>
                         <input type="password" x-ref="currentPassword" required
@@ -73,7 +73,7 @@
                     {!! (new BaconQrCode\Writer(new BaconQrCode\Renderer\ImageRenderer(new BaconQrCode\Renderer\RendererStyle\RendererStyle(200), new BaconQrCode\Renderer\Image\SvgImageBackEnd())))->writeString((new PragmaRX\Google2FA\Google2FA())->getQRCodeUrl(config('app.name', 'Laravel'), $actor->email, $totpSecret)) !!}
                     <p class="mt-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $totpSecret }}</p>
                 </div>
-                <form wire:submit="confirmTotp($refs.totpCode.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
+                <form x-on:submit.prevent="$wire.confirmTotp($refs.totpCode.value)" class="mt-3 flex flex-wrap items-end gap-2" x-data>
                     <div class="min-w-0 flex-1">
                         <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Enter the 6-digit code</label>
                         <input type="text" x-ref="totpCode" required inputmode="numeric" pattern="[0-9]*" maxlength="6"
