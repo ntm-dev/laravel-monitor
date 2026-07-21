@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire as Cards;
+use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
 
 class MonitorServiceProvider extends ServiceProvider
@@ -26,6 +27,8 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerRequestTimeline();
         $this->registerLivewireComponents();
         $this->registerAuthorization();
+        $this->registerAuth();
+        $this->registerOAuth();
 
         $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
     }
@@ -33,6 +36,7 @@ class MonitorServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Support\Settings::apply();
+        $this->registerAppleOAuthDriver();
 
         // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
         // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
@@ -168,6 +172,7 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.outgoing-requests', Cards\OutgoingRequests::class);
         Livewire::component('monitor.mail', Cards\MailAndNotifications::class);
         Livewire::component('monitor.logs', Cards\Logs::class);
+        Livewire::component('monitor.team', Cards\Team::class);
         Livewire::component('monitor.users', Cards\Users::class);
         Livewire::component('monitor.application', Cards\Application::class);
         Livewire::component('monitor.issues', Cards\Issues::class);
@@ -190,6 +195,31 @@ class MonitorServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Register the package's own `monitor` guard/provider pair, unless the
+     * host app already defined one under the same name — mirrors
+     * registerAuthorization()'s "don't clobber a host override" rule for
+     * the viewMonitor Gate.
+     */
+    protected function registerAuth(): void
+    {
+        $guard = MonitorUser::guardName();
+
+        if (! $this->app['config']->has("auth.guards.{$guard}")) {
+            $this->app['config']->set("auth.guards.{$guard}", [
+                'driver' => 'session',
+                'provider' => 'monitor_users',
+            ]);
+        }
+
+        if (! $this->app['config']->has('auth.providers.monitor_users')) {
+            $this->app['config']->set('auth.providers.monitor_users', [
+                'driver' => 'eloquent',
+                'model' => MonitorUser::class,
+            ]);
+        }
+    }
+
     protected function registerCommands(): void
     {
         if ($this->app->runningInConsole()) {
@@ -199,5 +229,33 @@ class MonitorServiceProvider extends ServiceProvider
                 Commands\AggregateCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Socialite reads driver config from `services.<provider>`, which this
+     * package has no business publishing into the host app's own
+     * config/services.php — mirror registerAuth()'s approach instead and
+     * merge it at runtime from this package's own `monitor.auth.oauth.*`,
+     * skipping any provider the host app already configured itself.
+     */
+    protected function registerOAuth(): void
+    {
+        foreach (['google', 'apple'] as $provider) {
+            if (! $this->app['config']->has("services.{$provider}")) {
+                $this->app['config']->set("services.{$provider}", $this->app['config']->get("monitor.auth.oauth.{$provider}", []));
+            }
+        }
+    }
+
+    protected function registerAppleOAuthDriver(): void
+    {
+        if (! class_exists(\SocialiteProviders\Apple\Provider::class)) {
+            return;
+        }
+
+        $this->app->make(\Illuminate\Contracts\Events\Dispatcher::class)->listen(
+            \SocialiteProviders\Manager\SocialiteWasCalled::class,
+            fn (\SocialiteProviders\Manager\SocialiteWasCalled $event) => $event->extendSocialite('apple', \SocialiteProviders\Apple\Provider::class),
+        );
     }
 }

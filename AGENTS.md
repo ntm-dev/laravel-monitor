@@ -27,9 +27,30 @@ php -l path/to/file.blade.php   # syntax-check a single blade file
 - UI mirrors Laravel Nightwatch's dashboard style: dotted-line `dl` metric rows
   (see `resources/views/livewire/query-detail.blade.php`, `exception-detail.blade.php`),
   Tailwind CDN JIT, dark mode via `.dark` class.
+- **All user-facing text must go through the translation system** — `__('monitor::messages.<section>.<key>')`,
+  never a hardcoded string in a Blade view. Add the key to both
+  `resources/lang/en/messages.php` and `resources/lang/vi/messages.php` (this package ships
+  English + Vietnamese; keep them in sync). See the existing `nav`/`group`/`settings` sections
+  for the nesting convention (one sub-array per feature/page).
 - Route-list "key" format for `type: 'request'` entries is `"METHOD URI"` (e.g. `"GET /api/foo"`);
   list views split it back apart with `Str::before`/`Str::after`. Requests with no matched
   Laravel route are grouped under the literal key `Requests::UNMATCHED_ROUTE` ("Unmatched Route").
+
+## Migrations
+
+**Single migration file, always.** This package is installed into other
+Laravel apps purely to monitor them, and the integration only allows one
+migration file. All tables live in
+`database/migrations/2026_01_01_000000_create_monitor_table.php` — do not
+add a second migration file for any reason, including a new table.
+
+When the schema needs to change:
+1. Edit the relevant `Schema::create()`/`Schema::table()` block in that one
+   file directly, so a fresh install still produces the right structure.
+2. Apply the same change to any already-migrated database (this repo's own
+   dev setup, a consuming app) with a manual `ALTER`/`Schema::table()` call
+   run directly (e.g. via `artisan tinker`) — never by writing a new
+   migration file to carry the change.
 
 ## Gotchas
 - **`<pre><code>...</code></pre>` must have zero whitespace/newline between the tags.**

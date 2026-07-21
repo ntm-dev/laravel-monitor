@@ -622,6 +622,28 @@ class MonitorTest extends TestCase
         }
     }
 
+    public function test_requests_list_colors_methods_and_shows_error_icons(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record('request', 'POST /users', ['status' => 201], 60, '2xx', 1);
+        Monitor::record('request', 'PUT /users/1', ['status' => 200], 70, '2xx', 1);
+        Monitor::record('request', 'PATCH /users/1', ['status' => 200], 40, '2xx', 1);
+        Monitor::record('request', 'DELETE /users/1', ['status' => 204], 30, '2xx', 1);
+        Monitor::record('request', 'GET /orders', ['status' => 404], 20, '4xx', 1);
+        Monitor::record('request', 'POST /payments', ['status' => 500], 90, '5xx', 1);
+        Monitor::flush();
+
+        $this->get('/monitor/requests')
+            ->assertOk()
+            ->assertSee('text-emerald-600', false)
+            ->assertSee('text-blue-500', false)
+            ->assertSee('text-rose-600', false)
+            ->assertSee('fill-amber-500', false)
+            ->assertSee('fill-rose-500', false);
+    }
+
     public function test_entries_recorded_during_a_request_are_correlated(): void
     {
         $monitor = app(\LaravelMonitor\Monitor::class);
@@ -1194,6 +1216,735 @@ class MonitorTest extends TestCase
 
         $this->post('/monitor/issues/'.$uuid.'/status', ['status' => 'not-a-status'])
             ->assertSessionHasErrors('status');
+    }
+
+    public function test_monitor_users_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_users', [
+            'id', 'name', 'email', 'password', 'role', 'created_at', 'updated_at',
+        ]));
+
+        \Illuminate\Support\Facades\DB::table('monitor_users')->insert([
+            'name' => 'Test User',
+            'email' => 'test-user@example.com',
+            'password' => 'irrelevant-for-this-test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $row = \Illuminate\Support\Facades\DB::table('monitor_users')->where('email', 'test-user@example.com')->first();
+
+        $this->assertSame('viewer', $row->role);
+    }
+
+    public function test_monitor_invitations_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_invitations', [
+            'id', 'email', 'role', 'token', 'invited_by', 'expires_at', 'created_at', 'updated_at',
+        ]));
+    }
+
+    public function test_monitor_password_resets_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_password_resets', [
+            'id', 'email', 'token', 'created_at', 'updated_at',
+        ]));
+    }
+
+    public function test_monitor_email_changes_table_exists_with_expected_columns(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumns('monitor_email_changes', [
+            'id', 'user_id', 'new_email', 'token', 'verified_at', 'expires_at', 'created_at', 'updated_at',
+        ]));
+    }
+
+    public function test_monitor_user_role_helpers_reflect_the_stored_role(): void
+    {
+        $owner = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Owner',
+            'email' => 'owner-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin',
+            'email' => 'admin-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'admin',
+        ]);
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'viewer-role-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+
+        $this->assertTrue($owner->canManageSettings());
+        $this->assertTrue($admin->canManageSettings());
+        $this->assertFalse($viewer->canManageSettings());
+
+        $this->assertSame('monitor', \LaravelMonitor\Models\MonitorUser::guardName());
+    }
+
+    public function test_the_monitor_guard_is_registered_and_backed_by_monitor_user(): void
+    {
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Guard Test',
+            'email' => 'guard-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->attempt([
+            'email' => 'guard-test@example.com',
+            'password' => 'password',
+        ]));
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_setup_page_is_shown_when_no_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $this->get('/monitor/setup')
+            ->assertOk()
+            ->assertSeeText('Create the owner account');
+    }
+
+    public function test_setup_creates_the_first_user_as_owner_and_logs_them_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $this->post('/monitor/setup', [
+            'name' => 'First Owner',
+            'email' => 'first-owner@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor');
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'first-owner@example.com')->first();
+
+        $this->assertNotNull($user);
+        $this->assertSame('owner', $user->role);
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_setup_is_unreachable_once_a_user_already_exists(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'existing@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor/setup')->assertRedirect('/monitor/login');
+
+        $this->post('/monitor/setup', [
+            'name' => 'Second Owner',
+            'email' => 'second-owner@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor/login');
+
+        $this->assertNull(\LaravelMonitor\Models\MonitorUser::where('email', 'second-owner@example.com')->first());
+    }
+
+    public function test_login_page_is_shown(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'login-page-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor/login')
+            ->assertOk()
+            ->assertSeeText('Sign in');
+    }
+
+    public function test_login_with_correct_credentials_authenticates_and_redirects(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Success',
+            'email' => 'login-success@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-success@example.com',
+            'password' => 'correct-password',
+        ])->assertRedirect('/monitor');
+
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_login_with_wrong_password_does_not_authenticate(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Failure',
+            'email' => 'login-failure@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-failure@example.com',
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+    }
+
+    public function test_login_with_wrong_password_records_a_failed_auth_entry(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Login Failure',
+            'email' => 'login-failure-recorded@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'email' => 'login-failure-recorded@example.com',
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'auth',
+            'subtype' => 'failed',
+        ]);
+    }
+
+    public function test_logout_clears_the_monitor_guard_session(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Logout Test',
+            'email' => 'logout-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->actingAs($user, 'monitor');
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+
+        $this->post('/monitor/logout')->assertRedirect('/monitor/login');
+
+        $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+    }
+
+    public function test_unauthenticated_visitor_is_redirected_to_setup_when_no_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $this->get('/monitor')->assertRedirect('/monitor/setup');
+    }
+
+    public function test_unauthenticated_visitor_is_redirected_to_login_when_users_exist(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Existing',
+            'email' => 'redirect-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $this->get('/monitor')->assertRedirect('/monitor/login');
+    }
+
+    public function test_authenticated_visitor_passes_through_to_the_dashboard(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // TestCase::setUp() already logged in a default owner.
+        $this->get('/monitor')->assertOk();
+    }
+
+    public function test_the_gate_still_hard_aborts_regardless_of_auth_state(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => false);
+
+        // TestCase::setUp()'s default owner is authenticated, but the Gate
+        // is the outer, unconditional switch — it must still win.
+        $this->get('/monitor')->assertForbidden();
+    }
+
+    public function test_a_viewer_cannot_post_settings_system(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->post('/monitor/settings/system', [])->assertForbidden();
+    }
+
+    public function test_a_viewer_cannot_post_settings_reset(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-reset-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->post('/monitor/settings/reset')->assertForbidden();
+    }
+
+    public function test_an_admin_can_post_settings_reset(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin',
+            'email' => 'settings-admin@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'admin',
+        ]);
+        $this->actingAs($admin, 'monitor');
+
+        $this->post('/monitor/settings/reset')->assertRedirect();
+    }
+
+    public function test_monitor_user_gains_isowner_and_canmanageteam_helpers(): void
+    {
+        $owner = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Owner', 'email' => 'owner-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'owner',
+        ]);
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin', 'email' => 'admin-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer', 'email' => 'viewer-helpers-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        $this->assertTrue($owner->isOwner());
+        $this->assertFalse($admin->isOwner());
+        $this->assertFalse($viewer->isOwner());
+
+        $this->assertTrue($owner->canManageTeam());
+        $this->assertTrue($admin->canManageTeam());
+        $this->assertFalse($viewer->canManageTeam());
+    }
+
+    public function test_monitor_invitation_create_for_generates_a_findable_token_and_expires_in_two_hours(): void
+    {
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('invitee@example.com', 'viewer', $inviter);
+
+        $this->assertSame('invitee@example.com', $invitation->email);
+        $this->assertSame('viewer', $invitation->role);
+        $this->assertSame($inviter->id, $invitation->invited_by);
+        $this->assertNotSame($plainToken, $invitation->token, 'the stored token must be hashed, not the plain value');
+        $this->assertTrue($invitation->expires_at->between(now()->addMinutes(119), now()->addMinutes(121)));
+        $this->assertFalse($invitation->isExpired());
+
+        $found = \LaravelMonitor\Models\MonitorInvitation::findByPlainToken($plainToken);
+        $this->assertNotNull($found);
+        $this->assertSame($invitation->id, $found->id);
+
+        $this->assertNull(\LaravelMonitor\Models\MonitorInvitation::findByPlainToken('not-a-real-token'));
+    }
+
+    public function test_monitor_invitation_create_for_refreshes_an_existing_pending_invite_to_the_same_email(): void
+    {
+        $firstInviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $secondInviter = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Second Admin', 'email' => 'second-inviter-test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+
+        ['invitation' => $first] = \LaravelMonitor\Models\MonitorInvitation::createFor('re-invited@example.com', 'viewer', $firstInviter);
+        ['invitation' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('re-invited@example.com', 'admin', $secondInviter);
+
+        $this->assertSame($first->id, $second->id, 'refreshing should update the same row, not create a second one');
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorInvitation::where('email', 're-invited@example.com')->count());
+        $this->assertSame('admin', $second->fresh()->role);
+        $this->assertSame($secondInviter->id, $second->fresh()->invited_by);
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorInvitation::findByPlainToken($secondToken));
+    }
+
+    public function test_team_invitation_mail_links_to_the_accept_url_with_the_plain_token(): void
+    {
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('mail-test@example.com', 'viewer', $inviter);
+
+        $mail = new \LaravelMonitor\Mail\TeamInvitationMail($invitation, $plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/invitations/'.$plainToken, $rendered);
+        $this->assertStringContainsString($inviter->name, $rendered);
+    }
+
+    public function test_team_tab_is_registered_in_the_footer_group(): void
+    {
+        [, $footer] = \LaravelMonitor\Support\Nav::grouped();
+
+        $this->assertArrayHasKey('team', $footer);
+        $this->assertSame('monitor.team', $footer['team']['component']);
+    }
+
+    public function test_accept_invitation_page_is_shown_for_a_valid_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('accept-page-test@example.com', 'viewer', $inviter);
+
+        $this->get('/monitor/invitations/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('accept-page-test@example.com');
+    }
+
+    public function test_accept_invitation_returns_404_for_an_unknown_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/invitations/not-a-real-token')->assertNotFound();
+    }
+
+    public function test_accept_invitation_shows_an_expired_message_for_an_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('expired-test@example.com', 'viewer', $inviter);
+        $invitation->forceFill(['expires_at' => now()->subHour()])->save();
+
+        $this->get('/monitor/invitations/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('expired');
+    }
+
+    public function test_accepting_an_invitation_creates_the_user_with_the_invited_role_and_logs_them_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['invitation' => $invitation, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('accepting@example.com', 'admin', $inviter);
+
+        $this->post('/monitor/invitations/'.$plainToken, [
+            'name' => 'Accepted Member',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor');
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'accepting@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertSame('admin', $user->role);
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+        $this->assertNull(\LaravelMonitor\Models\MonitorInvitation::find($invitation->id));
+    }
+
+    public function test_accepting_an_already_consumed_invitation_returns_404_instead_of_erroring(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $inviter = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorInvitation::createFor('double-submit@example.com', 'viewer', $inviter);
+
+        $payload = [
+            'name' => 'Double Submit',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        $this->post('/monitor/invitations/'.$plainToken, $payload)->assertRedirect('/monitor');
+        $this->post('/monitor/invitations/'.$plainToken, $payload)->assertNotFound();
+
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorUser::where('email', 'double-submit@example.com')->count());
+    }
+
+    public function test_monitor_password_reset_create_for_hashes_the_token_and_refreshes_on_repeat_request(): void
+    {
+        ['reset' => $first, 'plainToken' => $firstToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('reset-test@example.com');
+        ['reset' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('reset-test@example.com');
+
+        $this->assertSame($first->id, $second->id, 'a repeat request should refresh the same row, not create a second one');
+        $this->assertNotSame($firstToken, $secondToken);
+        $this->assertNotSame($firstToken, $second->token, 'the stored token must be hashed, not the plain value');
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorPasswordReset::findByPlainToken($secondToken));
+        $this->assertNull(\LaravelMonitor\Models\MonitorPasswordReset::findByPlainToken($firstToken), 'the old token must stop working once refreshed');
+    }
+
+    public function test_monitor_password_reset_is_expired_after_60_minutes(): void
+    {
+        ['reset' => $reset] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('expiry-test@example.com');
+        $this->assertFalse($reset->isExpired());
+
+        $reset->forceFill(['created_at' => now()->subMinutes(61)])->save();
+        $this->assertTrue($reset->fresh()->isExpired());
+    }
+
+    public function test_monitor_email_change_create_for_hashes_the_token_and_is_unverified_by_default(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'new-address@example.com');
+
+        $this->assertSame($requester->id, $emailChange->user_id);
+        $this->assertSame('new-address@example.com', $emailChange->new_email);
+        $this->assertNotSame($plainToken, $emailChange->token);
+        $this->assertFalse($emailChange->isVerified());
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorEmailChange::findByPlainToken($plainToken));
+        $this->assertSame($requester->id, $emailChange->user->id);
+    }
+
+    public function test_monitor_email_change_repeat_request_resets_verification(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        ['emailChange' => $first] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'first-address@example.com');
+        $first->forceFill(['verified_at' => now()])->save();
+
+        ['emailChange' => $second, 'plainToken' => $secondToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'second-address@example.com');
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, \LaravelMonitor\Models\MonitorEmailChange::where('user_id', $requester->id)->count());
+        $this->assertSame('second-address@example.com', $second->fresh()->new_email);
+        $this->assertFalse($second->fresh()->isVerified(), 'requesting again must reset verification on the refreshed row');
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorEmailChange::findByPlainToken($secondToken));
+    }
+
+    public function test_monitor_email_change_is_expired_after_60_minutes(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'expiry-change-test@example.com');
+
+        $this->assertFalse($emailChange->isExpired());
+
+        $emailChange->forceFill(['expires_at' => now()->subHour()])->save();
+        $this->assertTrue($emailChange->fresh()->isExpired());
+    }
+
+    public function test_password_reset_mail_links_to_the_reset_url_with_the_plain_token(): void
+    {
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('mail-reset-test@example.com');
+
+        $mail = new \LaravelMonitor\Mail\PasswordResetMail($plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/reset-password/'.$plainToken, $rendered);
+    }
+
+    public function test_email_change_verification_mail_links_to_the_verify_url_with_the_plain_token(): void
+    {
+        $requester = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($requester, 'mail-verify-test@example.com');
+
+        $mail = new \LaravelMonitor\Mail\EmailChangeVerificationMail($plainToken);
+        $rendered = $mail->render();
+
+        $this->assertStringContainsString('/monitor/email-changes/'.$plainToken, $rendered);
+    }
+
+    public function test_forgot_password_page_is_shown(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/forgot-password')->assertOk();
+    }
+
+    public function test_requesting_a_reset_for_a_known_email_sends_the_mail(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $this->post('/monitor/forgot-password', ['email' => 'owner@example.com'])->assertRedirect();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\LaravelMonitor\Mail\PasswordResetMail::class);
+        $this->assertNotNull(\LaravelMonitor\Models\MonitorPasswordReset::where('email', 'owner@example.com')->first());
+    }
+
+    public function test_requesting_a_reset_for_an_unknown_email_sends_nothing_but_still_redirects_the_same_way(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $knownResponse = $this->post('/monitor/forgot-password', ['email' => 'owner@example.com']);
+        $unknownResponse = $this->post('/monitor/forgot-password', ['email' => 'unknown-nobody@example.com']);
+
+        $unknownResponse->assertRedirect();
+        $this->assertSame($knownResponse->headers->get('Location'), $unknownResponse->headers->get('Location'), 'the response must not reveal whether the email exists');
+        \Illuminate\Support\Facades\Mail::assertSent(\LaravelMonitor\Mail\PasswordResetMail::class, 1);
+        $this->assertNull(\LaravelMonitor\Models\MonitorPasswordReset::where('email', 'unknown-nobody@example.com')->first());
+    }
+
+    public function test_reset_password_page_is_shown_for_a_valid_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $this->get('/monitor/reset-password/'.$plainToken)->assertOk();
+    }
+
+    public function test_reset_password_returns_404_for_an_unknown_or_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/reset-password/not-a-real-token')->assertNotFound();
+
+        ['reset' => $reset, 'plainToken' => $expiredToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('expired-reset-test@example.com');
+        $reset->forceFill(['created_at' => now()->subMinutes(61)])->save();
+
+        $this->get('/monitor/reset-password/'.$expiredToken)->assertNotFound();
+    }
+
+    public function test_resetting_the_password_updates_it_and_logs_the_user_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $user = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $this->post('/monitor/reset-password/'.$plainToken, [
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ])->assertRedirect('/monitor');
+
+        $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-123', $user->fresh()->password));
+    }
+
+    public function test_resetting_an_already_consumed_password_reset_token_returns_404_instead_of_erroring(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorPasswordReset::createFor('owner@example.com');
+
+        $payload = ['password' => 'new-password-123', 'password_confirmation' => 'new-password-123'];
+
+        $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertRedirect('/monitor');
+        $this->post('/monitor/reset-password/'.$plainToken, $payload)->assertNotFound();
+    }
+
+    public function test_email_change_show_page_is_shown_for_a_valid_unverified_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'verify-show-test@example.com');
+
+        $this->get('/monitor/email-changes/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('verify-show-test@example.com');
+    }
+
+    public function test_email_change_show_returns_404_for_an_unknown_or_expired_token(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/email-changes/not-a-real-token')->assertNotFound();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange, 'plainToken' => $expiredToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'expired-verify-test@example.com');
+        $emailChange->forceFill(['expires_at' => now()->subHour()])->save();
+
+        $this->get('/monitor/email-changes/'.$expiredToken)->assertNotFound();
+    }
+
+    public function test_verifying_an_owners_email_change_applies_it_immediately(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'owner-new-email@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)
+            ->assertOk()
+            ->assertSeeText('owner-new-email@example.com');
+
+        $this->assertSame('owner-new-email@example.com', $owner->fresh()->email);
+        $this->assertNull(\LaravelMonitor\Models\MonitorEmailChange::find($emailChange->id));
+    }
+
+    public function test_verifying_a_non_owners_email_change_leaves_it_pending_for_approval(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $admin = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Admin', 'email' => 'pending-change-admin@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'), 'role' => 'admin',
+        ]);
+        ['emailChange' => $emailChange, 'plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($admin, 'admin-new-email@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)->assertOk();
+
+        $this->assertSame('pending-change-admin@example.com', $admin->fresh()->email, 'a non-owner change must not apply until approved');
+        $this->assertNotNull($emailChange->fresh()->verified_at);
+    }
+
+    public function test_verifying_an_already_applied_email_change_returns_404(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $owner = \LaravelMonitor\Models\MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        ['plainToken' => $plainToken] = \LaravelMonitor\Models\MonitorEmailChange::createFor($owner, 'double-submit-verify@example.com');
+
+        $this->post('/monitor/email-changes/'.$plainToken)->assertOk();
+        $this->post('/monitor/email-changes/'.$plainToken)->assertNotFound();
     }
 }
 

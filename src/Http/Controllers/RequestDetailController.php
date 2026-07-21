@@ -7,7 +7,6 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\Nav;
-use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -39,8 +38,6 @@ class RequestDetailController
 
     public function __invoke(string $requestId): View
     {
-        app()->setLocale(Preferences::locale());
-
         $root = $this->storage->findByRequestId($requestId);
 
         abort_unless($root !== null, 404);

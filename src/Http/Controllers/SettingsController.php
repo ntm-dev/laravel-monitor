@@ -6,6 +6,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Settings;
 
@@ -21,6 +22,8 @@ class SettingsController
 {
     public function system(Request $request): RedirectResponse
     {
+        abort_unless($request->user(MonitorUser::guardName())->canManageSettings(), 403);
+
         $validated = $request->validate([
             'theme' => ['required', 'string', 'in:'.implode(',', Preferences::THEMES)],
             'locale' => ['required', 'string', 'in:'.implode(',', Preferences::availableLocales())],
@@ -83,8 +86,10 @@ class SettingsController
         return $this->backTo($path, 'monitor.settings_saved')->withCookie($cookie);
     }
 
-    public function reset(): RedirectResponse
+    public function reset(Request $request): RedirectResponse
     {
+        abort_unless($request->user(MonitorUser::guardName())->canManageSettings(), 403);
+
         Settings::reset();
 
         // Path reverts to the config default — redirect there, not the override.

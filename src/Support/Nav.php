@@ -35,6 +35,7 @@ class Nav
             'outgoing' => ['label' => __('monitor::messages.nav.outgoing'), 'group' => $activity, 'icon' => Icons::OUTGOING, 'component' => 'monitor.outgoing-requests'],
             'users' => ['label' => __('monitor::messages.nav.users'), 'group' => $monitoring, 'icon' => Icons::USERS, 'component' => 'monitor.users'],
             'logs' => ['label' => __('monitor::messages.nav.logs'), 'group' => $monitoring, 'icon' => Icons::LOGS, 'component' => 'monitor.logs'],
+            'team' => ['label' => __('monitor::messages.nav.team'), 'group' => 'footer', 'icon' => Icons::TEAM, 'component' => 'monitor.team'],
             'settings' => ['label' => __('monitor::messages.nav.settings'), 'group' => 'footer', 'icon' => Icons::SETTINGS, 'component' => null],
         ];
     }

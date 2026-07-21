@@ -22,7 +22,7 @@
             <h1 class="truncate text-2xl font-bold tracking-tight">{{ $title }}</h1>
         @endif
 
-        @if ($tab !== 'settings')
+        @if (! in_array($tab, ['settings', 'team'], true))
         <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
                 <a href="{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'period' => $value, 'key' => $key])) }}"

@@ -7,7 +7,6 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
-use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -41,8 +40,6 @@ class JobAttemptController
 
     public function __invoke(string $attemptId): View
     {
-        app()->setLocale(Preferences::locale());
-
         $root = $this->storage->findByRequestId($attemptId, 'job');
 
         abort_unless($root !== null, 404);

@@ -4,6 +4,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Single migration file for the whole package, by design: this package is
+ * installed into other Laravel apps purely to monitor them, and only one
+ * migration file is allowed for that integration to stay simple. Do NOT add
+ * a second migration file — when the schema needs to change, edit the
+ * relevant Schema::create()/Schema::table() block in this file directly (so
+ * a fresh install still gets the right structure), then apply the same
+ * change with a manual ALTER against the already-migrated database instead
+ * of writing a new migration.
+ */
 return new class extends Migration
 {
     public function getConnection()
@@ -88,10 +98,81 @@ return new class extends Migration
             $table->index(['period', 'bucket']);
             $table->index('type');
         });
+
+        Schema::create($this->usersTable(), function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->string('role', 16)->default('viewer');
+            $table->text('totp_secret')->nullable();
+            $table->timestamp('totp_enabled_at')->nullable();
+            $table->json('totp_recovery_codes')->nullable();
+            $table->timestamps();
+        });
+
+        // Token hashed with SHA-256 (not Hash::make()/bcrypt) — see
+        // MonitorInvitation::createFor(): it must be queryable by value from
+        // a single URL parameter, which a salted bcrypt hash can't support.
+        Schema::create($this->invitationsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->string('email');
+            $table->string('role', 16);
+            $table->string('token', 64)->unique();
+            $table->unsignedBigInteger('invited_by');
+            $table->timestamp('expires_at');
+            $table->timestamps();
+        });
+
+        Schema::create($this->passwordResetsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->string('email');
+            $table->string('token', 64)->unique();
+            $table->timestamps();
+        });
+
+        Schema::create($this->emailChangesTable(), function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('new_email');
+            $table->string('token', 64)->unique();
+            $table->timestamp('verified_at')->nullable();
+            $table->timestamp('expires_at');
+            $table->timestamps();
+        });
+
+        Schema::create($this->webauthnCredentialsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('credential_id')->unique();
+            $table->text('public_key');
+            $table->string('label');
+            $table->unsignedInteger('sign_count')->default(0);
+            $table->timestamp('created_at');
+
+            $table->index('user_id');
+        });
+
+        Schema::create($this->oauthAccountsTable(), function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('provider', 16);
+            $table->string('provider_user_id');
+            $table->timestamps();
+
+            $table->unique(['provider', 'provider_user_id']);
+            $table->index('user_id');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists($this->oauthAccountsTable());
+        Schema::dropIfExists($this->webauthnCredentialsTable());
+        Schema::dropIfExists($this->emailChangesTable());
+        Schema::dropIfExists($this->passwordResetsTable());
+        Schema::dropIfExists($this->invitationsTable());
+        Schema::dropIfExists($this->usersTable());
         Schema::dropIfExists($this->aggregatesTable());
         Schema::dropIfExists($this->entriesTable());
     }
@@ -104,5 +185,35 @@ return new class extends Migration
     protected function aggregatesTable(): string
     {
         return config('monitor.aggregates.table', 'monitor_aggregates');
+    }
+
+    protected function usersTable(): string
+    {
+        return config('monitor.auth.table', 'monitor_users');
+    }
+
+    protected function invitationsTable(): string
+    {
+        return config('monitor.auth.invitations_table', 'monitor_invitations');
+    }
+
+    protected function passwordResetsTable(): string
+    {
+        return config('monitor.auth.password_resets_table', 'monitor_password_resets');
+    }
+
+    protected function emailChangesTable(): string
+    {
+        return config('monitor.auth.email_changes_table', 'monitor_email_changes');
+    }
+
+    protected function webauthnCredentialsTable(): string
+    {
+        return config('monitor.auth.webauthn_table', 'monitor_webauthn_credentials');
+    }
+
+    protected function oauthAccountsTable(): string
+    {
+        return config('monitor.auth.oauth_accounts_table', 'monitor_oauth_accounts');
     }
 };

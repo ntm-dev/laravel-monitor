@@ -141,6 +141,35 @@ class AggregatesTest extends TestCase
         $this->assertSame(2, $stats->count);
     }
 
+    public function test_stats_falls_back_to_raw_scan_when_aggregates_have_gone_stale(): void
+    {
+        $now = CarbonImmutable::now();
+
+        // Simulates `monitor:aggregate` having stopped running a while ago
+        // (missing schedule, crashed worker): the aggregates table's
+        // earliest bucket still predates the requested `since`, so the old
+        // aggregatesCover() (lower-bound check only) would have trusted it
+        // and silently reported zero for anything recorded after it
+        // stalled.
+        DB::table('monitor_aggregates')->insert([
+            'bucket' => $now->subMinutes(20)->getTimestamp(),
+            'period' => 60,
+            'type' => 'request',
+            'subtype' => '2xx',
+            'aggregate' => 'count',
+            'value' => 1,
+            'count' => 1,
+        ]);
+
+        // A fresh raw entry the (stalled) aggregator never rolled up.
+        $this->insertEntry('request', '2xx', $now->subMinutes(2), duration: 150.0);
+
+        $stats = app(Storage::class)->stats('request', $now->subMinutes(10), '2xx');
+
+        $this->assertSame(1, $stats->count);
+        $this->assertSame(150.0, $stats->avg_duration);
+    }
+
     public function test_counts_per_bucket_still_scans_raw_rows_when_filtered_by_key(): void
     {
         $now = CarbonImmutable::now();
