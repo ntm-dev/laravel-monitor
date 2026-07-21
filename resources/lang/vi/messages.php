@@ -80,6 +80,10 @@ return [
     'team' => [
         'my_account' => 'Tài khoản của tôi',
 
+        'name' => 'Tên',
+        'edit_name' => 'Sửa tên',
+        'name_updated' => 'Tên của bạn đã được cập nhật.',
+
         'email_address' => 'Địa chỉ email',
         'email_change_sent' => 'Đã gửi email xác nhận — vui lòng kiểm tra hộp thư của bạn.',
         'edit_email' => 'Sửa email',
@@ -87,6 +91,7 @@ return [
         'current_password' => 'Mật khẩu hiện tại',
         'verify' => 'Xác minh',
         'cancel' => 'Huỷ',
+        'save' => 'Lưu',
 
         'password' => 'Mật khẩu',
         'password_changed' => 'Mật khẩu của bạn đã được thay đổi.',
@@ -153,6 +158,7 @@ return [
         'leave' => 'Rời nhóm',
         'leave_confirm' => 'Rời khỏi nhóm?',
 
+        'error_invalid_name' => 'Vui lòng nhập tên của bạn.',
         'error_invalid_email' => 'Vui lòng nhập một địa chỉ email hợp lệ.',
         'error_email_already_member' => 'Email này đã là thành viên.',
         'error_wrong_password' => 'Mật khẩu hiện tại không đúng.',

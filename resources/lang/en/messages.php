@@ -81,6 +81,10 @@ return [
     'team' => [
         'my_account' => 'My account',
 
+        'name' => 'Name',
+        'edit_name' => 'Edit name',
+        'name_updated' => 'Your name has been updated.',
+
         'email_address' => 'Email address',
         'email_change_sent' => 'Confirmation email sent — please check your email.',
         'edit_email' => 'Edit email',
@@ -88,6 +92,7 @@ return [
         'current_password' => 'Current password',
         'verify' => 'Verify',
         'cancel' => 'Cancel',
+        'save' => 'Save',
 
         'password' => 'Password',
         'password_changed' => 'Your password has been changed.',
@@ -154,6 +159,7 @@ return [
         'leave' => 'Leave',
         'leave_confirm' => 'Leave the team?',
 
+        'error_invalid_name' => 'Please enter your name.',
         'error_invalid_email' => 'Please enter a valid email address.',
         'error_email_already_member' => 'This email is already a member.',
         'error_wrong_password' => 'Your current password was incorrect.',

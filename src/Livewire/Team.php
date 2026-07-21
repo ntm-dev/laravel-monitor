@@ -118,20 +118,40 @@ class Team extends Card
         $invitation->delete();
     }
 
-    public bool $editingEmail = false;
+    public bool $nameUpdated = false;
+
+    public function startEditingName(): void
+    {
+        $this->nameUpdated = false;
+        $this->resetErrorBag('name');
+    }
+
+    public function updateName(string $name): void
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            $this->addError('name', __('monitor::messages.team.error_invalid_name'));
+
+            return;
+        }
+
+        $this->actor()->update(['name' => $name]);
+
+        $this->nameUpdated = true;
+        $this->dispatch('name-updated');
+    }
 
     public bool $emailChangeRequested = false;
 
     public function startEditingEmail(): void
     {
-        $this->editingEmail = true;
         $this->emailChangeRequested = false;
         $this->resetErrorBag(['newEmail', 'emailPassword']);
     }
 
     public function cancelEditingEmail(): void
     {
-        $this->editingEmail = false;
         $this->resetErrorBag(['newEmail', 'emailPassword']);
     }
 
@@ -161,8 +181,8 @@ class Team extends Card
 
         Mail::to($newEmail)->send(new EmailChangeVerificationMail($plainToken));
 
-        $this->editingEmail = false;
         $this->emailChangeRequested = true;
+        $this->dispatch('email-change-requested');
     }
 
     public bool $passwordChanged = false;
