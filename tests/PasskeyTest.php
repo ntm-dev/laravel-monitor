@@ -4,6 +4,7 @@ namespace LaravelMonitor\Tests;
 
 use CBOR\Encoder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use LaravelMonitor\Livewire\Team;
@@ -106,6 +107,31 @@ class PasskeyTest extends TestCase
         ]);
     }
 
+    public function test_authentication_options_do_not_require_a_prior_login(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->postJson('/monitor/webauthn/authenticate/options')
+            ->assertOk()
+            ->assertJsonStructure(['challenge']);
+    }
+
+    public function test_a_valid_authentication_response_logs_in_the_owning_user(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $owner = MonitorUser::query()->where('email', 'owner@example.com')->firstOrFail();
+
+        $optionsResponse = $this->postJson('/monitor/webauthn/authenticate/options')->json();
+        [$assertionResponse] = $this->fakeAssertionResponseFor($optionsResponse, $owner);
+
+        $this->postJson('/monitor/webauthn/authenticate', ['response' => $assertionResponse])
+            ->assertRedirect('/monitor');
+
+        $this->assertSame($owner->id, Auth::guard(MonitorUser::guardName())->id());
+    }
+
     public function test_removing_a_passkey_only_removes_the_owning_users_row(): void
     {
         $owner = MonitorUser::query()->where('email', 'owner@example.com')->firstOrFail();
@@ -159,7 +185,7 @@ class PasskeyTest extends TestCase
      * applies to the *assertion* (login) ceremony). We still generate a real ES256
      * keypair so Task 6's fakeAssertionResponseFor() can sign with it.
      *
-     * @return array{0: array<string, mixed>, 1: string}
+     * @return array{0: array<string, mixed>, 1: string, 2: \OpenSSLAsymmetricKey}
      */
     protected function fakeAttestationResponseFor(array $optionsResponse): array
     {
@@ -219,6 +245,79 @@ class PasskeyTest extends TestCase
             ],
         ];
 
-        return [$response, $credentialIdBase64Url];
+        return [$response, $credentialIdBase64Url, $keyPair];
+    }
+
+    /**
+     * Build a minimal "software authenticator" authentication (assertion) response by hand,
+     * for the credential this method registers itself.
+     *
+     * There's no existing passkey to authenticate against yet at the point this runs — the
+     * calling test only knows *who* should end up logged in ($user), not any credential ID —
+     * so this registers a real credential for $user first (temporarily impersonating them
+     * via actingAs(), the same "software authenticator" as fakeAttestationResponseFor(), whose
+     * ES256 keypair it keeps), then signs a fresh assertion with that same keypair. It restores
+     * the unauthenticated state (withoutMonitorAuth()) before returning, so the calling test's
+     * own POST to /monitor/webauthn/authenticate is what actually establishes the session.
+     *
+     * @return array{0: array<string, mixed>}
+     */
+    protected function fakeAssertionResponseFor(array $optionsResponse, MonitorUser $user): array
+    {
+        Gate::define('viewMonitor', fn ($u = null) => true);
+        $this->actingAs($user, MonitorUser::guardName());
+
+        $registrationOptions = $this->postJson('/monitor/webauthn/register/options')->json();
+        [$attestationResponse, $credentialId, $privateKey] = $this->fakeAttestationResponseFor($registrationOptions);
+
+        $this->postJson('/monitor/webauthn/register', [
+            'label' => 'Passkey login fixture',
+            'response' => $attestationResponse,
+        ])->assertOk();
+
+        $this->withoutMonitorAuth();
+
+        $host = 'localhost';
+        $origin = 'http://localhost';
+
+        $challenge = Base64UrlSafe::decodeNoPadding($optionsResponse['challenge']);
+
+        $clientDataJSON = json_encode([
+            'type' => 'webauthn.get',
+            'challenge' => Base64UrlSafe::encodeUnpadded($challenge),
+            'origin' => $origin,
+        ]);
+
+        // Same rpIdHash + flags + counter shape as registration's authenticatorData, minus
+        // the attested-credential-data block (AT flag unset — see AuthenticatorDataLoader::
+        // load(), which only parses that block when the flag is present) since this is an
+        // authentication, not a registration, ceremony. Counter must exceed the value stored
+        // during registration (1) for CheckCounter to accept it.
+        $rpIdHash = hash('sha256', $host, true);
+        $flags = chr(0x01); // bit 0 (UP) only
+        $signCount = pack('N', 2);
+        $authenticatorData = $rpIdHash.$flags.$signCount;
+
+        $dataToSign = $authenticatorData.hash('sha256', $clientDataJSON, true);
+        openssl_sign($dataToSign, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+
+        // Usernameless/discoverable-credential flow: authenticate() passes null as the
+        // "already known" userHandle to AuthenticatorAssertionResponseValidator::check(), so
+        // CheckUserHandle instead requires the *response's* userHandle to identify the user —
+        // it must match the CredentialRecord's userHandle, which registration stored as the
+        // raw (string) user ID (see AuthenticatorAttestationResponseValidator::check()).
+        $response = [
+            'id' => $credentialId,
+            'rawId' => $credentialId,
+            'type' => 'public-key',
+            'response' => [
+                'clientDataJSON' => Base64UrlSafe::encodeUnpadded($clientDataJSON),
+                'authenticatorData' => base64_encode($authenticatorData),
+                'signature' => base64_encode($signature),
+                'userHandle' => Base64UrlSafe::encodeUnpadded((string) $user->id),
+            ],
+        ];
+
+        return [$response];
     }
 }

@@ -4,16 +4,21 @@ namespace LaravelMonitor\Http\Controllers\Auth;
 
 use Cose\Algorithm\Signature\ECDSA\ES256;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\OptionalAuthMethod;
 use LaravelMonitor\Support\WebauthnCredentialRepository;
+use Webauthn\AuthenticatorAssertionResponse;
+use Webauthn\AuthenticatorAssertionResponseValidator;
 use Webauthn\AuthenticatorAttestationResponse;
 use Webauthn\AuthenticatorAttestationResponseValidator;
 use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialParameters;
+use Webauthn\PublicKeyCredentialRequestOptions;
 use Webauthn\PublicKeyCredentialRpEntity;
 use Webauthn\PublicKeyCredentialUserEntity;
 
@@ -87,6 +92,77 @@ class WebauthnController
         $request->session()->forget('monitor_webauthn_creation_options');
 
         return response()->json(['status' => 'ok']);
+    }
+
+    public function authenticateOptions(Request $request): JsonResponse
+    {
+        abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
+
+        $options = PublicKeyCredentialRequestOptions::create(
+            random_bytes(32),
+            userVerification: PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
+        );
+
+        // Same reasoning as registerOptions(): $options->challenge is raw binary, so
+        // json_encode()ing the object directly (response()->json($options)) would choke on
+        // invalid UTF-8 — serialize via the library's own serializer instead and hand PHP's
+        // json_encode entirely to it.
+        $json = $this->repository()->serializer()->serialize($options, 'json');
+
+        $request->session()->put('monitor_webauthn_request_options', $json);
+
+        return JsonResponse::fromJsonString($json);
+    }
+
+    public function authenticate(Request $request): RedirectResponse
+    {
+        abort_unless(OptionalAuthMethod::passkeysAvailable(), 404);
+
+        $validated = $request->validate(['response' => ['required']]);
+        $repository = $this->repository();
+        $serializer = $repository->serializer();
+
+        $storedOptions = $request->session()->get('monitor_webauthn_request_options');
+
+        // Same "session expired/never populated" guard as register() — deserialize()
+        // would otherwise be handed null and throw a TypeError before any validation runs.
+        abort_if($storedOptions === null, 422);
+
+        $options = $serializer->deserialize(
+            $storedOptions,
+            PublicKeyCredentialRequestOptions::class,
+            'json',
+        );
+
+        try {
+            $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
+        } catch (\Throwable $e) {
+            // Same rationale as register()'s catch: the "response" payload is
+            // attacker/client-controlled and can be malformed in ways that throw
+            // before we ever reach a validation guard.
+            abort(422);
+        }
+
+        abort_unless($credential instanceof PublicKeyCredential && $credential->response instanceof AuthenticatorAssertionResponse, 422);
+
+        $existingRecord = $repository->findOneByCredentialId($credential->rawId);
+        abort_if($existingRecord === null, 422);
+
+        $credentialRecord = AuthenticatorAssertionResponseValidator::create($this->ceremonyStepManagerFactory($request)->requestCeremony())
+            ->check($existingRecord, $credential->response, $options, $request->getHost(), null);
+
+        $repository->updateCredentialRecord($credentialRecord);
+        $request->session()->forget('monitor_webauthn_request_options');
+
+        $user = MonitorUser::query()->findOrFail($credentialRecord->userHandle);
+
+        // Standalone/passwordless login — deliberately does not route through the
+        // TOTP challenge (see TwoFactorChallengeController): possessing a
+        // previously-registered passkey is itself the second factor.
+        Auth::guard(MonitorUser::guardName())->login($user);
+        $request->session()->regenerate();
+
+        return redirect()->route('monitor.dashboard');
     }
 
     protected function repository(): WebauthnCredentialRepository

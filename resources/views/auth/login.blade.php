@@ -32,6 +32,73 @@
                     <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Sign in</button>
                 </form>
 
+                <button type="button" id="passkey-login-button" @if (! \LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable()) disabled @endif
+                        class="mt-3 w-full rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50">
+                    Sign in with a passkey
+                </button>
+                @unless (\LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable())
+                    <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">web-auth/webauthn-lib</code> to enable this.</p>
+                @endunless
+                <script>
+                    // Same base64url <-> ArrayBuffer bridge as Team's "Add a passkey" script
+                    // (resources/views/livewire/team.blade.php) — the server's JSON and the
+                    // browser's WebAuthn API disagree on wire format.
+                    function base64UrlToArrayBuffer(base64Url) {
+                        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                        const binary = atob(base64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        return bytes.buffer;
+                    }
+
+                    function arrayBufferToBase64Url(buffer) {
+                        const bytes = new Uint8Array(buffer);
+                        let binary = '';
+                        for (let i = 0; i < bytes.length; i++) {
+                            binary += String.fromCharCode(bytes[i]);
+                        }
+                        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                    }
+
+                    document.getElementById('passkey-login-button')?.addEventListener('click', async () => {
+                        const options = await (await fetch('{{ route('monitor.webauthn.authenticate.options') }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        })).json();
+
+                        options.challenge = base64UrlToArrayBuffer(options.challenge);
+                        (options.allowCredentials ?? []).forEach((credential) => {
+                            credential.id = base64UrlToArrayBuffer(credential.id);
+                        });
+
+                        // Usernameless: no allowCredentials list, so the browser prompts for
+                        // any discoverable passkey registered for this origin.
+                        const credential = await navigator.credentials.get({ publicKey: options });
+
+                        const response = await fetch('{{ route('monitor.webauthn.authenticate.store') }}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify({
+                                response: {
+                                    id: credential.id,
+                                    rawId: arrayBufferToBase64Url(credential.rawId),
+                                    type: credential.type,
+                                    response: {
+                                        clientDataJSON: arrayBufferToBase64Url(credential.response.clientDataJSON),
+                                        authenticatorData: arrayBufferToBase64Url(credential.response.authenticatorData),
+                                        signature: arrayBufferToBase64Url(credential.response.signature),
+                                        userHandle: credential.response.userHandle ? arrayBufferToBase64Url(credential.response.userHandle) : null,
+                                    },
+                                },
+                            }),
+                        });
+
+                        window.location.href = response.url;
+                    });
+                </script>
+
                 <p class="mt-3 text-center text-sm text-neutral-500 dark:text-neutral-400">
                     <a href="{{ route('monitor.password.request') }}" class="text-blue-600 hover:underline dark:text-blue-400">Forgot your password?</a>
                 </p>

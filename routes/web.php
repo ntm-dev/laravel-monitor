@@ -26,6 +26,8 @@ Route::domain(config('monitor.domain'))
         Route::post('/logout', [LoginController::class, 'destroy'])->name('monitor.logout');
         Route::get('/two-factor-challenge', [TwoFactorChallengeController::class, 'show'])->name('monitor.two-factor.challenge');
         Route::post('/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->name('monitor.two-factor.challenge.store');
+        Route::post('/webauthn/authenticate/options', [WebauthnController::class, 'authenticateOptions'])->name('monitor.webauthn.authenticate.options');
+        Route::post('/webauthn/authenticate', [WebauthnController::class, 'authenticate'])->name('monitor.webauthn.authenticate.store');
         Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('monitor.invitations.show');
         Route::post('/invitations/{token}', [InvitationController::class, 'store'])->name('monitor.invitations.store');
         Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('monitor.password.request');
