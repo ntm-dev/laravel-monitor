@@ -107,6 +107,14 @@
                     <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">laravel/socialite</code> and configure <code class="font-mono">MONITOR_GOOGLE_CLIENT_ID</code> to enable this.</p>
                 @endunless
 
+                <a href="{{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple') ? route('monitor.oauth.redirect', 'apple') : '#' }}"
+                   class="mt-3 flex w-full items-center justify-center rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50 {{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple') ? '' : 'cursor-not-allowed opacity-50' }}">
+                    Continue with Apple
+                </a>
+                @unless (\LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple'))
+                    <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">laravel/socialite socialiteproviders/apple</code> and configure <code class="font-mono">MONITOR_APPLE_CLIENT_ID</code> to enable this.</p>
+                @endunless
+
                 <p class="mt-3 text-center text-sm text-neutral-500 dark:text-neutral-400">
                     <a href="{{ route('monitor.password.request') }}" class="text-blue-600 hover:underline dark:text-blue-400">Forgot your password?</a>
                 </p>

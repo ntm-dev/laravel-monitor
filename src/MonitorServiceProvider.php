@@ -37,6 +37,7 @@ class MonitorServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Support\Settings::apply();
+        $this->registerAppleOAuthDriver();
 
         // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
         // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
@@ -264,5 +265,17 @@ class MonitorServiceProvider extends ServiceProvider
                 $this->app['config']->set("services.{$provider}", $this->app['config']->get("monitor.auth.oauth.{$provider}", []));
             }
         }
+    }
+
+    protected function registerAppleOAuthDriver(): void
+    {
+        if (! class_exists(\SocialiteProviders\Apple\Provider::class)) {
+            return;
+        }
+
+        $this->app->make(\Illuminate\Contracts\Events\Dispatcher::class)->listen(
+            \SocialiteProviders\Manager\SocialiteWasCalled::class,
+            fn (\SocialiteProviders\Manager\SocialiteWasCalled $event) => $event->extendSocialite('apple', \SocialiteProviders\Apple\Provider::class),
+        );
     }
 }

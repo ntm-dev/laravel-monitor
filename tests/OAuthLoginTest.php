@@ -106,4 +106,29 @@ class OAuthLoginTest extends TestCase
         $this->assertFalse(Auth::guard(MonitorUser::guardName())->check());
         $this->assertDatabaseMissing((new MonitorOauthAccount())->getTable(), ['provider' => 'google']);
     }
+
+    public function test_apple_callback_with_a_matching_email_logs_the_user_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        config(['monitor.auth.oauth.apple.client_id' => 'test-apple-client-id']);
+        $this->withoutMonitorAuth();
+
+        Socialite::fake('apple', (new SocialiteUser())->map([
+            'id' => 'apple-123', 'name' => 'Owner', 'email' => 'owner@example.com',
+        ]));
+
+        $this->get('/monitor/oauth/apple/callback')->assertRedirect('/monitor');
+
+        $owner = MonitorUser::query()->where('email', 'owner@example.com')->firstOrFail();
+        $this->assertSame($owner->id, Auth::guard(MonitorUser::guardName())->id());
+    }
+
+    public function test_apple_login_button_is_disabled_without_a_configured_client_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        config(['monitor.auth.oauth.apple.client_id' => null]);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/login')->assertSeeText('Install laravel/socialite');
+    }
 }
