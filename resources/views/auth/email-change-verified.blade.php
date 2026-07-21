@@ -15,7 +15,24 @@
                     <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Email verified</h1>
                     <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Thanks — <strong>{{ $newEmail }}</strong> is verified. An owner or admin needs to approve the change before it takes effect.</p>
                 @endif
+
+                <p class="mt-4 text-xs text-neutral-400 dark:text-neutral-500">Redirecting to the dashboard in <span id="redirect-countdown">10</span> seconds&hellip;</p>
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            let seconds = 10;
+            const countdown = document.getElementById('redirect-countdown');
+            const timer = setInterval(function () {
+                seconds -= 1;
+                countdown.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(timer);
+                    window.location.href = '{{ route('monitor.dashboard') }}';
+                }
+            }, 1000);
+        })();
+    </script>
 </x-monitor::layout>

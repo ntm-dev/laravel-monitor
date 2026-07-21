@@ -74,13 +74,13 @@ class OAuthLoginTest extends TestCase
         $this->assertSame(1, MonitorOauthAccount::query()->where('provider', 'google')->where('provider_user_id', 'google-789')->count());
     }
 
-    public function test_google_login_button_is_disabled_without_a_configured_client_id(): void
+    public function test_google_login_button_is_hidden_without_a_configured_client_id(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
         config(['monitor.auth.oauth.google.client_id' => null]);
         $this->withoutMonitorAuth();
 
-        $this->get('/monitor/login')->assertSeeText('Install laravel/socialite');
+        $this->get('/monitor/login')->assertDontSeeText('Continue with Google');
     }
 
     public function test_a_callback_when_socialite_throws_shows_error_and_creates_nothing(): void
@@ -123,13 +123,13 @@ class OAuthLoginTest extends TestCase
         $this->assertSame($owner->id, Auth::guard(MonitorUser::guardName())->id());
     }
 
-    public function test_apple_login_button_is_disabled_without_a_configured_client_id(): void
+    public function test_apple_login_button_is_hidden_without_a_configured_client_id(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
         config(['monitor.auth.oauth.apple.client_id' => null]);
         $this->withoutMonitorAuth();
 
-        $this->get('/monitor/login')->assertSeeText('Install laravel/socialite');
+        $this->get('/monitor/login')->assertDontSeeText('Continue with Apple');
     }
 
     public function test_a_redirect_for_an_unrouted_provider_name_is_a_404(): void

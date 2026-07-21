@@ -1,6 +1,9 @@
 {{-- Desktop sidebar: app identity, grouped tab links and footer entries.
      All data is prepared by Http\Controllers\DashboardController. --}}
 @props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial'])
+@php
+    $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
+@endphp
 <aside class="sticky top-0 hidden h-screen w-[228px] shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
     <div class="p-2">
         <div class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5">
@@ -54,8 +57,8 @@
             </a>
         </div>
         <div class="flex items-center gap-2.5 border-t border-neutral-100 px-2 pb-1 pt-2.5 dark:border-neutral-800">
-            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ $appInitial }}</span>
-            <span class="truncate text-sm text-neutral-700 dark:text-neutral-300">{{ config('app.name', 'Laravel') }}</span>
+            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ strtoupper(mb_substr($navActor?->name ?? $appInitial, 0, 1)) }}</span>
+            <span class="truncate text-sm text-neutral-700 dark:text-neutral-300">{{ $navActor?->name ?? config('app.name', 'Laravel') }}</span>
             <span class="ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" title="Live · refreshes every {{ $refresh }}s">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
             </span>

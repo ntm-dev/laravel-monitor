@@ -32,13 +32,12 @@
                     <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Sign in</button>
                 </form>
 
-                <button type="button" id="passkey-login-button" @if (! \LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable()) disabled @endif
-                        class="mt-3 w-full rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50">
-                    Sign in with a passkey
-                </button>
-                @unless (\LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable())
-                    <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">web-auth/webauthn-lib</code> to enable this.</p>
-                @endunless
+                @if (\LaravelMonitor\Support\OptionalAuthMethod::passkeysAvailable() && \LaravelMonitor\Support\OptionalAuthMethod::webauthnDomainValid())
+                    <button type="button" id="passkey-login-button"
+                            class="mt-3 w-full rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50">
+                        Sign in with a passkey
+                    </button>
+                @endif
                 <script>
                     // Same base64url <-> ArrayBuffer bridge as Team's "Add a passkey" script
                     // (resources/views/livewire/team.blade.php) — the server's JSON and the
@@ -99,21 +98,19 @@
                     });
                 </script>
 
-                <a href="{{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('google') ? route('monitor.oauth.redirect', 'google') : '#' }}"
-                   class="mt-3 flex w-full items-center justify-center rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50 {{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('google') ? '' : 'cursor-not-allowed opacity-50' }}">
-                    Continue with Google
-                </a>
-                @unless (\LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('google'))
-                    <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">laravel/socialite</code> and configure <code class="font-mono">MONITOR_GOOGLE_CLIENT_ID</code> to enable this.</p>
-                @endunless
+                @if (\LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('google'))
+                    <a href="{{ route('monitor.oauth.redirect', 'google') }}"
+                       class="mt-3 flex w-full items-center justify-center rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50">
+                        Continue with Google
+                    </a>
+                @endif
 
-                <a href="{{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple') ? route('monitor.oauth.redirect', 'apple') : '#' }}"
-                   class="mt-3 flex w-full items-center justify-center rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50 {{ \LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple') ? '' : 'cursor-not-allowed opacity-50' }}">
-                    Continue with Apple
-                </a>
-                @unless (\LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple'))
-                    <p class="mt-1 text-center text-xs text-neutral-400 dark:text-neutral-500">Install <code class="font-mono">laravel/socialite socialiteproviders/apple</code> and configure <code class="font-mono">MONITOR_APPLE_CLIENT_ID</code> to enable this.</p>
-                @endunless
+                @if (\LaravelMonitor\Support\OptionalAuthMethod::oauthAvailable('apple'))
+                    <a href="{{ route('monitor.oauth.redirect', 'apple') }}"
+                       class="mt-3 flex w-full items-center justify-center rounded-md border border-neutral-200 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800/50">
+                        Continue with Apple
+                    </a>
+                @endif
 
                 <p class="mt-3 text-center text-sm text-neutral-500 dark:text-neutral-400">
                     <a href="{{ route('monitor.password.request') }}" class="text-blue-600 hover:underline dark:text-blue-400">Forgot your password?</a>

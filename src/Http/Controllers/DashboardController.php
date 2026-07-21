@@ -27,9 +27,6 @@ class DashboardController
 {
     public function __invoke(Request $request): View
     {
-        // Apply the viewer's language before any label/heading is resolved.
-        app()->setLocale(Preferences::locale());
-
         $period = $request->query('period', Card::DEFAULT_PERIOD);
 
         if (! array_key_exists($period, Card::periods())) {

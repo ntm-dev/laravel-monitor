@@ -22,6 +22,10 @@ class Team extends Card
         return 'monitor::livewire.team';
     }
 
+    public string $memberSearch = '';
+
+    public string $memberRoleFilter = 'all';
+
     protected function data(): array
     {
         $actor = $this->actor();
@@ -37,14 +41,33 @@ class Team extends Card
             })
             ->values();
 
+        $roleOrder = ['owner' => 2, 'admin' => 1, 'viewer' => 0];
+
+        $members = MonitorUser::query()
+            ->when($this->memberRoleFilter !== 'all', fn ($query) => $query->where('role', $this->memberRoleFilter))
+            ->when($this->memberSearch !== '', function ($query) {
+                $query->where(function ($query) {
+                    $query->where('name', 'like', '%'.$this->memberSearch.'%')
+                        ->orWhere('email', 'like', '%'.$this->memberSearch.'%');
+                });
+            })
+            ->get()
+            ->sort(function (MonitorUser $a, MonitorUser $b) use ($roleOrder) {
+                $roleComparison = ($roleOrder[$b->role] ?? -1) <=> ($roleOrder[$a->role] ?? -1);
+
+                return $roleComparison !== 0 ? $roleComparison : $b->id <=> $a->id;
+            })
+            ->values();
+
         return [
-            'members' => MonitorUser::query()->orderBy('created_at')->get(),
+            'members' => $members,
             'pendingInvitations' => MonitorInvitation::query()
                 ->where('expires_at', '>', now())
                 ->orderByDesc('created_at')
                 ->get(),
             'pendingEmailChanges' => $pendingEmailChanges,
             'passkeys' => MonitorWebauthnCredential::query()->where('user_id', $actor->id)->get(),
+            'soleOwner' => $actor->isOwner() && MonitorUser::query()->where('role', 'owner')->count() <= 1,
         ];
     }
 
@@ -61,13 +84,13 @@ class Team extends Card
         }
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->addError('email', 'Please enter a valid email address.');
+            $this->addError('email', __('monitor::messages.team.error_invalid_email'));
 
             return;
         }
 
         if (MonitorUser::query()->where('email', $email)->exists()) {
-            $this->addError('email', 'This email is already a member.');
+            $this->addError('email', __('monitor::messages.team.error_email_already_member'));
 
             return;
         }
@@ -75,6 +98,8 @@ class Team extends Card
         ['invitation' => $invitation, 'plainToken' => $plainToken] = MonitorInvitation::createFor($email, $role, $actor);
 
         Mail::to($email)->send(new TeamInvitationMail($invitation, $plainToken));
+
+        $this->dispatch('member-invited');
     }
 
     public function cancelInvite(int $invitationId): void
@@ -93,18 +118,41 @@ class Team extends Card
         $invitation->delete();
     }
 
-    public function requestEmailChange(string $newEmail): void
+    public bool $editingEmail = false;
+
+    public bool $emailChangeRequested = false;
+
+    public function startEditingEmail(): void
+    {
+        $this->editingEmail = true;
+        $this->emailChangeRequested = false;
+        $this->resetErrorBag(['newEmail', 'emailPassword']);
+    }
+
+    public function cancelEditingEmail(): void
+    {
+        $this->editingEmail = false;
+        $this->resetErrorBag(['newEmail', 'emailPassword']);
+    }
+
+    public function requestEmailChange(string $newEmail, string $currentPassword): void
     {
         $actor = $this->actor();
 
+        if (! Hash::check($currentPassword, $actor->password)) {
+            $this->addError('emailPassword', __('monitor::messages.team.error_wrong_password'));
+
+            return;
+        }
+
         if (! filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
-            $this->addError('newEmail', 'Please enter a valid email address.');
+            $this->addError('newEmail', __('monitor::messages.team.error_invalid_email'));
 
             return;
         }
 
         if (MonitorUser::query()->where('email', $newEmail)->where('id', '!=', $actor->id)->exists()) {
-            $this->addError('newEmail', 'This email is already in use.');
+            $this->addError('newEmail', __('monitor::messages.team.error_email_already_in_use'));
 
             return;
         }
@@ -112,6 +160,40 @@ class Team extends Card
         ['plainToken' => $plainToken] = MonitorEmailChange::createFor($actor, $newEmail);
 
         Mail::to($newEmail)->send(new EmailChangeVerificationMail($plainToken));
+
+        $this->editingEmail = false;
+        $this->emailChangeRequested = true;
+    }
+
+    public bool $passwordChanged = false;
+
+    public function changePassword(string $currentPassword, string $newPassword, string $newPasswordConfirmation): void
+    {
+        $actor = $this->actor();
+        $this->passwordChanged = false;
+
+        if (! Hash::check($currentPassword, $actor->password)) {
+            $this->addError('currentPassword', __('monitor::messages.team.error_wrong_password'));
+
+            return;
+        }
+
+        if (strlen($newPassword) < 8) {
+            $this->addError('newPassword', __('monitor::messages.team.error_password_too_short'));
+
+            return;
+        }
+
+        if ($newPassword !== $newPasswordConfirmation) {
+            $this->addError('newPassword', __('monitor::messages.team.error_password_confirmation_mismatch'));
+
+            return;
+        }
+
+        $actor->update(['password' => Hash::make($newPassword)]);
+
+        $this->passwordChanged = true;
+        $this->dispatch('password-changed');
     }
 
     public function approveEmailChange(int $emailChangeId): void
@@ -136,7 +218,7 @@ class Team extends Card
         }
 
         if (MonitorUser::query()->where('email', $emailChange->new_email)->where('id', '!=', $requester->id)->exists()) {
-            $this->addError('emailChange', 'That email is no longer available.');
+            $this->addError('emailChange', __('monitor::messages.team.error_email_no_longer_available'));
 
             return;
         }
@@ -169,7 +251,14 @@ class Team extends Card
             return;
         }
 
+        $this->resetErrorBag('totp');
         $this->totpSecret = (new Google2FA())->generateSecretKey();
+    }
+
+    public function cancelEnrollingTotp(): void
+    {
+        $this->totpSecret = null;
+        $this->resetErrorBag('totp');
     }
 
     public function confirmTotp(string $code): void
@@ -181,7 +270,7 @@ class Team extends Card
         $google2fa = new Google2FA();
 
         if (! $google2fa->verifyKey($this->totpSecret, $code)) {
-            $this->addError('totp', 'That code did not match. Please try again.');
+            $this->addError('totp', __('monitor::messages.team.error_totp_code_mismatch'));
 
             return;
         }
@@ -206,12 +295,14 @@ class Team extends Card
         $actor = $this->actor();
 
         if (! Hash::check($currentPassword, $actor->password)) {
-            $this->addError('totp', 'Your current password was incorrect.');
+            $this->addError('totp', __('monitor::messages.team.error_wrong_password'));
 
             return;
         }
 
         $actor->update(['totp_secret' => null, 'totp_enabled_at' => null, 'totp_recovery_codes' => null]);
+
+        $this->dispatch('totp-disabled');
     }
 
     public function disableMemberTotp(int $memberId): void
@@ -283,7 +374,7 @@ class Team extends Card
         $actor = $this->actor();
 
         if ($actor->isOwner() && MonitorUser::query()->where('role', 'owner')->count() <= 1) {
-            $this->addError('leave', 'Transfer ownership to someone else before leaving — a team always needs an owner.');
+            $this->addError('leave', __('monitor::messages.team.error_sole_owner_cannot_leave'));
 
             return;
         }

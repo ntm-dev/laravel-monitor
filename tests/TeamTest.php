@@ -36,11 +36,65 @@ class TeamTest extends TestCase
         $this->assertContains('pending@example.com', $invitationEmails);
     }
 
+    public function test_members_are_sorted_by_role_then_id_descending(): void
+    {
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $olderAdmin = MonitorUser::create([
+            'name' => 'Older Admin', 'email' => 'older-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $newerAdmin = MonitorUser::create([
+            'name' => 'Newer Admin', 'email' => 'newer-admin@example.com',
+            'password' => Hash::make('password'), 'role' => 'admin',
+        ]);
+        $viewer = MonitorUser::create([
+            'name' => 'A Viewer', 'email' => 'a-viewer@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        $members = Livewire::test(Team::class)->viewData('members');
+
+        $this->assertSame(
+            [$owner->id, $newerAdmin->id, $olderAdmin->id, $viewer->id],
+            $members->pluck('id')->all()
+        );
+    }
+
+    public function test_members_can_be_filtered_by_role(): void
+    {
+        MonitorUser::create([
+            'name' => 'A Viewer', 'email' => 'a-viewer@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        $component = Livewire::test(Team::class)->set('memberRoleFilter', 'viewer');
+
+        $roles = $component->viewData('members')->pluck('role')->unique()->all();
+        $this->assertSame(['viewer'], $roles);
+    }
+
+    public function test_members_can_be_searched_by_name_or_email(): void
+    {
+        MonitorUser::create([
+            'name' => 'Findable Person', 'email' => 'unrelated@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+        MonitorUser::create([
+            'name' => 'Someone Else', 'email' => 'someone-else@example.com',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        $members = Livewire::test(Team::class)->set('memberSearch', 'Findable')->viewData('members');
+
+        $this->assertSame(['Findable Person'], $members->pluck('name')->all());
+    }
+
     public function test_owner_can_invite_a_new_member_and_an_email_is_sent(): void
     {
         Mail::fake();
 
-        Livewire::test(Team::class)->call('invite', 'new-member@example.com', 'viewer');
+        Livewire::test(Team::class)->call('invite', 'new-member@example.com', 'viewer')
+            ->assertDispatched('member-invited');
 
         $this->assertDatabaseHas('monitor_invitations', ['email' => 'new-member@example.com', 'role' => 'viewer']);
         Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->invitation->email === 'new-member@example.com');
@@ -211,10 +265,22 @@ class TeamTest extends TestCase
 
     public function test_the_sole_owner_cannot_leave(): void
     {
-        Livewire::test(Team::class)->call('leave');
+        Livewire::test(Team::class)->call('leave')->assertHasErrors('leave');
 
         $owner = MonitorUser::where('email', 'owner@example.com')->first();
         $this->assertNotNull($owner, 'the sole owner must still exist — leave() must have been blocked');
+    }
+
+    public function test_data_marks_sole_owner_so_the_leave_button_can_be_disabled(): void
+    {
+        $this->assertTrue(Livewire::test(Team::class)->viewData('soleOwner'));
+
+        MonitorUser::create([
+            'name' => 'Second Owner', 'email' => 'second-owner@example.com',
+            'password' => Hash::make('password'), 'role' => 'owner',
+        ]);
+
+        $this->assertFalse(Livewire::test(Team::class)->viewData('soleOwner'));
     }
 
     public function test_owner_can_transfer_ownership_and_becomes_admin(): void
@@ -258,7 +324,7 @@ class TeamTest extends TestCase
         ]);
         $this->actingAs($viewer, 'monitor');
 
-        Livewire::test(Team::class)->call('requestEmailChange', 'new-for-viewer@example.com');
+        Livewire::test(Team::class)->call('requestEmailChange', 'new-for-viewer@example.com', 'password');
 
         $this->assertDatabaseHas('monitor_email_changes', ['user_id' => $viewer->id, 'new_email' => 'new-for-viewer@example.com']);
         Mail::assertSent(EmailChangeVerificationMail::class);
@@ -268,7 +334,7 @@ class TeamTest extends TestCase
     {
         Mail::fake();
 
-        Livewire::test(Team::class)->call('requestEmailChange', 'not-an-email')->assertHasErrors('newEmail');
+        Livewire::test(Team::class)->call('requestEmailChange', 'not-an-email', 'password')->assertHasErrors('newEmail');
 
         $this->assertSame(0, MonitorEmailChange::count());
         Mail::assertNothingSent();
@@ -283,10 +349,55 @@ class TeamTest extends TestCase
             'password' => Hash::make('password'), 'role' => 'viewer',
         ]);
 
-        Livewire::test(Team::class)->call('requestEmailChange', 'already-taken@example.com')->assertHasErrors('newEmail');
+        Livewire::test(Team::class)->call('requestEmailChange', 'already-taken@example.com', 'password')->assertHasErrors('newEmail');
 
         $this->assertSame(0, MonitorEmailChange::count());
         Mail::assertNothingSent();
+    }
+
+    public function test_requesting_an_email_change_with_the_wrong_current_password_is_rejected(): void
+    {
+        Mail::fake();
+
+        Livewire::test(Team::class)->call('requestEmailChange', 'new-owner-email@example.com', 'wrong-password')
+            ->assertHasErrors('emailPassword');
+
+        $this->assertSame(0, MonitorEmailChange::count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_password_can_be_changed_with_the_correct_current_password(): void
+    {
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+
+        Livewire::test(Team::class)->call('changePassword', 'password', 'a-new-password', 'a-new-password')
+            ->assertHasNoErrors()
+            ->assertDispatched('password-changed');
+
+        $this->assertTrue(Hash::check('a-new-password', $owner->fresh()->password));
+    }
+
+    public function test_changing_password_with_the_wrong_current_password_is_rejected(): void
+    {
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $originalPassword = $owner->password;
+
+        Livewire::test(Team::class)->call('changePassword', 'wrong-password', 'a-new-password', 'a-new-password')
+            ->assertHasErrors('currentPassword');
+
+        $this->assertSame($originalPassword, $owner->fresh()->password);
+    }
+
+    public function test_changing_password_with_a_short_new_password_is_rejected(): void
+    {
+        Livewire::test(Team::class)->call('changePassword', 'password', 'short', 'short')
+            ->assertHasErrors('newPassword');
+    }
+
+    public function test_changing_password_with_a_mismatched_confirmation_is_rejected(): void
+    {
+        Livewire::test(Team::class)->call('changePassword', 'password', 'a-new-password', 'a-different-password')
+            ->assertHasErrors('newPassword');
     }
 
     public function test_owner_can_approve_an_admins_verified_email_change(): void

@@ -9,7 +9,7 @@
 
             <div class="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                 <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Confirm this email address</h1>
-                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Confirm that <strong>{{ $emailChange->new_email }}</strong> belongs to you.</p>
+                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Confirm that <strong>{{ $emailChange->new_email }}</strong> belongs to you to update your {{ config('app.name', 'Laravel') }} Monitor account email.</p>
 
                 <form method="POST" action="{{ route('monitor.email-changes.store', $token) }}" class="mt-4">
                     @csrf

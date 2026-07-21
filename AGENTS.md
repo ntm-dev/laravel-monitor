@@ -27,6 +27,11 @@ php -l path/to/file.blade.php   # syntax-check a single blade file
 - UI mirrors Laravel Nightwatch's dashboard style: dotted-line `dl` metric rows
   (see `resources/views/livewire/query-detail.blade.php`, `exception-detail.blade.php`),
   Tailwind CDN JIT, dark mode via `.dark` class.
+- **All user-facing text must go through the translation system** — `__('monitor::messages.<section>.<key>')`,
+  never a hardcoded string in a Blade view. Add the key to both
+  `resources/lang/en/messages.php` and `resources/lang/vi/messages.php` (this package ships
+  English + Vietnamese; keep them in sync). See the existing `nav`/`group`/`settings` sections
+  for the nesting convention (one sub-array per feature/page).
 - Route-list "key" format for `type: 'request'` entries is `"METHOD URI"` (e.g. `"GET /api/foo"`);
   list views split it back apart with `Str::before`/`Str::after`. Requests with no matched
   Laravel route are grouped under the literal key `Requests::UNMATCHED_ROUTE` ("Unmatched Route").
