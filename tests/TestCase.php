@@ -66,10 +66,16 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app): array
     {
-        return [
+        return array_filter([
             LivewireServiceProvider::class,
             MonitorServiceProvider::class,
-        ];
+            // laravel/socialite ships its own service provider (binding
+            // Socialite::class's Factory contract); this package has no
+            // Testbench package auto-discovery, so register it explicitly
+            // whenever the (require-dev/suggested) package is installed —
+            // OAuthLoginTest resolves the Socialite facade directly.
+            class_exists(\Laravel\Socialite\SocialiteServiceProvider::class) ? \Laravel\Socialite\SocialiteServiceProvider::class : null,
+        ]);
     }
 
     protected function defineEnvironment($app): void

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use LaravelMonitor\Http\Controllers\Auth\EmailChangeController;
 use LaravelMonitor\Http\Controllers\Auth\InvitationController;
 use LaravelMonitor\Http\Controllers\Auth\LoginController;
+use LaravelMonitor\Http\Controllers\Auth\OAuthController;
 use LaravelMonitor\Http\Controllers\Auth\PasswordResetController;
 use LaravelMonitor\Http\Controllers\Auth\SetupController;
 use LaravelMonitor\Http\Controllers\Auth\TwoFactorChallengeController;
@@ -28,6 +29,8 @@ Route::domain(config('monitor.domain'))
         Route::post('/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->name('monitor.two-factor.challenge.store');
         Route::post('/webauthn/authenticate/options', [WebauthnController::class, 'authenticateOptions'])->name('monitor.webauthn.authenticate.options');
         Route::post('/webauthn/authenticate', [WebauthnController::class, 'authenticate'])->name('monitor.webauthn.authenticate.store');
+        Route::get('/oauth/{provider}/redirect', [OAuthController::class, 'redirect'])->name('monitor.oauth.redirect');
+        Route::get('/oauth/{provider}/callback', [OAuthController::class, 'callback'])->name('monitor.oauth.callback');
         Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('monitor.invitations.show');
         Route::post('/invitations/{token}', [InvitationController::class, 'store'])->name('monitor.invitations.store');
         Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('monitor.password.request');

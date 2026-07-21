@@ -29,6 +29,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerLivewireComponents();
         $this->registerAuthorization();
         $this->registerAuth();
+        $this->registerOAuth();
 
         $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
     }
@@ -246,6 +247,22 @@ class MonitorServiceProvider extends ServiceProvider
                 Commands\ClearCommand::class,
                 Commands\AggregateCommand::class,
             ]);
+        }
+    }
+
+    /**
+     * Socialite reads driver config from `services.<provider>`, which this
+     * package has no business publishing into the host app's own
+     * config/services.php — mirror registerAuth()'s approach instead and
+     * merge it at runtime from this package's own `monitor.auth.oauth.*`,
+     * skipping any provider the host app already configured itself.
+     */
+    protected function registerOAuth(): void
+    {
+        foreach (['google', 'apple'] as $provider) {
+            if (! $this->app['config']->has("services.{$provider}")) {
+                $this->app['config']->set("services.{$provider}", $this->app['config']->get("monitor.auth.oauth.{$provider}", []));
+            }
         }
     }
 }
