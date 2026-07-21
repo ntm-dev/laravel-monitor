@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use LaravelMonitor\Livewire\Team;
 use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
@@ -100,6 +101,32 @@ class TwoFactorTest extends TestCase
             ->assertSessionHasErrors('code');
 
         $this->assertFalse(Auth::guard('monitor')->check());
+    }
+
+    public function test_a_wrong_totp_code_on_the_challenge_records_a_failed_auth_entry(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        $user = $this->createTotpEnabledUser();
+
+        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+
+        $this->post('/monitor/two-factor-challenge', ['code' => '000000'])
+            ->assertSessionHasErrors('code');
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'auth',
+            'subtype' => 'failed',
+        ]);
+    }
+
+    public function test_the_two_factor_challenge_and_login_routes_are_throttled(): void
+    {
+        $challengeMiddleware = Route::getRoutes()->getByName('monitor.two-factor.challenge.store')->middleware();
+        $loginMiddleware = Route::getRoutes()->getByName('monitor.login.store')->middleware();
+
+        $this->assertContains('throttle:10,1', $challengeMiddleware);
+        $this->assertContains('throttle:10,1', $loginMiddleware);
     }
 
     public function test_a_correct_recovery_code_logs_in_and_is_removed_from_the_stored_list(): void

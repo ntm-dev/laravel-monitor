@@ -7,16 +7,21 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 use LaravelMonitor\Models\MonitorOauthAccount;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Support\OptionalAuthMethod;
 
 class OAuthController
 {
     public function redirect(string $provider): RedirectResponse
     {
+        abort_unless(OptionalAuthMethod::oauthAvailable($provider), 404);
+
         return Socialite::driver($provider)->redirect();
     }
 
     public function callback(string $provider): RedirectResponse
     {
+        abort_unless(OptionalAuthMethod::oauthAvailable($provider), 404);
+
         try {
             $socialiteUser = Socialite::driver($provider)->user();
         } catch (\Throwable $e) {

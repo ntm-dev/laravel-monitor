@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Http\Controllers\Auth;
 
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,8 @@ class TwoFactorChallengeController
 
             return redirect()->route('monitor.dashboard');
         }
+
+        event(new Failed(MonitorUser::guardName(), $user, ['email' => $user->email]));
 
         throw ValidationException::withMessages([
             'code' => 'That code did not match. Please try again.',

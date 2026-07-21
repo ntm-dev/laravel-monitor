@@ -131,4 +131,21 @@ class OAuthLoginTest extends TestCase
 
         $this->get('/monitor/login')->assertSeeText('Install laravel/socialite');
     }
+
+    public function test_a_redirect_for_an_unrouted_provider_name_is_a_404(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/oauth/somefakeprovider/redirect')->assertNotFound();
+    }
+
+    public function test_a_redirect_for_google_without_a_configured_client_id_is_a_404(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        config(['monitor.auth.oauth.google.client_id' => null]);
+        $this->withoutMonitorAuth();
+
+        $this->get('/monitor/oauth/google/redirect')->assertNotFound();
+    }
 }

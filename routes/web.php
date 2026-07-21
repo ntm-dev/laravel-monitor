@@ -23,14 +23,14 @@ Route::domain(config('monitor.domain'))
         Route::get('/setup', [SetupController::class, 'show'])->name('monitor.setup');
         Route::post('/setup', [SetupController::class, 'store'])->name('monitor.setup.store');
         Route::get('/login', [LoginController::class, 'show'])->name('monitor.login');
-        Route::post('/login', [LoginController::class, 'store'])->name('monitor.login.store');
+        Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:10,1')->name('monitor.login.store');
         Route::post('/logout', [LoginController::class, 'destroy'])->name('monitor.logout');
         Route::get('/two-factor-challenge', [TwoFactorChallengeController::class, 'show'])->name('monitor.two-factor.challenge');
-        Route::post('/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->name('monitor.two-factor.challenge.store');
+        Route::post('/two-factor-challenge', [TwoFactorChallengeController::class, 'store'])->middleware('throttle:10,1')->name('monitor.two-factor.challenge.store');
         Route::post('/webauthn/authenticate/options', [WebauthnController::class, 'authenticateOptions'])->name('monitor.webauthn.authenticate.options');
         Route::post('/webauthn/authenticate', [WebauthnController::class, 'authenticate'])->name('monitor.webauthn.authenticate.store');
-        Route::get('/oauth/{provider}/redirect', [OAuthController::class, 'redirect'])->name('monitor.oauth.redirect');
-        Route::get('/oauth/{provider}/callback', [OAuthController::class, 'callback'])->name('monitor.oauth.callback');
+        Route::get('/oauth/{provider}/redirect', [OAuthController::class, 'redirect'])->where('provider', 'google|apple')->name('monitor.oauth.redirect');
+        Route::get('/oauth/{provider}/callback', [OAuthController::class, 'callback'])->where('provider', 'google|apple')->name('monitor.oauth.callback');
         Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('monitor.invitations.show');
         Route::post('/invitations/{token}', [InvitationController::class, 'store'])->name('monitor.invitations.store');
         Route::get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->name('monitor.password.request');
