@@ -82,4 +82,28 @@ class OAuthLoginTest extends TestCase
 
         $this->get('/monitor/login')->assertSeeText('Install laravel/socialite');
     }
+
+    public function test_a_callback_when_socialite_throws_shows_error_and_creates_nothing(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        // Mock the Socialite factory to return a driver that throws InvalidStateException
+        // (e.g., when state is tampered, missing, or user denies consent). This simulates
+        // a client-controlled OAuth callback failure that should not surface as a 500 error.
+        $mockDriver = \Mockery::mock();
+        $mockDriver->shouldReceive('user')->andThrow(new \Laravel\Socialite\Two\InvalidStateException());
+
+        $this->app->bind(\Laravel\Socialite\Contracts\Factory::class, function () use ($mockDriver) {
+            $mock = \Mockery::mock(\Laravel\Socialite\Contracts\Factory::class);
+            $mock->shouldReceive('driver')->with('google')->andReturn($mockDriver);
+            return $mock;
+        });
+
+        $this->get('/monitor/oauth/google/callback')
+            ->assertSessionHasErrors('email');
+
+        $this->assertFalse(Auth::guard(MonitorUser::guardName())->check());
+        $this->assertDatabaseMissing((new MonitorOauthAccount())->getTable(), ['provider' => 'google']);
+    }
 }
