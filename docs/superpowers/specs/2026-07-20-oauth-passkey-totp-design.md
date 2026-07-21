@@ -197,6 +197,19 @@ Table/column names are configurable via `config/monitor.php` under
   other — each of the three methods here is a standalone, complete way to
   authenticate.
 
+## Known risks
+
+Registering a passkey or enabling TOTP from an already-authenticated
+session requires no re-authentication step (no current-password prompt),
+so a compromised session can add a persistent, password-independent
+credential that survives a subsequent password reset. This matches the
+trust model this package already uses elsewhere — the Team page's
+invite and email-change flows also let any authenticated session take
+security-relevant actions without re-auth. Flagged during final review
+as an accepted risk for this release rather than an oversight: it is not
+addressed here by a step-up re-auth flow, which would need to be a
+deliberate, separately-scoped addition if the trust model changes later.
+
 ## Testing plan
 
 - **TOTP**: enabling with a correct confirmation code persists the
