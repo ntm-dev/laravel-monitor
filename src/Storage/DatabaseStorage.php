@@ -206,8 +206,13 @@ class DatabaseStorage implements Storage
             ->where('type', 'slow_query')
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
-            // created_at, not id — see cacheKeyStats() for why.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why — but this sample's duration values feed avg/p95
+            // directly (unlike cacheKeyStats' count-only aggregates), so a
+            // tied created_at second needs a deterministic secondary sort
+            // too — see sampleDurationsAcrossBuckets() for why.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows())
             ->get(['key', 'duration', 'payload']);
 
@@ -300,10 +305,15 @@ class DatabaseStorage implements Storage
 
         // See cacheKeyStats() for why the GROUP BY runs over a capped
         // subquery, ordered by created_at rather than id, rather than the
-        // raw filtered table directly.
+        // raw filtered table directly. Unlike cacheKeyStats' count-only
+        // aggregates, avg_duration/max_duration below are computed from
+        // this sample's actual values, so created_at alone isn't a safe
+        // sort within a tied second — see sampleDurationsAcrossBuckets()
+        // for why `id` is added as a deterministic tiebreaker.
         $sample = $this->query($type, $since, $subtype, null, $until)
             ->select(['key', 'duration', 'created_at'])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows());
 
         return $this->table()
@@ -731,8 +741,14 @@ class DatabaseStorage implements Storage
         ?int $userId = null,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
-            // created_at, not id — see cacheKeyStats() for why.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why — plus `id` as a deterministic tiebreaker, since
+            // avg_duration/p95_duration below are computed from this
+            // sample's actual values — see sampleDurationsAcrossBuckets()
+            // for why a tied created_at second isn't safe to leave
+            // unordered when the sample feeds a duration statistic.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows())
             ->get(['key', 'subtype', 'duration']);
 
@@ -789,9 +805,15 @@ class DatabaseStorage implements Storage
         ?int $userId = null,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
-            // created_at, not id — see cacheKeyStats() for why. Rows arrive
-            // newest-first, so the first row seen per key is its last_seen.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why. Rows arrive newest-first, so the first row seen per
+            // key is its last_seen. `id` is added as a deterministic
+            // tiebreaker because — unlike cacheKeyStats' count-only
+            // aggregates — avg_duration/p95_duration below are computed
+            // from this sample's actual values; see
+            // sampleDurationsAcrossBuckets() for why that matters.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit(self::MAX_SAMPLE_ROWS)
             ->get(['key', 'duration', 'created_at']);
 
