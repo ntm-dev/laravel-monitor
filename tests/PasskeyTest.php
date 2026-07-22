@@ -18,7 +18,13 @@ use LaravelMonitor\Models\MonitorWebauthnCredential;
 use LaravelMonitor\Support\WebauthnCredentialRepository;
 use Livewire\Livewire;
 use ParagonIE\ConstantTime\Base64UrlSafe;
+use PHPUnit\Framework\Attributes\RequiresPhp;
 
+// web-auth/webauthn-lib ^5.3 (the version this package's WebauthnCredentialRepository
+// is written against) requires PHP >=8.2, so it's deliberately left out of
+// require-dev's install on the PHP 8.1 CI legs (see .github/workflows/tests.yml) —
+// passkeys are an optional auth method there, same as TOTP/OAuth without their packages.
+#[RequiresPhp('>=8.2.0')]
 class PasskeyTest extends TestCase
 {
     use RefreshDatabase;

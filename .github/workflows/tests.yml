@@ -95,6 +95,15 @@ jobs:
           esac
           composer require "orchestra/testbench:$TESTBENCH" --no-interaction --no-update --dev
 
+      # web-auth/webauthn-lib ^5.3 requires PHP >=8.2; passkeys are an optional
+      # auth method (same as TOTP/OAuth without their packages), so on PHP 8.1
+      # it's left uninstalled rather than blocking the whole matrix leg —
+      # PasskeyTest/OptionalAuthMethodTest skip themselves via #[RequiresPhp].
+      - name: Drop web-auth/webauthn-lib on PHP 8.1
+        if: matrix.php == '8.1'
+        run: |
+          composer remove web-auth/webauthn-lib --dev --no-interaction --no-update
+
       - name: Install dependencies
         run: |
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}

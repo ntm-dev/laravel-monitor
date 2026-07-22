@@ -4,6 +4,7 @@ namespace LaravelMonitor\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LaravelMonitor\Support\OptionalAuthMethod;
+use PHPUnit\Framework\Attributes\RequiresPhp;
 
 class OptionalAuthMethodTest extends TestCase
 {
@@ -14,6 +15,9 @@ class OptionalAuthMethodTest extends TestCase
         $this->assertTrue(OptionalAuthMethod::totpAvailable());
     }
 
+    // web-auth/webauthn-lib requires PHP >=8.2 and is deliberately left out of
+    // require-dev's install on the PHP 8.1 CI legs (see .github/workflows/tests.yml).
+    #[RequiresPhp('>=8.2.0')]
     public function test_passkeys_are_available_when_webauthn_lib_is_installed(): void
     {
         $this->assertTrue(OptionalAuthMethod::passkeysAvailable());
