@@ -18,7 +18,7 @@ class Overview extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
 
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, '2xx', null, $until);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, '3xx', null, $until);

@@ -30,7 +30,7 @@ class ExceptionDetail extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $key = $this->key;
 
         $group = $storage->exceptionGroups($since, $until)->firstWhere('key', $key);

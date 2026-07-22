@@ -13,9 +13,20 @@ abstract class Card extends Component
     public const DEFAULT_PERIOD = '1h';
 
     /**
-     * Time slices used by the bar / line charts.
+     * Candidate bucket widths (seconds), finest first — mirrors Nightwatch's
+     * own per-period chart resolution (1h -> 30s buckets, 24h -> 15m, 7d ->
+     * 2h, 14d -> 4h): the chart uses the *finest* width here that still
+     * keeps the total point count at or under MAX_CHART_BUCKETS, instead of
+     * always slicing every range into the same fixed number of buckets
+     * (which made a 30-day chart exactly as coarse per-pixel as a 1-hour
+     * one). Each width is chosen so it divides evenly into every period in
+     * config('monitor.periods') — see bucketSeconds().
      */
-    public const CHART_BUCKETS = 60;
+    protected const NICE_BUCKET_SECONDS = [
+        30, 60, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400, 172800, 259200, 604800,
+    ];
+
+    protected const MAX_CHART_BUCKETS = 120;
 
     public string $period = self::DEFAULT_PERIOD;
 
@@ -90,7 +101,59 @@ abstract class Card extends Component
             return CarbonImmutable::parse($this->from);
         }
 
-        return CarbonImmutable::now()->subHours(self::periods()[$this->period] ?? 1);
+        // Rounded down to the chart's bucket-width grid, not a bare
+        // now()->subHours(): a live window recomputes "since" fresh on
+        // every poll, so an unaligned since drifts forward by however many
+        // seconds elapsed since the last poll — shifting every bucket's
+        // absolute boundary by that same amount and reshuffling which
+        // bucket a row near an edge falls into, even when no new data has
+        // arrived. Aligning to the grid means since only jumps forward in
+        // whole bucket-width steps, so the chart's layout stays fixed
+        // between polls that land inside the same step.
+        $hours = self::periods()[$this->period] ?? 1;
+        $bucketSeconds = $this->bucketSeconds();
+        $timestamp = CarbonImmutable::now()->subHours($hours)->getTimestamp();
+
+        return CarbonImmutable::createFromTimestamp((int) floor($timestamp / $bucketSeconds) * $bucketSeconds);
+    }
+
+    /**
+     * Total width of the selected window, in seconds — the selected range
+     * for a custom period, or the preset's configured hours for a live one.
+     */
+    protected function windowSeconds(): int
+    {
+        if ($this->hasCustomRange()) {
+            return max(1, CarbonImmutable::parse($this->from)->diffInSeconds(CarbonImmutable::parse($this->to)));
+        }
+
+        return (int) ((self::periods()[$this->period] ?? 1) * 3600);
+    }
+
+    /**
+     * The finest width from NICE_BUCKET_SECONDS that still keeps the chart
+     * to at most MAX_CHART_BUCKETS points for the current window.
+     */
+    protected function bucketSeconds(): int
+    {
+        $totalSeconds = $this->windowSeconds();
+
+        foreach (self::NICE_BUCKET_SECONDS as $width) {
+            if ((int) ceil($totalSeconds / $width) <= self::MAX_CHART_BUCKETS) {
+                return $width;
+            }
+        }
+
+        return self::NICE_BUCKET_SECONDS[count(self::NICE_BUCKET_SECONDS) - 1];
+    }
+
+    /**
+     * Number of time slices the bar / line charts should render for the
+     * current period or custom range — see bucketSeconds().
+     */
+    public function chartBuckets(): int
+    {
+        return max(1, (int) ceil($this->windowSeconds() / $this->bucketSeconds()));
     }
 
     /**

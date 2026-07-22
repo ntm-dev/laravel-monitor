@@ -50,7 +50,7 @@ class CacheStats extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
 
         $hitBuckets = $storage->countsPerBucket('cache', $since, $buckets, 'hit', null, $until);
         $missBuckets = $storage->countsPerBucket('cache', $since, $buckets, 'miss', null, $until);

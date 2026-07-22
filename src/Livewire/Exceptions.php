@@ -95,7 +95,7 @@ class Exceptions extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $userId = $this->userId !== '' ? (int) $this->userId : null;
 
         $groups = $storage->exceptionGroups($since, $until, $userId);

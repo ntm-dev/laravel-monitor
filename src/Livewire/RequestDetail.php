@@ -27,7 +27,7 @@ class RequestDetail extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $key = $this->key;
 
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, '2xx', $key, $until);

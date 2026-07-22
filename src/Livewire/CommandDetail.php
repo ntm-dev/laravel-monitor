@@ -23,7 +23,7 @@ class CommandDetail extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $key = $this->key;
 
         // One query grouped by subtype instead of two separate stats()
