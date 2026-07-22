@@ -30,6 +30,7 @@ class Monitor
      *     response_ready: ?int,
      *     terminating: ?int,
      *     queries: int,
+     *     models: int,
      * }|null
      */
     protected ?array $request = null;
@@ -46,12 +47,21 @@ class Monitor
      * concurrently with an HTTP request, so at most one of $request/$job is
      * ever set.
      *
-     * @var array{id: string, start: float}|null
+     * @var array{id: string, start: float, models: int}|null
      */
     protected ?array $job = null;
 
-    /** The artisan command currently running, or null outside a console command. */
-    protected ?string $command = null;
+    /**
+     * State of the artisan command currently running, or null outside one —
+     * same shape/purpose as $job but for console commands, so anything a
+     * command triggers (queries, mail, notifications, jobs it dispatches)
+     * correlates onto its own timeline the same way. A console process runs
+     * one command at a time, never concurrently with a request or a queued
+     * job attempt, so at most one of $request/$job/$command is ever set.
+     *
+     * @var array{id: string, name: string, start: float, models: int}|null
+     */
+    protected ?array $command = null;
 
     public function __construct(protected Application $app)
     {
@@ -80,7 +90,7 @@ class Monitor
             $duration,
             $subtype,
             $userId,
-            $this->request['id'] ?? $this->job['id'] ?? null,
+            $this->request['id'] ?? $this->job['id'] ?? $this->command['id'] ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -122,6 +132,16 @@ class Monitor
             return max(0.0, round($elapsed - ($duration ?? 0), 3));
         }
 
+        if ($this->command !== null) {
+            if ($type === 'command') {
+                return 0.0;
+            }
+
+            $elapsed = max(0.0, round((microtime(true) - $this->command['start']) * 1000, 3));
+
+            return max(0.0, round($elapsed - ($duration ?? 0), 3));
+        }
+
         return null;
     }
 
@@ -150,6 +170,7 @@ class Monitor
             'response_ready' => null,
             'terminating' => null,
             'queries' => 0,
+            'models' => 0,
         ];
 
         $elapsed = $this->elapsedMs();
@@ -175,6 +196,7 @@ class Monitor
         $this->job = [
             'id' => (string) Str::uuid(),
             'start' => microtime(true),
+            'models' => 0,
         ];
     }
 
@@ -189,15 +211,38 @@ class Monitor
         $this->job = null;
     }
 
-    /** Set by the CommandStarting listener; used to label queries recorded outside a request. */
-    public function setCommand(?string $command): void
+    /**
+     * Starts tracking an artisan command run. Called by the Commands
+     * recorder on CommandStarting, before the command's own handle() runs —
+     * everything it triggers (queries, mail, notifications, jobs) picks up
+     * this id via record()'s request_id fallback, the same way an HTTP
+     * request's or a job attempt's children do.
+     */
+    public function beginCommandRun(string $name): void
     {
-        $this->command = $command;
+        $this->command = [
+            'id' => (string) Str::uuid(),
+            'name' => $name,
+            'start' => microtime(true),
+            'models' => 0,
+        ];
     }
 
+    public function commandRunId(): ?string
+    {
+        return $this->command['id'] ?? null;
+    }
+
+    /** The running command's name, e.g. "app:sync-data" — used to label queries recorded outside a request/job. */
     public function commandName(): ?string
     {
-        return $this->command;
+        return $this->command['name'] ?? null;
+    }
+
+    /** Called by the Commands recorder once the run's own `command` entry has been recorded. */
+    public function endCommandRun(): void
+    {
+        $this->command = null;
     }
 
     /**
@@ -247,6 +292,33 @@ class Monitor
     public function queryCount(): int
     {
         return $this->request['queries'] ?? 0;
+    }
+
+    /**
+     * Count every Eloquent model hydrated during the current request, job
+     * attempt or command run — mirrors incrementQueryCount(), but across
+     * whichever context is active (a job/command has no bootstrap/
+     * middleware phases of its own, so unlike queries it can't fall back to
+     * "outside a request means uncounted").
+     */
+    public function incrementModelCount(): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        if ($this->request !== null) {
+            $this->request['models']++;
+        } elseif ($this->job !== null) {
+            $this->job['models']++;
+        } elseif ($this->command !== null) {
+            $this->command['models']++;
+        }
+    }
+
+    public function modelCount(): int
+    {
+        return $this->request['models'] ?? $this->job['models'] ?? $this->command['models'] ?? 0;
     }
 
     /** Milliseconds elapsed since the request started, or null outside one. */
@@ -377,6 +449,7 @@ class Monitor
 
         $entry->payload['phases'] = $this->request['phases'];
         $entry->payload['query_count'] = $this->request['queries'];
+        $entry->payload['model_count'] = $this->request['models'];
         $entry->duration = max($entry->duration ?? 0.0, $this->elapsedMsPrecise() ?? 0.0);
     }
 

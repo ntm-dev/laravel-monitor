@@ -163,10 +163,33 @@ return new class extends Migration
             $table->unique(['provider', 'provider_user_id']);
             $table->index('user_id');
         });
+
+        // One row per issue (an exception fingerprint or a performance-
+        // threshold breach), keyed by [type, key] — mirrors monitor_entries'
+        // own type/key vocabulary rather than introducing a separate one.
+        // Kept apart from monitor_entries: this table holds durable
+        // Open/Resolved/Ignored state a user sets, not immutable recorded
+        // facts, and is never pruned by monitor:prune.
+        Schema::create($this->issuesTable(), function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->nullable()->unique();
+            $table->string('type', 32);
+            $table->string('key', 255);
+            $table->string('status', 16)->default('open');
+            $table->string('priority', 16)->default('none');
+            $table->timestamp('first_seen');
+            $table->timestamp('last_seen');
+            $table->timestamp('resolved_at')->nullable();
+            $table->timestamps();
+
+            $table->unique(['type', 'key']);
+            $table->index(['type', 'status']);
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists($this->issuesTable());
         Schema::dropIfExists($this->oauthAccountsTable());
         Schema::dropIfExists($this->webauthnCredentialsTable());
         Schema::dropIfExists($this->emailChangesTable());
@@ -215,5 +238,10 @@ return new class extends Migration
     protected function oauthAccountsTable(): string
     {
         return config('monitor.auth.oauth_accounts_table', 'monitor_oauth_accounts');
+    }
+
+    protected function issuesTable(): string
+    {
+        return config('monitor.issues.table', 'monitor_issues');
     }
 };

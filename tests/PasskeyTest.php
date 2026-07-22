@@ -2,7 +2,12 @@
 
 namespace LaravelMonitor\Tests;
 
-use CBOR\Encoder;
+use CBOR\ByteStringObject;
+use CBOR\MapItem;
+use CBOR\MapObject;
+use CBOR\NegativeIntegerObject;
+use CBOR\TextStringObject;
+use CBOR\UnsignedIntegerObject;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -13,7 +18,13 @@ use LaravelMonitor\Models\MonitorWebauthnCredential;
 use LaravelMonitor\Support\WebauthnCredentialRepository;
 use Livewire\Livewire;
 use ParagonIE\ConstantTime\Base64UrlSafe;
+use PHPUnit\Framework\Attributes\RequiresPhp;
 
+// web-auth/webauthn-lib ^5.3 (the version this package's WebauthnCredentialRepository
+// is written against) requires PHP >=8.2, so it's deliberately left out of
+// require-dev's install on the PHP 8.1 CI legs (see .github/workflows/tests.yml) —
+// passkeys are an optional auth method there, same as TOTP/OAuth without their packages.
+#[RequiresPhp('>=8.2.0')]
 class PasskeyTest extends TestCase
 {
     use RefreshDatabase;
@@ -210,13 +221,15 @@ class PasskeyTest extends TestCase
 
         $credentialId = random_bytes(16);
 
-        $encoder = new Encoder();
-        $coseKey = $encoder->encode([
-            1 => 2,   // kty: EC2
-            3 => -7,  // alg: ES256
-            -1 => 1,  // crv: P-256
-            -2 => $x,
-            -3 => $y,
+        // web-auth/webauthn-lib ^5.3 requires spomky-labs/cbor-php ^3.0, whose
+        // Encoder::encode(array) convenience (for an arbitrary PHP array) was
+        // removed in favour of building a typed CBORObject tree explicitly.
+        $coseKey = (string) MapObject::create([
+            MapItem::create(UnsignedIntegerObject::create(1), UnsignedIntegerObject::create(2)),   // kty: EC2
+            MapItem::create(UnsignedIntegerObject::create(3), NegativeIntegerObject::create(-7)),  // alg: ES256
+            MapItem::create(NegativeIntegerObject::create(-1), UnsignedIntegerObject::create(1)),  // crv: P-256
+            MapItem::create(NegativeIntegerObject::create(-2), ByteStringObject::create($x)),
+            MapItem::create(NegativeIntegerObject::create(-3), ByteStringObject::create($y)),
         ]);
 
         $rpIdHash = hash('sha256', $host, true);
@@ -227,10 +240,10 @@ class PasskeyTest extends TestCase
 
         $authenticatorData = $rpIdHash.$flags.$signCount.$aaguid.$credentialIdLength.$credentialId.$coseKey;
 
-        $attestationObject = $encoder->encode([
-            'fmt' => 'none',
-            'attStmt' => [],
-            'authData' => $authenticatorData,
+        $attestationObject = (string) MapObject::create([
+            MapItem::create(TextStringObject::create('fmt'), TextStringObject::create('none')),
+            MapItem::create(TextStringObject::create('attStmt'), MapObject::create([])),
+            MapItem::create(TextStringObject::create('authData'), ByteStringObject::create($authenticatorData)),
         ]);
 
         $credentialIdBase64Url = Base64UrlSafe::encodeUnpadded($credentialId);

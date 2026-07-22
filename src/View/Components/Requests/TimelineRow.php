@@ -25,6 +25,7 @@ class TimelineRow extends Component
         'notification' => 'bg-fuchsia-500 dark:bg-fuchsia-400',
         'queue' => 'bg-orange-500 dark:bg-orange-400',
         'http' => 'bg-cyan-500 dark:bg-cyan-400',
+        'lazy_loading' => 'bg-rose-500 dark:bg-rose-400',
     ];
 
     /** Inline badge text per event type; unknown types are uppercased. */
@@ -35,6 +36,7 @@ class TimelineRow extends Component
         'notification' => 'NOTIFICATION',
         'queue' => 'QUEUE',
         'http' => 'HTTP',
+        'lazy_loading' => 'N+1',
     ];
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';
@@ -45,7 +47,7 @@ class TimelineRow extends Component
     public const SLOW_BAR = 'border border-amber-500 bg-amber-500/20 dark:border-amber-400 dark:bg-amber-400/20';
 
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
-    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification'];
+    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading'];
 
     /** Bar left edge / width as percentages of the total duration. */
     public float $left;

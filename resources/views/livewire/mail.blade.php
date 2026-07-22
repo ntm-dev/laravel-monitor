@@ -21,8 +21,6 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
-
             <x-monitor::card class="flex flex-col p-4">
                 <x-monitor::metric label="Mails" :value="number_format($direct + $viaNotification)">
                     <x-monitor::legend label="Direct" dot="bg-blue-500" :value="number_format($direct)"/>
@@ -36,6 +34,8 @@
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>
             </x-monitor::card>
+
+            <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
         </div>
 
         {{-- Grouped by mailable/notification class --}}

@@ -254,4 +254,55 @@ interface Storage
      * @return Collection<string, string>
      */
     public function rootTypesFor(array $requestIds): Collection;
+
+    /**
+     * Record that each of the given issues (an exception group or a
+     * performance-threshold breach) is still occurring, as of its own last
+     * occurrence in this period — creates a new "open" row on first sight,
+     * otherwise just bumps last_seen. A previously "resolved" issue that
+     * recurs after its resolved_at reopens automatically (mirrors
+     * Nightwatch); an "ignored" issue stays ignored until manually reopened.
+     *
+     * @param  array<string, DateTimeInterface>  $lastSeenByKey
+     */
+    public function syncIssues(string $type, array $lastSeenByKey): void;
+
+    /**
+     * Status + priority + first_seen for each of the given keys of a type,
+     * keyed by key — batches what would otherwise be one lookup per row on
+     * the Issues page. A key with no matching row (not yet synced) is
+     * simply absent.
+     *
+     * @param  string[]  $keys
+     * @return Collection<string, object{id: int, uuid: string, status: string, priority: string, first_seen: CarbonImmutable}>
+     */
+    public function issueStatuses(string $type, array $keys): Collection;
+
+    /**
+     * Set an issue's status directly (open/resolved/ignored) — the resolve/
+     * ignore/reopen actions on the Issues page. Creates the row if
+     * syncIssues() hasn't seen this key yet rather than silently no-op-ing.
+     */
+    public function setIssueStatus(string $type, string $key, string $status): void;
+
+    /**
+     * Count of issues currently "open" — powers the sidebar badge. Not
+     * scoped to the viewer's selected time range: issues are persistent
+     * records synced by syncIssues(), not a windowed event count.
+     */
+    public function openIssueCount(): int;
+
+    /**
+     * Set an issue's priority (one of Format::PRIORITIES' keys) — silently
+     * no-ops on an invalid value. Creates the row if syncIssues() hasn't
+     * seen this key yet, same as setIssueStatus().
+     */
+    public function setIssuePriority(string $type, string $key, string $priority): void;
+
+    /**
+     * Resolve a monitor_issues row by its uuid — the /monitor/issues/{uuid}
+     * detail route uses this to find the [type, key] pair to fetch the
+     * underlying exception/performance data for.
+     */
+    public function findIssueByUuid(string $uuid): ?object;
 }

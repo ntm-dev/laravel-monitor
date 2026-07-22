@@ -103,8 +103,11 @@ class TwoFactorTest extends TestCase
         $this->assertFalse(Auth::guard('monitor')->check());
     }
 
-    public function test_a_wrong_totp_code_on_the_challenge_records_a_failed_auth_entry(): void
+    public function test_a_wrong_totp_code_on_the_challenge_does_not_record_monitors_own_auth_entry(): void
     {
+        // Monitor's own dashboard auth (guard: 'monitor') is independent of
+        // the application being monitored — Recorders\Authentication must
+        // not capture it as if it were the app's own auth activity.
         Gate::define('viewMonitor', fn ($user = null) => true);
         $this->withoutMonitorAuth();
         $user = $this->createTotpEnabledUser();
@@ -114,9 +117,8 @@ class TwoFactorTest extends TestCase
         $this->post('/monitor/two-factor-challenge', ['code' => '000000'])
             ->assertSessionHasErrors('code');
 
-        $this->assertDatabaseHas('monitor_entries', [
+        $this->assertDatabaseMissing('monitor_entries', [
             'type' => 'auth',
-            'subtype' => 'failed',
         ]);
     }
 

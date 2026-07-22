@@ -7,23 +7,21 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
+use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Timeline;
 
 /**
- * Renders the standalone Job Attempt Detail page: one queued job execution
- * and every event it triggered (queries, mail, notifications, cache,
- * outgoing requests), on the same waterfall timeline used for requests —
- * mirrors Nightwatch, whose notification/mail rows link here (rather than to
- * a standalone notification/mail page) because both sides of a mail-channel
- * notification already show up side by side on this one timeline. Owns its
- * own route (`monitor.jobs.attempts.show`), same as RequestDetailController.
+ * Renders the standalone Command Run Detail page: one artisan command
+ * execution and every event it triggered (queries, mail, notifications,
+ * cache, dispatched jobs), on the same waterfall timeline used for requests
+ * and job attempts. Owns its own route (`monitor.commands.runs.show`), same
+ * as RequestDetailController/JobAttemptController.
  */
-class JobAttemptController
+class CommandRunController
 {
     /**
-     * Recorder type => events-summary bucket key. No 'job' entry — unlike a
-     * request, whose children include jobs it queued, a job attempt's own
-     * timeline shouldn't summarise itself.
+     * Recorder type => events-summary bucket key. No 'command' entry —
+     * a command run's own timeline shouldn't summarise itself.
      */
     protected const SUMMARY_TYPES = [
         'slow_query' => 'queries',
@@ -31,6 +29,7 @@ class JobAttemptController
         'mail' => 'mail',
         'notification' => 'notifications',
         'outgoing_request' => 'outgoing',
+        'job' => 'jobs',
         'lazy_loading' => 'lazy_loading',
     ];
 
@@ -38,29 +37,31 @@ class JobAttemptController
     {
     }
 
-    public function __invoke(string $attemptId): View
+    public function __invoke(string $runId): View
     {
-        $root = $this->storage->findByRequestId($attemptId, 'job');
+        app()->setLocale(Preferences::locale());
+
+        $root = $this->storage->findByRequestId($runId, 'command');
 
         abort_unless($root !== null, 404);
 
-        $children = $this->storage->timelineFor($attemptId, 'job');
+        $children = $this->storage->timelineFor($runId, 'command');
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        return view('monitor::job-attempt-page', [
+        return view('monitor::command-run-page', [
             'root' => $root,
             'timeline' => Timeline::build($root, $children),
             'totalDuration' => max(1, (int) ($root->duration ?? 0)),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'tab' => 'jobs',
+            'tab' => 'commands',
             'range' => [],
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
             'timezone' => Format::timezone(),
-            'threshold' => (int) config('monitor.thresholds.job', 1000),
+            'threshold' => (int) config('monitor.thresholds.command', 1000),
         ]);
     }
 

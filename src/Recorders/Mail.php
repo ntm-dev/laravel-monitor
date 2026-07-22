@@ -24,6 +24,17 @@ class Mail extends Recorder
 
     public function record(MessageSent $event): void
     {
+        // Monitor sends its own transactional mail for dashboard account
+        // management (team invitations, password resets, email-change
+        // verification) — never activity of the application being
+        // monitored, so it must not be recorded as such, the same way
+        // Recorders\Authentication excludes the dashboard's own guard.
+        $mailableClass = $event->data['__laravel_mailable'] ?? null;
+
+        if (is_string($mailableClass) && str_starts_with($mailableClass, 'LaravelMonitor\\')) {
+            return;
+        }
+
         try {
             $message = $event->message;
             $subject = $message->getSubject() ?? '(no subject)';

@@ -26,6 +26,7 @@ class Timeline
         'notification' => ['type' => 'notification', 'label' => 'Notification'],
         'job' => ['type' => 'queue', 'label' => 'Queued Job'],
         'outgoing_request' => ['type' => 'http', 'label' => 'Outgoing Request'],
+        'lazy_loading' => ['type' => 'lazy_loading', 'label' => 'Lazy Load'],
     ];
 
     /**
@@ -108,6 +109,7 @@ class Timeline
             'cache' => ucfirst($row->subtype ?? 'cache').' · '.($row->key ?? ''),
             'mail' => $row->payload['subject'] ?? $row->key ?? $fallback,
             'notification', 'job' => class_basename($row->key ?? $fallback),
+            'lazy_loading' => class_basename($row->payload['model'] ?? $row->key ?? $fallback).'::'.($row->payload['relation'] ?? ''),
             default => $row->key ?? $fallback,
         };
     }

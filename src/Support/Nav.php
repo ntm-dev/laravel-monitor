@@ -25,6 +25,7 @@ class Nav
             'issues' => ['label' => __('monitor::messages.nav.issues'), 'group' => null, 'icon' => Icons::ISSUES, 'component' => 'monitor.issues'],
             'requests' => ['label' => __('monitor::messages.nav.requests'), 'group' => $activity, 'icon' => Icons::REQUESTS, 'component' => 'monitor.requests'],
             'jobs' => ['label' => __('monitor::messages.nav.jobs'), 'group' => $activity, 'icon' => Icons::JOBS, 'component' => 'monitor.jobs'],
+            'commands' => ['label' => __('monitor::messages.nav.commands'), 'group' => $activity, 'icon' => Icons::COMMANDS, 'component' => 'monitor.commands'],
             'schedule' => ['label' => __('monitor::messages.nav.schedule'), 'group' => $activity, 'icon' => Icons::SCHEDULE, 'component' => 'monitor.schedule'],
             'exceptions' => ['label' => __('monitor::messages.nav.exceptions'), 'group' => $activity, 'icon' => Icons::EXCEPTIONS, 'component' => 'monitor.exceptions'],
             'queries' => ['label' => __('monitor::messages.nav.queries'), 'group' => $activity, 'icon' => Icons::QUERIES, 'component' => 'monitor.queries'],

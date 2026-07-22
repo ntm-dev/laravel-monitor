@@ -32,6 +32,29 @@ class Requests extends Recorder
         'php-auth-digest',
     ];
 
+    /**
+     * Body field names (case-insensitive, any nesting depth) replaced before
+     * storing. Mirrors REDACT_HEADERS' intent for the request body.
+     */
+    protected const REDACT_BODY_FIELDS = [
+        'password',
+        'password_confirmation',
+        'current_password',
+        'token',
+        'secret',
+        'api_key',
+        'apikey',
+        'access_token',
+        'refresh_token',
+        'credit_card',
+        'card_number',
+        'cvv',
+        'cvc',
+    ];
+
+    /** Stored bodies larger than this (encoded, in bytes) are replaced with a size marker instead. */
+    protected const MAX_BODY_BYTES = 10000;
+
     public function register(Dispatcher $events): void
     {
         $events->listen(RequestHandled::class, [$this, 'record']);
@@ -66,19 +89,23 @@ class Requests extends Recorder
         $this->monitor->record(
             type: 'request',
             key: $request->method().' '.$uri,
-            payload: [
+            payload: array_filter([
                 'method' => $request->method(),
                 'path' => '/'.ltrim($path, '/'),
                 'url' => $this->url($request),
                 'status' => $status,
                 'ip' => $request->ip(),
                 'server' => gethostname() ?: null,
+                'route_name' => $route?->getName(),
+                'route_action' => $route ? $this->routeAction($route) : null,
+                'route_domain' => $route?->getDomain(),
                 'request_size' => strlen($request->getContent()),
                 'response_size' => $this->responseSize($event->response),
                 'peak_memory' => memory_get_peak_usage(true),
                 'request_headers' => $this->headers($request->headers),
                 'response_headers' => $this->headers($event->response->headers),
-            ],
+                'body' => $this->body($request),
+            ], fn ($value) => $value !== null),
             duration: $duration,
             subtype: $this->statusGroup($status),
             userId: $userId,
@@ -136,6 +163,67 @@ class Requests extends Recorder
             $result[$name] = in_array(strtolower($name), self::REDACT_HEADERS, true)
                 ? '••• redacted •••'
                 : implode(', ', $values);
+        }
+
+        return $result;
+    }
+
+    /**
+     * "Controller@method" for a route backed by a controller, the route's
+     * declared action name otherwise (e.g. "Closure") — whatever
+     * getActionName() already resolves, since Laravel formats both cases
+     * consistently.
+     */
+    protected function routeAction(mixed $route): ?string
+    {
+        return method_exists($route, 'getActionName') ? $route->getActionName() : null;
+    }
+
+    /**
+     * Best-effort request body, redacted and capped in size — skipped for
+     * GET/HEAD (query params already show up in the URL, and Laravel has no
+     * concept of a GET body worth capturing separately). Mirrors Nightwatch,
+     * which applies the same method restriction.
+     */
+    protected function body(Request $request): ?array
+    {
+        if (in_array($request->getMethod(), ['GET', 'HEAD'], true)) {
+            return null;
+        }
+
+        $input = $request->isJson() ? (array) $request->json()->all() : $request->request->all();
+
+        if ($input === []) {
+            return null;
+        }
+
+        $redacted = $this->redactBody($input);
+        $encoded = json_encode($redacted);
+
+        if (! is_string($encoded) || strlen($encoded) > self::MAX_BODY_BYTES) {
+            return ['_truncated' => true, '_size' => is_string($encoded) ? strlen($encoded) : null];
+        }
+
+        return $redacted;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $input
+     * @return array<array-key, mixed>
+     */
+    protected function redactBody(array $input): array
+    {
+        $result = [];
+
+        foreach ($input as $key => $value) {
+            $result[$key] = match (true) {
+                is_array($value) => $this->redactBody($value),
+                in_array(strtolower((string) $key), self::REDACT_BODY_FIELDS, true) => '••• redacted •••',
+                is_scalar($value) || $value === null => $value,
+                // File uploads and other non-scalar values aren't meaningful
+                // to store as-is; note the type instead of failing to encode.
+                default => '('.get_debug_type($value).')',
+            };
         }
 
         return $result;

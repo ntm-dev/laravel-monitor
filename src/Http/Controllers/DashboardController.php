@@ -4,6 +4,8 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Http\Headings\CommandHeading;
 use LaravelMonitor\Http\Headings\ExceptionHeading;
 use LaravelMonitor\Http\Headings\Heading;
 use LaravelMonitor\Http\Headings\JobHeading;
@@ -62,6 +64,7 @@ class DashboardController
             'tabs' => $tabs,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
+            'openIssueCount' => app(Storage::class)->openIssueCount(),
             'detail' => $detail,
             'title' => $tabs[$tab]['label'],
             'pageTitle' => $detail?->pageTitle ?? $tabs[$tab]['label'],
@@ -90,6 +93,7 @@ class DashboardController
         return match ($tab) {
             'requests' => (new RequestHeading)($key),
             'jobs' => (new JobHeading)($key),
+            'commands' => (new CommandHeading)($key),
             'exceptions' => app(ExceptionHeading::class)($key),
             'queries' => (new QueryHeading)($key),
             'notifications' => app(NotificationHeading::class)($key),
