@@ -63,16 +63,42 @@ class Queries extends Recorder
     }
 
     /**
-     * Whether the query touches Monitor's own storage table — read live
-     * from config since it's user-configurable via the Settings page
+     * Whether the query touches one of Monitor's own tables — not just the
+     * entries table, but every table the package's own dashboard reads on
+     * every request (monitor_users, for the authenticated actor) or on
+     * specific pages (Team's monitor_invitations/monitor_webauthn_credentials,
+     * Issues' monitor_issues, ...). Table names are read live from config
+     * since they're user-configurable via the Settings page
      * (Support\Settings::apply() overlays a saved override before any
      * request is handled).
      */
     protected function isSelfReferential(string $sql): bool
     {
-        $table = (string) config('monitor.storage.database.table', 'monitor_entries');
+        $sql = strtolower($sql);
 
-        return $table !== '' && str_contains(strtolower($sql), strtolower($table));
+        foreach ($this->ownTables() as $table) {
+            if ($table !== '' && str_contains($sql, strtolower($table))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    protected function ownTables(): array
+    {
+        return [
+            (string) config('monitor.storage.database.table', 'monitor_entries'),
+            (string) config('monitor.aggregates.table', 'monitor_aggregates'),
+            (string) config('monitor.issues.table', 'monitor_issues'),
+            (string) config('monitor.auth.table', 'monitor_users'),
+            (string) config('monitor.auth.invitations_table', 'monitor_invitations'),
+            (string) config('monitor.auth.password_resets_table', 'monitor_password_resets'),
+            (string) config('monitor.auth.email_changes_table', 'monitor_email_changes'),
+            (string) config('monitor.auth.webauthn_table', 'monitor_webauthn_credentials'),
+            (string) config('monitor.auth.oauth_accounts_table', 'monitor_oauth_accounts'),
+        ];
     }
 
     /**

@@ -6,6 +6,7 @@ use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
+use LaravelMonitor\Models\MonitorUser;
 
 class Authentication extends Recorder
 {
@@ -18,6 +19,10 @@ class Authentication extends Recorder
 
     public function recordLogin(Login $event): void
     {
+        if ($this->isMonitorsOwnGuard($event->guard)) {
+            return;
+        }
+
         $this->monitor->record(
             type: 'auth',
             key: $this->identifier($event->user),
@@ -29,6 +34,10 @@ class Authentication extends Recorder
 
     public function recordLogout(Logout $event): void
     {
+        if ($this->isMonitorsOwnGuard($event->guard)) {
+            return;
+        }
+
         $this->monitor->record(
             type: 'auth',
             key: $this->identifier($event->user),
@@ -40,6 +49,10 @@ class Authentication extends Recorder
 
     public function recordFailed(Failed $event): void
     {
+        if ($this->isMonitorsOwnGuard($event->guard)) {
+            return;
+        }
+
         $identifier = $event->user
             ? $this->identifier($event->user)
             : (string) ($event->credentials['email'] ?? $event->credentials['username'] ?? 'unknown');
@@ -51,6 +64,18 @@ class Authentication extends Recorder
             subtype: 'failed',
             userId: $event->user?->getAuthIdentifier(),
         );
+    }
+
+    /**
+     * The Monitor dashboard has its own, separate auth system (MonitorUser,
+     * guard configurable via monitor.auth.guard) — its own logins/logouts
+     * aren't activity of the application being monitored and must not be
+     * recorded as such, mirroring how Recorders\Requests already excludes
+     * requests to the dashboard's own routes.
+     */
+    protected function isMonitorsOwnGuard(string $guard): bool
+    {
+        return $guard === MonitorUser::guardName();
     }
 
     protected function identifier($user): string

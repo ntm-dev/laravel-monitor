@@ -162,6 +162,37 @@ class MonitorTest extends TestCase
         $this->assertDatabaseCount('monitor_entries', 0);
     }
 
+    /**
+     * Not just the entries table — the dashboard also queries its own
+     * monitor_users/monitor_issues/etc. tables on ordinary page loads (e.g.
+     * looking up the authenticated actor on every request), and those
+     * queries are just as much Monitor's own internal activity as the
+     * entries-table writes, not the monitored application's.
+     */
+    #[DataProvider('ownTableProvider')]
+    public function test_slow_query_recorder_ignores_all_of_monitors_own_tables(string $table): void
+    {
+        event(new QueryExecuted("select * from {$table}", [], 1.0, DB::connection()));
+
+        Monitor::flush();
+
+        $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
+    public static function ownTableProvider(): array
+    {
+        return [
+            ['monitor_aggregates'],
+            ['monitor_issues'],
+            ['monitor_users'],
+            ['monitor_invitations'],
+            ['monitor_password_resets'],
+            ['monitor_email_changes'],
+            ['monitor_webauthn_credentials'],
+            ['monitor_oauth_accounts'],
+        ];
+    }
+
     public function test_cache_recorder_captures_duration_between_the_before_and_after_events(): void
     {
         if (! class_exists(RetrievingKey::class)) {
@@ -272,6 +303,22 @@ class MonitorTest extends TestCase
         $payload = json_decode($row->payload, true);
 
         $this->assertArrayNotHasKey('correlation_id', $payload);
+    }
+
+    public function test_mail_recorder_ignores_monitors_own_transactional_mail(): void
+    {
+        // Team invitations, password resets, email-change verification —
+        // Monitor's own dashboard account-management mail (LaravelMonitor\Mail\*)
+        // isn't activity of the application being monitored, the same way
+        // Recorders\Authentication excludes the dashboard's own guard.
+        $message = $this->emailMessage('You have been invited', 'invitee@example.com');
+
+        event(new \Illuminate\Mail\Events\MessageSending($message, ['__laravel_mailable' => \LaravelMonitor\Mail\TeamInvitationMail::class]));
+        event(new \Illuminate\Mail\Events\MessageSent($this->sentMessage($message, 'invitee@example.com'), ['__laravel_mailable' => \LaravelMonitor\Mail\TeamInvitationMail::class]));
+
+        Monitor::flush();
+
+        $this->assertDatabaseCount('monitor_entries', 0);
     }
 
     public function test_mail_recorder_tags_direct_and_notification_triggered_sends_differently(): void
@@ -1416,8 +1463,13 @@ class MonitorTest extends TestCase
         $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
     }
 
-    public function test_login_with_wrong_password_records_a_failed_auth_entry(): void
+    public function test_login_with_wrong_password_does_not_record_monitors_own_auth_entry(): void
     {
+        // Monitor's own dashboard auth (guard: 'monitor') is independent of
+        // the application being monitored — Recorders\Authentication must
+        // not capture it as if it were the app's own auth activity, the
+        // same way Recorders\Requests already excludes the dashboard's own
+        // routes from the request log.
         Gate::define('viewMonitor', fn ($user = null) => true);
         $this->withoutMonitorAuth();
 
@@ -1432,6 +1484,18 @@ class MonitorTest extends TestCase
             'email' => 'login-failure-recorded@example.com',
             'password' => 'wrong-password',
         ])->assertSessionHasErrors('email');
+
+        $this->assertDatabaseMissing('monitor_entries', [
+            'type' => 'auth',
+        ]);
+    }
+
+    public function test_a_failed_login_on_the_monitored_applications_own_guard_is_recorded(): void
+    {
+        Monitor::flush();
+
+        event(new \Illuminate\Auth\Events\Failed('web', null, ['email' => 'someone@example.com']));
+        Monitor::flush();
 
         $this->assertDatabaseHas('monitor_entries', [
             'type' => 'auth',
