@@ -52,6 +52,28 @@ When the schema needs to change:
    run directly (e.g. via `artisan tinker`) — never by writing a new
    migration file to carry the change.
 
+## GitHub issue automation
+
+This repo has a slash-command pipeline for turning a GitHub issue directly into a PR:
+
+- `/fix-issue <issue-number>` — bug reports (`bug` label). Branches `fix/issue-<n>-...`,
+  dispatches to the `issue-bug-fixer` subagent (writes a failing regression test first, then
+  fixes the root cause), runs the `security-review` skill on the diff, commits as `fix: ...` /
+  `Fixes #<n>`, opens the PR.
+- `/implement-issue <issue-number>` — feature requests (`enhancement` label). Branches
+  `feat/issue-<n>-...`, dispatches to the `issue-feature-builder` subagent (tests first, then
+  implements), runs the `security-review` skill on the diff, commits as `feat: ...` /
+  `Closes #<n>`, opens the PR.
+- `/work-issue <issue-number>` — reads the issue's labels/content and picks one of the two
+  pipelines above automatically; use this when you haven't pre-classified the issue yourself.
+- Issue forms live in `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`) and
+  apply the `bug`/`enhancement` labels these commands key off of — keep the templates and this
+  routing logic in sync if the label taxonomy changes.
+
+Both subagents stop short of committing, pushing, or verifying UI changes in a browser — the
+calling command handles git/PR steps, and a human is expected to do the actual browser check
+for anything the subagent flags as unverified. Neither pipeline merges its own PR.
+
 ## Gotchas
 - **`<pre><code>...</code></pre>` must have zero whitespace/newline between the tags.**
   `pre` preserves whitespace literally — any indentation before `<code>` renders as a leading
@@ -62,3 +84,6 @@ When the schema needs to change:
 
 ## Workflow
 Only commit when explicitly asked — drafting a commit message is not permission to commit.
+Running `/fix-issue`, `/implement-issue`, or `/work-issue` *is* that explicit ask for the scope
+of that one issue — those commands are expected to commit and open a PR without a separate
+confirmation step, per their own instructions in `.claude/commands/`.
