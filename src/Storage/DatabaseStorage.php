@@ -206,8 +206,13 @@ class DatabaseStorage implements Storage
             ->where('type', 'slow_query')
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
-            // created_at, not id — see cacheKeyStats() for why.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why — but this sample's duration values feed avg/p95
+            // directly (unlike cacheKeyStats' count-only aggregates), so a
+            // tied created_at second needs a deterministic secondary sort
+            // too — see sampleDurationsAcrossBuckets() for why.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows())
             ->get(['key', 'duration', 'payload']);
 
@@ -300,10 +305,15 @@ class DatabaseStorage implements Storage
 
         // See cacheKeyStats() for why the GROUP BY runs over a capped
         // subquery, ordered by created_at rather than id, rather than the
-        // raw filtered table directly.
+        // raw filtered table directly. Unlike cacheKeyStats' count-only
+        // aggregates, avg_duration/max_duration below are computed from
+        // this sample's actual values, so created_at alone isn't a safe
+        // sort within a tied second — see sampleDurationsAcrossBuckets()
+        // for why `id` is added as a deterministic tiebreaker.
         $sample = $this->query($type, $since, $subtype, null, $until)
             ->select(['key', 'duration', 'created_at'])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows());
 
         return $this->table()
@@ -667,8 +677,20 @@ class DatabaseStorage implements Storage
                 ->when($bucketEnd !== null, fn (Builder $q) => $q->where('created_at', '<', $bucketEnd))
                 ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
                 ->select(['created_at', 'duration'])
-                // created_at, not id — see cacheKeyStats() for why.
+                // created_at, not id, as the primary sort — see cacheKeyStats()
+                // for why — but unlike the count-only aggregates there, this
+                // sample's actual duration *values* feed avg/p95/min/max
+                // directly, so which rows land inside a tied created_at
+                // second isn't safe to leave to the storage engine: without a
+                // deterministic secondary sort, two runs of the same query
+                // (e.g. a wire:poll refresh vs. the next page load) can each
+                // pick a different subset of a busy second's rows and yield
+                // different stats for what's effectively the same window —
+                // the chart visibly changing shape on every refresh. `id`
+                // tiebreaks deterministically without disturbing the
+                // created_at-first ordering the index above is built for.
                 ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->limit($capPerBucket);
         }
 
@@ -719,8 +741,14 @@ class DatabaseStorage implements Storage
         ?int $userId = null,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
-            // created_at, not id — see cacheKeyStats() for why.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why — plus `id` as a deterministic tiebreaker, since
+            // avg_duration/p95_duration below are computed from this
+            // sample's actual values — see sampleDurationsAcrossBuckets()
+            // for why a tied created_at second isn't safe to leave
+            // unordered when the sample feeds a duration statistic.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($this->maxSampleRows())
             ->get(['key', 'subtype', 'duration']);
 
@@ -777,9 +805,15 @@ class DatabaseStorage implements Storage
         ?int $userId = null,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
-            // created_at, not id — see cacheKeyStats() for why. Rows arrive
-            // newest-first, so the first row seen per key is its last_seen.
+            // created_at, not id, as the primary sort — see cacheKeyStats()
+            // for why. Rows arrive newest-first, so the first row seen per
+            // key is its last_seen. `id` is added as a deterministic
+            // tiebreaker because — unlike cacheKeyStats' count-only
+            // aggregates — avg_duration/p95_duration below are computed
+            // from this sample's actual values; see
+            // sampleDurationsAcrossBuckets() for why that matters.
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit(self::MAX_SAMPLE_ROWS)
             ->get(['key', 'duration', 'created_at']);
 
@@ -1021,7 +1055,7 @@ class DatabaseStorage implements Storage
     }
 
     /**
-     * @return array{0: CarbonImmutable, 1: float}
+     * @return array{0: CarbonImmutable, 1: int}
      */
     protected function bucketGrid(DateTimeInterface $since, int $buckets, ?DateTimeInterface $until = null): array
     {
@@ -1029,13 +1063,31 @@ class DatabaseStorage implements Storage
             $since instanceof CarbonImmutable ? $since : CarbonImmutable::parse($since->format('Y-m-d H:i:s'))
         );
 
-        $end = $until !== null
-            ? CarbonImmutable::parse($until->format('Y-m-d H:i:s'))
-            : CarbonImmutable::now();
+        if ($until !== null) {
+            $end = CarbonImmutable::parse($until->format('Y-m-d H:i:s'));
+            $seconds = max(1, $start->diffInSeconds($end));
 
-        $seconds = max(1, $start->diffInSeconds($end));
+            return [$start, max(1, (int) round($seconds / $buckets))];
+        }
 
-        return [$start, $seconds / $buckets];
+        // Live window ($until === null, i.e. "up to now"): $start is
+        // already pinned to a fixed grid by Card::since(), but now() itself
+        // keeps advancing between polls, so the raw diff to $start grows
+        // continuously for as long as that grid step stays open — rounding
+        // it to the *nearest* whole second (the previous fix here) still let
+        // the bucket width tip from 60 to 61 partway through every step,
+        // which — multiplied out across the higher-index buckets — was
+        // enough to flip which whole second their boundary landed on and
+        // reshuffle the chart mid-step. Rounding the diff UP to the next
+        // whole multiple of $buckets instead pins the bucket width to a
+        // single value for the entire step (it only ticks over exactly when
+        // $start itself jumps to the next grid point, since both are driven
+        // by the same wall-clock boundary), at the cost of the window being
+        // up to one bucket wider than the nominal period.
+        $seconds = max(1, $start->diffInSeconds(CarbonImmutable::now()));
+        $seconds = (int) (ceil($seconds / $buckets) * $buckets);
+
+        return [$start, max(1, intdiv($seconds, $buckets))];
     }
 
     /**

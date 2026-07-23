@@ -70,7 +70,7 @@ class Requests extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $userId = $this->userId !== '' ? (int) $this->userId : null;
 
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, '2xx', null, $until, $userId);

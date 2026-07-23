@@ -154,11 +154,16 @@ class Monitor
      * Start tracking the current HTTP request. Called by the RecordTimeline
      * global middleware; offsets are measured from PHP's request start so
      * they line up with the recorded request duration.
+     *
+     * LARAVEL_START (set on the first line of public/index.php) takes
+     * priority over REQUEST_TIME_FLOAT (set by the SAPI before PHP even
+     * starts executing the script) — mirrors Nightwatch's own start-time
+     * resolution, so duration doesn't include webserver/PHP bootstrap time
+     * outside Laravel's own lifecycle.
      */
     public function beginRequest(): void
     {
-        $start = (float) (request()->server('REQUEST_TIME_FLOAT')
-            ?: (defined('LARAVEL_START') ? LARAVEL_START : microtime(true)));
+        $start = (float) (\defined('LARAVEL_START') ? LARAVEL_START : (request()->server('REQUEST_TIME_FLOAT') ?: microtime(true)));
 
         $this->request = [
             'id' => (string) Str::uuid(),

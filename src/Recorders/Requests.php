@@ -77,7 +77,8 @@ class Requests extends Recorder
         // their own row. Mirrors Nightwatch's "Unmatched Route" grouping.
         $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : self::UNMATCHED_ROUTE;
 
-        $startTime = $request->server('REQUEST_TIME_FLOAT') ?: (defined('LARAVEL_START') ? LARAVEL_START : null);
+        // LARAVEL_START before REQUEST_TIME_FLOAT — see Monitor::beginRequest() for why.
+        $startTime = \defined('LARAVEL_START') ? LARAVEL_START : $request->server('REQUEST_TIME_FLOAT');
         $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 2) : null;
 
         try {

@@ -18,7 +18,7 @@ class MailAndNotifications extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
 
         $bySubtype = $storage->statsBySubtype('mail', $since, $until);
         $direct = $bySubtype->get('direct')?->count ?? 0;

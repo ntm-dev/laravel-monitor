@@ -25,7 +25,7 @@ class QueryDetail extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $key = $this->key;
 
         $entries = $storage->recent('slow_query', $since, 50, null, $key, $until);

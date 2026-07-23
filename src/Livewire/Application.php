@@ -14,7 +14,7 @@ class Application extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
         $threshold = (int) config('monitor.thresholds.request', 1000);
 
         $slowRoutes = $storage->aggregateByKey('request', $since, null, 50, 'max_duration', $until)

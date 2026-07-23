@@ -64,7 +64,7 @@ class Queries extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
 
         $queries = $storage->queryStats($since, $until);
 

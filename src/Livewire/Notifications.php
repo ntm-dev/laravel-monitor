@@ -38,7 +38,7 @@ class Notifications extends Card
         $since = $this->since();
         $until = $this->until();
         $storage = $this->storage();
-        $buckets = self::CHART_BUCKETS;
+        $buckets = $this->chartBuckets();
 
         $bySubtype = $storage->statsBySubtype('notification', $since, $until);
         $knownChannels = $bySubtype->keys()->intersect(self::KNOWN_CHANNELS)->values();
