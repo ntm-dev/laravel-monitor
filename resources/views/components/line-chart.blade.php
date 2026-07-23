@@ -20,7 +20,7 @@
     <svg class="absolute inset-0 h-full w-full" viewBox="0 0 {{ $buckets }} 100" preserveAspectRatio="none">
         @if ($thresholdY !== null)
             <line x1="0" x2="{{ $buckets }}" y1="{{ $thresholdY }}" y2="{{ $thresholdY }}"
-                  stroke="#2dd4bf" stroke-width="0.1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>
+                  stroke="#2dd4bf" stroke-width="0.4" stroke-dasharray="4" vector-effect="non-scaling-stroke"/>
         @endif
         @foreach ($series as $serie)
             @foreach ($serie['lines'] as $points)
