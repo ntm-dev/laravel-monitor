@@ -1,6 +1,6 @@
 {{-- Stacked bar chart with Nightwatch-style dark tooltips.
      $series = [['label', 'dot' (pill class), 'bar' (segment class), 'data' => int[]], ...] --}}
-@props(['series', 'since', 'until', 'height' => 'h-28', 'barWidth' => 'w-[calc(100%-4px)]'])
+@props(['series', 'since', 'until', 'height' => 'h-28', 'barWidth' => 'w-[100%]'])
 @php
     $chartBuckets = count($series[0]['data'] ?? []) ?: 1;
     $chartSeconds = max(1, (int) ($since->diffInSeconds($until) / $chartBuckets));
