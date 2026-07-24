@@ -33,6 +33,7 @@ interface Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        int $offset = 0,
     ): Collection;
 
     /**
