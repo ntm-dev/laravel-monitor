@@ -5,19 +5,19 @@
             <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'jobs'] + $range)" external>Jobs</x-monitor::link-button>
         </x-slot:actions>
 
-        <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3"
-             x-data="{
-                 hoverIndex: null,
-                 setHoverIndex(i) { this.hoverIndex = i },
-                 clearHoverIndex() { this.hoverIndex = null },
-             }">
+        <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
             {{-- Exceptions --}}
             @if ($exceptions > 0)
                 <x-monitor::card class="flex flex-col p-4">
                     <x-monitor::badge>Exceptions</x-monitor::badge>
                     <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($exceptions) }} exceptions reported {{ $periodPhrase }}.</p>
                     <p class="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">Errors have impacted {{ $impactedUsers }} {{ $impactedUsers === 1 ? 'user' : 'users' }}.</p>
-                    <div class="mt-6 flex-1">
+                    <div class="mt-6 flex-1"
+                         x-data="{
+                             hoverIndex: null,
+                             setHoverIndex(i) { this.hoverIndex = i },
+                             clearHoverIndex() { this.hoverIndex = null },
+                         }">
                         <x-monitor::bar-chart :since="$since" :until="$until" height="h-36"
                             :series="[['label' => 'Unhandled', 'dot' => 'bg-rose-500', 'data' => $exceptionBuckets]]"/>
                     </div>
@@ -59,7 +59,12 @@
             @endif
 
             {{-- Jobs --}}
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-1.5"
+                 x-data="{
+                     hoverIndex: null,
+                     setHoverIndex(i) { this.hoverIndex = i },
+                     clearHoverIndex() { this.hoverIndex = null },
+                 }">
                 <x-monitor::jobs-chart-card class="flex-1"
                     :queued="$queuedJobs" :processed="$processedJobs" :failed="$failedJobs"
                     :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets"
