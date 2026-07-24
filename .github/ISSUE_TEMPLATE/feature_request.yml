@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a new feature or enhancement for the monitor dashboard
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What are you trying to do that the dashboard doesn't support today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What should the feature look like? Reference an existing tab/card/component if this extends one.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links to Nightwatch's equivalent feature, related issues, etc.
+    validations:
+      required: false

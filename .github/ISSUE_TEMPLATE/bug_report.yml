@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in the monitor dashboard isn't working correctly
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What's broken
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps to trigger the bug, starting from a clean install.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include any error messages, stack traces, or screenshots.
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: laravel-monitor version
+      placeholder: e.g. 1.2.0
+    validations:
+      required: true
+  - type: input
+    id: laravel-version
+    attributes:
+      label: Laravel version
+      placeholder: e.g. 11.x
+    validations:
+      required: true
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: e.g. 8.3
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else relevant (browser, dark/light mode, storage driver, ...).
+    validations:
+      required: false
