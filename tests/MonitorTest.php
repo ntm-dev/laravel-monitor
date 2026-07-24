@@ -13,7 +13,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
+use LaravelMonitor\Livewire\RequestDetail;
 use LaravelMonitor\Support\Fingerprint;
+use LaravelMonitor\Support\Preferences;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
 use RuntimeException;
@@ -689,6 +692,51 @@ class MonitorTest extends TestCase
             ->assertSee('text-rose-600', false)
             ->assertSee('fill-amber-500', false)
             ->assertSee('fill-rose-500', false);
+    }
+
+    public function test_request_detail_individual_requests_paginate_past_the_first_page(): void
+    {
+        for ($i = 0; $i < 60; $i++) {
+            Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        }
+        Monitor::flush();
+
+        $component = Livewire::test(RequestDetail::class, ['key' => 'GET /users']);
+
+        $this->assertSame(60, $component->viewData('totalEntries'));
+        $this->assertSame(1, $component->viewData('page'));
+        $this->assertSame(2, $component->viewData('lastPage'));
+        $this->assertCount(RequestDetail::PER_PAGE, $component->viewData('entries'));
+
+        $component->call('nextPage');
+
+        $this->assertSame(2, $component->viewData('page'));
+        $this->assertCount(10, $component->viewData('entries'));
+    }
+
+    public function test_custom_range_from_the_picker_is_interpreted_in_the_viewers_timezone(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // A safely-past date (well before "today"), so Card::normalizeRange()'s
+        // clamp-to-now never clips the window regardless of when this test runs.
+        // 2026-01-15 04:00 UTC = 2026-01-15 11:00 in Asia/Ho_Chi_Minh (UTC+7).
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-01-15 04:00:00', 'UTC'));
+        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::flush();
+        CarbonImmutable::setTestNow();
+
+        // A custom range picked as 09:00-13:00 *local* Vietnam time covers the
+        // entry above (11:00 local). Parsed as bare UTC (the pre-fix bug),
+        // that same window is 09:00-13:00 UTC — well after the 04:00 UTC
+        // entry — so the route would wrongly disappear from the list.
+        $this->withCookie(Preferences::COOKIE, json_encode(['timezone' => 'Asia/Ho_Chi_Minh']))
+            ->get('/monitor/requests?'.http_build_query([
+                'from' => '2026-01-15T09:00',
+                'to' => '2026-01-15T13:00',
+            ]))
+            ->assertOk()
+            ->assertSee('1 Route');
     }
 
     public function test_entries_recorded_during_a_request_are_correlated(): void

@@ -72,7 +72,7 @@ class DashboardController
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
             'timezone' => Format::timezone(),
-            'rangeMax' => now()->format(Format::RANGE),
+            'rangeMax' => now(Preferences::timezone())->format(Format::RANGE),
             'system' => $tab === 'settings' ? Settings::current() : null,
             'storageDrivers' => $tab === 'settings' ? Settings::storageDrivers() : null,
             'prefs' => $tab === 'settings' ? Preferences::all() : null,

@@ -90,10 +90,12 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        int $offset = 0,
     ): Collection {
         return $this->query($type, $since, $subtype, $key, $until)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
+            ->offset($offset)
             ->limit($limit)
             ->get()
             ->map(fn ($row) => $this->hydrate($row));
