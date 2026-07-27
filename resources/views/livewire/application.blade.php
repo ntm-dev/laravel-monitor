@@ -40,7 +40,7 @@
                     <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($slowRouteCount) }} {{ $slowRouteCount === 1 ? 'route' : 'routes' }} exceeded thresholds {{ $periodPhrase }}.</p>
                     <div class="mt-5 space-y-2">
                         @foreach ($slowRoutes as $route)
-                            <a href="{{ route('monitor.dashboard', ['tab' => 'requests', 'key' => $route->key] + $range) }}"
+                            <a href="{{ route('monitor.requests.routes.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($route->key)] + $range) }}"
                                class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-800/50 p-3 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:shadow-sm">
                                 <span class="min-w-0">
                                     <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>

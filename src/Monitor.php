@@ -16,19 +16,21 @@ class Monitor
 
     /**
      * State of the HTTP request currently being recorded, or null outside a
-     * request (console, queue workers). Mirrors Nightwatch's RequestState:
-     * a shared per-request identity plus lifecycle stage boundaries, so every
-     * entry recorded during the request can be correlated on the timeline.
+     * request (console, queue workers). Mirrors Nightwatch's RequestState: a
+     * shared per-request identity plus a *live* lifecycle stage pointer
+     * (`stage`) — not a set of independent timestamp markers — so every
+     * entry recorded during the request can be tagged with the stage it
+     * actually happened in (see `record()`), instead of being classified
+     * after the fact by comparing its timestamp against stored phase
+     * intervals (see `Support\Timeline::containingPhase()`, still used only
+     * as a fallback for rows stored before this stage tag existed).
      *
      * @var array{
      *     id: string,
      *     start: float,
      *     phases: array<int, array{name: string, start: int, duration: int}>,
-     *     middleware_start: int,
-     *     controller_start: ?int,
-     *     composing: ?int,
-     *     response_ready: ?int,
-     *     terminating: ?int,
+     *     stage: string,
+     *     stage_start: int,
      *     queries: int,
      *     models: int,
      * }|null
@@ -81,6 +83,15 @@ class Monitor
     ): void {
         if (! $this->enabled()) {
             return;
+        }
+
+        // Live-tag the entry with the request's current stage — the fix for
+        // queries that run while a middleware is unwinding after `$next()`
+        // (e.g. session persistence) getting swept into whatever phase
+        // happened to be open the longest, purely because their stored
+        // start_offset fell inside that phase's interval.
+        if ($type !== 'request' && $this->request !== null) {
+            $payload['phase'] = $this->request['stage'];
         }
 
         $entry = new Entry(
@@ -169,11 +180,8 @@ class Monitor
             'id' => (string) Str::uuid(),
             'start' => $start,
             'phases' => [],
-            'middleware_start' => 0,
-            'controller_start' => null,
-            'composing' => null,
-            'response_ready' => null,
-            'terminating' => null,
+            'stage' => 'middleware',
+            'stage_start' => 0,
             'queries' => 0,
             'models' => 0,
         ];
@@ -181,7 +189,7 @@ class Monitor
         $elapsed = $this->elapsedMs();
 
         $this->recordPhase('bootstrap', 0, $elapsed);
-        $this->request['middleware_start'] = $elapsed;
+        $this->request['stage_start'] = $elapsed;
     }
 
     public function requestId(): ?string
@@ -354,59 +362,94 @@ class Monitor
 
     /**
      * Marks the middleware → controller boundary. Called by the
-     * MarkControllerStart route-group middleware; first call wins.
+     * MarkControllerStart route-group middleware — attached directly onto
+     * the matched route at RouteMatched time, i.e. before any route
+     * middleware's own `handle()` runs.
      */
     public function markControllerStart(): void
     {
-        if ($this->request === null || $this->request['controller_start'] !== null) {
-            return;
-        }
-
-        $elapsed = $this->elapsedMs();
-
-        $this->request['controller_start'] = $elapsed;
-        $this->recordPhase('middleware', $this->request['middleware_start'], $elapsed - $this->request['middleware_start']);
-    }
-
-    public function controllerStartOffset(): ?int
-    {
-        return $this->request['controller_start'] ?? null;
+        $this->transitionStage('controller', from: 'middleware');
     }
 
     /**
-     * Marks the first view composition after the controller took over —
-     * the best available signal that rendering has started.
+     * Marks the controller → render boundary. Called on
+     * Illuminate\Routing\Events\PreparingResponse, dispatched by
+     * Router::prepareResponse() while still deep inside the route's own
+     * middleware pipeline (Route::run()'s Pipeline `then()` callback) —
+     * before bubbling back out through any middleware's post-`$next()` code.
      */
-    public function markComposing(): void
+    public function markRenderStart(): void
     {
-        if ($this->request === null
-            || $this->request['controller_start'] === null
-            || $this->request['composing'] !== null) {
-            return;
-        }
-
-        $this->request['composing'] = $this->elapsedMs();
+        $this->transitionStage('render', from: 'controller');
     }
 
-    public function firstComposingOffset(): ?int
+    /**
+     * Marks the render → unwinding boundary. Called on
+     * Illuminate\Routing\Events\ResponsePrepared, dispatched immediately
+     * after PreparingResponse, once the Response object is finalized — from
+     * here on, only middleware's own post-`$next()` work remains (e.g.
+     * StartSession::handleStatefulRequest() persisting the session), which
+     * is genuinely "still middleware", not "still rendering".
+     */
+    public function markUnwinding(): void
     {
-        return $this->request['composing'] ?? null;
+        $this->transitionStage('unwinding', from: 'render');
     }
 
-    /** Marks the point where the response left the router (RequestHandled). */
+    /**
+     * Marks the point every middleware (route and global alike) has finished
+     * unwinding and the response is about to be sent. Called on
+     * Illuminate\Foundation\Http\Events\RequestHandled, which fires only
+     * after the *entire* middleware pipeline has returned — whatever stage
+     * the request is still in gets closed out here, not just 'render' or
+     * 'unwinding', so an early return/exception that skipped those still
+     * gets a sensible boundary instead of an open-ended phase.
+     */
     public function markResponseReady(): void
     {
-        if ($this->request !== null && $this->request['response_ready'] === null) {
-            $this->request['response_ready'] = $this->elapsedMs();
-        }
+        $this->transitionStage('sending');
     }
 
     /** Marks the start of the terminating phase (response already sent). */
     public function markTerminating(): void
     {
-        if ($this->request !== null && $this->request['terminating'] === null) {
-            $this->request['terminating'] = $this->elapsedMs();
+        $this->transitionStage('terminating');
+    }
+
+    /**
+     * Move to a new named lifecycle stage, closing out the phase the
+     * request was previously in — the live equivalent of Nightwatch's
+     * ExecutionStage state machine. Replaces the old approach of recording
+     * a handful of independent timestamp markers and matching every entry's
+     * stored start_offset against them after the fact (still available as
+     * Support\Timeline::containingPhase(), kept only as a fallback for rows
+     * stored before this stage tag existed): that approach couldn't tell
+     * "still rendering the view" apart from "a middleware doing its own
+     * post-`$next()` work" — both looked identical (just elapsed time)
+     * once measured from outside. Tagging entries with the *live* stage at
+     * record() time (see `record()`) removes that ambiguity entirely.
+     *
+     * @param  ?string  $from  if given, the transition is ignored unless the
+     *                         request is currently in this stage — guards
+     *                         against a framework event firing out of order,
+     *                         more than once, or not at all.
+     */
+    protected function transitionStage(string $stage, ?string $from = null): void
+    {
+        if ($this->request === null || $this->request['stage'] === $stage) {
+            return;
         }
+
+        if ($from !== null && $this->request['stage'] !== $from) {
+            return;
+        }
+
+        $now = $this->elapsedMs();
+
+        $this->recordPhase($this->request['stage'], $this->request['stage_start'], $now - $this->request['stage_start']);
+
+        $this->request['stage'] = $stage;
+        $this->request['stage_start'] = $now;
     }
 
     /** Append a named lifecycle phase (offsets/durations in ms). */
@@ -425,10 +468,11 @@ class Monitor
 
     /**
      * Complete the buffered root `request` entry right before it is stored:
-     * add the sending/terminating phases (which only end at flush time),
-     * attach the collected phases and extend the duration to cover the full
-     * lifecycle — mirroring Nightwatch, whose request duration is the sum of
-     * all execution stages including Terminating.
+     * close out whichever stage the request was still in (mirroring every
+     * other stage transition), attach the collected phases and extend the
+     * duration to cover the full lifecycle — mirroring Nightwatch, whose
+     * request duration is the sum of all execution stages including
+     * Terminating.
      */
     protected function finalizePendingRequest(): void
     {
@@ -441,16 +485,8 @@ class Monitor
         $this->pendingRequest = null;
 
         $elapsed = $this->elapsedMs();
-        $ready = $this->request['response_ready'];
 
-        if ($ready !== null) {
-            $sendingEnd = $this->request['terminating'] ?? $elapsed;
-            $this->recordPhase('sending', $ready, $sendingEnd - $ready);
-        }
-
-        if ($this->request['terminating'] !== null) {
-            $this->recordPhase('terminating', $this->request['terminating'], $elapsed - $this->request['terminating']);
-        }
+        $this->recordPhase($this->request['stage'], $this->request['stage_start'], $elapsed - $this->request['stage_start']);
 
         $entry->payload['phases'] = $this->request['phases'];
         $entry->payload['query_count'] = $this->request['queries'];

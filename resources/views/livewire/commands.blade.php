@@ -18,7 +18,7 @@
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($commands as $command)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                onclick="window.location='{{ route('monitor.dashboard', ['tab' => 'commands', 'key' => $command->key] + $range) }}'">
+                                onclick="window.location='{{ route('monitor.commands.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($command->key)] + $range) }}'">
                                 <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $command->key }}">{{ $command->key }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">{{ number_format($command->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $command->failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($command->failed) }}</td>

@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\View\Component;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline as TimelineSupport;
 use LaravelMonitor\Support\TimelineEntry;
@@ -68,6 +69,7 @@ class Timeline extends Component
         $this->ticks = $this->buildTicks();
         $this->entriesJson = Js::from(collect($entries)->mapWithKeys(fn (TimelineEntry $entry) => [$entry->id => [
             'type' => $entry->type,
+            'badge' => TimelineRow::badgeFor($entry->type),
             'label' => $entry->label,
             'start' => $entry->start,
             'duration' => $entry->duration,
@@ -78,16 +80,19 @@ class Timeline extends Component
             // it again here the same way keeps this link matching the row
             // QueryDetail's exact-equality lookup expects.
             'queryUrl' => $entry->type === 'query'
-                ? route('monitor.dashboard', ['tab' => 'queries', 'key' => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label)])
+                ? route('monitor.queries.show', ['hash' => KeyHash::for(Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label))])
                 : null,
             // The entry's own database id — see NotificationDetail/MailDetail —
             // for the full per-occurrence page (correlation link to the other
-            // one included), which this inline panel only summarises.
+            // one included), which this inline panel only summarises. The
+            // hash is the notification/mail *class*'s (metadata['key'], its
+            // own grouping key — see Support\Timeline::metadataFor()), not
+            // the entry's own id.
             'notificationUrl' => $entry->type === 'notification'
-                ? route('monitor.dashboard', ['tab' => 'notifications', 'key' => $entry->id])
+                ? route('monitor.notifications.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
                 : null,
             'mailUrl' => $entry->type === 'mail'
-                ? route('monitor.dashboard', ['tab' => 'mail', 'key' => $entry->id])
+                ? route('monitor.mail.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
                 : null,
         ]])->all())->toHtml();
     }

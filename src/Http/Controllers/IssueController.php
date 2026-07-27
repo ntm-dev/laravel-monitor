@@ -12,6 +12,7 @@ use LaravelMonitor\Livewire\Concerns\BuildsExceptionDetail;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Livewire\Issues;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 
@@ -150,7 +151,11 @@ class IssueController
             'label' => $type === 'job' ? class_basename($key) : Str::limit($key, 100),
             'count' => $stats->count,
             'maxDuration' => $stats->max_duration,
-            'targetUrl' => route('monitor.dashboard', ['tab' => $area['tab']] + (in_array($type, ['request', 'job'], true) ? ['key' => $key] : [])),
+            'targetUrl' => match ($type) {
+                'request' => route('monitor.requests.routes.show', ['hash' => KeyHash::for($key)]),
+                'job' => route('monitor.jobs.show', ['hash' => KeyHash::for($key)]),
+                default => route('monitor.dashboard', ['tab' => $area['tab']]),
+            },
         ];
     }
 }

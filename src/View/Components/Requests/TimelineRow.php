@@ -32,8 +32,8 @@ class TimelineRow extends Component
     protected const BADGES = [
         'query' => 'QUERY',
         'cache' => 'CACHE',
-        'mail' => 'MAIL',
-        'notification' => 'NOTIFICATION',
+        'mail' => 'MAIL SENT',
+        'notification' => 'NOTIFICATION SENT',
         'queue' => 'QUEUE',
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
@@ -96,7 +96,7 @@ class TimelineRow extends Component
         $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
         $this->width = $total > 0 ? min(100 - $this->left, max(0.15, ($entry->duration / $total) * 100)) : 0.15;
         $this->durationLabel = Format::duration($entry->duration);
-        $this->badge = self::BADGES[$entry->type] ?? strtoupper($entry->type);
+        $this->badge = self::badgeFor($entry->type);
         $this->color = self::COLORS[$entry->type] ?? 'bg-neutral-400 dark:bg-neutral-500';
         $this->slow = $kind === 'event' && $entry->duration >= (float) config('monitor.recorders.'.Queries::class.'.threshold', 100);
         $this->barColor = $this->slow ? self::SLOW_BAR : self::NEUTRAL_BAR;
@@ -108,6 +108,18 @@ class TimelineRow extends Component
     public function render(): View
     {
         return view('monitor::components.requests.timeline-row');
+    }
+
+    /**
+     * The inline badge text for an event type — shared with
+     * View\Components\Requests\Timeline (the JSON entry map read by the
+     * Alpine inspector panel), so the panel header shows the same wording
+     * as the tree/bar rows instead of a second, JS-side mapping drifting
+     * out of sync with this one.
+     */
+    public static function badgeFor(string $type): string
+    {
+        return self::BADGES[$type] ?? strtoupper($type);
     }
 
     /**

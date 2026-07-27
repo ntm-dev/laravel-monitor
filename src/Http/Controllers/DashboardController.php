@@ -27,6 +27,17 @@ use LaravelMonitor\Support\Settings;
  */
 class DashboardController
 {
+    /** Tab name => the `type` column value its grouping key lives under. */
+    protected const ENTRY_TYPES = [
+        'requests' => 'request',
+        'jobs' => 'job',
+        'commands' => 'command',
+        'queries' => 'slow_query',
+        'exceptions' => 'exception',
+        'notifications' => 'notification',
+        'mail' => 'mail',
+    ];
+
     public function __invoke(Request $request): View
     {
         $period = $request->query('period', Card::DEFAULT_PERIOD);
@@ -43,7 +54,7 @@ class DashboardController
 
         [$from, $to] = Card::normalizeRange($request->query('from'), $request->query('to'));
 
-        $key = $request->query('key');
+        $key = $this->resolveKey($request, $tab);
         $tabs = Nav::tabs();
 
         [$groups, $footerTabs] = Nav::grouped();
@@ -72,13 +83,53 @@ class DashboardController
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
             'timezone' => Format::timezone(),
-            'rangeMax' => now()->format(Format::RANGE),
+            'rangeMax' => now(Preferences::timezone())->format(Format::RANGE),
             'system' => $tab === 'settings' ? Settings::current() : null,
             'storageDrivers' => $tab === 'settings' ? Settings::storageDrivers() : null,
             'prefs' => $tab === 'settings' ? Preferences::all() : null,
             'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
             'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,
+            // So the header's period-switcher/custom-range links can rebuild
+            // the *current* URL (whichever named route matched — plain
+            // monitor.dashboard or one of the hashed detail routes) with just
+            // the period/from/to swapped, instead of hardcoding monitor.dashboard.
+            'currentRouteName' => $request->route()->getName(),
+            'currentRouteParams' => $request->route()->parameters(),
         ]);
+    }
+
+    /**
+     * The active tab's grouping key, resolved from whichever URL shape
+     * matched: a numeric `{id}` (one specific occurrence — notifications/
+     * mail's dual mode), a hashed `{hash}` (see Support\KeyHash), or the
+     * legacy `?key=` query string for anything not behind a hashed route.
+     * 404s when a hash was given but doesn't resolve to anything (a stale or
+     * invalid link) — mirrors RequestDetailController et al.'s own
+     * abort_unless(..., 404) for an unknown id.
+     */
+    protected function resolveKey(Request $request, string $tab): ?string
+    {
+        if (($id = $request->route('id')) !== null) {
+            return (string) $id;
+        }
+
+        $hash = $request->route('hash');
+
+        if ($hash === null) {
+            return $request->query('key');
+        }
+
+        // Exceptions already group by an opaque Fingerprint hash (stored
+        // directly as the entry's own key) — no reverse lookup needed.
+        if ($tab === 'exceptions') {
+            return $hash;
+        }
+
+        $key = app(Storage::class)->resolveKeyHash(self::ENTRY_TYPES[$tab] ?? $tab, $hash);
+
+        abort_unless($key !== null, 404);
+
+        return $key;
     }
 
     /**

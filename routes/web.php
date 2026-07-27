@@ -47,6 +47,47 @@ Route::domain(config('monitor.domain'))
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');
             Route::get('/issues/{uuid}', [IssueController::class, 'show'])->name('monitor.issues.show');
+
+            // Hashed-path detail pages, replacing the old ?key=<raw key>
+            // query string (see Support\KeyHash / DashboardController::resolveKey()).
+            // {tab} is a real route parameter (bound to one literal value via
+            // where()+defaults()) purely so DashboardController's existing
+            // $request->route('tab', ...) keeps working unchanged.
+            Route::get('/requests/routes/{hash}', DashboardController::class)
+                ->where(['tab' => 'requests', 'hash' => '[0-9a-f]{32}'])
+                ->defaults('tab', 'requests')
+                ->name('monitor.requests.routes.show');
+            // A plain `RequestDetailController::class` action here would
+            // silently misbehave: Laravel binds non-class-typed controller
+            // parameters *positionally* (see ControllerDispatcher::dispatch()
+            // -> array_values($parameters)), not by name — with two route
+            // segments but the controller's __invoke() declaring only
+            // `$requestId`, it would receive {hash}'s value instead. The
+            // closure below binds both by name (closures ARE matched to
+            // route parameters in URI order, which is what we want here)
+            // and forwards just the one the controller actually needs.
+            Route::get('/requests/routes/{hash}/{requestId}', function (string $hash, string $requestId) {
+                return app(RequestDetailController::class)($requestId);
+            })->where('hash', '[0-9a-f]{32}')->name('monitor.requests.routes.request');
+
+            foreach (['jobs', 'commands', 'queries', 'exceptions'] as $groupTab) {
+                Route::get("/{$groupTab}/{hash}", DashboardController::class)
+                    ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
+                    ->defaults('tab', $groupTab)
+                    ->name("monitor.{$groupTab}.show");
+            }
+
+            foreach (['notifications', 'mail'] as $groupTab) {
+                Route::get("/{$groupTab}/{hash}", DashboardController::class)
+                    ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
+                    ->defaults('tab', $groupTab)
+                    ->name("monitor.{$groupTab}.show");
+                Route::get("/{$groupTab}/{hash}/{id}", DashboardController::class)
+                    ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}', 'id' => '[0-9]+'])
+                    ->defaults('tab', $groupTab)
+                    ->name("monitor.{$groupTab}.sends.show");
+            }
+
             Route::post('/issues/{uuid}/status', [IssueController::class, 'updateStatus'])->name('monitor.issues.status');
             Route::post('/issues/{uuid}/priority', [IssueController::class, 'updatePriority'])->name('monitor.issues.priority');
             Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');

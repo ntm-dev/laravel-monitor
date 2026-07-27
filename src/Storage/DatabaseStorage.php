@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\KeyHash;
 use Ramsey\Uuid\Uuid;
 
 class DatabaseStorage implements Storage
@@ -90,10 +91,12 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
+        int $offset = 0,
     ): Collection {
         return $this->query($type, $since, $subtype, $key, $until)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
+            ->offset($offset)
             ->limit($limit)
             ->get()
             ->map(fn ($row) => $this->hydrate($row));
@@ -1052,6 +1055,16 @@ class DatabaseStorage implements Storage
             'first_seen' => CarbonImmutable::parse($row->first_seen),
             'last_seen' => CarbonImmutable::parse($row->last_seen),
         ];
+    }
+
+    public function resolveKeyHash(string $type, string $hash): ?string
+    {
+        return $this->table()
+            ->where('type', $type)
+            ->select('key')
+            ->distinct()
+            ->pluck('key')
+            ->first(fn (?string $key) => $key !== null && KeyHash::for($key) === $hash);
     }
 
     /**

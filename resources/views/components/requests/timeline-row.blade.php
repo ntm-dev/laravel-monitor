@@ -25,11 +25,20 @@
     $highlightClass = $detailable
         ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
         : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
+    // Full text for the tree pane's hover tooltip — only the root row and
+    // events actually have a truncated label worth expanding; empty skips
+    // showTooltip() below (see timeline.blade.php).
+    $tooltipText = match (true) {
+        $kind === 'root' => $entry->label,
+        $kind === 'event' => $detail,
+        default => '',
+    };
 @endphp
 @if ($part === 'label')
     <div @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable])
          :class="{{ $highlightClass }}"
-         @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
+         @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
+         @mouseleave="hoveredId = null; hideTooltip()"
          @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
@@ -44,15 +53,6 @@
                 <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"></span>
                 <span class="shrink-0 font-mono text-[11px] font-medium text-neutral-700 dark:text-neutral-200">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
-
-                {{-- Full SQL / cache key on hover — the label above is CSS-truncated,
-                     this shows the untruncated $detail in a floating tooltip. --}}
-                @if ($detail !== '')
-                    <div class="pointer-events-none invisible absolute left-8 top-full z-30 mt-1 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 opacity-0 shadow-lg transition-opacity duration-100"
-                         :class="hoveredId === '{{ $entry->id }}' ? 'visible opacity-100' : ''">
-                        {{ $detail }}
-                    </div>
-                @endif
             @endif
         </div>
     </div>

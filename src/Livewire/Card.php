@@ -5,6 +5,7 @@ namespace LaravelMonitor\Livewire;
 use Carbon\CarbonImmutable;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\Preferences;
 use Livewire\Component;
 use Throwable;
 
@@ -66,6 +67,12 @@ abstract class Card extends Component
      * Validate a custom from/to pair: both parseable, chronological, and
      * never reaching into the future. Returns [null, null] when invalid.
      *
+     * The <input type="datetime-local"> values arrive as naive wall-clock
+     * strings the viewer picked in their own Preferences::timezone(), not
+     * the app's default timezone — parsing them without that timezone would
+     * silently reinterpret e.g. "14:00" typed in Asia/Ho_Chi_Minh as 14:00
+     * UTC, shifting the whole queried window by the viewer's UTC offset.
+     *
      * @return array{0: string|null, 1: string|null}
      */
     public static function normalizeRange(?string $from, ?string $to): array
@@ -75,8 +82,8 @@ abstract class Card extends Component
         }
 
         try {
-            $fromDate = CarbonImmutable::parse($from);
-            $toDate = CarbonImmutable::parse($to);
+            $fromDate = CarbonImmutable::parse($from, Preferences::timezone());
+            $toDate = CarbonImmutable::parse($to, Preferences::timezone());
         } catch (Throwable) {
             return [null, null];
         }
@@ -98,7 +105,7 @@ abstract class Card extends Component
     protected function since(): CarbonImmutable
     {
         if ($this->hasCustomRange()) {
-            return CarbonImmutable::parse($this->from);
+            return $this->parseCustomBoundary($this->from);
         }
 
         // Rounded down to the chart's bucket-width grid, not a bare
@@ -124,7 +131,7 @@ abstract class Card extends Component
     protected function windowSeconds(): int
     {
         if ($this->hasCustomRange()) {
-            return max(1, CarbonImmutable::parse($this->from)->diffInSeconds(CarbonImmutable::parse($this->to)));
+            return max(1, $this->parseCustomBoundary($this->from)->diffInSeconds($this->parseCustomBoundary($this->to)));
         }
 
         return (int) ((self::periods()[$this->period] ?? 1) * 3600);
@@ -161,7 +168,23 @@ abstract class Card extends Component
      */
     protected function until(): ?CarbonImmutable
     {
-        return $this->hasCustomRange() ? CarbonImmutable::parse($this->to) : null;
+        return $this->hasCustomRange() ? $this->parseCustomBoundary($this->to) : null;
+    }
+
+    /**
+     * Parse a Format::RANGE boundary (from/to) as wall-clock time in the
+     * viewer's Preferences::timezone(), then normalize it to the app's own
+     * timezone. Storage always deals in `created_at` values naive to
+     * config('app.timezone') (see DatabaseStorage::store()/hydrate()) — a
+     * Carbon instance still tagged with the viewer's timezone would print
+     * the wrong wall-clock string once it reaches a SQL binding, since
+     * Illuminate\Database\Connection::prepareBindings() formats a
+     * DateTimeInterface value as-is, in whatever timezone it's carrying.
+     */
+    protected function parseCustomBoundary(string $value): CarbonImmutable
+    {
+        return CarbonImmutable::parse($value, Preferences::timezone())
+            ->setTimezone(config('app.timezone', 'UTC'));
     }
 
     /**
