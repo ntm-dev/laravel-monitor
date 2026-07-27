@@ -17,6 +17,7 @@
 
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
 @endphp
+{{-- start event summary cards --}}
 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
     @foreach ($cards as $key => $card)
         @php($stats = $summary[$key] ?? ['count' => 0, 'duration' => 0])
@@ -26,7 +27,17 @@
                 <span class="font-mono text-[11px] uppercase tracking-tight">{{ $card['label'] }}</span>
             </div>
             <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($stats['count']) }}</p>
-            <p class="mt-0.5 font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $stats['duration'] > 0 ? $fmt($stats['duration']) : '—' }}</p>
+            <div class="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $stats['duration'] > 0 ? $fmt($stats['duration']) : '—' }}</span>
+                @if ($key === 'queries' && ($stats['duplicates'] ?? 0) > 0)
+                    {{-- Pulses every duplicate-SQL dot on the timeline below
+                         (see timeline.blade.php's monitor-duplicates-heartbeat
+                         listener) rather than navigating anywhere. --}}
+                    <span class="cursor-pointer font-mono text-[11px] text-amber-600 hover:underline dark:text-amber-400"
+                          onclick="window.dispatchEvent(new CustomEvent('monitor-duplicates-heartbeat'))">{{ $stats['duplicates'] }} {{ $stats['duplicates'] === 1 ? 'duplicate' : 'duplicates' }}</span>
+                @endif
+            </div>
         </x-monitor::card>
     @endforeach
 </div>
+{{-- end event summary cards --}}

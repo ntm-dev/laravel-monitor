@@ -43,34 +43,41 @@
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
-        <div class="flex min-w-0 items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
+        <div class="flex min-w-0 translate-y-px items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
             @elseif ($kind === 'phase')
                 <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
             @else
-                <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"></span>
-                <span class="shrink-0 font-mono text-[11px] font-medium text-neutral-700 dark:text-neutral-200">{{ $badge }}</span>
+                <span class="relative h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"
+                      @if ($duplicateColor) :class="heartbeatActive ? 'monitor-heartbeat text-{{ $duplicateColor }}-500' : ''" @endif></span>
+                <span class="shrink-0 font-mono text-[11px] font-medium {{ $badgeTextColor }}">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
             @endif
         </div>
     </div>
 @else
-    <div @class(['relative flex h-9 items-center', 'cursor-pointer' => $detailable])
-         :class="{{ $highlightClass }}"
-         @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
-         @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
-        <div class="relative flex h-full items-center" style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px">
+    {{-- data-duplicate-group marks the first-in-DOM-order match for the
+         EventSummary "N duplicates" click handler's scrollIntoView() (see
+         timeline.blade.php) — first in the timeline == first chronologically. --}}
+    <div class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable])
+             style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px"
+             @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
+             @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
             @if ($kind === 'root')
-                <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
-                <div class="sticky left-0 z-10 flex h-6 items-center gap-1.5 whitespace-nowrap px-2">
-                    <span class="font-mono text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{{ $durationLabel }}</span>
+                <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
+                <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">
+                    @if ($status !== null)
+                        <span class="inline-flex h-5 shrink-0 items-center rounded px-1 font-mono text-[11px] {{ $statusBadgeClass }}">{{ $status }}</span>
+                    @endif
+                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                     <span class="max-w-lg truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ $entry->label }}</span>
                 </div>
             @elseif ($kind === 'phase')
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800"></span>
-                <div class="sticky left-0 z-10 flex h-6 items-center gap-1.5 whitespace-nowrap px-1.5">
+                <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                 </div>
@@ -84,7 +91,7 @@
                         </div>
                     @endif
                 </span>
-                <div class="sticky left-0 z-10 flex h-6 items-center gap-1.5 whitespace-nowrap px-1.5">
+                <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] font-medium text-neutral-700 dark:text-neutral-200">{{ $badge }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detailShort }}</span>

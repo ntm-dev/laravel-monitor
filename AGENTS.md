@@ -35,6 +35,14 @@ php -l path/to/file.blade.php   # syntax-check a single blade file
 - Route-list "key" format for `type: 'request'` entries is `"METHOD URI"` (e.g. `"GET /api/foo"`);
   list views split it back apart with `Str::before`/`Str::after`. Requests with no matched
   Laravel route are grouped under the literal key `Requests::UNMATCHED_ROUTE` ("Unmatched Route").
+- **New Blade blocks get a start/end comment pair**, e.g.:
+  ```blade
+  {{-- start card list query --}}
+  <div class="list-query-card">...</div>
+  {{-- end card list query --}}
+  ```
+  Applies when adding a new block (a card, a section, a loop); editing an existing
+  uncommented block doesn't require retrofitting one.
 
 ## Migrations
 

@@ -1,11 +1,8 @@
 @php
+    use LaravelMonitor\Support\Format;
     use LaravelMonitor\Support\Icons;
-    use LaravelMonitor\Support\Sql;
 
-    $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
-    $typeBadge = fn (string $sql) => Sql::isWrite($sql)
-        ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-        : 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400';
+    $fmt = fn ($ms) => Format::duration($ms);
 
     $columns = [
         'key' => ['label' => 'Query', 'align' => 'left'],
@@ -95,7 +92,9 @@
                                     <td class="py-2 pr-3">
                                         <span class="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                                             {{ $query->connection }}
-                                            <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ $typeBadge($query->key) }}">{{ Sql::isWrite($query->key) ? 'Write' : 'Read' }}</span>
+                                            @if ($query->connection_type)
+                                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$query->connection_type] }}">{{ $query->connection_type }}</span>
+                                            @endif
                                         </span>
                                     </td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($query->calls) }}</td>

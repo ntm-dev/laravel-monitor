@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
+use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -84,6 +85,8 @@ class JobAttemptController
             $summary[$key]['count']++;
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
         }
+
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
 
         return $summary;
     }

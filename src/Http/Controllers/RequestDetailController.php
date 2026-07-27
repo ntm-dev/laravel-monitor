@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\Nav;
+use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -94,6 +95,8 @@ class RequestDetailController
         // request payload carries a true total incremented on every query —
         // fall back to the slow-query count for older rows recorded before
         // that counter existed.
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
+
         if (isset($root->payload['query_count'])) {
             $summary['queries']['count'] = (int) $root->payload['query_count'];
         }

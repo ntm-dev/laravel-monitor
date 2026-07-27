@@ -229,12 +229,16 @@ class DatabaseStorage implements Storage
             $groupKey = $row->key.'@@'.$connection;
 
             $group = &$groups[$groupKey];
-            $group ??= ['key' => (string) $row->key, 'connection' => $connection, 'calls' => 0, 'durations' => []];
+            $group ??= ['key' => (string) $row->key, 'connection' => $connection, 'calls' => 0, 'durations' => [], 'connectionTypes' => []];
 
             $group['calls']++;
 
             if ($row->duration !== null) {
                 $group['durations'][] = (float) $row->duration;
+            }
+
+            if (isset($payload['connection_type'])) {
+                $group['connectionTypes'][$payload['connection_type']] = true;
             }
             unset($group);
         }
@@ -247,6 +251,12 @@ class DatabaseStorage implements Storage
             $result[] = (object) [
                 'key' => $group['key'],
                 'connection' => $group['connection'],
+                // Only shown when every sampled call agreed on one role —
+                // a connection name can carry more than one role across
+                // calls (e.g. a sticky read/write split alternating between
+                // the two), and showing one at random would be exactly the
+                // guesswork this column replaced Sql::isWrite() to avoid.
+                'connection_type' => count($group['connectionTypes']) === 1 ? array_key_first($group['connectionTypes']) : null,
                 'calls' => $group['calls'],
                 'total' => round(array_sum($durations), 2),
                 'avg' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),

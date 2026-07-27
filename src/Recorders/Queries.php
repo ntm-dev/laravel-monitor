@@ -51,6 +51,15 @@ class Queries extends Recorder
             payload: [
                 'sql' => $event->sql,
                 'connection' => $event->connectionName,
+                // The actual PDO connection role Laravel routed this query
+                // to ('read'/'write'/'direct'), straight from the framework
+                // — not guessed from the SQL verb, which only tells you the
+                // statement is a SELECT vs a mutation, not which physical
+                // connection (e.g. a read replica vs the write primary in a
+                // sticky/read-write split config) it ran against. Only
+                // available on Laravel >= 12.45 (readWriteType didn't exist
+                // on QueryExecuted before that); null everywhere else.
+                'connection_type' => property_exists($event, 'readWriteType') ? $event->readWriteType : null,
                 'location' => $this->location(),
                 // Only meaningful outside a request — inside one, the row
                 // already carries request_id and the Query Detail page

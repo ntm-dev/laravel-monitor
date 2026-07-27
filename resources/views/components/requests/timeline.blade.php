@@ -22,15 +22,29 @@
      the page header (outside this context) always wins instead. All data is
      precomputed by View\Components\Requests\Timeline; this template only
      renders it. --}}
-<x-monitor::card class="isolate overflow-hidden p-0"
+<x-monitor::card id="timeline" class="isolate overflow-hidden p-0"
+     @monitor-duplicates-heartbeat.window="
+         heartbeatActive = true;
+         clearTimeout(heartbeatTimer);
+         heartbeatTimer = setTimeout(() => heartbeatActive = false, 6000);
+         $el.querySelector('[data-duplicate-group]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+     "
      x-data="{
          zoom: 1,
          minZoom: 1,
          maxZoom: 8,
          scrollLeft: 0,
          crossX: null,
+         crossWidth: 0,
+         totalDuration: {{ $totalDuration }},
          selectedId: null,
          hoveredId: null,
+         // Toggled true for 5s (see the window listener above) whenever the
+         // EventSummary 'N duplicates' badge is clicked, so every dot
+         // sharing that query's colour (see TimelineRow::$duplicateColor)
+         // pulses at once — the visual equivalent of highlighting an N+1.
+         heartbeatActive: false,
+         heartbeatTimer: null,
          tooltip: { text: '', top: 0, left: 0 },
          dragging: false,
          dragMoved: false,
@@ -42,9 +56,10 @@
              const iso = this.selected()?.metadata?.created_at;
              return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' }) : '';
          },
-         sqlIsWrite() {
-             const sql = (this.selected()?.metadata?.sql || '').trim().toLowerCase();
-             return sql !== '' && ! sql.startsWith('select');
+         exceptionLocation() {
+             const file = this.selected()?.metadata?.file;
+             const line = this.selected()?.metadata?.line;
+             return file ? (line ? file + ':' + line : file) : '';
          },
          sqlHighlighted() {
              const sql = this.selected()?.metadata?.sql;
@@ -71,6 +86,12 @@
          track(event) {
              const rect = this.$refs.rows.getBoundingClientRect();
              this.crossX = event.clientX - rect.left;
+             this.crossWidth = rect.width;
+         },
+         crossMs() {
+             if (this.crossX === null || ! this.crossWidth) return 0;
+             const ratio = Math.min(1, Math.max(0, this.crossX / this.crossWidth));
+             return Math.round(ratio * this.totalDuration);
          },
          setZoom(next) {
              const el = this.$refs.scrollArea;
@@ -107,12 +128,44 @@
         </div>
         <div class="relative flex-1 overflow-hidden">
             <div class="relative h-full" :style="'width: ' + (zoom * 100) + '%; transform: translateX(-' + scrollLeft + 'px)'">
+                {{-- First/last ticks stay edge-anchored (centering them would
+                     push half the label off the pane); every other tick is
+                     centered on its mark so it lines up with the crosshair,
+                     which sits exactly at the mark itself. --}}
                 @foreach ($ticks as $tick)
-                    <span class="absolute top-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500 {{ $tick['last'] ? '-translate-x-full pr-1' : 'pl-1' }}"
+                    <span class="absolute top-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500 {{ match (true) {
+                              $tick['first'] => 'pl-1',
+                              $tick['last'] => '-translate-x-full pr-1',
+                              default => '-translate-x-1/2',
+                          } }}"
                           style="left: {{ $tick['pct'] }}%">{{ $tick['label'] }}</span>
                 @endforeach
+
+                {{-- Hover ms readout, tracking the same crossX the rows pane's
+                     crosshair uses — this container shares the identical
+                     zoom-width + translateX(-scrollLeft) transform as the
+                     rows pane, so a given crossX lines up with the same time
+                     position in both places. Pinned to the bottom of the
+                     ruler (flush with the border separating it from the rows
+                     pane below) and coloured to match the blue crosshair
+                     line, so it reads as a flag sitting directly on top of
+                     that line rather than a disconnected floating label. --}}
+                <div x-show="crossX !== null" x-cloak
+                     class="pointer-events-none absolute bottom-0 z-10 -translate-x-1/2 whitespace-nowrap rounded-t bg-blue-500 px-1.5 py-0.5 font-mono text-[10px] text-white shadow dark:bg-blue-600"
+                     :style="'left: ' + crossX + 'px'"
+                     x-text="crossMs() + 'ms'"></div>
             </div>
         </div>
+
+        {{-- Mirrors the detail panel's width/visibility below (the w-80
+             x-show="selectedId !== null" panel further down): the panel is a
+             flex sibling of the chart pane in the content row, so opening it
+             shrinks that row's flex-1 chart pane by 320px. Without a matching
+             spacer here, this ruler row's own flex-1 pane wouldn't shrink to
+             match, and the two rows' panes would end up different widths —
+             which is exactly what made the whole timeline appear to jump
+             left the instant a row was selected. --}}
+        <div x-show="selectedId !== null" x-cloak class="w-80 shrink-0"></div>
     </div>
 
     <div class="flex items-stretch divide-x divide-neutral-200 dark:divide-neutral-800">
@@ -185,7 +238,12 @@
              pass its own — much shorter — content height. `top-32` clears
              the dashboard's own sticky page header (~120px) so the two don't
              overlap. --}}
-        <div x-show="selectedId !== null" x-cloak x-transition class="w-80 shrink-0">
+        {{-- No x-transition here on purpose: with it, Alpine silently failed
+             to show this specific panel on the very first selection after
+             page load (stayed at width 0 until toggled a second time) —
+             verified by removing just x-transition, everything else equal.
+             Plain x-show still switches display instantly and correctly. --}}
+        <div x-show="selectedId !== null" class="w-80 shrink-0">
             <div class="sticky top-32 max-h-[calc(100vh-9rem)] divide-y divide-neutral-200 overflow-y-auto bg-neutral-50 dark:divide-neutral-800 dark:bg-neutral-900/50">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
@@ -240,12 +298,29 @@
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Duplicates</dt>
+                            <dd class="font-mono" :class="selected()?.duplicateCount > 1 ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-neutral-800 dark:text-neutral-200'" x-text="selected()?.duplicateCount"></dd>
+                        </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Connection</dt>
                             <dd class="flex items-center gap-1.5 font-mono text-neutral-800 dark:text-neutral-200">
                                 <span x-text="selected()?.metadata?.connection"></span>
-                                <span class="rounded px-1 py-0.5 text-[10px] font-medium"
-                                      :class="sqlIsWrite() ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'"
-                                      x-text="sqlIsWrite() ? 'WRITE' : 'READ'"></span>
+                                {{-- The actual PDO connection role Laravel routed this query to
+                                     (read/write/direct — see Recorders\Queries), not guessed from
+                                     the SQL verb: a read replica can run a write-shaped statement
+                                     under some setups, and a SELECT can just as easily run against
+                                     the write connection (e.g. right after a write, under a sticky
+                                     read/write split). Omitted entirely when the running Laravel
+                                     version doesn't report it (< 12.45) or it's ambiguous. --}}
+                                <template x-if="selected()?.metadata?.connection_type">
+                                    <span class="rounded px-1 py-0.5 text-[10px] font-medium uppercase"
+                                          :class="({
+                                              write: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+                                              read: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+                                              direct: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+                                          })[selected()?.metadata?.connection_type]"
+                                          x-text="selected()?.metadata?.connection_type"></span>
+                                </template>
                             </dd>
                         </div>
                         <template x-if="selected()?.metadata?.location">
@@ -350,6 +425,32 @@
                         </template>
                     </dl>
                 </template>
+
+                <template x-if="selected()?.type === 'exception'">
+                    <div class="p-4">
+                        <span class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">Message</span>
+                        <p class="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.message"></p>
+                    </div>
+                </template>
+                <template x-if="selected()?.type === 'exception'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.class" x-text="selected()?.metadata?.class"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">File</dt>
+                            {{-- direction:rtl + text-align:left is the standard trick for
+                                 truncating the *front* of a string while text-overflow
+                                 ellipsis keeps the tail (filename:line) visible. --}}
+                            <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="exceptionLocation()" x-text="exceptionLocation()"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Handled</dt>
+                            <dd class="font-mono font-medium" :class="selected()?.metadata?.handled ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'" x-text="selected()?.metadata?.handled ? 'True' : 'False'"></dd>
+                        </div>
+                    </dl>
+                </template>
             </div>
         </div>
     </div>
@@ -362,4 +463,28 @@
          class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 shadow-lg"
          :style="'top: ' + tooltip.top + 'px; left: ' + tooltip.left + 'px'"
          x-text="tooltip.text"></div>
+
+    {{-- Duplicate-SQL dot "heartbeat": two staggered rings expanding from
+         the dot and fading out, coloured via currentColor so one rule works
+         for every duplicate group's colour (see TimelineRow::$duplicateColor
+         and the `text-{color}-500` class applied alongside .monitor-heartbeat
+         in timeline-row.blade.php). Toggled on/off by heartbeatActive above. --}}
+    <style>
+        @keyframes monitor-heartbeat-ring {
+            from { transform: scale(1); opacity: 0.7; }
+            to { transform: scale(8); opacity: 0; }
+        }
+        .monitor-heartbeat::before,
+        .monitor-heartbeat::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 9999px;
+            background-color: currentColor;
+            animation: monitor-heartbeat-ring 2s ease-out infinite;
+        }
+        .monitor-heartbeat::after {
+            animation-delay: 0.5s;
+        }
+    </style>
 </x-monitor::card>

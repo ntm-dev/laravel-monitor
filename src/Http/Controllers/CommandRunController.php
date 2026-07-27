@@ -8,6 +8,7 @@ use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
+use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -85,6 +86,8 @@ class CommandRunController
             $summary[$key]['count']++;
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
         }
+
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
 
         return $summary;
     }
