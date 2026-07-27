@@ -15,6 +15,7 @@ use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\RequestDetail;
 use LaravelMonitor\Support\Fingerprint;
+use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Preferences;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -773,6 +774,89 @@ class MonitorTest extends TestCase
         $this->assertIsNumeric($children->first()->start_offset);
     }
 
+    /**
+     * Regression test for a query that runs from inside a middleware's own
+     * post-`$next()` code (e.g. StartSession persisting the session after
+     * the controller/view already produced the response) landing on the
+     * "Render" bucket of the Request Detail timeline instead of a distinct
+     * "after middleware" one. Monitor now tags every entry with the *live*
+     * stage it was recorded in (see Monitor::record()/transitionStage()),
+     * so this no longer depends on comparing a stored offset against a
+     * stored phase interval after the fact.
+     */
+    public function test_query_recorded_while_unwinding_middleware_is_attributed_to_unwinding_not_render(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        $monitor->markRenderStart();
+        Monitor::record('slow_query', 'select * from posts', ['sql' => 'select * from posts'], 5);
+        $monitor->markUnwinding();
+        Monitor::record('slow_query', 'insert into sessions', ['sql' => 'insert into sessions'], 3);
+        $monitor->markResponseReady();
+        $monitor->markTerminating();
+        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $requestId = $monitor->requestId();
+        $root = $storage->findByRequestId($requestId);
+
+        $phaseNames = collect($root->payload['phases'] ?? [])->pluck('name')->all();
+        $this->assertSame(
+            ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'terminating'],
+            $phaseNames,
+        );
+
+        $children = $storage->timelineFor($requestId)->keyBy('key');
+
+        $this->assertSame('render', $children['select * from posts']->payload['phase']);
+        $this->assertSame('unwinding', $children['insert into sessions']->payload['phase']);
+
+        $entries = \LaravelMonitor\Support\Timeline::build($root, $children->values());
+        $phasesById = collect($entries)->keyBy('type');
+
+        $renderQuery = collect($entries)->first(fn ($entry) => ($entry->metadata['sql'] ?? null) === 'select * from posts');
+        $unwindingQuery = collect($entries)->first(fn ($entry) => ($entry->metadata['sql'] ?? null) === 'insert into sessions');
+
+        $this->assertSame($phasesById['render']->id, $renderQuery->parentId);
+        $this->assertSame($phasesById['unwinding']->id, $unwindingQuery->parentId);
+        $this->assertNotSame($renderQuery->parentId, $unwindingQuery->parentId);
+    }
+
+    /**
+     * Rows stored before this "live" phase tag existed have no
+     * `payload['phase']` key at all — Timeline must still attribute them to
+     * *some* phase via the old start_offset/interval match, not blow up or
+     * drop them from the timeline.
+     */
+    public function test_timeline_falls_back_to_offset_matching_when_no_phase_tag_is_stored(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        Monitor::record('slow_query', 'select * from legacy', ['sql' => 'select * from legacy'], 5);
+        $monitor->markResponseReady();
+        $monitor->markTerminating();
+        Monitor::record('request', 'GET /legacy', ['method' => 'GET', 'path' => '/legacy', 'status' => 200], 60, '2xx', 1);
+        Monitor::flush();
+
+        $storage = app(Storage::class);
+        $requestId = $monitor->requestId();
+        $root = $storage->findByRequestId($requestId);
+        $children = $storage->timelineFor($requestId);
+
+        $legacyRow = $children->first();
+        unset($legacyRow->payload['phase']);
+
+        $entries = \LaravelMonitor\Support\Timeline::build($root, collect([$legacyRow]));
+        $query = collect($entries)->first(fn ($entry) => $entry->type === 'query');
+
+        $this->assertNotNull($query->parentId);
+    }
+
     public function test_request_recorder_captures_correlated_timeline_end_to_end(): void
     {
         \Illuminate\Support\Facades\Route::middleware('web')->get('/demo-users', function () {
@@ -866,6 +950,42 @@ class MonitorTest extends TestCase
         $this->get('/monitor/requests/does-not-exist')->assertNotFound();
     }
 
+    public function test_hashed_route_resolves_to_the_requests_list_for_that_route(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::flush();
+
+        $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users'))
+            ->assertOk()
+            ->assertSee('/users');
+    }
+
+    public function test_hashed_route_404s_for_an_unresolvable_hash(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/requests/routes/'.str_repeat('a', 32))->assertNotFound();
+    }
+
+    public function test_nested_hashed_route_renders_a_single_requests_detail_page(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::flush();
+
+        $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users').'/'.$monitor->requestId())
+            ->assertOk()
+            ->assertSee('/users')
+            ->assertSee('Timeline');
+    }
+
     public function test_notification_detail_page_links_to_its_correlated_mail_send(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
@@ -897,16 +1017,18 @@ class MonitorTest extends TestCase
 
         $notificationId = DB::table('monitor_entries')->where('type', 'notification')->value('id');
         $mailId = DB::table('monitor_entries')->where('type', 'mail')->value('id');
+        $notificationKey = DB::table('monitor_entries')->where('type', 'notification')->value('key');
+        $mailKey = DB::table('monitor_entries')->where('type', 'mail')->value('key');
 
         $this->get('/monitor/notifications?key='.$notificationId)
             ->assertOk()
             ->assertSee('View sent email')
-            ->assertSee('mail?key='.$mailId, false);
+            ->assertSee(route('monitor.mail.sends.show', ['hash' => KeyHash::for($mailKey), 'id' => $mailId]), false);
 
         $this->get('/monitor/mail?key='.$mailId)
             ->assertOk()
             ->assertSee('Sent via notification')
-            ->assertSee('notifications?key='.$notificationId, false);
+            ->assertSee(route('monitor.notifications.sends.show', ['hash' => KeyHash::for($notificationKey), 'id' => $notificationId]), false);
     }
 
     public function test_notification_detail_page_shows_not_found_state_for_unknown_id(): void

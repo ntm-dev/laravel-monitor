@@ -8,7 +8,8 @@
         <div class="flex min-w-0 flex-1 flex-col">
             <x-monitor::header :tab="$tab" :tabs="$tabs" :groups="$groups" :title="$title" :detail="$detail" :key="$key" :range="$range"
                                :period="$period" :periods="$periods" :has-custom-range="$hasCustomRange" :from="$from" :to="$to"
-                               :timezone="$timezone" :range-max="$rangeMax"/>
+                               :timezone="$timezone" :range-max="$rangeMax"
+                               :current-route-name="$currentRouteName" :current-route-params="$currentRouteParams"/>
 
             <main class="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-10 md:px-8">
                 @if ($tab === 'overview')

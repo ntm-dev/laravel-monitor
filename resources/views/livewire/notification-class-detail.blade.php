@@ -49,7 +49,7 @@
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            @php($url = $entry->timeline_url ?? route('monitor.dashboard', ['tab' => 'notifications', 'key' => $entry->id] + $range))
+                            @php($url = $entry->timeline_url ?? route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range))
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ $url }}'">
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>

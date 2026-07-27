@@ -125,7 +125,17 @@ class MonitorServiceProvider extends ServiceProvider
 
         $events->listen(RouteMatched::class, fn (RouteMatched $event) => $this->attachControllerStartMarker($event->route));
 
-        $events->listen('composing:*', fn () => $monitor->markComposing());
+        // PreparingResponse/ResponsePrepared fire back to back, from
+        // Router::prepareResponse() — still deep inside the route's own
+        // middleware pipeline, before it bubbles back out through any
+        // middleware's post-`$next()` code. That's what lets "render" mean
+        // only the controller/view's own work.
+        if (class_exists(\Illuminate\Routing\Events\PreparingResponse::class)) {
+            $events->listen(\Illuminate\Routing\Events\PreparingResponse::class, fn () => $monitor->markRenderStart());
+            $events->listen(\Illuminate\Routing\Events\ResponsePrepared::class, fn () => $monitor->markUnwinding());
+        }
+
+        $events->listen(\Illuminate\Foundation\Http\Events\RequestHandled::class, fn () => $monitor->markResponseReady());
 
         if (class_exists(\Illuminate\Foundation\Events\Terminating::class)) {
             $events->listen(\Illuminate\Foundation\Events\Terminating::class, fn () => $monitor->markTerminating());

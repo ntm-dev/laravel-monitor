@@ -1,5 +1,6 @@
 @php
     use LaravelMonitor\Support\Icons;
+    use LaravelMonitor\Support\KeyHash;
     use Illuminate\Support\Str;
 
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
@@ -82,7 +83,7 @@
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($routes as $route)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                onclick="window.location='{{ route('monitor.dashboard', ['tab' => 'requests', 'key' => $route->key] + $range) }}'">
+                                onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => KeyHash::for($route->key)] + $range) }}'">
                                 @php
                                     $method = Str::before($route->key, ' ');
                                     $methodClass = match ($method) {

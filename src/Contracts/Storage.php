@@ -306,4 +306,12 @@ interface Storage
      * underlying exception/performance data for.
      */
     public function findIssueByUuid(string $uuid): ?object;
+
+    /**
+     * The original key whose KeyHash::for() hash matches $hash, among every
+     * entry of $type ever recorded — the hash is one-way, so this scans the
+     * type's distinct keys (index-only via the [type, key] index) for a
+     * match. Null when nothing matches (a stale/invalid hash).
+     */
+    public function resolveKeyHash(string $type, string $hash): ?string;
 }

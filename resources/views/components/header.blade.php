@@ -1,7 +1,7 @@
 {{-- Sticky page header: detail breadcrumb or page title, period switcher with
      custom range picker, and the mobile tab strip. All data is prepared by
      Http\Controllers\DashboardController. --}}
-@props(['tab', 'tabs', 'groups', 'title', 'detail', 'key', 'range', 'period', 'periods', 'hasCustomRange', 'from', 'to', 'timezone', 'rangeMax'])
+@props(['tab', 'tabs', 'groups', 'title', 'detail', 'key', 'range', 'period', 'periods', 'hasCustomRange', 'from', 'to', 'timezone', 'rangeMax', 'currentRouteName', 'currentRouteParams'])
 <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
     <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
         @if ($detail !== null)
@@ -25,7 +25,7 @@
         @if (! in_array($tab, ['settings', 'team'], true))
         <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
-                <a href="{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'period' => $value, 'key' => $key])) }}"
+                <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"
                    @class([
                        'flex h-full min-w-8 items-center justify-center rounded-md border px-2.5 font-mono text-xs',
                        'border-blue-500 bg-blue-600 text-white' => ! $hasCustomRange && $period === $value,
@@ -45,7 +45,7 @@
                         if (new Date(this.to) > now) { this.to = now.toISOString().slice(0, 16); }
                         if (new Date(this.from) >= new Date(this.to)) { this.error = 'Start must be before end.'; return; }
                         const params = new URLSearchParams({ from: this.from, to: this.to });
-                        window.location = '{{ route('monitor.dashboard', array_filter(['tab' => $tab, 'key' => $key])) }}?' + params.toString();
+                        window.location = '{{ route($currentRouteName, $currentRouteParams) }}?' + params.toString();
                     },
                  }" class="relative h-full">
                 <button type="button" @click="open = ! open"

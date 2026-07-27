@@ -40,7 +40,7 @@
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
                             @php($status = (int) ($entry->payload['status'] ?? 0))
-                            @php($detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.show', $entry->request_id) : null)
+                            @php($detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'requestId' => $entry->request_id]) : null)
                             <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs">
                                     @if ($detailUrl)

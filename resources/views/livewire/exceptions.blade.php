@@ -78,7 +78,7 @@
                         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($groups as $group)
                                 <tr class="group cursor-pointer {{ $group->unhandled > 0 ? 'hover:bg-rose-50/50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}"
-                                    onclick="window.location='{{ route('monitor.dashboard', ['tab' => 'exceptions', 'key' => $group->key] + $range) }}'">
+                                    onclick="window.location='{{ route('monitor.exceptions.show', ['hash' => $group->key] + $range) }}'">
                                     <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $group->last_seen_full }}">
                                         {{ $group->last_seen_human }}
                                     </td>

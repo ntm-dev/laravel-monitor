@@ -4,8 +4,8 @@ namespace LaravelMonitor\Support;
 
 /**
  * One bar on the Request Detail timeline — either a lifecycle phase
- * (bootstrap/middleware/controller/render/sending/terminating) or a
- * correlated event (query/cache/mail/notification/queue/http). Kept
+ * (bootstrap/middleware/controller/render/unwinding/sending/terminating) or
+ * a correlated event (query/cache/mail/notification/queue/http). Kept
  * data-driven so new event types only need an entry in Timeline::EVENT_TYPES,
  * not new Blade branches.
  */

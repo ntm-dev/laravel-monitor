@@ -31,6 +31,7 @@
          crossX: null,
          selectedId: null,
          hoveredId: null,
+         tooltip: { text: '', top: 0, left: 0 },
          dragging: false,
          dragMoved: false,
          dragStartX: 0,
@@ -53,6 +54,19 @@
          copySql() {
              const sql = this.selected()?.metadata?.sql;
              if (sql) navigator.clipboard.writeText(sql);
+         },
+         // Fixed-position, not the row's own absolutely-positioned child: the
+         // pinned tree pane clips overflow to hold its column width steady
+         // (see the label pane's `overflow-hidden` below), which would
+         // otherwise clip this tooltip too whenever the truncated text it's
+         // showing extends past the pane's edge.
+         showTooltip(event, text) {
+             if (! text) { return; }
+             const rect = event.currentTarget.getBoundingClientRect();
+             this.tooltip = { text, top: rect.bottom + 4, left: rect.left };
+         },
+         hideTooltip() {
+             this.tooltip = { text: '', top: 0, left: 0 };
          },
          track(event) {
              const rect = this.$refs.rows.getBoundingClientRect();
@@ -175,7 +189,7 @@
             <div class="sticky top-32 max-h-[calc(100vh-9rem)] divide-y divide-neutral-200 overflow-y-auto bg-neutral-50 dark:divide-neutral-800 dark:bg-neutral-900/50">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
-                        <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400" x-text="selected()?.type"></h3>
+                        <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400" x-text="selected()?.badge"></h3>
                         <span class="mt-0.5 block font-mono text-xs text-neutral-400 dark:text-neutral-500" x-text="selectedTimestamp()"></span>
                     </div>
                     <div class="flex shrink-0 items-center gap-1">
@@ -339,4 +353,13 @@
             </div>
         </div>
     </div>
+
+    {{-- Shared tree-pane tooltip, positioned in the viewport (not the row) --
+         see showTooltip()/hideTooltip() above for why this can't just be an
+         absolutely-positioned child of each row like the chart pane's own
+         bar tooltips are. --}}
+    <div x-show="tooltip.text !== ''" x-cloak
+         class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 shadow-lg"
+         :style="'top: ' + tooltip.top + 'px; left: ' + tooltip.left + 'px'"
+         x-text="tooltip.text"></div>
 </x-monitor::card>

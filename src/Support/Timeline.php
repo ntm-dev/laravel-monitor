@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Support;
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 /**
@@ -13,7 +14,15 @@ use Illuminate\Support\Collection;
  */
 class Timeline
 {
-    public const PHASES = ['bootstrap', 'middleware', 'controller', 'render', 'sending', 'terminating'];
+    public const PHASES = ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'terminating'];
+
+    /**
+     * Phase name => display label, for the few phases whose name doesn't
+     * read well through a plain ucfirst() (see phaseEntries()).
+     */
+    protected const PHASE_LABELS = [
+        'unwinding' => 'Middleware',
+    ];
 
     /**
      * Recorder type => timeline type + fallback label. Add a row here to
@@ -71,7 +80,7 @@ class Timeline
             $entries[] = new TimelineEntry(
                 id: 'phase-'.$name,
                 type: $name,
-                label: ucfirst($name),
+                label: self::PHASE_LABELS[$name] ?? ucfirst($name),
                 start: max(0, (int) $phase['start']),
                 duration: max(0, (int) $phase['duration']),
                 parentId: 'request',
@@ -97,9 +106,34 @@ class Timeline
             label: self::labelFor($row, $map['label']),
             start: $start,
             duration: $duration,
-            parentId: self::containingPhase($start, $phases)?->id ?? 'request',
+            parentId: self::parentPhaseId($row, $start, $phases),
             metadata: self::metadataFor($row),
         );
+    }
+
+    /**
+     * The phase this entry belongs to on the timeline. Prefers the stage it
+     * was live-tagged with at record time (`payload['phase']`, set by
+     * Monitor::record() — accurate, since it reflects what was actually
+     * executing when the entry was recorded) and only falls back to
+     * matching its stored start_offset against the stored phase intervals
+     * (containingPhase()) for rows persisted before that tag existed.
+     *
+     * @param  TimelineEntry[]  $phases
+     */
+    protected static function parentPhaseId(object $row, int|float $start, array $phases): string
+    {
+        $taggedPhase = $row->payload['phase'] ?? null;
+
+        if ($taggedPhase !== null) {
+            foreach ($phases as $phase) {
+                if ($phase->type === $taggedPhase) {
+                    return $phase->id;
+                }
+            }
+        }
+
+        return self::containingPhase($start, $phases)?->id ?? 'request';
     }
 
     protected static function labelFor(object $row, string $fallback): string
@@ -119,7 +153,9 @@ class Timeline
      */
     protected static function metadataFor(object $row): array
     {
-        $metadata = $row->payload + [
+        // 'phase' is internal bookkeeping for parentPhaseId() above, not
+        // something the detail panel shows.
+        $metadata = Arr::except($row->payload, ['phase']) + [
             'subtype' => $row->subtype,
             'key' => $row->key,
             'duration' => $row->duration,
