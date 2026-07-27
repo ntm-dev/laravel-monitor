@@ -67,6 +67,15 @@ class Timeline extends Component
         $this->rows = $this->buildRows($byId->get('request'), $phases, $byParent);
         $this->orphanRows = $this->buildOrphanRows($phases, $byParent);
         $this->ticks = $this->buildTicks();
+
+        // How many times each normalized SQL shape shows up among this
+        // request's own (threshold-recorded) queries — surfaced in the
+        // inspector panel as "Duplicates" so a query repeated across an N+1
+        // loop is obvious without leaving the timeline.
+        $queryDuplicateCounts = collect($entries)
+            ->filter(fn (TimelineEntry $entry) => $entry->type === 'query')
+            ->countBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
+
         $this->entriesJson = Js::from(collect($entries)->mapWithKeys(fn (TimelineEntry $entry) => [$entry->id => [
             'type' => $entry->type,
             'badge' => TimelineRow::badgeFor($entry->type),
@@ -74,6 +83,9 @@ class Timeline extends Component
             'start' => $entry->start,
             'duration' => $entry->duration,
             'metadata' => $entry->metadata,
+            'duplicateCount' => $entry->type === 'query'
+                ? $queryDuplicateCounts[Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label)]
+                : null,
             // Only queries have their own detail page. The stored group key
             // is the normalized SQL shape (see Recorders\Queries::record()),
             // not the raw per-call SQL text in metadata['sql'] — normalizing

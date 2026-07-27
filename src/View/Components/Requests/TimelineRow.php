@@ -17,6 +17,9 @@ use LaravelMonitor\Support\TimelineEntry;
  */
 class TimelineRow extends Component
 {
+    /** Solid fill used for the exception dot in the tree pane. */
+    protected const ERROR_COLOR = 'bg-rose-600 dark:border-rose-500 dark:bg-rose-600';
+
     /** Dot colour per event type shown in the pinned tree column; unknown types fall back to neutral. */
     protected const COLORS = [
         'query' => 'bg-amber-500 dark:bg-amber-400',
@@ -26,6 +29,7 @@ class TimelineRow extends Component
         'queue' => 'bg-orange-500 dark:bg-orange-400',
         'http' => 'bg-cyan-500 dark:bg-cyan-400',
         'lazy_loading' => 'bg-rose-500 dark:bg-rose-400',
+        'exception' => self::ERROR_COLOR,
     ];
 
     /** Inline badge text per event type; unknown types are uppercased. */
@@ -41,13 +45,38 @@ class TimelineRow extends Component
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';
 
+    /**
+     * Root bar colour by HTTP status severity — job/command roots have no
+     * status and keep {@see ROOT_COLOR}. Keeps the same light background
+     * tint as ROOT_COLOR/warning; only the border colour signals severity.
+     */
+    protected const ROOT_STATUS_COLORS = [
+        'error' => 'bg-rose-600/15 border border-rose-600 dark:bg-rose-400/10 dark:border-rose-600',
+        'warning' => 'bg-amber-500/15 border border-amber-500/40 dark:bg-amber-400/10 dark:border-amber-400/40',
+    ];
+
+    /** Status badge colours: solid fill matching the severity colour, white text. */
+    protected const STATUS_BADGE_COLORS = [
+        'error' => 'bg-rose-600 dark:bg-rose-600 text-white', //dark:border-rose-500 dark:bg-rose-600
+        'warning' => 'bg-amber-700 dark:bg-amber-400 text-white',
+        'ok' => 'bg-emerald-700 dark:bg-emerald-400 text-white',
+    ];
+
     /** Nightwatch-style neutral event bar; only over-threshold events get a warning colour instead. */
     public const NEUTRAL_BAR = 'border border-neutral-200 bg-white group-hover:border-blue-400 dark:border-neutral-700 dark:bg-neutral-800 dark:group-hover:border-blue-500';
 
     public const SLOW_BAR = 'border border-amber-500 bg-amber-500/20 dark:border-amber-400 dark:bg-amber-400/20';
 
+    /** Exception bars are always rose-600, regardless of duration. */
+    public const EXCEPTION_BAR = 'border border-rose-600 bg-rose-600/20 dark:border-rose-600 dark:bg-rose-600/20';
+
+    /** Badge text colour per event type; unknown types fall back to neutral. */
+    protected const BADGE_TEXT_COLORS = [
+        'exception' => 'text-rose-600 dark:text-rose-600',
+    ];
+
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
-    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading'];
+    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception'];
 
     /** Bar left edge / width as percentages of the total duration. */
     public float $left;
@@ -67,6 +96,9 @@ class TimelineRow extends Component
     /** Dot colour per event type, used only in the pinned tree column. */
     public string $color;
 
+    /** Badge text colour per event type, matching {@see $color}; neutral by default. */
+    public string $badgeTextColor;
+
     /** Whether this event's duration is at/above the slow-event threshold — the only case the bar gets coloured. */
     public bool $slow;
 
@@ -76,7 +108,13 @@ class TimelineRow extends Component
     /** Whether clicking this row opens the inspector panel. */
     public bool $detailable;
 
-    public string $rootColor = self::ROOT_COLOR;
+    public string $rootColor;
+
+    /** HTTP status of the root request, null for job/command roots (no status) or non-root rows. */
+    public ?int $status = null;
+
+    /** Status badge background/text classes, empty when {@see $status} is null. */
+    public string $statusBadgeClass = '';
 
     public function __construct(
         public TimelineEntry $entry,
@@ -98,11 +136,38 @@ class TimelineRow extends Component
         $this->durationLabel = Format::duration($entry->duration);
         $this->badge = self::badgeFor($entry->type);
         $this->color = self::COLORS[$entry->type] ?? 'bg-neutral-400 dark:bg-neutral-500';
+        $this->badgeTextColor = self::BADGE_TEXT_COLORS[$entry->type] ?? 'text-neutral-700 dark:text-neutral-200';
         $this->slow = $kind === 'event' && $entry->duration >= (float) config('monitor.recorders.'.Queries::class.'.threshold', 100);
-        $this->barColor = $this->slow ? self::SLOW_BAR : self::NEUTRAL_BAR;
+        $this->barColor = match (true) {
+            $entry->type === 'exception' => self::EXCEPTION_BAR,
+            $this->slow => self::SLOW_BAR,
+            default => self::NEUTRAL_BAR,
+        };
         $this->detailable = $kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true);
         $this->detail = $this->resolveDetail();
         $this->detailShort = Str::limit($this->detail, 90);
+        if ($kind === 'root' && isset($entry->metadata['status'])) {
+            $this->status = (int) $entry->metadata['status'];
+            $this->statusBadgeClass = self::STATUS_BADGE_COLORS[self::severity($this->status)];
+        }
+
+        $this->rootColor = $this->status !== null
+            ? (self::ROOT_STATUS_COLORS[self::severity($this->status)] ?? self::ROOT_COLOR)
+            : self::ROOT_COLOR;
+    }
+
+    /**
+     * HTTP status severity bucket, matching the badge colours used
+     * elsewhere (header.blade.php, request-detail.blade.php's list): rose
+     * for 5xx, amber for 4xx, the default green otherwise.
+     */
+    protected static function severity(int $status): string
+    {
+        return match (true) {
+            $status >= 500 => 'error',
+            $status >= 400 => 'warning',
+            default => 'ok',
+        };
     }
 
     public function render(): View

@@ -47,7 +47,17 @@ class Timeline
     {
         $duration = (float) ($root->duration ?? 0);
 
-        $requestEntry = new TimelineEntry(id: 'request', type: 'request', label: $root->key ?? 'Request', start: 0, duration: $duration);
+        $requestEntry = new TimelineEntry(
+            id: 'request',
+            type: 'request',
+            label: $root->key ?? 'Request',
+            start: 0,
+            duration: $duration,
+            // Only requests carry an HTTP status; job/command roots leave
+            // this unset, so TimelineRow's root-bar coloring falls back to
+            // its neutral default for those.
+            metadata: array_filter(['status' => $root->payload['status'] ?? null], fn ($value) => $value !== null),
+        );
 
         $phases = self::phaseEntries($root->payload['phases'] ?? []);
 
@@ -91,9 +101,14 @@ class Timeline
     }
 
     /**
+     * Public so Http\Controllers\EventListController can reuse the same
+     * label/metadata mapping for its per-type "list every occurrence for
+     * this request/job/command" page, instead of a second copy of the
+     * type => label rules.
+     *
      * @param  TimelineEntry[]  $phases
      */
-    protected static function eventEntry(object $row, array $phases): TimelineEntry
+    public static function eventEntry(object $row, array $phases): TimelineEntry
     {
         $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 
@@ -143,6 +158,7 @@ class Timeline
             'cache' => ucfirst($row->subtype ?? 'cache').' · '.($row->key ?? ''),
             'mail' => $row->payload['subject'] ?? $row->key ?? $fallback,
             'notification', 'job' => class_basename($row->key ?? $fallback),
+            'exception' => class_basename($row->payload['class'] ?? $row->key ?? $fallback),
             'lazy_loading' => class_basename($row->payload['model'] ?? $row->key ?? $fallback).'::'.($row->payload['relation'] ?? ''),
             default => $row->key ?? $fallback,
         };

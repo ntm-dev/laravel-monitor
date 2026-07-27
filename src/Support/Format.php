@@ -60,4 +60,18 @@ class Format
     {
         return self::PRIORITIES[$priority] ?? self::PRIORITIES['none'];
     }
+
+    /**
+     * Badge colour classes for an HTTP status code: light tint matching its
+     * severity (5xx rose, 4xx amber, otherwise green) — shared by every
+     * status badge on the Request Detail page (header, General summary).
+     */
+    public static function statusBadgeClass(int $status): string
+    {
+        return match (true) {
+            $status >= 500 => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
+            $status >= 400 => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+            default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+        };
+    }
 }

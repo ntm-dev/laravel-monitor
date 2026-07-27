@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
+use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline;
 
 /**
@@ -53,6 +54,7 @@ class JobAttemptController
             'timeline' => Timeline::build($root, $children),
             'totalDuration' => max(1, (int) ($root->duration ?? 0)),
             'summary' => $this->eventsSummary($children),
+            'eventUrls' => $this->eventUrls($attemptId),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
             'tab' => 'jobs',
@@ -85,6 +87,24 @@ class JobAttemptController
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
         }
 
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
+
         return $summary;
+    }
+
+    /**
+     * Per-card "view every occurrence" link, one per EventSummary card key —
+     * see EventListController.
+     *
+     * @return array<string, string>
+     */
+    protected function eventUrls(string $attemptId): array
+    {
+        return collect(array_keys(EventListController::TYPES))
+            ->mapWithKeys(fn (string $type) => [$type => route('monitor.jobs.attempts.events', [
+                'attemptId' => $attemptId,
+                'type' => $type,
+            ])])
+            ->all();
     }
 }

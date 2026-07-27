@@ -8,11 +8,7 @@
     $path = $root->payload['path'] ?? Str::after($root->key ?? '', ' ');
     $url = $root->payload['url'] ?? null;
     $status = (int) ($root->payload['status'] ?? 0);
-    $badgeClass = match (true) {
-        $status >= 500 => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
-        $status >= 400 => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-        default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
-    };
+    $badgeClass = \LaravelMonitor\Support\Format::statusBadgeClass($status);
 @endphp
 <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
     <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
