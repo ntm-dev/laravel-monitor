@@ -87,3 +87,12 @@ Only commit when explicitly asked — drafting a commit message is not permissio
 Running `/fix-issue`, `/implement-issue`, or `/work-issue` *is* that explicit ask for the scope
 of that one issue — those commands are expected to commit and open a PR without a separate
 confirmation step, per their own instructions in `.claude/commands/`.
+
+**Branch naming**: the segment after `fix/`/`feat/` should be the singular name of the
+dashboard route/tab the change touches — e.g. `fix/request` for a Requests-area bug,
+`fix/exception` for Exceptions, `feat/job` for a Jobs-area feature. Tabs: request, job,
+command, query, exception, notification, mail, application, cache, outgoing, setting, issue.
+For multi-area or non-tab-specific work, fall back to a short kebab-case description as before
+(e.g. `fix/dashboard-chart-tooltip-cross-hover`). This doesn't apply to the `/fix-issue` /
+`/implement-issue` pipeline's own `fix|feat/issue-<n>-<slug>` naming, which prioritizes the
+issue number for traceability.
