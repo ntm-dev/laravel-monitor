@@ -11,7 +11,6 @@ use LaravelMonitor\Http\Controllers\Auth\TwoFactorChallengeController;
 use LaravelMonitor\Http\Controllers\Auth\WebauthnController;
 use LaravelMonitor\Http\Controllers\CommandRunController;
 use LaravelMonitor\Http\Controllers\DashboardController;
-use LaravelMonitor\Http\Controllers\EventListController;
 use LaravelMonitor\Http\Controllers\IssueController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
@@ -44,27 +43,6 @@ Route::domain(config('monitor.domain'))
         Route::post('/email-changes/{token}', [EmailChangeController::class, 'store'])->name('monitor.email-changes.store');
 
         Route::middleware(EnsureMonitorAuthenticated::class)->group(function () {
-            // start EventListController routes
-            // The "N Queries"/"N Mail"/... cards on the standalone request,
-            // job attempt, and command run pages link here — one page per
-            // event type, scoped to that single request/job/command, since
-            // neither the aggregate per-type tabs (span every request) nor
-            // scrolling the waterfall (doesn't scale past a handful) fits.
-            $eventTypes = implode('|', array_keys(EventListController::TYPES));
-
-            Route::get('/requests/routes/{hash}/{requestId}/{type}', function (string $hash, string $requestId, string $type) {
-                return app(EventListController::class)($requestId, $type, 'request');
-            })->where(['hash' => '[0-9a-f]{32}', 'type' => $eventTypes])->name('monitor.requests.routes.request.events');
-
-            Route::get('/jobs/attempts/{attemptId}/{type}', function (string $attemptId, string $type) {
-                return app(EventListController::class)($attemptId, $type, 'job');
-            })->where('type', $eventTypes)->name('monitor.jobs.attempts.events');
-
-            Route::get('/commands/runs/{runId}/{type}', function (string $runId, string $type) {
-                return app(EventListController::class)($runId, $type, 'command');
-            })->where('type', $eventTypes)->name('monitor.commands.runs.events');
-            // end EventListController routes
-
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');

@@ -50,14 +50,18 @@
             @elseif ($kind === 'phase')
                 <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
             @else
-                <span class="h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"></span>
+                <span class="relative h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"
+                      @if ($duplicateColor) :class="heartbeatActive ? 'monitor-heartbeat text-{{ $duplicateColor }}-500' : ''" @endif></span>
                 <span class="shrink-0 font-mono text-[11px] font-medium {{ $badgeTextColor }}">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
             @endif
         </div>
     </div>
 @else
-    <div class="relative flex h-9 items-center" :class="{{ $highlightClass }}">
+    {{-- data-duplicate-group marks the first-in-DOM-order match for the
+         EventSummary "N duplicates" click handler's scrollIntoView() (see
+         timeline.blade.php) — first in the timeline == first chronologically. --}}
+    <div class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
         <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px"
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"

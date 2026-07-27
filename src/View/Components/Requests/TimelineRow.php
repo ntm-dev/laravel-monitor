@@ -5,7 +5,6 @@ namespace LaravelMonitor\View\Components\Requests;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\View\Component;
-use LaravelMonitor\Recorders\Queries;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\TimelineEntry;
 
@@ -17,20 +16,10 @@ use LaravelMonitor\Support\TimelineEntry;
  */
 class TimelineRow extends Component
 {
-    /** Solid fill used for the exception dot in the tree pane. */
-    protected const ERROR_COLOR = 'bg-rose-600 dark:border-rose-500 dark:bg-rose-600';
+    /** Dot colour in the pinned tree column: exceptions, a duplicate-SQL group's colour, or the neutral default. */
+    protected const DEFAULT_COLOR = 'border border-blue-500 dark:border-blue-400';
 
-    /** Dot colour per event type shown in the pinned tree column; unknown types fall back to neutral. */
-    protected const COLORS = [
-        'query' => 'bg-amber-500 dark:bg-amber-400',
-        'cache' => 'bg-emerald-500 dark:bg-emerald-400',
-        'mail' => 'bg-pink-500 dark:bg-pink-400',
-        'notification' => 'bg-fuchsia-500 dark:bg-fuchsia-400',
-        'queue' => 'bg-orange-500 dark:bg-orange-400',
-        'http' => 'bg-cyan-500 dark:bg-cyan-400',
-        'lazy_loading' => 'bg-rose-500 dark:bg-rose-400',
-        'exception' => self::ERROR_COLOR,
-    ];
+    protected const EXCEPTION_COLOR = 'border border-rose-500 bg-rose-500 dark:border-rose-400 dark:bg-rose-400';
 
     /** Inline badge text per event type; unknown types are uppercased. */
     protected const BADGES = [
@@ -93,8 +82,11 @@ class TimelineRow extends Component
     /** Detail clamped for the inline chart label. */
     public string $detailShort;
 
-    /** Dot colour per event type, used only in the pinned tree column. */
+    /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}. */
     public string $color;
+
+    /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. */
+    public ?string $duplicateColor;
 
     /** Badge text colour per event type, matching {@see $color}; neutral by default. */
     public string $badgeTextColor;
@@ -135,9 +127,31 @@ class TimelineRow extends Component
         $this->width = $total > 0 ? min(100 - $this->left, max(0.15, ($entry->duration / $total) * 100)) : 0.15;
         $this->durationLabel = Format::duration($entry->duration);
         $this->badge = self::badgeFor($entry->type);
-        $this->color = self::COLORS[$entry->type] ?? 'bg-neutral-400 dark:bg-neutral-500';
+        $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
+        $this->color = match (true) {
+            $entry->type === 'exception' => self::EXCEPTION_COLOR,
+            $this->duplicateColor !== null => "border border-{$this->duplicateColor}-500 bg-{$this->duplicateColor}-500 dark:border-{$this->duplicateColor}-400 dark:bg-{$this->duplicateColor}-400",
+            default => self::DEFAULT_COLOR,
+        };
         $this->badgeTextColor = self::BADGE_TEXT_COLORS[$entry->type] ?? 'text-neutral-700 dark:text-neutral-200';
-        $this->slow = $kind === 'event' && $entry->duration >= (float) config('monitor.recorders.'.Queries::class.'.threshold', 100);
+        // Per-type "slow" signal against the same monitor.thresholds.* values
+        // the Settings page edits (see Support\Settings) — comparing every
+        // event's duration against the query recorder's own threshold
+        // (regardless of type) used to mark multi-second commands/jobs/
+        // notifications as "slow" right alongside queries that hadn't even
+        // crossed the *query* threshold the user configured (recorder's
+        // fast/slow subtype tag is a separate, .env-only threshold used for
+        // the Slow Queries digest, not what Settings/the dashboard call
+        // "query threshold"). queue/http map to their own threshold keys;
+        // every other type (cache, mail, notification, lazy_loading, nested
+        // commands/scheduled tasks) has no configured "slow" concept at all,
+        // so it never gets the warning bar.
+        $this->slow = $kind === 'event' && match ($entry->type) {
+            'query' => $entry->duration >= (float) config('monitor.thresholds.query', 500),
+            'queue' => $entry->duration >= (float) config('monitor.thresholds.job', 1000),
+            'http' => $entry->duration >= (float) config('monitor.thresholds.outgoing_request', 1000),
+            default => false,
+        };
         $this->barColor = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_BAR,
             $this->slow => self::SLOW_BAR,

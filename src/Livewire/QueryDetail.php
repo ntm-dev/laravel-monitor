@@ -2,8 +2,6 @@
 
 namespace LaravelMonitor\Livewire;
 
-use LaravelMonitor\Support\Sql;
-
 class QueryDetail extends Card
 {
     public string $key = '';
@@ -43,11 +41,28 @@ class QueryDetail extends Card
             'duration' => $storage->durationStats('slow_query', $since, $buckets, $key, null, $until),
             'entries' => $entries,
             'requestLabels' => $requestLabels,
-            'isWrite' => Sql::isWrite($key),
             'firstSeen' => $storage->firstSeen('slow_query', $key),
             // Derived from the loaded page of entries (not the full period)
-            // — a quick summary, not an exhaustive audit.
-            'connections' => $entries->pluck('payload.connection')->filter()->unique()->sort()->values(),
+            // — a quick summary, not an exhaustive audit. One row per
+            // distinct connection name; 'type' is only set when every
+            // sampled call against that connection agreed on the same PDO
+            // role (see DatabaseStorage::queryStats() for why a connection
+            // can carry more than one).
+            'connections' => $entries
+                ->pluck('payload.connection')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->map(function (string $connection) use ($entries) {
+                    $types = $entries
+                        ->where('payload.connection', $connection)
+                        ->pluck('payload.connection_type')
+                        ->filter()
+                        ->unique();
+
+                    return ['name' => $connection, 'type' => $types->count() === 1 ? $types->first() : null];
+                }),
         ];
     }
 }

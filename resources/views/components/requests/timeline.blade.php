@@ -23,6 +23,12 @@
      precomputed by View\Components\Requests\Timeline; this template only
      renders it. --}}
 <x-monitor::card id="timeline" class="isolate overflow-hidden p-0"
+     @monitor-duplicates-heartbeat.window="
+         heartbeatActive = true;
+         clearTimeout(heartbeatTimer);
+         heartbeatTimer = setTimeout(() => heartbeatActive = false, 6000);
+         $el.querySelector('[data-duplicate-group]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+     "
      x-data="{
          zoom: 1,
          minZoom: 1,
@@ -33,6 +39,12 @@
          totalDuration: {{ $totalDuration }},
          selectedId: null,
          hoveredId: null,
+         // Toggled true for 5s (see the window listener above) whenever the
+         // EventSummary 'N duplicates' badge is clicked, so every dot
+         // sharing that query's colour (see TimelineRow::$duplicateColor)
+         // pulses at once — the visual equivalent of highlighting an N+1.
+         heartbeatActive: false,
+         heartbeatTimer: null,
          tooltip: { text: '', top: 0, left: 0 },
          dragging: false,
          dragMoved: false,
@@ -48,10 +60,6 @@
              const file = this.selected()?.metadata?.file;
              const line = this.selected()?.metadata?.line;
              return file ? (line ? file + ':' + line : file) : '';
-         },
-         sqlIsWrite() {
-             const sql = (this.selected()?.metadata?.sql || '').trim().toLowerCase();
-             return sql !== '' && ! sql.startsWith('select');
          },
          sqlHighlighted() {
              const sql = this.selected()?.metadata?.sql;
@@ -297,9 +305,22 @@
                             <dt class="text-neutral-500 dark:text-neutral-400">Connection</dt>
                             <dd class="flex items-center gap-1.5 font-mono text-neutral-800 dark:text-neutral-200">
                                 <span x-text="selected()?.metadata?.connection"></span>
-                                <span class="rounded px-1 py-0.5 text-[10px] font-medium"
-                                      :class="sqlIsWrite() ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'"
-                                      x-text="sqlIsWrite() ? 'WRITE' : 'READ'"></span>
+                                {{-- The actual PDO connection role Laravel routed this query to
+                                     (read/write/direct — see Recorders\Queries), not guessed from
+                                     the SQL verb: a read replica can run a write-shaped statement
+                                     under some setups, and a SELECT can just as easily run against
+                                     the write connection (e.g. right after a write, under a sticky
+                                     read/write split). Omitted entirely when the running Laravel
+                                     version doesn't report it (< 12.45) or it's ambiguous. --}}
+                                <template x-if="selected()?.metadata?.connection_type">
+                                    <span class="rounded px-1 py-0.5 text-[10px] font-medium uppercase"
+                                          :class="({
+                                              write: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+                                              read: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+                                              direct: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+                                          })[selected()?.metadata?.connection_type]"
+                                          x-text="selected()?.metadata?.connection_type"></span>
+                                </template>
                             </dd>
                         </div>
                         <template x-if="selected()?.metadata?.location">
@@ -442,4 +463,28 @@
          class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 shadow-lg"
          :style="'top: ' + tooltip.top + 'px; left: ' + tooltip.left + 'px'"
          x-text="tooltip.text"></div>
+
+    {{-- Duplicate-SQL dot "heartbeat": two staggered rings expanding from
+         the dot and fading out, coloured via currentColor so one rule works
+         for every duplicate group's colour (see TimelineRow::$duplicateColor
+         and the `text-{color}-500` class applied alongside .monitor-heartbeat
+         in timeline-row.blade.php). Toggled on/off by heartbeatActive above. --}}
+    <style>
+        @keyframes monitor-heartbeat-ring {
+            from { transform: scale(1); opacity: 0.7; }
+            to { transform: scale(8); opacity: 0; }
+        }
+        .monitor-heartbeat::before,
+        .monitor-heartbeat::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 9999px;
+            background-color: currentColor;
+            animation: monitor-heartbeat-ring 2s ease-out infinite;
+        }
+        .monitor-heartbeat::after {
+            animation-delay: 0.5s;
+        }
+    </style>
 </x-monitor::card>

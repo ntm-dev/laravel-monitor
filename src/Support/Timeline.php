@@ -39,6 +39,18 @@ class Timeline
     ];
 
     /**
+     * Tailwind colour names handed out to duplicate-SQL groups on the
+     * timeline dot (see TimelineRow) — excludes blue (the default dot
+     * colour) and rose (exceptions) so a duplicate group is never confused
+     * with either. One group => one colour, picked deterministically from
+     * the normalized SQL shape so it stays the same across renders/reloads
+     * instead of reshuffling every page load.
+     */
+    protected const DUPLICATE_COLORS = [
+        'emerald', 'amber', 'fuchsia', 'cyan', 'violet', 'teal', 'orange', 'indigo', 'pink', 'lime',
+    ];
+
+    /**
      * @param  object  $root  the `request` row from Storage::findByRequestId()
      * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
      * @return TimelineEntry[]
@@ -67,7 +79,36 @@ class Timeline
                 ->all()
         );
 
+        self::assignDuplicateColors($events);
+
         return array_merge([$requestEntry], $phases, $events);
+    }
+
+    /**
+     * Groups this timeline's query entries by normalized SQL shape and
+     * stamps every entry in a group of 2+ with the same `duplicateColor`
+     * metadata — the EventSummary "N duplicates" badge highlights these
+     * dots with a heartbeat animation (see timeline-row.blade.php).
+     *
+     * @param  TimelineEntry[]  $entries
+     */
+    protected static function assignDuplicateColors(array $entries): void
+    {
+        $groups = collect($entries)
+            ->filter(fn (TimelineEntry $entry) => $entry->type === 'query')
+            ->groupBy(fn (TimelineEntry $entry) => $entry->metadata['key'] ?? $entry->label);
+
+        foreach ($groups as $key => $group) {
+            if ($group->count() < 2) {
+                continue;
+            }
+
+            $color = self::DUPLICATE_COLORS[crc32((string) $key) % count(self::DUPLICATE_COLORS)];
+
+            foreach ($group as $entry) {
+                $entry->metadata['duplicateColor'] = $color;
+            }
+        }
     }
 
     /**
@@ -101,14 +142,9 @@ class Timeline
     }
 
     /**
-     * Public so Http\Controllers\EventListController can reuse the same
-     * label/metadata mapping for its per-type "list every occurrence for
-     * this request/job/command" page, instead of a second copy of the
-     * type => label rules.
-     *
      * @param  TimelineEntry[]  $phases
      */
-    public static function eventEntry(object $row, array $phases): TimelineEntry
+    protected static function eventEntry(object $row, array $phases): TimelineEntry
     {
         $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 

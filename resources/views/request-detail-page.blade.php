@@ -20,7 +20,7 @@
                 />
                 <x-monitor::requests.body-section :body="$root->payload['body'] ?? null"/>
 
-                <x-monitor::requests.event-summary :summary="$summary" :event-urls="$eventUrls"/>
+                <x-monitor::requests.event-summary :summary="$summary"/>
 
                 <x-monitor::requests.timeline :entries="$timeline" :total-duration="$totalDuration"/>
 

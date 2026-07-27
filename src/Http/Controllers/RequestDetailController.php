@@ -6,7 +6,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
-use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline;
@@ -57,7 +56,6 @@ class RequestDetailController
             'timeline' => Timeline::build($root, $children),
             'totalDuration' => max(1, (int) ($root->duration ?? 0)),
             'summary' => $this->eventsSummary($root, $children),
-            'eventUrls' => $this->eventUrls($root, $requestId),
             'userName' => $userName,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
@@ -104,24 +102,5 @@ class RequestDetailController
         }
 
         return $summary;
-    }
-
-    /**
-     * Per-card "view every occurrence" link, one per EventSummary card key —
-     * see EventListController.
-     *
-     * @return array<string, string>
-     */
-    protected function eventUrls(object $root, string $requestId): array
-    {
-        $hash = KeyHash::for($root->key ?? '');
-
-        return collect(array_keys(EventListController::TYPES))
-            ->mapWithKeys(fn (string $type) => [$type => route('monitor.requests.routes.request.events', [
-                'hash' => $hash,
-                'requestId' => $requestId,
-                'type' => $type,
-            ])])
-            ->all();
     }
 }

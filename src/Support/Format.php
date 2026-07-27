@@ -31,6 +31,18 @@ class Format
     ];
 
     /**
+     * Badge classes for a query's actual PDO connection role — keyed by
+     * Illuminate\Database\Events\QueryExecuted::$readWriteType (null when
+     * running under a Laravel version that doesn't report it, or when it's
+     * ambiguous across a sampled group; see Recorders\Queries).
+     */
+    public const CONNECTION_TYPE_BADGES = [
+        'write' => 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+        'read' => 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        'direct' => 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-500 dark:text-neutral-400',
+    ];
+
+    /**
      * Render a millisecond duration the way Nightwatch does: "918ms", "1.73s".
      */
     public static function duration(int|float|null $milliseconds, string $fallback = '—'): string

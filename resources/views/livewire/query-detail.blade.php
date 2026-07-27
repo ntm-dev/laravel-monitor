@@ -4,11 +4,6 @@
 
     $fmt = fn ($ms) => Format::duration($ms);
     $tz = Format::timezone();
-
-    $typeBadgeClass = $isWrite
-        ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-        : 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400';
-    $typeLabel = $isWrite ? 'Write' : 'Read';
 @endphp
 <div wire:poll.{{ $refresh }}s>
     {{-- Info: metrics list on the left half, the full SQL as a nested card
@@ -47,8 +42,10 @@
                     <dd class="flex flex-wrap justify-end gap-1">
                         @forelse ($connections as $conn)
                             <span class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
-                                {{ $conn }}
-                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ $typeBadgeClass }}">{{ $typeLabel }}</span>
+                                {{ $conn['name'] }}
+                                @if ($conn['type'])
+                                    <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$conn['type']] }}">{{ $conn['type'] }}</span>
+                                @endif
                             </span>
                         @empty
                             <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">—</span>
@@ -116,6 +113,7 @@
                                 @php($commandName = $entry->payload['command'] ?? null)
                                 @php($location = $entry->payload['location'] ?? null)
                                 @php($connection = $entry->payload['connection'] ?? null)
+                                @php($connectionType = $entry->payload['connection_type'] ?? null)
                                 <tr class="{{ $requestUrl ? 'cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                     @if ($requestUrl) onclick="window.location='{{ $requestUrl }}'" @endif>
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
@@ -135,8 +133,8 @@
                                     <td class="py-2 pr-3">
                                         <span class="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-600 dark:text-neutral-300">
                                             {{ $connection ?? '—' }}
-                                            @if ($connection)
-                                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ $typeBadgeClass }}">{{ $typeLabel }}</span>
+                                            @if ($connectionType)
+                                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$connectionType] }}">{{ $connectionType }}</span>
                                             @endif
                                         </span>
                                     </td>
