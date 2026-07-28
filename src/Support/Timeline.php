@@ -107,12 +107,13 @@ class Timeline
 
             foreach ($group as $entry) {
                 $entry->metadata['duplicateColor'] = $color;
+                $entry->metadata['duplicateCount'] = $group->count();
             }
         }
     }
 
     /**
-     * @param  array<int, array{name: string, start: int, duration: int}>  $phases
+     * @param  array<int, array{name: string, start: float, duration: float}>  $phases
      * @return TimelineEntry[]
      */
     protected static function phaseEntries(array $phases): array
@@ -132,8 +133,8 @@ class Timeline
                 id: 'phase-'.$name,
                 type: $name,
                 label: self::PHASE_LABELS[$name] ?? ucfirst($name),
-                start: max(0, (int) $phase['start']),
-                duration: max(0, (int) $phase['duration']),
+                start: max(0.0, (float) $phase['start']),
+                duration: max(0.0, (float) $phase['duration']),
                 parentId: 'request',
             );
         }
@@ -149,7 +150,7 @@ class Timeline
         $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 
         $start = max(0.0, (float) ($row->start_offset ?? 0));
-        $duration = max(0.0, (float) ($row->duration ?? 0));
+        $duration = $row->duration !== null ? max(0.0, (float) $row->duration) : null;
 
         return new TimelineEntry(
             id: (string) $row->id,

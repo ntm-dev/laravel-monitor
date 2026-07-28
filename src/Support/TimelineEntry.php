@@ -16,7 +16,8 @@ class TimelineEntry
         public string $type,
         public string $label,
         public int|float $start,
-        public int|float $duration,
+        /** Null when the underlying event has no meaningful duration (e.g. an exception, a failed request) rather than a measured zero. */
+        public int|float|null $duration,
         public ?string $parentId = null,
         public array $metadata = [],
         public int $lane = 0,
@@ -25,6 +26,6 @@ class TimelineEntry
 
     public function end(): int|float
     {
-        return $this->start + $this->duration;
+        return $this->start + ($this->duration ?? 0);
     }
 }

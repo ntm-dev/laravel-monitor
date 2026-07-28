@@ -30,7 +30,7 @@
     // showTooltip() below (see timeline.blade.php).
     $tooltipText = match (true) {
         $kind === 'root' => $entry->label,
-        $kind === 'event' => $detail,
+        $kind === 'event' => $tooltipDetail,
         default => '',
     };
 @endphp
@@ -50,8 +50,12 @@
             @elseif ($kind === 'phase')
                 <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
             @else
-                <span class="relative h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"
-                      @if ($duplicateColor) :class="heartbeatActive ? 'monitor-heartbeat text-{{ $duplicateColor }}-500' : ''" @endif></span>
+                @if ($duplicateColor)
+                    <span class="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-{{ $duplicateColor }}-500 pl-px text-[8px] font-bold leading-none text-{{ $duplicateColor }}-500 dark:border-{{ $duplicateColor }}-400 dark:text-{{ $duplicateColor }}-400"
+                          :class="heartbeatActive ? 'monitor-heartbeat' : ''">D</span>
+                @else
+                    <span class="relative h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"></span>
+                @endif
                 <span class="shrink-0 font-mono text-[11px] font-medium {{ $badgeTextColor }}">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
             @endif
@@ -79,21 +83,25 @@
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
-                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                    @if ($durationLabel !== '')
+                        <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                    @endif
                 </div>
             @else
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded {{ $barColor }}"
                       @if ($detailable) :class="selectedId === '{{ $entry->id }}' ? 'ring-1 ring-blue-500' : ''" @endif>
-                    @if ($detail !== '')
+                    @if ($tooltipDetail !== '')
                         <div class="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1.5 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 opacity-0 shadow-lg transition-opacity duration-100"
                              :class="hoveredId === '{{ $entry->id }}' ? 'visible opacity-100' : ''">
-                            {{ $detail }}
+                            {{ $tooltipDetail }}
                         </div>
                     @endif
                 </span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] font-medium text-neutral-700 dark:text-neutral-200">{{ $badge }}</span>
-                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                    @if ($durationLabel !== '')
+                        <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                    @endif
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detailShort }}</span>
                 </div>
             @endif
