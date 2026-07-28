@@ -82,11 +82,17 @@ class TimelineRow extends Component
     /** Detail clamped for the inline chart label. */
     public string $detailShort;
 
+    /** Same as {@see $detail}, prefixed with the duplicate count — only ever shown in a hover tooltip, never inline. */
+    public string $tooltipDetail;
+
     /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}. */
     public string $color;
 
     /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. */
     public ?string $duplicateColor;
+
+    /** Number of entries sharing this duplicate-SQL group, null when this entry isn't a duplicate. */
+    public ?int $duplicateCount;
 
     /** Badge text colour per event type, matching {@see $color}; neutral by default. */
     public string $badgeTextColor;
@@ -124,10 +130,11 @@ class TimelineRow extends Component
         public string $rootLabel = 'REQUEST',
     ) {
         $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
-        $this->width = $total > 0 ? min(100 - $this->left, max(0.15, ($entry->duration / $total) * 100)) : 0.15;
-        $this->durationLabel = Format::duration($entry->duration);
+        $this->width = $total > 0 ? min(100 - $this->left, max(0.15, (($entry->duration ?? 0) / $total) * 100)) : 0.15;
+        $this->durationLabel = $entry->duration !== null ? Format::duration($entry->duration) : '';
         $this->badge = self::badgeFor($entry->type);
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
+        $this->duplicateCount = $entry->metadata['duplicateCount'] ?? null;
         $this->color = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_COLOR,
             $this->duplicateColor !== null => "border border-{$this->duplicateColor}-500 bg-{$this->duplicateColor}-500 dark:border-{$this->duplicateColor}-400 dark:bg-{$this->duplicateColor}-400",
@@ -160,6 +167,9 @@ class TimelineRow extends Component
         $this->detailable = $kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true);
         $this->detail = $this->resolveDetail();
         $this->detailShort = Str::limit($this->detail, 90);
+        $this->tooltipDetail = $this->duplicateCount !== null
+            ? "Called {$this->duplicateCount} " . Str::plural('time', $this->duplicateCount) . " — {$this->detail}"
+            : $this->detail;
         if ($kind === 'root' && isset($entry->metadata['status'])) {
             $this->status = (int) $entry->metadata['status'];
             $this->statusBadgeClass = self::STATUS_BADGE_COLORS[self::severity($this->status)];

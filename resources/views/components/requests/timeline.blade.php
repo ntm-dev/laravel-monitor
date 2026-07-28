@@ -21,8 +21,19 @@
      the card its own stacking context contains every z-index inside it, so
      the page header (outside this context) always wins instead. All data is
      precomputed by View\Components\Requests\Timeline; this template only
-     renders it. --}}
-<x-monitor::card id="timeline" class="isolate overflow-hidden p-0"
+     renders it.
+
+     Corners are clipped with `clip-path`, not `overflow-hidden`, because the
+     selected-event detail panel further down is `position: sticky` and is a
+     *descendant* of this card: `overflow: hidden/auto/scroll` on an ancestor
+     makes that ancestor the sticky-tracking scroll container per the CSS
+     Overflow spec, and since this card itself never scrolls (the window
+     does), that silently turns the panel's `sticky` into a no-op — it just
+     rides away with the rest of the card instead of pinning to the
+     viewport. `clip-path` still rounds the same corners but, unlike
+     `overflow`, doesn't establish a scroll container, so the sticky panel
+     keeps tracking the real (window) scroll. --}}
+<x-monitor::card id="timeline" class="isolate p-0 [clip-path:inset(0_round_0.5rem)]"
      @monitor-duplicates-heartbeat.window="
          heartbeatActive = true;
          clearTimeout(heartbeatTimer);
@@ -46,6 +57,7 @@
          heartbeatActive: false,
          heartbeatTimer: null,
          tooltip: { text: '', top: 0, left: 0 },
+         sqlCopied: false,
          dragging: false,
          dragMoved: false,
          dragStartX: 0,
@@ -64,11 +76,21 @@
          sqlHighlighted() {
              const sql = this.selected()?.metadata?.sql;
              if (! sql) return '';
-             return window.hljs ? window.hljs.highlight(sql, { language: 'sql', ignoreIllegals: true }).value : sql;
+             {{-- 'mysql' dialect, not the generic 'sql' one, because the
+                  generic dialect doesn't know backtick-quoted identifiers
+                  and pads them with stray spaces (`` `users` `` → `` ` users ` ``);
+                  Laravel's query builder backtick-quotes on every grammar it
+                  ships except Postgres/SQL Server, so this is the right
+                  default even for a non-MySQL connection's recorded SQL. --}}
+             const formatted = window.sqlFormatter ? window.sqlFormatter.format(sql, { language: 'mysql' }) : sql;
+             return window.hljs ? window.hljs.highlight(formatted, { language: 'sql', ignoreIllegals: true }).value : formatted;
          },
          copySql() {
              const sql = this.selected()?.metadata?.sql;
-             if (sql) navigator.clipboard.writeText(sql);
+             if (! sql) return;
+             navigator.clipboard.writeText(sql);
+             this.sqlCopied = true;
+             setTimeout(() => this.sqlCopied = false, 1500);
          },
          // Fixed-position, not the row's own absolutely-positioned child: the
          // pinned tree pane clips overflow to hold its column width steady
@@ -235,16 +257,23 @@
              the outer flex item) so it pins near the top of the viewport for
              as long as the row list beside it is tall enough to scroll
              through, instead of scrolling away with the rows the moment you
-             pass its own — much shorter — content height. `top-32` clears
-             the dashboard's own sticky page header (~120px) so the two don't
-             overlap. --}}
+             pass its own — much shorter — content height. `sticky` alone is
+             a no-op without an explicit offset, so `top-[120px]` sits the
+             panel flush against the bottom of the dashboard's own sticky
+             page header (measured at exactly 120px — back link + title row
+             + subtitle row, all three pages sharing this Timeline component
+             use the same header structure/padding) instead of leaving a
+             gap. Matches the `120px` already baked into
+             `max-h-[calc(100vh-120px)]` below, so the panel's sticky
+             position plus its own max-height exactly reaches the bottom of
+             the viewport. --}}
         {{-- No x-transition here on purpose: with it, Alpine silently failed
              to show this specific panel on the very first selection after
              page load (stayed at width 0 until toggled a second time) —
              verified by removing just x-transition, everything else equal.
              Plain x-show still switches display instantly and correctly. --}}
         <div x-show="selectedId !== null" class="w-80 shrink-0">
-            <div class="sticky top-32 max-h-[calc(100vh-9rem)] divide-y divide-neutral-200 overflow-y-auto bg-neutral-50 dark:divide-neutral-800 dark:bg-neutral-900/50">
+            <div class="sticky top-[120px] max-h-[calc(100vh-120px)] divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
                         <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400" x-text="selected()?.badge"></h3>
@@ -282,7 +311,8 @@
                         <div class="mb-1.5 flex items-center justify-between">
                             <span class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">SQL</span>
                             <button type="button" @click="copySql()" title="Copy" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
-                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5"/>
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! sqlCopied"/>
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="sqlCopied" x-cloak/>
                             </button>
                         </div>
                         <div class="max-h-64 overflow-auto">
@@ -472,7 +502,7 @@
     <style>
         @keyframes monitor-heartbeat-ring {
             from { transform: scale(1); opacity: 0.7; }
-            to { transform: scale(8); opacity: 0; }
+            to { transform: scale(2.5); opacity: 0; }
         }
         .monitor-heartbeat::before,
         .monitor-heartbeat::after {

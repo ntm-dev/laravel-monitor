@@ -42,8 +42,19 @@ class Format
         'direct' => 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-500 dark:text-neutral-400',
     ];
 
+    /** Duration units, largest first, as [milliseconds-per-unit, suffix]. */
+    protected const DURATION_UNITS = [
+        [3_600_000, 'h'],
+        [60_000, 'm'],
+        [1_000, 's'],
+        [1, 'ms'],
+    ];
+
     /**
      * Render a millisecond duration the way Nightwatch does: "918ms", "1.73s".
+     * Walks the unit ladder (h, m, s, ms) largest-first and uses the first
+     * one the value reaches 1 of; anything under 1ms drops to μs so it
+     * doesn't round away to "0ms".
      */
     public static function duration(int|float|null $milliseconds, string $fallback = '—'): string
     {
@@ -51,8 +62,14 @@ class Format
             return $fallback;
         }
 
-        if ($milliseconds >= 1000) {
-            return rtrim(rtrim(number_format($milliseconds / 1000, 2), '0'), '.').'s';
+        foreach (self::DURATION_UNITS as [$unitMs, $suffix]) {
+            if ($milliseconds >= $unitMs) {
+                return rtrim(rtrim(number_format($milliseconds / $unitMs, 2), '0'), '.').$suffix;
+            }
+        }
+
+        if ($milliseconds > 0) {
+            return rtrim(rtrim(number_format($milliseconds * 1000, 2), '0'), '.').'μs';
         }
 
         return rtrim(rtrim(number_format($milliseconds, 2), '0'), '.').'ms';

@@ -28,9 +28,9 @@ class Monitor
      * @var array{
      *     id: string,
      *     start: float,
-     *     phases: array<int, array{name: string, start: int, duration: int}>,
+     *     phases: array<int, array{name: string, start: float, duration: float}>,
      *     stage: string,
-     *     stage_start: int,
+     *     stage_start: float,
      *     queries: int,
      *     models: int,
      * }|null
@@ -186,7 +186,7 @@ class Monitor
             'models' => 0,
         ];
 
-        $elapsed = $this->elapsedMs();
+        $elapsed = $this->elapsedMsPrecise();
 
         $this->recordPhase('bootstrap', 0, $elapsed);
         $this->request['stage_start'] = $elapsed;
@@ -347,9 +347,10 @@ class Monitor
     /**
      * Milliseconds elapsed since the request started, to 3 decimal places
      * (microsecond precision). Used wherever a recorded `duration` or
-     * `start_offset` is derived from wall-clock time; lifecycle phase
-     * boundaries (bootstrap/middleware/...) stay whole milliseconds via
-     * elapsedMs() — they're only used for layout, not stored precisely.
+     * `start_offset` is derived from wall-clock time, including lifecycle
+     * phase boundaries (bootstrap/middleware/...) — a whole-millisecond
+     * elapsedMs() would round phases shorter than 1ms (e.g. "sending") down
+     * to a reported 0ms.
      */
     public function elapsedMsPrecise(): ?float
     {
@@ -444,7 +445,7 @@ class Monitor
             return;
         }
 
-        $now = $this->elapsedMs();
+        $now = $this->elapsedMsPrecise();
 
         $this->recordPhase($this->request['stage'], $this->request['stage_start'], $now - $this->request['stage_start']);
 
@@ -452,8 +453,8 @@ class Monitor
         $this->request['stage_start'] = $now;
     }
 
-    /** Append a named lifecycle phase (offsets/durations in ms). */
-    public function recordPhase(string $name, int $start, int $duration): void
+    /** Append a named lifecycle phase (offsets/durations in ms, microsecond precision). */
+    public function recordPhase(string $name, int|float $start, int|float $duration): void
     {
         if ($this->request === null) {
             return;
@@ -484,14 +485,14 @@ class Monitor
 
         $this->pendingRequest = null;
 
-        $elapsed = $this->elapsedMs();
+        $elapsed = $this->elapsedMsPrecise();
 
         $this->recordPhase($this->request['stage'], $this->request['stage_start'], $elapsed - $this->request['stage_start']);
 
         $entry->payload['phases'] = $this->request['phases'];
         $entry->payload['query_count'] = $this->request['queries'];
         $entry->payload['model_count'] = $this->request['models'];
-        $entry->duration = max($entry->duration ?? 0.0, $this->elapsedMsPrecise() ?? 0.0);
+        $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
     }
 
     /**
