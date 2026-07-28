@@ -4,6 +4,16 @@
 
     $fmt = fn ($ms) => Format::duration($ms);
     $tz = Format::timezone();
+
+    $recipients = $entry !== null ? collect([
+        'TO' => $entry->payload['to_count'] ?? 0,
+        'CC' => $entry->payload['cc_count'] ?? 0,
+        'BCC' => $entry->payload['bcc_count'] ?? 0,
+    ])->filter(fn ($count, $label) => $count > 0 || $label === 'TO')
+        ->map(fn ($count, $label) => $count.' '.$label)
+        ->implode(' / ') : '';
+
+    $attachmentNames = $entry !== null ? ($entry->payload['attachment_names'] ?? []) : [];
 @endphp
 <div wire:poll.{{ $refresh }}s>
     @if ($entry === null)
@@ -13,6 +23,13 @@
             <div class="md:w-1/2">
                 <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Info</h3>
                 <dl class="flex flex-col gap-3">
+                    @if ($recipients !== '')
+                        <div class="flex max-w-full items-baseline gap-2">
+                            <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Recipients</dt>
+                            <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                            <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $recipients }}</dd>
+                        </div>
+                    @endif
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">To</dt>
                         <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
@@ -40,7 +57,11 @@
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Attachments</dt>
                         <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
-                        <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $entry->payload['attachments'] ?? 0 }}</dd>
+                        @if ($attachmentNames !== [])
+                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ implode(', ', $attachmentNames) }}">{{ count($attachmentNames) }} ({{ implode(', ', $attachmentNames) }})</dd>
+                        @else
+                            <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $entry->payload['attachments'] ?? 0 }}</dd>
+                        @endif
                     </div>
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Duration</dt>
@@ -66,12 +87,12 @@
                        class="flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20">
                         <span class="flex items-center gap-2">
                             <x-monitor::icon :path="Icons::NOTIFICATIONS" class="h-4 w-4"/>
-                            Sent via notification: {{ class_basename($notification->payload['notification'] ?? $notification->key) }}
+                            Sent via notification: {{ $notification->payload['notification'] ?? $notification->key }}
                         </span>
                         <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-4 w-4"/>
                     </a>
                 @elseif (filled($entry->payload['notification'] ?? null))
-                    <p class="text-xs text-neutral-400 dark:text-neutral-500">Sent via notification {{ class_basename($entry->payload['notification']) }}, but its entry could not be found — it may have been purged.</p>
+                    <p class="text-xs text-neutral-400 dark:text-neutral-500">Sent via notification {{ $entry->payload['notification'] }}, but its entry could not be found — it may have been purged.</p>
                 @endif
             </div>
         </x-monitor::card>

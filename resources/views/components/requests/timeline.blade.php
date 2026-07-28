@@ -73,6 +73,24 @@
              const line = this.selected()?.metadata?.line;
              return file ? (line ? file + ':' + line : file) : '';
          },
+         mailRecipients() {
+             const m = this.selected()?.metadata;
+             if (! m) return '';
+             const parts = [];
+             if (m.to_count) parts.push(m.to_count + ' TO');
+             if (m.cc_count) parts.push(m.cc_count + ' CC');
+             if (m.bcc_count) parts.push(m.bcc_count + ' BCC');
+             return parts.join(' / ');
+         },
+         mailAttachments() {
+             const names = this.selected()?.metadata?.attachment_names || [];
+             const count = this.selected()?.metadata?.attachments || 0;
+             return names.length ? count + ' (' + names.join(', ') + ')' : String(count);
+         },
+         mailClass() {
+             const m = this.selected()?.metadata;
+             return m?.mailable || m?.notification || '';
+         },
          sqlHighlighted() {
              const sql = this.selected()?.metadata?.sql;
              if (! sql) return '';
@@ -136,7 +154,19 @@
              this.$refs.scrollArea.scrollLeft = this.dragScrollStart - dx;
          },
          stopDrag() { this.dragging = false },
-         selectRow(id) { if (! this.dragMoved) this.selectedId = (this.selectedId === id ? null : id) },
+         selectRow(id) {
+             if (this.dragMoved) return;
+             this.selectedId = (this.selectedId === id ? null : id);
+             if (this.selectedId === null) return;
+             // The tree pane's row is always vertically in view (it's what was
+             // just clicked) but the chart pane scrolls independently on its
+             // own horizontal axis — when zoomed in, the matching bar can sit
+             // outside the current scroll window entirely. 'nearest' is a
+             // no-op if it's already visible, so this never fights a click
+             // that didn't need scrolling.
+             const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
+             bar?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+         },
      }">
     <div class="flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
         <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
@@ -420,20 +450,56 @@
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Subject</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.subject" x-text="selected()?.metadata?.subject"></dd>
                         </div>
+                        <template x-if="mailRecipients()">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Recipients</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" x-text="mailRecipients()"></dd>
+                            </div>
+                        </template>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">To</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.to" x-text="selected()?.metadata?.to"></dd>
                         </div>
+                        <template x-if="selected()?.metadata?.cc">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Cc</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.cc" x-text="selected()?.metadata?.cc"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.bcc">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Bcc</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.bcc" x-text="selected()?.metadata?.bcc"></dd>
+                            </div>
+                        </template>
                         <template x-if="selected()?.metadata?.notification">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Via</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.notification" x-text="selected()?.metadata?.notification"></dd>
                             </div>
                         </template>
+                        <template x-if="selected()?.metadata?.attachments">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Attachments</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="mailAttachments()" x-text="mailAttachments()"></dd>
+                            </div>
+                        </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration + 'ms'"></dd>
                         </div>
+                        <template x-if="mailClass()">
+                            <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
+                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="mailClass()" x-text="mailClass()"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.mailer">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Mailer</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.mailer"></dd>
+                            </div>
+                        </template>
                     </dl>
                 </template>
 

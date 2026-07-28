@@ -98,7 +98,7 @@
                                         <x-monitor::icon :path="Icons::PRIORITY" :stroke="2" class="h-4 w-4 {{ $priorityColor($exception->priority) }}"/>
                                     </td>
                                     <td class="max-w-[26rem] cursor-pointer py-2.5 pr-3" onclick="window.location='{{ route('monitor.issues.show', $exception->uuid) }}'">
-                                        <p class="truncate font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200">{{ class_basename($exception->latest['class'] ?? $exception->key) }}</p>
+                                        <p class="truncate font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200" title="{{ $exception->latest['class'] ?? $exception->key }}">{{ $exception->latest['class'] ?? $exception->key }}</p>
                                         @if (($exception->latest['message'] ?? '') !== '')
                                             <p class="mt-0.5 line-clamp-1 text-xs text-neutral-400 dark:text-neutral-500">{{ $exception->latest['message'] }}</p>
                                         @endif

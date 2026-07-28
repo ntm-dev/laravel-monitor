@@ -159,7 +159,6 @@ class Exceptions extends Card
         return (object) [
             'key' => $group->key,
             'class' => $group->class,
-            'class_short' => class_basename($group->class),
             'message' => $group->message,
             'file' => $group->file,
             'line' => $group->line,

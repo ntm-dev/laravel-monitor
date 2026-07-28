@@ -21,7 +21,7 @@ class NotificationHeading
     {
         if (! ctype_digit($key)) {
             return new Heading(
-                heading: class_basename($key),
+                heading: $key,
                 titleAttr: $key,
                 pageTitle: class_basename($key),
             );
@@ -39,7 +39,7 @@ class NotificationHeading
         return new Heading(
             badge: $channel,
             badgeClass: 'bg-neutral-200/70 text-neutral-600',
-            heading: class_basename($class),
+            heading: $class,
             titleAttr: $class,
             pageTitle: class_basename($class),
         );
