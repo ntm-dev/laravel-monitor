@@ -48,13 +48,18 @@
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
             @elseif ($kind === 'phase')
-                <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
+                <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
+                @if ($entry->metadata['controller'] ?? null)
+                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500" title="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
+                @endif
             @else
                 @if ($duplicateColor)
                     <span class="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-{{ $duplicateColor }}-500 pl-px text-[8px] font-bold leading-none text-{{ $duplicateColor }}-500 dark:border-{{ $duplicateColor }}-400 dark:text-{{ $duplicateColor }}-400"
                           :class="heartbeatActive ? 'monitor-heartbeat' : ''">D</span>
                 @else
-                    <span class="relative h-1.5 w-1.5 shrink-0 rounded-full {{ $color }}"></span>
+                    <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                        <span class="relative h-1.5 w-1.5 rounded-full {{ $color }}"></span>
+                    </span>
                 @endif
                 <span class="shrink-0 font-mono text-[11px] font-medium {{ $badgeTextColor }}">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
@@ -67,7 +72,7 @@
          timeline.blade.php) — first in the timeline == first chronologically. --}}
     <div class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
         <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable])
-             style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px"
+             style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
              @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
             @if ($kind === 'root')
@@ -85,6 +90,9 @@
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
                     @if ($durationLabel !== '')
                         <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                    @endif
+                    @if ($entry->metadata['controller'] ?? null)
+                        <span class="max-w-sm truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" title="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
                     @endif
                 </div>
             @else

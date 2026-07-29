@@ -16,7 +16,7 @@
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Notification</dt>
                         <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
-                        <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ $entry->payload['notification'] ?? $entry->key }}">{{ class_basename($entry->payload['notification'] ?? $entry->key) }}</dd>
+                        <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ $entry->payload['notification'] ?? $entry->key }}">{{ $entry->payload['notification'] ?? $entry->key }}</dd>
                     </div>
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Channel</dt>

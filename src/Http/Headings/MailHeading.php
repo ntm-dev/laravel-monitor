@@ -21,7 +21,7 @@ class MailHeading
     {
         if (! ctype_digit($key)) {
             return new Heading(
-                heading: class_basename($key),
+                heading: $key,
                 titleAttr: $key,
                 pageTitle: class_basename($key),
             );

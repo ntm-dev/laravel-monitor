@@ -71,7 +71,7 @@ class Timeline
             metadata: array_filter(['status' => $root->payload['status'] ?? null], fn ($value) => $value !== null),
         );
 
-        $phases = self::phaseEntries($root->payload['phases'] ?? []);
+        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null);
 
         $events = self::assignLanes(
             $children->reject(fn (object $row) => $row->type === 'log')
@@ -114,9 +114,13 @@ class Timeline
 
     /**
      * @param  array<int, array{name: string, start: float, duration: float}>  $phases
+     * @param  string|null  $routeAction  the request root's "Controller@method" (see
+     *                                    Recorders\Requests::routeAction()) — surfaced on the
+     *                                    controller phase row, since "Controller" alone names
+     *                                    nothing.
      * @return TimelineEntry[]
      */
-    protected static function phaseEntries(array $phases): array
+    protected static function phaseEntries(array $phases, ?string $routeAction = null): array
     {
         $byName = collect($phases)->keyBy('name');
 
@@ -136,6 +140,7 @@ class Timeline
                 start: max(0.0, (float) $phase['start']),
                 duration: max(0.0, (float) $phase['duration']),
                 parentId: 'request',
+                metadata: $name === 'controller' && $routeAction !== null ? ['controller' => $routeAction] : [],
             );
         }
 
@@ -193,9 +198,10 @@ class Timeline
         return match ($row->type) {
             'slow_query' => 'Query',
             'cache' => ucfirst($row->subtype ?? 'cache').' · '.($row->key ?? ''),
-            'mail' => $row->payload['subject'] ?? $row->key ?? $fallback,
-            'notification', 'job' => class_basename($row->key ?? $fallback),
-            'exception' => class_basename($row->payload['class'] ?? $row->key ?? $fallback),
+            'mail' => $row->key ?? $fallback,
+            'notification' => $row->key ?? $fallback,
+            'job' => $row->key ?? $fallback,
+            'exception' => $row->payload['class'] ?? $row->key ?? $fallback,
             'lazy_loading' => class_basename($row->payload['model'] ?? $row->key ?? $fallback).'::'.($row->payload['relation'] ?? ''),
             default => $row->key ?? $fallback,
         };

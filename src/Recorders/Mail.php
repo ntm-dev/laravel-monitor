@@ -42,12 +42,24 @@ class Mail extends Recorder
             $to = $addresses($message->getTo());
             $cc = $addresses($message->getCc());
             $bcc = $addresses($message->getBcc());
+            $toCount = count($message->getTo());
+            $ccCount = count($message->getCc());
+            $bccCount = count($message->getBcc());
+            $attachmentNames = collect($message->getAttachments())
+                ->map(fn ($part) => $part->getFilename())
+                ->filter()
+                ->values()
+                ->all();
             $attachments = count($message->getAttachments());
         } catch (Throwable) {
             $subject = '(unknown)';
             $to = '';
             $cc = '';
             $bcc = '';
+            $toCount = 0;
+            $ccCount = 0;
+            $bccCount = 0;
+            $attachmentNames = [];
             $attachments = 0;
         }
 
@@ -74,10 +86,14 @@ class Mail extends Recorder
                 'to' => Str::limit($to, 250),
                 'cc' => Str::limit($cc, 250),
                 'bcc' => Str::limit($bcc, 250),
+                'to_count' => $toCount,
+                'cc_count' => $ccCount,
+                'bcc_count' => $bccCount,
                 'mailer' => $event->data['mailer'] ?? null,
                 'mailable' => is_string($mailable) ? $mailable : null,
                 'notification' => is_string($notification) ? $notification : null,
                 'attachments' => $attachments > 0 ? $attachments : null,
+                'attachment_names' => $attachmentNames !== [] ? $attachmentNames : null,
                 'correlation_id' => is_string($notification) ? $this->monitor->pendingNotificationCorrelationId() : null,
             ]),
             duration: $duration,

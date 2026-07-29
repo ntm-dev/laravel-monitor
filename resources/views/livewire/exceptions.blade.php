@@ -86,7 +86,7 @@
                                         <x-monitor::status-badge :handled="$group->handled"/>
                                     </td>
                                     <td class="max-w-[26rem] py-2.5 pr-3">
-                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-800 dark:text-neutral-200' }}" title="{{ $group->class }}">{{ $group->class_short }}</p>
+                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-800 dark:text-neutral-200' }}" title="{{ $group->class }}">{{ $group->class }}</p>
                                         @if (filled($group->message))
                                             <p class="mt-0.5 truncate text-xs text-neutral-400 dark:text-neutral-500" title="{{ $group->message }}">{{ $group->message }}</p>
                                         @elseif (filled($group->file))
