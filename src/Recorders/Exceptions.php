@@ -59,28 +59,31 @@ class Exceptions extends Recorder
     }
 
     /**
-     * Structured, Ignition-style frames: the throw site followed by the call
-     * stack, each tagged as application or vendor code.
+     * Structured, Ignition-style frames — the call stack from the throw site
+     * outward, each tagged as application or vendor code.
      *
      * @return array<int, array{file: string, line: int, function: string|null, label: string, vendor: bool}>
      */
     protected function frames(Throwable $exception): array
     {
-        $frames = [[
-            'file' => $exception->getFile(),
-            'line' => $exception->getLine(),
-            'function' => null,
-            'class' => null,
-            'type' => null,
-        ]];
+        $trace = $exception->getTrace();
 
-        foreach ($exception->getTrace() as $frame) {
-            $frames[] = $frame + ['file' => '[internal]', 'line' => 0];
-
-            if (count($frames) >= 30) {
-                break;
-            }
+        // Mirrors Laravel's own Foundation\Exceptions\Renderer\Exception::
+        // frames(): trace[0]'s own file/line is already the throw site (it's
+        // literally where $exception->getFile()/getLine() come from), so
+        // prepending a second frame built from those same two values — as
+        // this method used to — just duplicated it under a meaningless
+        // "{main}" label. The only real gap is that trace[0] sometimes has
+        // no class/function of its own; when that happens, borrow it from
+        // trace[1] instead of showing a blank frame.
+        if (count($trace) > 1 && empty($trace[0]['class'] ?? null) && empty($trace[0]['function'] ?? null)) {
+            $trace[0]['class'] = $trace[1]['class'] ?? null;
+            $trace[0]['type'] = $trace[1]['type'] ?? null;
+            $trace[0]['function'] = $trace[1]['function'] ?? null;
+            $trace[0]['args'] = $trace[1]['args'] ?? [];
         }
+
+        $frames = array_map(fn ($frame) => $frame + ['file' => '[internal]', 'line' => 0], array_slice($trace, 0, 30));
 
         return array_map(function ($frame) {
             $file = $this->relativePath($frame['file'] ?? '[internal]');
@@ -92,8 +95,32 @@ class Exceptions extends Recorder
                 'function' => $function !== '' ? $function : null,
                 'label' => $function !== '' ? $function : '{main}',
                 'vendor' => $this->isVendor($file),
+                // Argument *types* only (mirrors Laravel's own renderer,
+                // Foundation\Exceptions\Renderer\Frame::args() /
+                // Symfony's FlattenException::flattenArgs()) — never the
+                // actual values, so a request/model/password passed into a
+                // throwing call never ends up sitting in monitor_entries.
+                'args' => $this->argTypes($frame['args'] ?? []),
             ];
         }, $frames);
+    }
+
+    /**
+     * @param  array<mixed>  $args
+     * @return list<string>
+     */
+    protected function argTypes(array $args): array
+    {
+        return array_values(array_map(fn ($value) => match (true) {
+            is_object($value) => 'object('.get_class($value).')',
+            is_array($value) => 'array',
+            is_null($value) => 'null',
+            is_bool($value) => 'boolean',
+            is_int($value) => 'integer',
+            is_float($value) => 'float',
+            is_resource($value) => 'resource',
+            default => 'string',
+        }, $args));
     }
 
     protected function isVendor(string $path): bool

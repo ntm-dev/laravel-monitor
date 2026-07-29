@@ -40,7 +40,13 @@
 
         {{-- Stack trace --}}
         <div class="mt-6">
-            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/2 dark:shadow-black/20 overflow-hidden">
+            {{-- dark:bg-white/5, not /2: this app loads Tailwind via the
+                 cdn.tailwindcss.com script, whose JIT only generates
+                 color-opacity modifiers on the default scale
+                 (0/5/10/20/25/...); `/2` silently compiled to nothing,
+                 leaving this card stuck on its light-mode `bg-white`
+                 regardless of theme. --}}
+            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
                 <div class="flex flex-col gap-3 p-4 md:p-5"
                      x-data="{ copied: false, copy() {
                          navigator.clipboard.writeText(@js($markdown)).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1600); });

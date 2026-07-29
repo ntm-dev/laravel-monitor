@@ -104,6 +104,10 @@ trait BuildsExceptionDetail
             'main' => $main,
             'has_code' => $lines !== [],
             'lines' => $lines,
+            // Type placeholders only (see Recorders\Exceptions::argTypes()) —
+            // absent on exceptions recorded before this field existed, hence
+            // the default.
+            'args' => $frame['args'] ?? [],
         ];
     }
 
@@ -140,7 +144,20 @@ trait BuildsExceptionDetail
             return [null, null];
         }
 
-        $path = base_path($relative);
+        // Recorders\Exceptions::relativePath() strips the recording app's own
+        // base_path() prefix, but a frame can point outside that tree
+        // entirely — e.g. this package installed as a composer `path` repo
+        // symlink (see CLAUDE.local.md), where PHP resolves the symlinked
+        // vendor/ntm-dev/laravel-monitor/... frame to its real target
+        // directory, a sibling of the consuming app, not a subdirectory of
+        // it. relativePath()'s str_replace() then has nothing to strip and
+        // silently returns the path unchanged (still absolute). Blindly
+        // prefixing that with base_path() again here produced a nonsense,
+        // non-existent double path, so is_file() always failed, has_code
+        // stayed false, and the frame could never expand.
+        $path = str_starts_with($relative, DIRECTORY_SEPARATOR) || preg_match('#^[A-Za-z]:[\\\\/]#', $relative) === 1
+            ? $relative
+            : base_path($relative);
 
         if (! is_file($path) || ! is_readable($path)) {
             return [null, null];
