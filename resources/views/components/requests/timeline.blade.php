@@ -161,14 +161,37 @@
              // The tree pane's row is always vertically in view (it's what was
              // just clicked) but the chart pane scrolls independently on its
              // own horizontal axis — when zoomed in, the matching bar can sit
-             // outside the current scroll window entirely. 'nearest' is a
-             // no-op if it's already visible, so this never fights a click
-             // that didn't need scrolling.
-             const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
-             bar?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+             // outside the current scroll window entirely.
+             // $nextTick matters here: opening the detail panel shrinks the
+             // chart pane's width by 320px (it's a flex sibling), but that
+             // hasn't been applied to the DOM yet at the point selectedId is
+             // set above — scrollIntoView run synchronously would measure the
+             // pane's old, wider bounds. Waiting a tick lets Alpine flush the
+             // panel's layout change first, so the scroll math uses the
+             // narrower, final width.
+             // inline: 'center' (not 'nearest') because 'nearest' only scrolls
+             // the minimum distance needed, which parks the bar flush against
+             // whichever edge it entered from — and the right edge of this
+             // pane is the detail panel's own left border, so a bar arriving
+             // from the right ends up sitting right on top of that seam,
+             // reading as still covered. Centering it always leaves clear
+             // space on both sides regardless of which edge it was outside.
+             this.$nextTick(() => {
+                 const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
+                 bar?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+             });
          },
      }">
-    <div class="flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
+    {{-- Sticky at top-[120px] for the same reason the detail panel below is:
+         flush against the bottom of the dashboard's own sticky page header
+         (see components/header.blade.php's `sticky top-0`, measured at
+         120px). z-20 (not the z-10 used elsewhere in this card) so it stays
+         above the rows pane's own sticky bar labels as they scroll
+         underneath it, and it needs its own opaque background — sticky
+         content doesn't get one for free — matching x-monitor::card's
+         `bg-white dark:bg-neutral-900` so scrolled-past rows don't show
+         through. --}}
+    <div class="sticky top-[120px] z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">Timeline</h2>
             <div class="flex items-center gap-1.5">
@@ -288,22 +311,27 @@
              as long as the row list beside it is tall enough to scroll
              through, instead of scrolling away with the rows the moment you
              pass its own — much shorter — content height. `sticky` alone is
-             a no-op without an explicit offset, so `top-[120px]` sits the
-             panel flush against the bottom of the dashboard's own sticky
-             page header (measured at exactly 120px — back link + title row
-             + subtitle row, all three pages sharing this Timeline component
-             use the same header structure/padding) instead of leaving a
-             gap. Matches the `120px` already baked into
-             `max-h-[calc(100vh-120px)]` below, so the panel's sticky
-             position plus its own max-height exactly reaches the bottom of
-             the viewport. --}}
+             a no-op without an explicit offset, so `top-[169px]` sits the
+             panel flush against the bottom of the timeline's own sticky
+             title/zoom/ruler header above (`top-[120px] ... z-20` a bit up
+             from here) — 120px for the dashboard's own sticky page header
+             (back link + title row + subtitle row, all three pages sharing
+             this Timeline component use the same header structure/padding)
+             plus that header row's own rendered height (49px). Using the
+             same `top-[120px]` as that header would make the two sticky
+             elements land on the exact same viewport band, and whichever
+             paints later (this panel, being later in the DOM) would cover
+             the header instead of sitting below it. Matches the `169px`
+             already baked into `max-h-[calc(100vh-169px)]` below, so the
+             panel's sticky position plus its own max-height exactly reaches
+             the bottom of the viewport. --}}
         {{-- No x-transition here on purpose: with it, Alpine silently failed
              to show this specific panel on the very first selection after
              page load (stayed at width 0 until toggled a second time) —
              verified by removing just x-transition, everything else equal.
              Plain x-show still switches display instantly and correctly. --}}
         <div x-show="selectedId !== null" class="w-80 shrink-0">
-            <div class="sticky top-[120px] max-h-[calc(100vh-120px)] divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
+            <div class="sticky top-[169px] max-h-[calc(100vh-169px)] divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
                         <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400" x-text="selected()?.badge"></h3>
@@ -324,6 +352,12 @@
                         </template>
                         <template x-if="selected()?.type === 'mail'">
                             <a :href="selected()?.mailUrl" title="View Mail"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <template x-if="selected()?.type === 'exception'">
+                            <a :href="selected()?.exceptionUrl" title="View Exception"
                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>

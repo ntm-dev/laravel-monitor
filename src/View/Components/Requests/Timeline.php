@@ -106,6 +106,13 @@ class Timeline extends Component
             'mailUrl' => $entry->type === 'mail'
                 ? route('monitor.mail.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
                 : null,
+            // Exceptions already group by an opaque Fingerprint hash (stored
+            // directly as the entry's own key) — no KeyHash::for() reverse
+            // lookup needed, unlike the other detail links above (see
+            // DashboardController::resolveKey()).
+            'exceptionUrl' => $entry->type === 'exception'
+                ? route('monitor.exceptions.show', ['hash' => $entry->metadata['key']])
+                : null,
         ]])->all())->toHtml();
     }
 
