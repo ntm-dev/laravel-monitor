@@ -2,38 +2,43 @@
 
 namespace LaravelMonitor\Recorders;
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Support\Str;
 use LaravelMonitor\Support\Fingerprint;
 use Throwable;
 
 class Exceptions extends Recorder
 {
-    /**
-     * Log levels that mean the exception crashed the request / job rather than
-     * being caught and logged deliberately. Everything below "error" is treated
-     * as handled — the developer chose to downgrade it.
-     */
-    protected const UNHANDLED_LEVELS = ['error', 'critical', 'alert', 'emergency'];
-
     public function register(Dispatcher $events): void
     {
-        $events->listen(MessageLogged::class, [$this, 'record']);
+        $hook = function (ExceptionHandler $handler): void {
+            if ($handler instanceof Handler) {
+                $handler->reportable(fn (Throwable $exception) => $this->record($exception));
+            }
+        };
+
+        // The exception handler is normally resolved lazily, the first time
+        // something actually throws — long after this recorder registers —
+        // so afterResolving() is what catches it. But recorders can register
+        // after that first resolution too (e.g. a previous exception already
+        // forced it during this same process), so also fire immediately if
+        // it's already sitting in the container.
+        app()->afterResolving(ExceptionHandler::class, $hook);
+
+        if (app()->resolved(ExceptionHandler::class)) {
+            $hook(app(ExceptionHandler::class));
+        }
     }
 
-    public function record(MessageLogged $event): void
+    public function record(Throwable $exception): void
     {
-        $exception = $event->context['exception'] ?? null;
-
-        if (! $exception instanceof Throwable) {
-            return;
-        }
-
-        $class = get_class($exception);
+        $class = \get_class($exception);
         $message = Str::limit($exception->getMessage(), 500);
         $file = $this->relativePath($exception->getFile());
         $frames = $this->frames($exception);
+        $handled = $this->wasReportedDeliberately();
 
         $this->monitor->record(
             type: 'exception',
@@ -43,7 +48,7 @@ class Exceptions extends Recorder
                 'message' => $message,
                 'file' => $file,
                 'line' => $exception->getLine(),
-                'handled' => ! in_array($event->level, self::UNHANDLED_LEVELS, true),
+                'handled' => $handled,
                 'php_version' => PHP_VERSION,
                 'laravel_version' => $this->laravelVersion(),
                 'server' => gethostname() ?: null,
@@ -54,8 +59,28 @@ class Exceptions extends Recorder
                     $frames,
                 ),
             ],
-            subtype: in_array($event->level, self::UNHANDLED_LEVELS, true) ? 'unhandled' : 'handled',
+            subtype: $handled ? 'handled' : 'unhandled',
         );
+    }
+
+    /**
+     * Distinguishes a deliberate `report($e)` call inside application code
+     * (caught, logged, request/job carries on) from the exception handler's
+     * own automatic path for something that crashed the request/job outright
+     * (an uncaught throw, a failed queue job, ...) — both end up calling the
+     * handler's report() method, but only the former passes through the
+     * global report() *function* first, which shows up as its own stack
+     * frame with no class/`->`/`::` attached to it.
+     */
+    protected function wasReportedDeliberately(): bool
+    {
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 20) as $frame) {
+            if (($frame['function'] ?? null) === 'report' && ! isset($frame['class'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -68,14 +93,24 @@ class Exceptions extends Recorder
     {
         $trace = $exception->getTrace();
 
-        // Mirrors Laravel's own Foundation\Exceptions\Renderer\Exception::
-        // frames(): trace[0]'s own file/line is already the throw site (it's
-        // literally where $exception->getFile()/getLine() come from), so
-        // prepending a second frame built from those same two values — as
-        // this method used to — just duplicated it under a meaningless
-        // "{main}" label. The only real gap is that trace[0] sometimes has
-        // no class/function of its own; when that happens, borrow it from
-        // trace[1] instead of showing a blank frame.
+        // getTrace() never includes the throw site itself as its own entry —
+        // PHP only records *call* sites, and a `throw` isn't a call. trace[0]'s
+        // file/line is actually where trace[0]'s own function was *called
+        // from* (one level further out), not where it threw. So the throw
+        // site has to be prepended separately from $exception->getFile()/
+        // getLine(), same as Laravel's own Foundation\Exceptions\Renderer\
+        // Exception::frames() does via Symfony's FlattenException::setTrace().
+        // That synthetic frame starts with no class/function of its own;
+        // backfill it from the original trace[0], since that's the function
+        // that was actually executing when the exception was thrown.
+        array_unshift($trace, [
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'function' => null,
+            'class' => null,
+            'type' => null,
+        ]);
+
         if (count($trace) > 1 && empty($trace[0]['class'] ?? null) && empty($trace[0]['function'] ?? null)) {
             $trace[0]['class'] = $trace[1]['class'] ?? null;
             $trace[0]['type'] = $trace[1]['type'] ?? null;
