@@ -161,11 +161,25 @@
              // The tree pane's row is always vertically in view (it's what was
              // just clicked) but the chart pane scrolls independently on its
              // own horizontal axis — when zoomed in, the matching bar can sit
-             // outside the current scroll window entirely. 'nearest' is a
-             // no-op if it's already visible, so this never fights a click
-             // that didn't need scrolling.
-             const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
-             bar?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+             // outside the current scroll window entirely.
+             // $nextTick matters here: opening the detail panel shrinks the
+             // chart pane's width by 320px (it's a flex sibling), but that
+             // hasn't been applied to the DOM yet at the point selectedId is
+             // set above — scrollIntoView run synchronously would measure the
+             // pane's old, wider bounds. Waiting a tick lets Alpine flush the
+             // panel's layout change first, so the scroll math uses the
+             // narrower, final width.
+             // inline: 'center' (not 'nearest') because 'nearest' only scrolls
+             // the minimum distance needed, which parks the bar flush against
+             // whichever edge it entered from — and the right edge of this
+             // pane is the detail panel's own left border, so a bar arriving
+             // from the right ends up sitting right on top of that seam,
+             // reading as still covered. Centering it always leaves clear
+             // space on both sides regardless of which edge it was outside.
+             this.$nextTick(() => {
+                 const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
+                 bar?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+             });
          },
      }">
     <div class="flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 dark:divide-neutral-800 dark:border-neutral-800">
@@ -324,6 +338,12 @@
                         </template>
                         <template x-if="selected()?.type === 'mail'">
                             <a :href="selected()?.mailUrl" title="View Mail"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <template x-if="selected()?.type === 'exception'">
+                            <a :href="selected()?.exceptionUrl" title="View Exception"
                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>
