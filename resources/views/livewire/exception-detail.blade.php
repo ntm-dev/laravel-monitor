@@ -109,9 +109,11 @@
                             @foreach ($occurrences as $occurrence)
                                 <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                     <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $occurrence->date }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
-                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $occurrence->server ?? '—' }}</td>
+                                    <td class="max-w-[14rem] py-2 pr-3">
+                                        <x-monitor::exception-source-badge :type="$occurrence->sourceType" :label="$occurrence->sourceLabel" :url="$occurrence->sourceUrl"/>
+                                    </td>
                                     <td class="max-w-[22rem] truncate py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300" title="{{ $occurrence->message }}">{{ $occurrence->message ?? '—' }}</td>
-                                    <td class="py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300">{{ $occurrence->user ?? '—' }}</td>
+                                    <td class="py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300">{{ $occurrence->user }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

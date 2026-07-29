@@ -288,9 +288,21 @@ class DatabaseStorage implements Storage
         }
 
         return $this->table()
-            ->whereIn('type', ['request', 'job'])
+            ->whereIn('type', ['request', 'job', 'command'])
             ->whereIn('request_id', $requestIds)
             ->pluck('type', 'request_id');
+    }
+
+    public function rootLabelsFor(array $requestIds): Collection
+    {
+        if ($requestIds === []) {
+            return collect();
+        }
+
+        return $this->table()
+            ->whereIn('type', ['request', 'job', 'command'])
+            ->whereIn('request_id', $requestIds)
+            ->pluck('key', 'request_id');
     }
 
     /** Decode the JSON payload and parse timestamps on a raw row. */

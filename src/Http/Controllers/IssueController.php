@@ -125,12 +125,7 @@ class IssueController
             'frameGroups' => $this->frameGroups($payload['frames'] ?? []),
             'markdown' => $this->markdown($payload, $handled),
             'summary' => $this->summary($lastSeen, $firstSeen, $phpVersion, $laravelVersion, (int) ($group?->users ?? 0), $occurrencesCount, $servers, $tz),
-            'occurrences' => $occurrences->take(50)->map(fn ($row) => (object) [
-                'date' => Format::datetime($row->created_at),
-                'server' => $row->payload['server'] ?? null,
-                'message' => $row->payload['message'] ?? null,
-                'user' => $row->user_id !== null ? ($names[$row->user_id] ?? "User #{$row->user_id}") : null,
-            ]),
+            'occurrences' => $this->occurrenceRows($occurrences, $names, $this->storage),
         ];
     }
 

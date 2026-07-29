@@ -665,6 +665,62 @@ class MonitorTest extends TestCase
             ->assertSee('Occurrences');
     }
 
+    public function test_exception_detail_page_links_to_the_request_it_happened_during(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $monitor->beginRequest();
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('request', 'GET /users', ['status' => 500], 20, '5xx');
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', 1);
+
+        $requestId = $monitor->requestId();
+
+        Monitor::flush();
+
+        $this->get('/monitor/exceptions?key='.$key)
+            ->assertOk()
+            ->assertSee('GET /users')
+            ->assertSee(route('monitor.requests.show', $requestId), false);
+    }
+
+    public function test_exception_detail_page_links_to_the_command_run_it_happened_during(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $monitor->beginCommandRun('app:sync-data');
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('command', 'app:sync-data', ['exit_code' => 1], 20, 'failure');
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', 1);
+
+        $runId = $monitor->commandRunId();
+
+        Monitor::flush();
+
+        $this->get('/monitor/exceptions?key='.$key)
+            ->assertOk()
+            ->assertSee('app:sync-data')
+            ->assertSee(route('monitor.commands.runs.show', $runId), false);
+    }
+
     public function test_dashboard_is_protected_by_gate(): void
     {
         $this->get('/monitor')->assertForbidden();

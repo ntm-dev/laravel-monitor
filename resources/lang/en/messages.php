@@ -27,6 +27,12 @@ return [
         'monitoring' => 'Monitoring',
     ],
 
+    'exception' => [
+        'source_request' => 'Request',
+        'source_job' => 'Job',
+        'source_command' => 'Command',
+    ],
+
     'settings' => [
         'preferences' => 'Preferences',
         'preferences_hint' => 'These settings are stored in your browser and only affect how the dashboard looks for you.',
