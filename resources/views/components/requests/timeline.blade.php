@@ -40,6 +40,7 @@
          heartbeatTimer = setTimeout(() => heartbeatActive = false, 6000);
          $el.querySelector('[data-duplicate-group]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
      "
+     @monitor-scroll-to-timeline-event.window="scrollToType($event.detail.type)"
      x-data="{
          zoom: 1,
          minZoom: 1,
@@ -181,6 +182,33 @@
                  bar?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
              });
          },
+         // Fired by the EventSummary cards above the timeline (every type but
+         // 'queries', which has its own duplicates-heartbeat scroll instead)
+         // — jumps to the first row of that type in DOM order, i.e. the
+         // nearest one chronologically since rows render in timeline order.
+         scrollToType(type) {
+             const row = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => this.data[el.dataset.rowId]?.type === type);
+             if (! row) return;
+             // Only query/cache/mail/notification/lazy_loading/exception/http
+             // rows are ever detailable (see TimelineRow::DETAILABLE_TYPES) —
+             // that's baked server-side into this same element's
+             // 'cursor-pointer' class, so checking for it here avoids keeping
+             // a second, JS-side copy of that type list that could drift out
+             // of sync.
+             if (row.classList.contains('cursor-pointer')) {
+                 // selectRow()'s own nextTick only centers the *horizontal*
+                 // (chart-pane) axis — it assumes the row is already visible
+                 // vertically, true when it was just clicked directly, but
+                 // not here, coming from a summary card that can be anywhere
+                 // on the page. Center it vertically first, then hand off.
+                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 this.selectRow(row.dataset.rowId);
+             } else {
+                 // Nothing to select for queue rows (no inspector panel for
+                 // them) — just center the bar in both axes directly.
+                 row.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'center' });
+             }
+         },
      }">
     {{-- Sticky at top-[120px] for the same reason the detail panel below is:
          flush against the bottom of the dashboard's own sticky page header
@@ -270,7 +298,7 @@
              absolute; top-full) extend past this box's edges — without it
              this becomes a real (if invisible) vertical scroll container
              that traps the mouse wheel instead of letting it scroll the page. --}}
-        <div class="relative flex-1 overflow-x-auto overflow-y-hidden bg-neutral-50/50 dark:bg-transparent"
+        <div class="monitor-timeline-scrollbar relative flex-1 overflow-x-auto overflow-y-hidden bg-neutral-50/50 dark:bg-transparent"
              x-ref="scrollArea" @scroll="scrollLeft = $event.target.scrollLeft" @mousemove.window="onDrag($event)" @mouseup.window="stopDrag()">
             <div :style="'width: ' + (zoom * 100) + '%'" class="min-w-full select-none" :class="dragging ? 'cursor-grabbing' : 'cursor-grab'" @mousedown="startDrag($event)">
                 {{-- Rows + full-height gridlines/crosshair overlay --}}
@@ -362,6 +390,12 @@
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>
                         </template>
+                        <template x-if="selected()?.type === 'http'">
+                            <a :href="selected()?.outgoingUrl" title="View Outgoing Request"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
                         <button type="button" @click="selectedId = null" class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOSE" :stroke="2" class="h-4 w-4"/>
                         </button>
@@ -420,7 +454,9 @@
                         <template x-if="selected()?.metadata?.location">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">File</dt>
-                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.location" x-text="selected()?.metadata?.location"></dd>
+                                {{-- direction:rtl + text-align:left truncates the *front* of the
+                                     string (the path) while keeping the tail (file:line) visible. --}}
+                                <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="selected()?.metadata?.location" x-text="selected()?.metadata?.location"></dd>
                             </div>
                         </template>
                     </dl>
@@ -459,7 +495,9 @@
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Notification</dt>
-                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.notification" x-text="selected()?.label"></dd>
+                            {{-- direction:rtl + text-align:left truncates the *front* of the
+                                 FQCN, keeping the class name itself (the tail) visible. --}}
+                            <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="selected()?.metadata?.notification" x-text="selected()?.label"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Channel</dt>
@@ -525,7 +563,9 @@
                         <template x-if="mailClass()">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
-                                <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="mailClass()" x-text="mailClass()"></dd>
+                                {{-- direction:rtl + text-align:left truncates the *front* of the
+                                     FQCN, keeping the class name itself (the tail) visible. --}}
+                                <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="mailClass()" x-text="mailClass()"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.mailer">
@@ -541,7 +581,9 @@
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Model</dt>
-                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.model" x-text="selected()?.metadata?.model"></dd>
+                            {{-- direction:rtl + text-align:left truncates the *front* of the
+                                 FQCN, keeping the class name itself (the tail) visible. --}}
+                            <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="selected()?.metadata?.model" x-text="selected()?.metadata?.model"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Relation</dt>
@@ -556,6 +598,29 @@
                     </dl>
                 </template>
 
+                <template x-if="selected()?.type === 'http'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Method</dt>
+                            <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.method"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Status</dt>
+                            <dd class="font-mono font-medium"
+                                :class="selected()?.metadata?.status == null ? 'text-neutral-400 dark:text-neutral-500' : selected()?.metadata?.status >= 500 ? 'text-rose-600 dark:text-rose-400' : selected()?.metadata?.status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'"
+                                x-text="selected()?.metadata?.status ?? 'Failed'"></dd>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">URL</dt>
+                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
+                        </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
+                        </div>
+                    </dl>
+                </template>
+
                 <template x-if="selected()?.type === 'exception'">
                     <div class="p-4">
                         <span class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">Message</span>
@@ -566,7 +631,9 @@
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
-                            <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.class" x-text="selected()?.metadata?.class"></dd>
+                            {{-- direction:rtl + text-align:left truncates the *front* of the
+                                 FQCN, keeping the class name itself (the tail) visible. --}}
+                            <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="selected()?.metadata?.class" x-text="selected()?.metadata?.class"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">File</dt>
@@ -615,6 +682,30 @@
         }
         .monitor-heartbeat::after {
             animation-delay: 0.5s;
+        }
+
+        /* Firefox: thumb colour matched to neutral-300/neutral-700 (light/dark),
+           transparent track so it doesn't add its own bar under the chart. */
+        .monitor-timeline-scrollbar {
+            scrollbar-color: rgb(212 212 212) transparent;
+        }
+        .dark .monitor-timeline-scrollbar {
+            scrollbar-color: rgb(64 64 64) transparent;
+        }
+        /* Chromium/Safari: the default scrollbar otherwise stays light-themed
+           (native OS chrome) even inside a dark-mode page. */
+        .monitor-timeline-scrollbar::-webkit-scrollbar {
+            height: 8px;
+        }
+        .monitor-timeline-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .monitor-timeline-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgb(212 212 212);
+            border-radius: 9999px;
+        }
+        .dark .monitor-timeline-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgb(64 64 64);
         }
     </style>
 </x-monitor::card>

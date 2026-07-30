@@ -196,6 +196,7 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.mail-detail', Cards\MailDetail::class);
         Livewire::component('monitor.notification-class-detail', Cards\NotificationClassDetail::class);
         Livewire::component('monitor.mail-class-detail', Cards\MailClassDetail::class);
+        Livewire::component('monitor.outgoing-detail', Cards\OutgoingDetail::class);
     }
 
     protected function registerAuthorization(): void

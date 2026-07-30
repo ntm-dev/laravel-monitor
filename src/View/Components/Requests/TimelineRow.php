@@ -65,7 +65,7 @@ class TimelineRow extends Component
     ];
 
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
-    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception'];
+    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception', 'http'];
 
     /** Bar left edge / width as percentages of the total duration. */
     public float $left;
