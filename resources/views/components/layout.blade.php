@@ -47,6 +47,11 @@
         };
     </script>
     <style>[x-cloak] { display: none !important; }</style>
+    {{-- highlight.js only ships the light "github" theme (loaded above) — no
+         dark variant exists to swap in, so override just the token colours
+         that read poorly against a dark background instead of loading a
+         second stylesheet. --}}
+    <style>.dark .hljs-string { color: #60748c; }</style>
     @livewireStyles
 </head>
 <body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
