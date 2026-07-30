@@ -3,6 +3,7 @@
 namespace LaravelMonitor;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use Throwable;
@@ -65,6 +66,33 @@ class Monitor
      */
     protected ?array $command = null;
 
+    /**
+     * State of the scheduled task currently running, or null outside one —
+     * same shape/purpose as $command, but for `Schedule::call()`/closure
+     * tasks executing directly in the scheduler's own process. Command-based
+     * tasks (`Schedule::command()`) always run as a *separate* `php artisan`
+     * subprocess even when "foreground" (see
+     * Illuminate\Console\Scheduling\Event::execute()) — their own timeline
+     * is stitched back onto this same id via Laravel's own Context
+     * dehydration/hydration instead (see beginScheduledTaskRun(),
+     * Recorders\Commands::recordStarting()), not via this in-process field.
+     *
+     * @var array{id: string, start: float, models: int}|null
+     */
+    protected ?array $scheduledTask = null;
+
+    /**
+     * Context key a scheduled task's own id rides under across the process
+     * boundary a command-based task's own `php artisan` subprocess creates.
+     * Laravel's scheduler already dehydrates the whole Context into that
+     * subprocess's `__LARAVEL_CONTEXT` env var and rehydrates it there before
+     * any application code runs (see Illuminate\Log\Context\ContextServiceProvider) —
+     * riding on that existing, framework-native mechanism instead of a
+     * bespoke env var means no changes are needed to how the subprocess is
+     * spawned at all.
+     */
+    protected const SCHEDULED_TASK_CONTEXT_KEY = 'monitor_scheduled_task_id';
+
     public function __construct(protected Application $app)
     {
     }
@@ -101,7 +129,14 @@ class Monitor
             $duration,
             $subtype,
             $userId,
-            $this->request['id'] ?? $this->job['id'] ?? $this->command['id'] ?? null,
+            // scheduledTask before command: a command-based scheduled task's
+            // own subprocess starts life already inside the outer
+            // schedule:run command's own $command context (its
+            // CommandStarting fired first) — a fresh $scheduledTask, begun
+            // right before this specific task ran, must win so everything
+            // it triggers correlates onto *this* task's run, not onto
+            // schedule:run itself.
+            $this->request['id'] ?? $this->job['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -139,6 +174,16 @@ class Monitor
             }
 
             $elapsed = max(0.0, round((microtime(true) - $this->job['start']) * 1000, 3));
+
+            return max(0.0, round($elapsed - ($duration ?? 0), 3));
+        }
+
+        if ($this->scheduledTask !== null) {
+            if ($type === 'scheduled_task') {
+                return 0.0;
+            }
+
+            $elapsed = max(0.0, round((microtime(true) - $this->scheduledTask['start']) * 1000, 3));
 
             return max(0.0, round($elapsed - ($duration ?? 0), 3));
         }
@@ -230,11 +275,20 @@ class Monitor
      * everything it triggers (queries, mail, notifications, jobs) picks up
      * this id via record()'s request_id fallback, the same way an HTTP
      * request's or a job attempt's children do.
+     *
+     * @param  ?string  $inheritedId  when this run is a command-based
+     *                                 scheduled task's own subprocess, its
+     *                                 inherited scheduled-task-run id (see
+     *                                 inheritedScheduledTaskRunId()) — adopted
+     *                                 as this run's own id instead of minting
+     *                                 a fresh one, so it (and everything it
+     *                                 triggers) nests onto that task's
+     *                                 timeline rather than starting its own.
      */
-    public function beginCommandRun(string $name): void
+    public function beginCommandRun(string $name, ?string $inheritedId = null): void
     {
         $this->command = [
-            'id' => (string) Str::uuid(),
+            'id' => $inheritedId ?? (string) Str::uuid(),
             'name' => $name,
             'start' => microtime(true),
             'models' => 0,
@@ -256,6 +310,57 @@ class Monitor
     public function endCommandRun(): void
     {
         $this->command = null;
+    }
+
+    /**
+     * Starts tracking a scheduled task run. Called by the ScheduledTasks
+     * recorder on ScheduledTaskStarting, before the task itself runs —
+     * everything it triggers in-process (a closure/`Schedule::call()` task's
+     * own code, or anything running between here and the subprocess spawn
+     * for a command-based one) picks up this id via record()'s request_id
+     * fallback. Also stamped onto Context so a command-based task's own
+     * subprocess inherits it — see SCHEDULED_TASK_CONTEXT_KEY.
+     */
+    public function beginScheduledTaskRun(): void
+    {
+        $id = (string) Str::uuid();
+
+        $this->scheduledTask = [
+            'id' => $id,
+            'start' => microtime(true),
+            'models' => 0,
+        ];
+
+        Context::add(self::SCHEDULED_TASK_CONTEXT_KEY, $id);
+    }
+
+    public function scheduledTaskRunId(): ?string
+    {
+        return $this->scheduledTask['id'] ?? null;
+    }
+
+    /** Called by the ScheduledTasks recorder once the run's own `scheduled_task` entry has been recorded. */
+    public function endScheduledTaskRun(): void
+    {
+        $this->scheduledTask = null;
+        Context::forget(self::SCHEDULED_TASK_CONTEXT_KEY);
+    }
+
+    /**
+     * The scheduled-task-run id inherited from the parent scheduler process
+     * via Laravel's own Context dehydration/hydration, or null when running
+     * standalone (a manually-invoked command, or one running outside any
+     * scheduled task). Read by the Commands recorder on CommandStarting so a
+     * command-based task's own subprocess correlates its `command` entry (and
+     * everything it in turn triggers) onto the *same* timeline as the
+     * scheduled_task entry recorded back in the scheduler's process, instead
+     * of minting an unrelated id of its own — see beginScheduledTaskRun().
+     */
+    public function inheritedScheduledTaskRunId(): ?string
+    {
+        $id = Context::get(self::SCHEDULED_TASK_CONTEXT_KEY);
+
+        return is_string($id) && $id !== '' ? $id : null;
     }
 
     /**
@@ -324,6 +429,8 @@ class Monitor
             $this->request['models']++;
         } elseif ($this->job !== null) {
             $this->job['models']++;
+        } elseif ($this->scheduledTask !== null) {
+            $this->scheduledTask['models']++;
         } elseif ($this->command !== null) {
             $this->command['models']++;
         }
@@ -331,7 +438,7 @@ class Monitor
 
     public function modelCount(): int
     {
-        return $this->request['models'] ?? $this->job['models'] ?? $this->command['models'] ?? 0;
+        return $this->request['models'] ?? $this->job['models'] ?? $this->scheduledTask['models'] ?? $this->command['models'] ?? 0;
     }
 
     /** Milliseconds elapsed since the request started, or null outside one. */

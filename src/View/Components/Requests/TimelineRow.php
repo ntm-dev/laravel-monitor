@@ -30,6 +30,7 @@ class TimelineRow extends Component
         'queue' => 'QUEUE',
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
+        'command' => 'COMMAND',
     ];
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';

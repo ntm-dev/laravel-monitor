@@ -288,7 +288,7 @@ class DatabaseStorage implements Storage
         }
 
         return $this->table()
-            ->whereIn('type', ['request', 'job', 'command'])
+            ->whereIn('type', ['request', 'job', 'command', 'scheduled_task'])
             ->whereIn('request_id', $requestIds)
             ->pluck('type', 'request_id');
     }
@@ -300,7 +300,7 @@ class DatabaseStorage implements Storage
         }
 
         return $this->table()
-            ->whereIn('type', ['request', 'job', 'command'])
+            ->whereIn('type', ['request', 'job', 'command', 'scheduled_task'])
             ->whereIn('request_id', $requestIds)
             ->pluck('key', 'request_id');
     }

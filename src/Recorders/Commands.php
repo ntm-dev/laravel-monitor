@@ -29,10 +29,24 @@ class Commands extends Recorder
 
         $this->startedAt = microtime(true);
 
+        // A command-based scheduled task (Schedule::command()) always runs
+        // this command in a *separate* `php artisan` subprocess, even when
+        // scheduled to run "in the foreground" — see
+        // Illuminate\Console\Scheduling\Event::execute(). The scheduled
+        // task's own id rides across that process boundary via Laravel's
+        // own Context dehydration/hydration (see
+        // Monitor::beginScheduledTaskRun()), so it's already available here,
+        // in the fresh subprocess, before any application code has run.
+        // Adopting it as this run's own id — instead of minting a fresh one
+        // — is what nests this command (and everything it triggers: queries,
+        // mail, dispatched jobs, ...) onto the scheduled task's own timeline
+        // rather than starting an unrelated one of its own.
+        $inheritedId = $this->monitor->inheritedScheduledTaskRunId();
+
         // Before the command's own handle() runs, so everything it triggers
         // (queries, mail, notifications, dispatched jobs) correlates onto
         // this run's own timeline — mirrors beginRequest()/beginJobAttempt().
-        $this->monitor->beginCommandRun($event->command);
+        $this->monitor->beginCommandRun($event->command, $inheritedId);
     }
 
     public function recordFinished(CommandFinished $event): void
