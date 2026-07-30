@@ -1,6 +1,7 @@
 @php
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
     $tz = \LaravelMonitor\Support\Format::timezone();
+    $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2"
@@ -20,7 +21,7 @@
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::JOBS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ $entries->count() === 1 ? 'Job Run' : 'Job Runs' }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ $totalEntries === 1 ? 'Job Run' : 'Job Runs' }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
@@ -33,11 +34,18 @@
                             <th class="pb-2 font-normal">Queue</th>
                             <th class="pb-2 font-normal">Status</th>
                             <th class="pb-2 text-right font-normal">Duration</th>
+                            <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                            {{-- Only processed/failed/released rows carry an attempt id of their
+                                 own (minted at JobProcessing via beginJobAttempt(), see
+                                 Recorders\Jobs) — a 'queued' row's request_id instead points to
+                                 whatever dispatched the job, so it wouldn't resolve here. --}}
+                            @php($attemptUrl = ($entry->request_id ?? null) && $entry->subtype !== 'queued' ? route('monitor.jobs.attempts.show', $entry->request_id) : null)
+                            <tr class="{{ $attemptUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                                @if ($attemptUrl) onclick="window.location='{{ $attemptUrl }}'" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['queue'] ?? 'default' }}</td>
                                 <td class="py-2 pr-3">
@@ -53,10 +61,30 @@
                                     @endif
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
+                                <td class="py-2 pl-2 text-right">
+                                    @if ($attemptUrl)
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                        </span>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
+
+                @if ($lastPage > 1)
+                    <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                        <span>Showing {{ $from + 1 }}–{{ min($from + $perPage, $totalEntries) }} of {{ number_format($totalEntries) }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" wire:click="previousPage" @disabled($page <= 1)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Prev</button>
+                            <span>{{ $page }} / {{ $lastPage }}</span>
+                            <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Next</button>
+                        </div>
+                    </div>
+                @endif
             @endif
         </x-monitor::card>
     </div>
