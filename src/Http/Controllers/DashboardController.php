@@ -11,6 +11,7 @@ use LaravelMonitor\Http\Headings\Heading;
 use LaravelMonitor\Http\Headings\JobHeading;
 use LaravelMonitor\Http\Headings\MailHeading;
 use LaravelMonitor\Http\Headings\NotificationHeading;
+use LaravelMonitor\Http\Headings\OutgoingHeading;
 use LaravelMonitor\Http\Headings\QueryHeading;
 use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Livewire\Card;
@@ -36,6 +37,7 @@ class DashboardController
         'exceptions' => 'exception',
         'notifications' => 'notification',
         'mail' => 'mail',
+        'outgoing' => 'outgoing_request',
     ];
 
     public function __invoke(Request $request): View
@@ -149,6 +151,7 @@ class DashboardController
             'queries' => (new QueryHeading)($key),
             'notifications' => app(NotificationHeading::class)($key),
             'mail' => app(MailHeading::class)($key),
+            'outgoing' => app(OutgoingHeading::class)($key),
             default => null,
         };
     }

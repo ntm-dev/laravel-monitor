@@ -77,7 +77,7 @@ Route::domain(config('monitor.domain'))
                     ->name("monitor.{$groupTab}.show");
             }
 
-            foreach (['notifications', 'mail'] as $groupTab) {
+            foreach (['notifications', 'mail', 'outgoing'] as $groupTab) {
                 Route::get("/{$groupTab}/{hash}", DashboardController::class)
                     ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
                     ->defaults('tab', $groupTab)

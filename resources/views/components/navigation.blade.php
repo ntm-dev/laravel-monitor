@@ -16,7 +16,7 @@
         </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-2 pb-2">
+    <nav class="monitor-nav-scrollbar flex-1 overflow-y-auto px-2 pb-2">
         @foreach ($groups as $group => $items)
             @if ($group !== '')
                 <p class="px-2 pb-1 pt-4 text-xs text-neutral-400 dark:text-neutral-500">{{ $group }}</p>
@@ -46,10 +46,10 @@
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                    @class([
                        'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm',
-                       'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5' => $tab === $tabKey,
-                       'border-transparent text-neutral-500 hover:text-neutral-900' => $tab !== $tabKey,
+                       'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
+                       'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $tab !== $tabKey,
                    ])>
-                    <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600' : 'text-neutral-400 group-hover:text-neutral-600' }}"/>
+                    <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300' }}"/>
                     {{ $item['label'] }}
                 </a>
             @endforeach
@@ -75,4 +75,30 @@
             </form>
         </div>
     </div>
+
+    {{-- Same dark-mode scrollbar fix as the Request Detail timeline (see
+         components/requests/timeline.blade.php's .monitor-timeline-scrollbar)
+         — without it this vertical scrollbar stays the light native OS
+         colour even inside a dark-mode page. --}}
+    <style>
+        .monitor-nav-scrollbar {
+            scrollbar-color: rgb(212 212 212) transparent;
+        }
+        .dark .monitor-nav-scrollbar {
+            scrollbar-color: rgb(64 64 64) transparent;
+        }
+        .monitor-nav-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .monitor-nav-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .monitor-nav-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgb(212 212 212);
+            border-radius: 9999px;
+        }
+        .dark .monitor-nav-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgb(64 64 64);
+        }
+    </style>
 </aside>

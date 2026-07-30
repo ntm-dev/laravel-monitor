@@ -113,6 +113,12 @@ class Timeline extends Component
             'exceptionUrl' => $entry->type === 'exception'
                 ? route('monitor.exceptions.show', ['hash' => $entry->metadata['key']])
                 : null,
+            // Outgoing requests only have a per-occurrence detail page (no
+            // aggregate "class" mode like notifications/mail) — see
+            // Http\Headings\OutgoingHeading / Livewire\OutgoingDetail.
+            'outgoingUrl' => $entry->type === 'http'
+                ? route('monitor.outgoing.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
+                : null,
         ]])->all())->toHtml();
     }
 
