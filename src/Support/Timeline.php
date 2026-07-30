@@ -2,9 +2,9 @@
 
 namespace LaravelMonitor\Support;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use LaravelMonitor\View\Components\Requests\TimelineRow;
 
 /**
  * Builds the ordered list of TimelineEntry rows shown on the Request Detail
@@ -62,10 +62,10 @@ class Timeline
      * @param  object  $root  the `request` row from Storage::findByRequestId()
      * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
      * @param  ?Collection<string, Collection<int, object{outcome: object, children: Collection}>>  $jobExecutions  from
-     *                                                                                                                Storage::jobExecutionsByJobId(), keyed by job_id — splices each dispatched
-     *                                                                                                                job's own sub-timeline into this one (see spliceJobExecutions()) instead
-     *                                                                                                                of leaving it a dead-end placeholder. Omit when the caller doesn't need
-     *                                                                                                                this (e.g. a page that doesn't want the extra queries).
+     *                                                                                                                Storage::jobExecutionsByJobId(), keyed by job_id — attaches each
+     *                                                                                                                dispatched job's own outcome(s) (see attachJobExecutions()) as an
+     *                                                                                                                expandable, textual sub-list on its dispatch entry, instead of leaving
+     *                                                                                                                it a dead end. Omit when the caller doesn't need this.
      * @return TimelineEntry[]
      */
     public static function build(object $root, Collection $children, ?Collection $jobExecutions = null): array
@@ -90,7 +90,7 @@ class Timeline
         $events = $rawEvents->map(fn (object $row) => self::eventEntry($row, $phases))->all();
 
         if ($jobExecutions !== null && $jobExecutions->isNotEmpty()) {
-            $events = self::spliceJobExecutions($events, $rawEvents, $jobExecutions, $root);
+            self::attachJobExecutions($events, $rawEvents, $jobExecutions);
         }
 
         $events = self::assignLanes($events);
@@ -101,40 +101,29 @@ class Timeline
     }
 
     /**
-     * Replaces each dispatched-job placeholder ('queue' type, still labelled
-     * "Queued Job" for a job with no outcome yet) that a later processed/
-     * failed/released outcome has since landed for with that outcome's own
-     * row, plus that job's own children nested directly under it — mirrors
-     * Nightwatch's single merged trace view instead of a dead-end
-     * placeholder. A job still only 'queued' keeps its plain placeholder.
+     * Stamps each dispatched-job entry ('queue' type — still just the
+     * dispatch-time marker, its own duration/position on the timeline
+     * unchanged) with its resolved outcome(s) (processed/failed/released —
+     * more than one on a retry) as plain text, under
+     * `metadata['executions']` — the tree pane renders this as an
+     * expandable list beneath the dispatch row (mirroring the vendor-frame
+     * collapse in stack-trace.blade.php), not a second proportional bar: a
+     * queue worker can pick a job up seconds or minutes after dispatch, far
+     * outside the dispatching root's own (often sub-second) duration, so
+     * there's no time scale the two could share without either the root's
+     * own bar or the job's own becoming imperceptible. A job still only
+     * 'queued' is untouched — nothing to expand yet.
      *
-     * Repositioning is by wall clock, not proportional: a queue worker can
-     * pick a job up seconds or minutes after dispatch, far outside the
-     * dispatching root's own (often sub-second) duration — rather than
-     * inventing a second, independently-zoomed scale for the nested
-     * section, this places it at its real elapsed offset on the SAME scale
-     * the rest of the timeline uses, same as Nightwatch itself, accepting
-     * that a slow-to-process job can make the root's own bar read as
-     * comparatively tiny. `created_at` is only second-precision in storage
-     * (see the migration's plain `timestamp` column), so this offset is
-     * accurate to the nearest second, not the millisecond — immaterial next
-     * to gaps that are themselves typically several seconds or more.
-     *
-     * @param  TimelineEntry[]  $events
+     * @param  TimelineEntry[]  $events  mutated in place
      * @param  Collection<int, object>  $rawEvents  the same rows $events was built from, kept around to read payload['job_id']
      * @param  Collection<string, Collection<int, object{outcome: object, children: Collection}>>  $jobExecutions
-     * @return TimelineEntry[]
      */
-    protected static function spliceJobExecutions(array $events, Collection $rawEvents, Collection $jobExecutions, object $root): array
+    protected static function attachJobExecutions(array $events, Collection $rawEvents, Collection $jobExecutions): void
     {
         $rawById = $rawEvents->keyBy('id');
-        $rootStart = (float) CarbonImmutable::parse($root->created_at)->format('U.u');
-        $merged = [];
 
         foreach ($events as $entry) {
             if ($entry->type !== 'queue') {
-                $merged[] = $entry;
-
                 continue;
             }
 
@@ -142,77 +131,45 @@ class Timeline
             $executions = $jobId !== null ? $jobExecutions->get($jobId) : null;
 
             if ($executions === null || $executions->isEmpty()) {
-                $merged[] = $entry;
-
                 continue;
             }
 
-            foreach ($executions as $index => $execution) {
-                array_push($merged, ...self::jobExecutionEntries($entry, $execution, $index, $rootStart));
-            }
+            $entry->metadata['executions'] = $executions
+                ->map(fn (object $execution, int $index) => self::executionSummary($execution, $index))
+                ->all();
         }
-
-        return $merged;
     }
 
     /**
-     * @return TimelineEntry[]
+     * @return array{subtype: string, duration: ?float, attempt: int, queue: ?string, connection: ?string, attempt_request_id: string, children: list<array{badge: string, detail: string, duration: ?float}>}
      */
-    protected static function jobExecutionEntries(TimelineEntry $placeholder, object $execution, int $attemptIndex, float $rootStart): array
+    protected static function executionSummary(object $execution, int $attemptIndex): array
     {
         $outcome = $execution->outcome;
-        $outcomeDuration = $outcome->duration !== null ? (float) $outcome->duration : null;
 
-        // The outcome's own created_at is stamped when it finished (see
-        // Recorders\Jobs) — its processing start is that minus its own
-        // duration, the same math the job's own standalone timeline uses.
-        $processingStartedAt = (float) CarbonImmutable::parse($outcome->created_at)->format('U.u') - (($outcomeDuration ?? 0) / 1000);
+        return [
+            'subtype' => $outcome->subtype,
+            'duration' => $outcome->duration !== null ? (float) $outcome->duration : null,
+            'attempt' => $attemptIndex + 1,
+            'queue' => $outcome->payload['queue'] ?? null,
+            'connection' => $outcome->payload['connection'] ?? null,
+            // What monitor.jobs.attempts.show needs to link to this specific
+            // attempt's own standalone page.
+            'attempt_request_id' => $outcome->request_id,
+            'children' => $execution->children
+                ->reject(fn (object $row) => $row->type === 'log')
+                ->map(function (object $row) {
+                    $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
 
-        $start = max(0.0, ($processingStartedAt - $rootStart) * 1000);
-
-        $outcomeEntry = new TimelineEntry(
-            id: 'job-outcome-'.$outcome->id,
-            type: 'queue',
-            label: $placeholder->label,
-            start: $start,
-            duration: $outcomeDuration,
-            parentId: $placeholder->parentId,
-            metadata: array_merge($placeholder->metadata, array_filter([
-                'subtype' => $outcome->subtype,
-                'attempt' => $attemptIndex + 1,
-                'queue' => $outcome->payload['queue'] ?? null,
-                'connection' => $outcome->payload['connection'] ?? null,
-                // This outcome's own unique attempt id (distinct from the
-                // job_id it shares with sibling attempts/the placeholder) —
-                // what monitor.jobs.attempts.show needs to link to its own
-                // standalone waterfall, for a viewer who wants that page's
-                // event-summary cards rather than this merged view.
-                'attempt_request_id' => $outcome->request_id,
-            ], fn ($value) => $value !== null)),
-        );
-
-        $entries = [$outcomeEntry];
-
-        foreach ($execution->children as $childRow) {
-            if ($childRow->type === 'log') {
-                continue;
-            }
-
-            $map = self::EVENT_TYPES[$childRow->type] ?? ['type' => $childRow->type, 'label' => ucfirst($childRow->type)];
-            $childOffset = (float) ($childRow->start_offset ?? 0);
-
-            $entries[] = new TimelineEntry(
-                id: (string) $childRow->id,
-                type: $map['type'],
-                label: self::labelFor($childRow, $map['label']),
-                start: $start + $childOffset,
-                duration: $childRow->duration !== null ? (float) $childRow->duration : null,
-                parentId: $outcomeEntry->id,
-                metadata: self::metadataFor($childRow),
-            );
-        }
-
-        return $entries;
+                    return [
+                        'badge' => TimelineRow::badgeFor($map['type']),
+                        'detail' => self::labelFor($row, $map['label']),
+                        'duration' => $row->duration !== null ? (float) $row->duration : null,
+                    ];
+                })
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

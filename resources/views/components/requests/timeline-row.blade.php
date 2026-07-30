@@ -21,7 +21,7 @@
      type just show their hover tooltip and aren't clickable, matching
      Nightwatch. --}}
 @php
-    $depth = match ($kind) { 'phase' => 1, 'event' => 2, default => 0 } + $nestingLevel;
+    $depth = match ($kind) { 'phase' => 1, 'event' => 2, default => 0 };
     $highlightClass = $detailable
         ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
         : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
@@ -63,6 +63,18 @@
                 @endif
                 <span class="shrink-0 font-mono text-[11px] font-medium {{ $badgeTextColor }}">{{ $badge }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $detail }}</span>
+                @if ($entry->type === 'queue' && ($entry->metadata['executions'] ?? null))
+                    {{-- Toggles the resolved execution(s) list rendered right
+                         after this row (see timeline-job-executions.blade.php)
+                         — .stop keeps this from also firing selectRow() above,
+                         since 'queue' rows are detailable too. --}}
+                    <button type="button" @click.stop="toggleJobExecutions('{{ $entry->id }}')"
+                            class="ml-auto flex h-4 w-4 shrink-0 items-center justify-center text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                        <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
+                                          class="h-3 w-3 transition-transform"
+                                          x-bind:class="expandedJobs['{{ $entry->id }}'] ? 'rotate-180' : ''"/>
+                    </button>
+                @endif
             @endif
         </div>
     </div>

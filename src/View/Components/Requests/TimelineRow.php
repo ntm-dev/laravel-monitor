@@ -129,17 +129,6 @@ class TimelineRow extends Component
         public string $part = 'bar',
         /** "REQUEST" for the Request Detail timeline, "JOB" for a job attempt's — see JobAttemptController. */
         public string $rootLabel = 'REQUEST',
-        /**
-         * Extra nesting level on top of the usual root/phase/event depth:
-         * 0 for a normal top-level event, 1+ for an event nested under a
-         * dispatched job's own row (see Support\Timeline::spliceJobExecutions()) —
-         * indents the tree-pane label so a merged job's own queries/mail/etc
-         * read as belonging to it, not as siblings of the job dispatch
-         * itself. Named distinctly from timeline-row.blade.php's own local
-         * $depth (root/phase/event's fixed indent guide count) to avoid the
-         * two colliding in that view's scope.
-         */
-        public int $nestingLevel = 0,
     ) {
         $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
         $this->width = $total > 0 ? min(100 - $this->left, max(0.15, (($entry->duration ?? 0) / $total) * 100)) : 0.15;
