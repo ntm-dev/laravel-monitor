@@ -36,6 +36,13 @@ class Timeline
         'job' => ['type' => 'queue', 'label' => 'Queued Job'],
         'outgoing_request' => ['type' => 'http', 'label' => 'Outgoing Request'],
         'lazy_loading' => ['type' => 'lazy_loading', 'label' => 'Lazy Load'],
+        // A command-based scheduled task's own `php artisan` subprocess
+        // reports its own 'command' entry tagged with the scheduled task's
+        // id (see Monitor::beginScheduledTaskRun()) — nesting it here as a
+        // child, exactly like 'job' above, is what makes it show up as a
+        // "HANDLE ..." row under the SCHEDULED TASK root instead of only
+        // ever rendering as its own separate root (CommandRunController).
+        'command' => ['type' => 'command', 'label' => 'Command'],
     ];
 
     /**

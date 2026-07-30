@@ -2,7 +2,7 @@
 
 namespace LaravelMonitor\Livewire;
 
-class CommandDetail extends Card
+class ScheduleDetail extends Card
 {
     public const PER_PAGE = 50;
 
@@ -29,7 +29,7 @@ class CommandDetail extends Card
 
     protected function view(): string
     {
-        return 'monitor::livewire.command-detail';
+        return 'monitor::livewire.schedule-detail';
     }
 
     protected function data(): array
@@ -40,26 +40,27 @@ class CommandDetail extends Card
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
-        // One query grouped by subtype instead of two separate stats()
-        // calls (success/failed) — see Livewire/Overview.php.
-        $bySubtype = $storage->statsBySubtype('command', $since, $until, key: $key);
+        // One query grouped by subtype instead of three separate stats()
+        // calls (finished/failed/skipped) — see Livewire/Overview.php.
+        $bySubtype = $storage->statsBySubtype('scheduled_task', $since, $until, key: $key);
 
         $totalEntries = $bySubtype->sum('count');
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
         return [
-            'success' => $bySubtype->get('success')?->count ?? 0,
+            'finished' => $bySubtype->get('finished')?->count ?? 0,
             'failed' => $bySubtype->get('failed')?->count ?? 0,
-            'successBuckets' => $storage->countsPerBucket('command', $since, $buckets, 'success', $key, $until),
-            'failedBuckets' => $storage->countsPerBucket('command', $since, $buckets, 'failed', $key, $until),
-            'duration' => $storage->durationStats('command', $since, $buckets, $key, null, $until),
-            'entries' => $storage->recent('command', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
+            'skipped' => $bySubtype->get('skipped')?->count ?? 0,
+            'finishedBuckets' => $storage->countsPerBucket('scheduled_task', $since, $buckets, 'finished', $key, $until),
+            'failedBuckets' => $storage->countsPerBucket('scheduled_task', $since, $buckets, 'failed', $key, $until),
+            'skippedBuckets' => $storage->countsPerBucket('scheduled_task', $since, $buckets, 'skipped', $key, $until),
+            'duration' => $storage->durationStats('scheduled_task', $since, $buckets, $key, 'finished', $until),
+            'entries' => $storage->recent('scheduled_task', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
             'totalEntries' => $totalEntries,
             'page' => $page,
             'lastPage' => $lastPage,
             'perPage' => self::PER_PAGE,
-            'threshold' => (int) config('monitor.thresholds.command', 1000),
         ];
     }
 }

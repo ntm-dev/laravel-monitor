@@ -14,6 +14,7 @@ use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\IssueController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
+use LaravelMonitor\Http\Controllers\ScheduleRunController;
 use LaravelMonitor\Http\Controllers\SettingsController;
 use LaravelMonitor\Http\Middleware\Authorize;
 use LaravelMonitor\Http\Middleware\EnsureMonitorAuthenticated;
@@ -46,6 +47,7 @@ Route::domain(config('monitor.domain'))
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');
+            Route::get('/schedule/runs/{runId}', ScheduleRunController::class)->name('monitor.schedule.runs.show');
             Route::get('/issues/{uuid}', [IssueController::class, 'show'])->name('monitor.issues.show');
 
             // Hashed-path detail pages, replacing the old ?key=<raw key>
@@ -70,7 +72,7 @@ Route::domain(config('monitor.domain'))
                 return app(RequestDetailController::class)($requestId);
             })->where('hash', '[0-9a-f]{32}')->name('monitor.requests.routes.request');
 
-            foreach (['jobs', 'commands', 'queries', 'exceptions'] as $groupTab) {
+            foreach (['jobs', 'commands', 'schedule', 'queries', 'exceptions'] as $groupTab) {
                 Route::get("/{$groupTab}/{hash}", DashboardController::class)
                     ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
                     ->defaults('tab', $groupTab)

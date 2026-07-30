@@ -73,6 +73,7 @@ trait BuildsExceptionDetail
                     'request' => route('monitor.requests.show', $row->request_id),
                     'job' => route('monitor.jobs.attempts.show', $row->request_id),
                     'command' => route('monitor.commands.runs.show', $row->request_id),
+                    'scheduled_task' => route('monitor.schedule.runs.show', $row->request_id),
                     default => null,
                 },
             ];
