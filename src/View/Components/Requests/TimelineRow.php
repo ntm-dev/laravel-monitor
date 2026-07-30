@@ -27,7 +27,7 @@ class TimelineRow extends Component
         'cache' => 'CACHE',
         'mail' => 'MAIL SENT',
         'notification' => 'NOTIFICATION SENT',
-        'queue' => 'QUEUE',
+        'queue' => 'JOB DISPATCH',
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
         'command' => 'COMMAND',
@@ -67,11 +67,6 @@ class TimelineRow extends Component
 
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
     protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception', 'http', 'queue'];
-
-    /** Bar left edge / width as percentages of the total duration. */
-    public float $left;
-
-    public float $width;
 
     public string $durationLabel;
 
@@ -117,7 +112,11 @@ class TimelineRow extends Component
 
     public function __construct(
         public TimelineEntry $entry,
-        public int $total,
+        /** Bar left edge / width, as percentages of the page's one fixed time scale (see View\Components\Requests\Timeline) — precomputed there from this row's real wall-clock offset, not clamped to 0-100%, since a row from a non-default track can genuinely fall outside that window. */
+        public float $left,
+        public float $width,
+        /** Which track (see View\Components\Requests\Timeline) this row belongs to — governs only its own expand/collapse visibility (`expandedTracks` in timeline.blade.php), not its position. */
+        public string $trackId,
         public string $kind = 'event',
         /**
          * Which half of the two-pane layout this instance renders: the
@@ -129,9 +128,9 @@ class TimelineRow extends Component
         public string $part = 'bar',
         /** "REQUEST" for the Request Detail timeline, "JOB" for a job attempt's — see JobAttemptController. */
         public string $rootLabel = 'REQUEST',
+        /** Whether clicking this root row toggles its own track's expand state — false when there's only one track (nothing to toggle). */
+        public bool $focusable = false,
     ) {
-        $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
-        $this->width = $total > 0 ? min(100 - $this->left, max(0.15, (($entry->duration ?? 0) / $total) * 100)) : 0.15;
         $this->durationLabel = $entry->duration !== null ? Format::duration($entry->duration) : '';
         $this->badge = self::badgeFor($entry->type);
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;

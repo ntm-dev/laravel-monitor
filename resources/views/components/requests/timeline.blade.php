@@ -19,9 +19,12 @@
      header (also z-10) — a tie the later element in the DOM (this card)
      wins, painting the timeline over the page header once scrolled. Giving
      the card its own stacking context contains every z-index inside it, so
-     the page header (outside this context) always wins instead. All data is
-     precomputed by View\Components\Requests\Timeline; this template only
-     renders it.
+     the page header (outside this context) always wins instead. Every row's
+     position (and the ruler) is precomputed by View\Components\Requests\Timeline
+     against one fixed scale for the whole page (the `$defaultTrack` track's
+     own duration) — expanding/collapsing a track here is purely a visibility
+     toggle (`expandedTracks` below), independent per track; it never moves
+     the scale or auto-collapses any other track.
 
      Corners are clipped with `clip-path`, not `overflow-hidden`, because the
      selected-event detail panel further down is `position: sticky` and is a
@@ -49,6 +52,13 @@
          crossX: null,
          crossWidth: 0,
          totalDuration: {{ $totalDuration }},
+         // Which tracks currently show their own phase/event rows — starts
+         // with just the page's default track (see
+         // MergesJobTimelines::defaultTrackId()); toggling any other track on
+         // via toggleTrack() below only ever adds to/removes from this set,
+         // it never touches another track's own entry.
+         expandedTracks: { '{{ $defaultTrack }}': true },
+         toggleTrack(id) { this.expandedTracks[id] = ! this.expandedTracks[id] },
          selectedId: null,
          hoveredId: null,
          // Toggled true for 5s (see the window listener above) whenever the
@@ -57,6 +67,10 @@
          // pulses at once — the visual equivalent of highlighting an N+1.
          heartbeatActive: false,
          heartbeatTimer: null,
+         // Same pulse, scoped to just the clicked query's own duplicate
+         // group (see selectRow() below) rather than every group on the page.
+         heartbeatColor: null,
+         heartbeatColorTimer: null,
          tooltip: { text: '', top: 0, left: 0 },
          sqlCopied: false,
          dragging: false,
@@ -158,6 +172,15 @@
          selectRow(id) {
              if (this.dragMoved) return;
              this.selectedId = (this.selectedId === id ? null : id);
+             // Selecting a duplicate query pulses every dot sharing its own
+             // group's colour (see TimelineRow::$duplicateColor), so an N+1
+             // is obvious without hunting for the EventSummary badge.
+             clearTimeout(this.heartbeatColorTimer);
+             const color = this.selectedId !== null ? this.data[this.selectedId]?.duplicateColor : null;
+             this.heartbeatColor = color ?? null;
+             if (color) {
+                 this.heartbeatColorTimer = setTimeout(() => this.heartbeatColor = null, 6000);
+             }
              if (this.selectedId === null) return;
              // The tree pane's row is always vertically in view (it's what was
              // just clicked) but the chart pane scrolls independently on its
@@ -277,18 +300,15 @@
              horizontally — no sticky/z-index tricks required. --}}
         <div class="w-1/5 max-w-[250px] shrink-0 overflow-hidden whitespace-nowrap">
             @foreach ($rows as $row)
-                <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
+                @if ($row['kind'] === 'divider')
+                    <div x-show="expandedTracks['{{ $row['track'] }}']" class="flex h-9 items-center border-t border-neutral-50 pr-3 dark:border-neutral-800/40">
+                        <span class="h-9 w-4 shrink-0 border-l border-neutral-300 dark:border-neutral-700"></span>
+                        <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
+                    </div>
+                @else
+                    <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" part="label"/>
+                @endif
             @endforeach
-
-            @if ($orphanRows !== [])
-                <div class="flex h-9 items-center border-t border-neutral-50 pr-3 dark:border-neutral-800/40">
-                    <span class="h-9 w-4 shrink-0 border-l border-neutral-300 dark:border-neutral-700"></span>
-                    <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
-                </div>
-                @foreach ($orphanRows as $row)
-                    <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
-                @endforeach
-            @endif
         </div>
 
         {{-- Horizontally-scrolling chart pane. overflow-y-hidden is required,
@@ -318,16 +338,12 @@
                          :style="'left: ' + crossX + 'px'"></div>
 
                     @foreach ($rows as $row)
-                        <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
+                        @if ($row['kind'] === 'divider')
+                            <div x-show="expandedTracks['{{ $row['track'] }}']" class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
+                        @else
+                            <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" part="bar"/>
+                        @endif
                     @endforeach
-
-                    {{-- Events that didn't fall inside any recorded phase --}}
-                    @if ($orphanRows !== [])
-                        <div class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
-                        @foreach ($orphanRows as $row)
-                            <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
-                        @endforeach
-                    @endif
                 </div>
             </div>
         </div>
@@ -392,12 +408,6 @@
                         </template>
                         <template x-if="selected()?.type === 'http'">
                             <a :href="selected()?.outgoingUrl" title="View Outgoing Request"
-                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
-                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
-                            </a>
-                        </template>
-                        <template x-if="selected()?.type === 'queue' && selected()?.jobAttemptUrl">
-                            <a :href="selected()?.jobAttemptUrl" title="View Job's own timeline"
                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>

@@ -51,10 +51,12 @@ class CommandRunController
         $children = $this->storage->timelineFor($runId, 'command');
 
         [$groups, $footerTabs] = Nav::grouped();
+        $tracks = $this->buildTracks($root, $children, 'COMMAND');
 
         return view('monitor::command-run-page', [
             'root' => $root,
-            'tracks' => $this->buildTracks($root, $children, 'COMMAND'),
+            'tracks' => $tracks,
+            'defaultTrack' => $this->defaultTrackId($tracks),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

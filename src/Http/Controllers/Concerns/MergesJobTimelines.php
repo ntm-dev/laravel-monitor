@@ -81,11 +81,11 @@ trait MergesJobTimelines
         // The outcome's own created_at is stamped when it finished (see
         // Recorders\Jobs) — its processing start is that minus its own
         // duration, the same math the job's own standalone timeline uses.
-        $processingStartedAt = (float) CarbonImmutable::parse($outcome->created_at)->format('U.u') - ($duration / 1000);
+        $processingStartedAt = (float) CarbonImmutable::parse($outcome->created_at)->format('U.u') - $duration / 1000;
         $start = max(0.0, ($processingStartedAt - $rootStart) * 1000);
 
         return [
-            'id' => 'job-'.$outcome->id,
+            'id' => "job-{$outcome->id}",
             'badge' => 'JOB',
             'label' => $outcome->key ?? 'Job',
             'attempt' => $attemptIndex + 1,
@@ -109,5 +109,29 @@ trait MergesJobTimelines
         }
 
         return $this->storage->jobExecutionsByJobId($jobIds, $since);
+    }
+
+    /**
+     * Which track starts expanded (and doubles as the fixed scale every bar
+     * on the page is positioned against — see View\Components\Requests\Timeline).
+     * Defaults to the root ('root') unless a `?job=<id>` query string names
+     * one of this page's own job tracks — set by JobAttemptController when it
+     * redirects a directly-visited, already-tracked job attempt here, so
+     * landing on this page from that job's own link expands (and scales
+     * around) *that* job instead of the root.
+     */
+    protected function defaultTrackId(array $tracks): string
+    {
+        $requestedJobId = request()->query('job');
+
+        if ($requestedJobId !== null) {
+            $candidate = "job-{$requestedJobId}";
+
+            if (collect($tracks)->contains('id', $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $tracks[0]['id'];
     }
 }

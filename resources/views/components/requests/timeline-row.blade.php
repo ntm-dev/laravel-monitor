@@ -33,18 +33,32 @@
         $kind === 'event' => $tooltipDetail,
         default => '',
     };
+    // A root row always stays visible (it's the track's own summary bar,
+    // doubling as the affordance to expand/collapse it) — every other row in
+    // this track only renders while its own track is expanded (see
+    // timeline.blade.php's `expandedTracks` state). Expanding one track never
+    // collapses another — each track's own expand state is independent.
+    $visible = $kind === 'root' ? 'true' : "expandedTracks['{$trackId}']";
+    $toggleClick = "toggleTrack('{$trackId}')";
 @endphp
 @if ($part === 'label')
-    <div @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable])
+    <div x-show="{{ $visible }}"
+         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable)])
          :class="{{ $highlightClass }}"
          @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
          @mouseleave="hoveredId = null; hideTooltip()"
-         @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
+         @if ($detailable) @click="selectRow('{{ $entry->id }}')"
+         @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
         <div class="flex min-w-0 translate-y-px items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
+                @if ($focusable)
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
+                                      class="h-3 w-3 shrink-0 text-neutral-400 transition-transform dark:text-neutral-500"
+                                      x-bind:class="expandedTracks['{{ $trackId }}'] ? '' : '-rotate-90'"/>
+                @endif
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
             @elseif ($kind === 'phase')
@@ -55,7 +69,7 @@
             @else
                 @if ($duplicateColor)
                     <span class="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-{{ $duplicateColor }}-500 pl-px text-[8px] font-bold leading-none text-{{ $duplicateColor }}-500 dark:border-{{ $duplicateColor }}-400 dark:text-{{ $duplicateColor }}-400"
-                          :class="heartbeatActive ? 'monitor-heartbeat' : ''">D</span>
+                          :class="(heartbeatActive || heartbeatColor === '{{ $duplicateColor }}') ? 'monitor-heartbeat' : ''">D</span>
                 @else
                     <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                         <span class="relative h-1.5 w-1.5 rounded-full {{ $color }}"></span>
@@ -70,11 +84,12 @@
     {{-- data-duplicate-group marks the first-in-DOM-order match for the
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
-    <div class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
-        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable])
+    <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable)])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
-             @if ($detailable) @click="selectRow('{{ $entry->id }}')" @endif>
+             @if ($detailable) @click="selectRow('{{ $entry->id }}')"
+             @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
             @if ($kind === 'root')
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">

@@ -60,10 +60,12 @@ class ScheduleRunController
         $children = $this->storage->timelineFor($runId, 'scheduled_task');
 
         [$groups, $footerTabs] = Nav::grouped();
+        $tracks = $this->buildTracks($root, $children, 'SCHEDULED TASK');
 
         return view('monitor::schedule-run-page', [
             'root' => $root,
-            'tracks' => $this->buildTracks($root, $children, 'SCHEDULED TASK'),
+            'tracks' => $tracks,
+            'defaultTrack' => $this->defaultTrackId($tracks),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

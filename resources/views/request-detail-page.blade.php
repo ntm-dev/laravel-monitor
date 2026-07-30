@@ -22,7 +22,7 @@
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
-                <x-monitor::requests.timeline-tracks :tracks="$tracks"/>
+                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack"/>
 
             </main>
         </div>

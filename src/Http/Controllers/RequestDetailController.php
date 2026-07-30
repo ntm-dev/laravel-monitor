@@ -51,10 +51,12 @@ class RequestDetailController
             : null;
 
         [$groups, $footerTabs] = Nav::grouped();
+        $tracks = $this->buildTracks($root, $children, 'REQUEST');
 
         return view('monitor::request-detail-page', [
             'root' => $root,
-            'tracks' => $this->buildTracks($root, $children, 'REQUEST'),
+            'tracks' => $tracks,
+            'defaultTrack' => $this->defaultTrackId($tracks),
             'summary' => $this->eventsSummary($root, $children),
             'userName' => $userName,
             'groups' => $groups,

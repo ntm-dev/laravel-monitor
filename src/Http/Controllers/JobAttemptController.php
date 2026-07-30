@@ -60,16 +60,23 @@ class JobAttemptController
         abort_unless($root !== null, 404);
 
         if (($ancestorUrl = $this->ancestorUrl($root)) !== null) {
-            return redirect($ancestorUrl);
+            // `job=` tells the landing page to expand (and scale its whole
+            // timeline around) *this* job's own track instead of its
+            // default root — see MergesJobTimelines::defaultTrackId().
+            $separator = str_contains($ancestorUrl, '?') ? '&' : '?';
+
+            return redirect("{$ancestorUrl}{$separator}job={$root->id}");
         }
 
         $children = $this->storage->timelineFor($attemptId, 'job');
 
         [$groups, $footerTabs] = Nav::grouped();
+        $tracks = $this->buildTracks($root, $children, 'JOB');
 
         return view('monitor::job-attempt-page', [
             'root' => $root,
-            'tracks' => $this->buildTracks($root, $children, 'JOB'),
+            'tracks' => $tracks,
+            'defaultTrack' => $this->defaultTrackId($tracks),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
