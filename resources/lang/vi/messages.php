@@ -27,6 +27,12 @@ return [
         'monitoring' => 'Giám sát',
     ],
 
+    'exception' => [
+        'source_request' => 'Request',
+        'source_job' => 'Job',
+        'source_command' => 'Command',
+    ],
+
     'settings' => [
         'preferences' => 'Tuỳ chỉnh',
         'preferences_hint' => 'Các tuỳ chọn này được lưu trong trình duyệt và chỉ thay đổi giao diện bảng điều khiển cho riêng bạn.',

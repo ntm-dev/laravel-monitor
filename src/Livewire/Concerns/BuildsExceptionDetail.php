@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Livewire\Concerns;
 
 use Illuminate\Support\Collection;
+use LaravelMonitor\Contracts\Storage;
 
 /**
  * Shape a fetched exception's raw payload (frames, message, class, ...)
@@ -41,6 +42,41 @@ trait BuildsExceptionDetail
             ['Occurrences', number_format($occurrencesCount)],
             ['Servers', $servers->isNotEmpty() ? $servers->implode(', ') : '—'],
         ];
+    }
+
+    /**
+     * Shape occurrence rows for the table: date/message/user plus which
+     * request/job/command run the exception happened during, so the
+     * dashboard can link back to it — mirrors Nightwatch tagging every event
+     * with the request/job/command it occurred in. One batched
+     * rootTypesFor()/rootLabelsFor() pair instead of a lookup per row (same
+     * approach as NotificationClassDetail's timeline_url).
+     *
+     * @param  array<int|string, string>  $names  user_id => display name
+     */
+    protected function occurrenceRows(Collection $occurrences, array $names, Storage $storage): Collection
+    {
+        $requestIds = $occurrences->pluck('request_id')->filter()->unique()->values()->all();
+        $rootTypes = $storage->rootTypesFor($requestIds);
+        $rootLabels = $storage->rootLabelsFor($requestIds);
+
+        return $occurrences->take(50)->map(function ($row) use ($names, $rootTypes, $rootLabels) {
+            $sourceType = $rootTypes->get($row->request_id);
+
+            return (object) [
+                'date' => \LaravelMonitor\Support\Format::datetime($row->created_at),
+                'message' => $row->payload['message'] ?? null,
+                'user' => $row->user_id !== null ? ($names[$row->user_id] ?? "User #{$row->user_id}") : 'Guest',
+                'sourceType' => $sourceType,
+                'sourceLabel' => $sourceType !== null ? $rootLabels->get($row->request_id) : null,
+                'sourceUrl' => match ($sourceType) {
+                    'request' => route('monitor.requests.show', $row->request_id),
+                    'job' => route('monitor.jobs.attempts.show', $row->request_id),
+                    'command' => route('monitor.commands.runs.show', $row->request_id),
+                    default => null,
+                },
+            ];
+        });
     }
 
     /**
@@ -104,6 +140,10 @@ trait BuildsExceptionDetail
             'main' => $main,
             'has_code' => $lines !== [],
             'lines' => $lines,
+            // Type placeholders only (see Recorders\Exceptions::argTypes()) —
+            // absent on exceptions recorded before this field existed, hence
+            // the default.
+            'args' => $frame['args'] ?? [],
         ];
     }
 
@@ -140,7 +180,20 @@ trait BuildsExceptionDetail
             return [null, null];
         }
 
-        $path = base_path($relative);
+        // Recorders\Exceptions::relativePath() strips the recording app's own
+        // base_path() prefix, but a frame can point outside that tree
+        // entirely — e.g. this package installed as a composer `path` repo
+        // symlink (see CLAUDE.local.md), where PHP resolves the symlinked
+        // vendor/ntm-dev/laravel-monitor/... frame to its real target
+        // directory, a sibling of the consuming app, not a subdirectory of
+        // it. relativePath()'s str_replace() then has nothing to strip and
+        // silently returns the path unchanged (still absolute). Blindly
+        // prefixing that with base_path() again here produced a nonsense,
+        // non-existent double path, so is_file() always failed, has_code
+        // stayed false, and the frame could never expand.
+        $path = str_starts_with($relative, DIRECTORY_SEPARATOR) || preg_match('#^[A-Za-z]:[\\\\/]#', $relative) === 1
+            ? $relative
+            : base_path($relative);
 
         if (! is_file($path) || ! is_readable($path)) {
             return [null, null];

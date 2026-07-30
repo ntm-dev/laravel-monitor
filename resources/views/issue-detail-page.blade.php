@@ -36,7 +36,13 @@
                                 </dl>
                             </x-monitor::card>
 
-                            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/2 dark:shadow-black/20 overflow-hidden">
+                            {{-- dark:bg-white/5, not /2: this app loads Tailwind via the
+                                 cdn.tailwindcss.com script, whose JIT only generates
+                                 color-opacity modifiers on the default scale
+                                 (0/5/10/20/25/...); `/2` silently compiled to nothing,
+                                 leaving this card stuck on its light-mode `bg-white`
+                                 regardless of theme. --}}
+                            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
                                 <div class="flex flex-col gap-3 p-4 md:p-5"
                                      x-data="{ copied: false, copy() {
                                          navigator.clipboard.writeText(@js($markdown)).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1600); });
@@ -81,9 +87,11 @@
                                                 @foreach ($occurrences as $occurrence)
                                                     <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                                         <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $occurrence->date }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
-                                                        <td class="py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $occurrence->server ?? '—' }}</td>
+                                                        <td class="max-w-[14rem] py-2 pr-3">
+                                                            <x-monitor::exception-source-badge :type="$occurrence->sourceType" :label="$occurrence->sourceLabel" :url="$occurrence->sourceUrl"/>
+                                                        </td>
                                                         <td class="max-w-[22rem] truncate py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300" title="{{ $occurrence->message }}">{{ $occurrence->message ?? '—' }}</td>
-                                                        <td class="py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300">{{ $occurrence->user ?? '—' }}</td>
+                                                        <td class="py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300">{{ $occurrence->user }}</td>
                                                     </tr>
                                                 @endforeach
                                             </tbody>

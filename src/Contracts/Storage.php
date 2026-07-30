@@ -245,16 +245,29 @@ interface Storage
     public function requestLabels(array $requestIds): Collection;
 
     /**
-     * Which root type ('request' or 'job') each of the given correlation ids
-     * belongs to, keyed by request_id, in a single query — batches what
-     * would otherwise be one findByRequestId() probe per row (e.g. deciding
-     * whether a notification/mail list row should link to the Request or
-     * Job Attempt timeline).
+     * Which root type ('request', 'job', or 'command') each of the given
+     * correlation ids belongs to, keyed by request_id, in a single query —
+     * batches what would otherwise be one findByRequestId() probe per row
+     * (e.g. deciding whether a list row should link to the Request, Job
+     * Attempt, or Command Run timeline).
      *
      * @param  string[]  $requestIds
      * @return Collection<string, string>
      */
     public function rootTypesFor(array $requestIds): Collection;
+
+    /**
+     * The root entry's own key ("METHOD /path" for a request, the job class
+     * name, or the artisan command string) for each of the given correlation
+     * ids, keyed by request_id, in a single query — the generic counterpart
+     * to requestLabels() that doesn't assume the root is a request. Pair
+     * with rootTypesFor() to know which of the three it is before deciding
+     * which detail-page route to link to.
+     *
+     * @param  string[]  $requestIds
+     * @return Collection<string, string>
+     */
+    public function rootLabelsFor(array $requestIds): Collection;
 
     /**
      * Record that each of the given issues (an exception group or a

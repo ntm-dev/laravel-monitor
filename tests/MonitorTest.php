@@ -6,9 +6,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\Events\CacheHit;
 use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Cache\Events\RetrievingKey;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use LaravelMonitor\Contracts\Storage;
@@ -547,7 +547,10 @@ class MonitorTest extends TestCase
     {
         $exception = new RuntimeException('Charge declined for order 4821');
 
-        event(new MessageLogged('error', $exception->getMessage(), ['exception' => $exception]));
+        // Reporting straight through the handler (rather than via the
+        // report() helper) mimics an exception that crashed the request/job
+        // outright instead of one an app deliberately caught and reported.
+        app(ExceptionHandler::class)->report($exception);
         Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'exception')->first();
@@ -562,11 +565,45 @@ class MonitorTest extends TestCase
         $this->assertNotEmpty($payload['frames']);
     }
 
-    public function test_exception_recorder_marks_lower_levels_as_handled(): void
+    public function test_exception_recorder_attributes_the_top_frame_to_the_throw_site(): void
+    {
+        // getTrace()[0]'s file/line point to wherever the throwing method was
+        // *called from*, not to the throw itself — pairing that location with
+        // the throwing method's own name (as the buggy code briefly did)
+        // mislabels the top frame, and can even flag an application method as
+        // vendor code when its caller happens to live in vendor/.
+        $thrower = new class
+        {
+            public function boom(): never
+            {
+                throw new RuntimeException('kaboom');
+            }
+        };
+
+        try {
+            $thrower->boom();
+        } catch (RuntimeException $exception) {
+        }
+
+        app(ExceptionHandler::class)->report($exception);
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'exception')->first();
+        $payload = json_decode($row->payload, true);
+        $topFrame = $payload['frames'][0];
+
+        $this->assertSame($exception->getLine(), $topFrame['line']);
+        $this->assertStringContainsString('boom', $topFrame['label']);
+        $this->assertFalse($topFrame['vendor']);
+    }
+
+    public function test_exception_recorder_marks_deliberately_reported_exceptions_as_handled(): void
     {
         $exception = new RuntimeException('Retrying webhook');
 
-        event(new MessageLogged('warning', $exception->getMessage(), ['exception' => $exception]));
+        // Going through the report() helper (rather than calling the handler
+        // directly) is what marks this as a deliberate, non-crashing report.
+        report($exception);
         Monitor::flush();
 
         $this->assertDatabaseHas('monitor_entries', [
@@ -626,6 +663,62 @@ class MonitorTest extends TestCase
             ->assertSee('Boom')
             ->assertSee('Copy as Markdown')
             ->assertSee('Occurrences');
+    }
+
+    public function test_exception_detail_page_links_to_the_request_it_happened_during(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $monitor->beginRequest();
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('request', 'GET /users', ['status' => 500], 20, '5xx');
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', 1);
+
+        $requestId = $monitor->requestId();
+
+        Monitor::flush();
+
+        $this->get('/monitor/exceptions?key='.$key)
+            ->assertOk()
+            ->assertSee('GET /users')
+            ->assertSee(route('monitor.requests.show', $requestId), false);
+    }
+
+    public function test_exception_detail_page_links_to_the_command_run_it_happened_during(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $monitor->beginCommandRun('app:sync-data');
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record('command', 'app:sync-data', ['exit_code' => 1], 20, 'failure');
+        Monitor::record('exception', $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', 1);
+
+        $runId = $monitor->commandRunId();
+
+        Monitor::flush();
+
+        $this->get('/monitor/exceptions?key='.$key)
+            ->assertOk()
+            ->assertSee('app:sync-data')
+            ->assertSee(route('monitor.commands.runs.show', $runId), false);
     }
 
     public function test_dashboard_is_protected_by_gate(): void
