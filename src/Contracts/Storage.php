@@ -216,6 +216,32 @@ interface Storage
     public function timelineFor(string $requestId, string $rootType = 'request'): Collection;
 
     /**
+     * The 'queued' dispatch-time entry sharing the given job_id (the queue
+     * driver's own id — see Recorders\Jobs), or null when none match within
+     * the window — the reverse of jobExecutionsByJobId(): given a job
+     * attempt's own outcome (which carries the same job_id in its payload),
+     * find what dispatched it. That entry's own request_id/type (via
+     * rootTypesFor()) identifies the request/command/scheduled task it came
+     * from, if any.
+     */
+    public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object;
+
+    /**
+     * For each given job_id, every outcome entry (processed/failed/released
+     * — more than one on a retry) recorded for it, each paired with its own
+     * children (queries/mail/... it triggered while running) — the data
+     * needed to splice a dispatched job's own execution into the timeline of
+     * whatever request/command/scheduled task dispatched it, matching
+     * Nightwatch's single merged trace view instead of a bare, dead-end
+     * "queued" placeholder. Keyed by job_id; a job_id with no matching
+     * outcome yet is simply absent.
+     *
+     * @param  string[]  $jobIds
+     * @return Collection<string, Collection<int, object{outcome: object, children: Collection}>>
+     */
+    public function jobExecutionsByJobId(array $jobIds, DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
+
+    /**
      * Per-key cache breakdown, unsorted: one row per key exposing key,
      * hit_ratio, hits, misses, writes, deletes, failures, total. Callers
      * sort/paginate themselves, same convention as routeStats(). Sampled at

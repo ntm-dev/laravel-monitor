@@ -5,6 +5,7 @@ namespace LaravelMonitor\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
@@ -29,6 +30,8 @@ use LaravelMonitor\Support\Timeline;
  */
 class ScheduleRunController
 {
+    use MergesJobTimelines;
+
     /**
      * Recorder type => events-summary bucket key. No 'command' entry — a
      * command-based task's own nested command run shows up on the timeline
@@ -59,10 +62,12 @@ class ScheduleRunController
 
         [$groups, $footerTabs] = Nav::grouped();
 
+        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
+
         return view('monitor::schedule-run-page', [
             'root' => $root,
-            'timeline' => Timeline::build($root, $children),
-            'totalDuration' => max(1, (int) ($root->duration ?? 0)),
+            'timeline' => $timeline,
+            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

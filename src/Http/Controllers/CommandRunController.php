@@ -5,6 +5,7 @@ namespace LaravelMonitor\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
@@ -20,6 +21,8 @@ use LaravelMonitor\Support\Timeline;
  */
 class CommandRunController
 {
+    use MergesJobTimelines;
+
     /**
      * Recorder type => events-summary bucket key. No 'command' entry —
      * a command run's own timeline shouldn't summarise itself.
@@ -50,10 +53,12 @@ class CommandRunController
 
         [$groups, $footerTabs] = Nav::grouped();
 
+        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
+
         return view('monitor::command-run-page', [
             'root' => $root,
-            'timeline' => Timeline::build($root, $children),
-            'totalDuration' => max(1, (int) ($root->duration ?? 0)),
+            'timeline' => $timeline,
+            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

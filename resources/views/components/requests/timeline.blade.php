@@ -277,7 +277,7 @@
              horizontally — no sticky/z-index tricks required. --}}
         <div class="w-1/5 max-w-[250px] shrink-0 overflow-hidden whitespace-nowrap">
             @foreach ($rows as $row)
-                <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
+                <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" :nesting-level="$row['depth'] ?? 0" part="label"/>
             @endforeach
 
             @if ($orphanRows !== [])
@@ -286,7 +286,7 @@
                     <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
                 </div>
                 @foreach ($orphanRows as $row)
-                    <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
+                    <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" :nesting-level="$row['depth'] ?? 0" part="label"/>
                 @endforeach
             @endif
         </div>
@@ -318,14 +318,14 @@
                          :style="'left: ' + crossX + 'px'"></div>
 
                     @foreach ($rows as $row)
-                        <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
+                        <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" :nesting-level="$row['depth'] ?? 0" part="bar"/>
                     @endforeach
 
                     {{-- Events that didn't fall inside any recorded phase --}}
                     @if ($orphanRows !== [])
                         <div class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
                         @foreach ($orphanRows as $row)
-                            <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
+                            <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" :nesting-level="$row['depth'] ?? 0" part="bar"/>
                         @endforeach
                     @endif
                 </div>
@@ -392,6 +392,12 @@
                         </template>
                         <template x-if="selected()?.type === 'http'">
                             <a :href="selected()?.outgoingUrl" title="View Outgoing Request"
+                               class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                            </a>
+                        </template>
+                        <template x-if="selected()?.type === 'queue' && selected()?.jobAttemptUrl">
+                            <a :href="selected()?.jobAttemptUrl" title="View Job's own timeline"
                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                             </a>
@@ -614,6 +620,45 @@
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">URL</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200" :title="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
                         </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
+                        </div>
+                    </dl>
+                </template>
+
+                <template x-if="selected()?.type === 'queue'">
+                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Job</dt>
+                            {{-- direction:rtl + text-align:left truncates the *front* of the
+                                 FQCN, keeping the class name itself (the tail) visible. --}}
+                            <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200" style="direction: rtl; text-align: left;" :title="selected()?.metadata?.key" x-text="selected()?.metadata?.key"></dd>
+                        </div>
+                        <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                            <dt class="text-neutral-500 dark:text-neutral-400">Status</dt>
+                            <dd class="font-mono font-medium uppercase"
+                                :class="({ processed: 'text-emerald-600 dark:text-emerald-400', failed: 'text-rose-600 dark:text-rose-400', released: 'text-amber-600 dark:text-amber-400', queued: 'text-neutral-500 dark:text-neutral-400' })[selected()?.metadata?.subtype] ?? 'text-neutral-800 dark:text-neutral-200'"
+                                x-text="selected()?.metadata?.subtype ?? 'queued'"></dd>
+                        </div>
+                        <template x-if="selected()?.metadata?.queue">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Queue</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.queue"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.connection">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Connection</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.metadata?.connection"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.attempt">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Attempt</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="'#' + selected()?.metadata?.attempt"></dd>
+                            </div>
+                        </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200" x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>

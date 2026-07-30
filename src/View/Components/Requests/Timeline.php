@@ -119,6 +119,13 @@ class Timeline extends Component
             'outgoingUrl' => $entry->type === 'http'
                 ? route('monitor.outgoing.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
                 : null,
+            // Only set once a dispatched job's outcome has landed and been
+            // spliced in (see Support\Timeline::spliceJobExecutions()) — a
+            // still-'queued' placeholder has no attempt of its own yet to
+            // link to.
+            'jobAttemptUrl' => $entry->type === 'queue' && isset($entry->metadata['attempt_request_id'])
+                ? route('monitor.jobs.attempts.show', $entry->metadata['attempt_request_id'])
+                : null,
         ]])->all())->toHtml();
     }
 
@@ -129,21 +136,21 @@ class Timeline extends Component
 
     /**
      * @param  Collection<int, TimelineEntry>  $phases
-     * @return list<array{kind: string, entry: TimelineEntry}>
+     * @return list<array{kind: string, entry: TimelineEntry, depth: int}>
      */
     protected function buildRows(?TimelineEntry $request, Collection $phases, Collection $byParent): array
     {
         $rows = [];
 
         if ($request !== null) {
-            $rows[] = ['kind' => 'root', 'entry' => $request];
+            $rows[] = ['kind' => 'root', 'entry' => $request, 'depth' => 0];
         }
 
         foreach ($phases as $phase) {
-            $rows[] = ['kind' => 'phase', 'entry' => $phase];
+            $rows[] = ['kind' => 'phase', 'entry' => $phase, 'depth' => 0];
 
             foreach ($byParent->get($phase->id, collect())->sortBy('start') as $event) {
-                $rows[] = ['kind' => 'event', 'entry' => $event];
+                array_push($rows, ...$this->eventRowsRecursive($event, $byParent, 1));
             }
         }
 
@@ -151,19 +158,40 @@ class Timeline extends Component
     }
 
     /**
+     * A dispatched job's own children (spliced in by Support\Timeline::build())
+     * carry a parentId pointing at the job's own entry, not a phase — walking
+     * this recursively (rather than the single byParent->get($phase->id) level
+     * above) is what renders them indented directly under their job's row
+     * instead of falling through to the "Other" bucket below.
+     *
+     * @return list<array{kind: string, entry: TimelineEntry, depth: int}>
+     */
+    protected function eventRowsRecursive(TimelineEntry $event, Collection $byParent, int $depth): array
+    {
+        $rows = [['kind' => 'event', 'entry' => $event, 'depth' => $depth]];
+
+        foreach ($byParent->get($event->id, collect())->sortBy('start') as $child) {
+            array_push($rows, ...$this->eventRowsRecursive($child, $byParent, $depth + 1));
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param  Collection<int, TimelineEntry>  $phases
-     * @return list<array{kind: string, entry: TimelineEntry}>
+     * @return list<array{kind: string, entry: TimelineEntry, depth: int}>
      */
     protected function buildOrphanRows(Collection $phases, Collection $byParent): array
     {
         $known = $phases->pluck('id')->push('request');
 
-        return $byParent->get('request', collect())
-            ->reject(fn (TimelineEntry $entry) => $known->contains($entry->id))
-            ->sortBy('start')
-            ->map(fn (TimelineEntry $entry) => ['kind' => 'event', 'entry' => $entry])
-            ->values()
-            ->all();
+        $rows = [];
+
+        foreach ($byParent->get('request', collect())->reject(fn (TimelineEntry $entry) => $known->contains($entry->id))->sortBy('start') as $entry) {
+            array_push($rows, ...$this->eventRowsRecursive($entry, $byParent, 0));
+        }
+
+        return $rows;
     }
 
     /**

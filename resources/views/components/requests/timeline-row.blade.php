@@ -21,7 +21,7 @@
      type just show their hover tooltip and aren't clickable, matching
      Nightwatch. --}}
 @php
-    $depth = match ($kind) { 'phase' => 1, 'event' => 2, default => 0 };
+    $depth = match ($kind) { 'phase' => 1, 'event' => 2, default => 0 } + $nestingLevel;
     $highlightClass = $detailable
         ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
         : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
