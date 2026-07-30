@@ -7,11 +7,10 @@
 @endphp
 <div wire:poll.{{ $refresh }}s>
     {{-- Info: metrics list on the left half, the full SQL as a nested card
-         on the right half — mirrors Nightwatch's query detail layout. The
-         page header already shows a wrapped copy of the SQL for quick
-         reference; this is the canonical full text, wrapping instead of
-         scrolling horizontally, capped in height with its own vertical
-         scroll for pathologically long queries. --}}
+         on the right half. The page header already shows a wrapped copy of
+         the SQL for quick reference; this is the canonical full text,
+         wrapping instead of scrolling horizontally, capped in height with
+         its own vertical scroll for pathologically long queries. --}}
     <x-monitor::card class="flex flex-col gap-6 p-4 md:flex-row">
         <div class="md:w-1/2">
             <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Info</h3>

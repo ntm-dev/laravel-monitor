@@ -1,4 +1,4 @@
-{{-- Timeline: Nightwatch-style waterfall of the request lifecycle. True
+{{-- Timeline: a waterfall view of the request lifecycle. True
      two-pane layout — a pinned tree pane on the left and an independently
      horizontally-scrolling chart pane on the right, as two separate flex
      siblings (not a shared scrolling grid). The tree pane never joins the
@@ -58,7 +58,28 @@
          // via toggleTrack() below only ever adds to/removes from this set,
          // it never touches another track's own entry.
          expandedTracks: { '{{ $defaultTrack }}': true },
-         toggleTrack(id) { this.expandedTracks[id] = ! this.expandedTracks[id] },
+         // Landing here already scoped to a specific job track (see
+         // MergesJobTimelines::defaultTrackId()) — it starts expanded above,
+         // but with other tracks stacked ahead of it on the page it can
+         // still render below the fold, so jump to it immediately, same as
+         // toggleTrack() does for a manual expand. No-op when the default
+         // track is already the page's first (nothing to scroll to).
+         init() {
+             if (! {{ $defaultTrack !== ($tracks[0]['id'] ?? null) ? 'true' : 'false' }}) return;
+             this.$nextTick(() => {
+                 this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+             });
+         },
+         toggleTrack(id) {
+             this.expandedTracks[id] = ! this.expandedTracks[id];
+             if (! this.expandedTracks[id]) return;
+             // Jump straight to the track that was just expanded — with
+             // several tracks stacked on the page, the one you just opened
+             // can easily be scrolled off well below the fold.
+             this.$nextTick(() => {
+                 this.$refs.rows.querySelector(`[data-track-root='${id}']`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             });
+         },
          selectedId: null,
          hoveredId: null,
          // Toggled true for 5s (see the window listener above) whenever the
@@ -306,7 +327,7 @@
                         <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
                     </div>
                 @else
-                    <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" part="label"/>
+                    <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" part="label"/>
                 @endif
             @endforeach
         </div>
@@ -341,7 +362,7 @@
                         @if ($row['kind'] === 'divider')
                             <div x-show="expandedTracks['{{ $row['track'] }}']" class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
                         @else
-                            <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" part="bar"/>
+                            <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" part="bar"/>
                         @endif
                     @endforeach
                 </div>

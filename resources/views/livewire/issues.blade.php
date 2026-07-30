@@ -3,7 +3,7 @@
     use LaravelMonitor\Support\Icons;
 
     $fmt = fn ($ms) => Format::duration($ms);
-    $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('nightwatch'.$i), 16, 36)))->implode(' ');
+    $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('monitor'.$i), 16, 36)))->implode(' ');
     $actionButton = 'shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
     $priorityColor = fn (string $priority) => match ($priority) {
         'urgent' => 'text-rose-500',

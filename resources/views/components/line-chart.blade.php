@@ -1,4 +1,4 @@
-{{-- AVG / P95 duration line chart with Nightwatch-style dark tooltips.
+{{-- AVG / P95 duration line chart with dark hover tooltips.
      All geometry is precomputed by LaravelMonitor\View\Components\LineChart so lines,
      standalone dots and hover markers share the exact same coordinates.
 

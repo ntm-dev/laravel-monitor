@@ -14,8 +14,8 @@ abstract class Card extends Component
     public const DEFAULT_PERIOD = '1h';
 
     /**
-     * Candidate bucket widths (seconds), finest first — mirrors Nightwatch's
-     * own per-period chart resolution (1h -> 30s buckets, 24h -> 15m, 7d ->
+     * Candidate bucket widths (seconds), finest first — this chart's own
+     * per-period resolution (1h -> 30s buckets, 24h -> 15m, 7d ->
      * 2h, 14d -> 4h): the chart uses the *finest* width here that still
      * keeps the total point count at or under MAX_CHART_BUCKETS, instead of
      * always slicing every range into the same fixed number of buckets

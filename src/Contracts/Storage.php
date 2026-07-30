@@ -231,8 +231,8 @@ interface Storage
      * — more than one on a retry) recorded for it, each paired with its own
      * children (queries/mail/... it triggered while running) — the data
      * needed to splice a dispatched job's own execution into the timeline of
-     * whatever request/command/scheduled task dispatched it, matching
-     * Nightwatch's single merged trace view instead of a bare, dead-end
+     * whatever request/command/scheduled task dispatched it, producing a
+     * single merged trace view instead of a bare, dead-end
      * "queued" placeholder. Keyed by job_id; a job_id with no matching
      * outcome yet is simply absent.
      *
@@ -300,8 +300,8 @@ interface Storage
      * performance-threshold breach) is still occurring, as of its own last
      * occurrence in this period — creates a new "open" row on first sight,
      * otherwise just bumps last_seen. A previously "resolved" issue that
-     * recurs after its resolved_at reopens automatically (mirrors
-     * Nightwatch); an "ignored" issue stays ignored until manually reopened.
+     * recurs after its resolved_at reopens automatically; an "ignored" issue
+     * stays ignored until manually reopened.
      *
      * @param  array<string, DateTimeInterface>  $lastSeenByKey
      */

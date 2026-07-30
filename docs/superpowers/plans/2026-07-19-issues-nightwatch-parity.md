@@ -1,8 +1,8 @@
-# Issues page Nightwatch parity Implementation Plan
+# Issues page Ticket-ID/Priority Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give the Issues tab a Nightwatch-style ticket number, a manual priority field, and a dedicated `/monitor/issues/{uuid}` detail page with a Status/Priority "Manage" panel, replacing today's card-list with a sortable-looking table.
+**Goal:** Give the Issues tab a ticket number, a manual priority field, and a dedicated `/monitor/issues/{uuid}` detail page with a Status/Priority "Manage" panel, replacing today's card-list with a sortable-looking table.
 
 **Architecture:** `monitor_issues` gains `uuid` (UUID v7, generated with `ramsey/uuid` — `Str::uuid7()` isn't available before Laravel 11) and `priority` columns. The list Livewire component (`Livewire\Issues`) attaches these to each row and gains checkbox multi-select with bulk Resolve/Ignore. A new plain (non-Livewire) `IssueController` — same "owns its own route, fetches everything itself" pattern as `RequestDetailController`/`JobAttemptController` — resolves `{uuid}` and renders either the exception's full detail (stack trace, occurrences, summary — reusing trace-shaping logic extracted from `ExceptionDetail` into a shared trait) or a compact performance-issue summary, plus a Manage panel that submits Status/Priority via plain POST-and-redirect (same convention as `SettingsController`).
 
@@ -15,7 +15,7 @@
 - Follow `php-conventions`, `laravel-conventions`, `livewire-conventions`, and `phpunit-conventions` skills already available in this repo (control-structure style, migration `getConnection()` pattern, Livewire component conventions, running one test before the full suite).
 - `AGENTS.md`: `<pre><code>` must have zero whitespace between the tags; only commit when explicitly asked (already asked for in this case — commit after each task).
 - **This machine's Herd PHP CLI is broken** (missing dylib) — run all PHP/Composer/PHPUnit commands with `/opt/homebrew/bin/php` explicitly, e.g. `/opt/homebrew/bin/php vendor/bin/phpunit ...`, not bare `php`.
-- After all tasks: run the full suite (`/opt/homebrew/bin/php vendor/bin/phpunit`), commit, push to `feat/nightwatch-parity-improvements`, update the PR title/description, and watch CI — fix and re-push if anything fails (per explicit user instruction for this session).
+- After all tasks: run the full suite (`/opt/homebrew/bin/php vendor/bin/phpunit`), commit, push to `feat/issues-ticket-priority`, update the PR title/description, and watch CI — fix and re-push if anything fails (per explicit user instruction for this session).
 
 ---
 
@@ -172,10 +172,7 @@ Expected: FAIL — `Format::priorityLabel()` doesn't exist.
 In `src/Support/Format.php`, add inside the `Format` class (after the existing `RANGE` constant):
 
 ```php
-    /**
-     * Manual issue-priority levels, value => human label — mirrors
-     * Nightwatch's five-level priority field on an Issue.
-     */
+    /** Manual issue-priority levels, value => human label. */
     public const PRIORITIES = [
         'none' => 'No priority',
         'low' => 'Low',
@@ -1419,7 +1416,7 @@ Replace the entire file with:
     use LaravelMonitor\Support\Icons;
 
     $fmt = fn ($ms) => Format::duration($ms);
-    $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('nightwatch'.$i), 16, 36)))->implode(' ');
+    $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('monitor'.$i), 16, 36)))->implode(' ');
     $actionButton = 'shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
     $priorityColor = fn (string $priority) => match ($priority) {
         'urgent' => 'text-rose-500',
@@ -1846,10 +1843,10 @@ Using the already-running `laravel-newest` dev server (symlinked to this package
 - [ ] **Step 3: Push and update the PR**
 
 ```bash
-git push origin feat/nightwatch-parity-improvements
-gh pr edit 13 --title "feat: Nightwatch-style Issues page (ticket IDs, priority, dedicated detail page)" --body "$(cat <<'EOF'
+git push origin feat/issues-ticket-priority
+gh pr edit 13 --title "feat: ticket IDs, priority, dedicated detail page for Issues" --body "$(cat <<'EOF'
 ## Summary
-- Adds a Nightwatch-style ticket number (#id) and manual priority field to Issues (exceptions + performance breaches).
+- Adds a ticket number (#id) and manual priority field to Issues (exceptions + performance breaches).
 - Redesigns the Issues list as a sortable-looking table with bulk checkbox Resolve/Ignore.
 - Adds a dedicated /monitor/issues/{uuid} detail page with a Status/Priority "Manage" panel (exceptions get the full stack-trace/occurrences view; performance issues get a compact summary + link back to their own tab).
 - Sidebar "Issues" badge showing the open-issue count.

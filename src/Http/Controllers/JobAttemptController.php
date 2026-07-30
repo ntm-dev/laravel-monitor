@@ -16,8 +16,8 @@ use LaravelMonitor\Support\Sql;
  * Renders the standalone Job Attempt Detail page: one queued job execution
  * and every event it triggered (queries, mail, notifications, cache,
  * outgoing requests), on the same waterfall timeline used for requests —
- * mirrors Nightwatch, whose notification/mail rows link here (rather than to
- * a standalone notification/mail page) because both sides of a mail-channel
+ * notification/mail rows link here (rather than to a standalone
+ * notification/mail page) because both sides of a mail-channel
  * notification already show up side by side on this one timeline. Owns its
  * own route (`monitor.jobs.attempts.show`), same as RequestDetailController.
  *

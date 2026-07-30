@@ -1,4 +1,4 @@
-# Issues page: Nightwatch parity (ticket IDs, priority, dedicated detail page)
+# Issues page: ticket IDs, priority, dedicated detail page
 
 Date: 2026-07-19
 Status: Approved (pending implementation plan)
@@ -9,17 +9,16 @@ The Issues tab (`/monitor/issues`) currently renders exceptions and
 performance-threshold breaches as a simple divided list: no ticket number,
 no priority, no dedicated detail route, and (as a separate bug already
 fixed) exception rows were showing a fingerprint hash instead of the
-exception class name. The user wants this tab restyled to match
-[Laravel Nightwatch's own Issues → Exceptions view](https://nightwatch.laravel.com),
-which presents a sortable, checkbox-selectable table with a numeric ticket
-ID, a priority indicator, and a dedicated `/issues/{id}` detail page with a
-"Manage" panel (Status + Priority).
+exception class name. The user wants this tab restyled as a sortable,
+checkbox-selectable table with a numeric ticket ID, a priority indicator,
+and a dedicated `/issues/{id}` detail page with a "Manage" panel
+(Status + Priority).
 
-Nightwatch also has an Assignee field and an AI-generated Description box.
-Both are explicitly out of scope: this package has no team/user-account
+An Assignee field and an AI-generated Description box were considered and
+are explicitly out of scope: this package has no team/user-account
 system of its own (the dashboard is gated by a single `viewMonitor` Gate
-against the host app's own Auth guard, not a multi-user team), and the AI
-description generator is a Nightwatch-specific paid feature.
+against the host app's own Auth guard, not a multi-user team), and an AI
+description generator is a paid-tier feature this package doesn't offer.
 
 ## Scope
 
@@ -44,9 +43,9 @@ In scope:
 Out of scope:
 - Assignee (no team/user-account concept to assign to).
 - Description/notes field.
-- Interactive column sorting on the Issues table (Nightwatch supports it;
-  v1 here keeps the existing fixed ordering — worst/most-recent first —
-  to control scope. Can be added later without touching the data model).
+- Interactive column sorting on the Issues table — v1 here keeps the
+  existing fixed ordering — worst/most-recent first — to control scope.
+  Can be added later without touching the data model.
 - Inline priority editing from the list row (priority is set from the
   detail page's Manage panel only).
 

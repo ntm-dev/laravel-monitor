@@ -18,10 +18,7 @@ class Format
      */
     public const RANGE = 'Y-m-d\TH:i';
 
-    /**
-     * Manual issue-priority levels, value => human label — mirrors
-     * Nightwatch's five-level priority field on an Issue.
-     */
+    /** Manual issue-priority levels, value => human label. */
     public const PRIORITIES = [
         'none' => 'No priority',
         'low' => 'Low',
@@ -51,10 +48,10 @@ class Format
     ];
 
     /**
-     * Render a millisecond duration the way Nightwatch does: "918ms", "1.73s".
-     * Walks the unit ladder (h, m, s, ms) largest-first and uses the first
-     * one the value reaches 1 of; anything under 1ms drops to μs so it
-     * doesn't round away to "0ms".
+     * Render a millisecond duration in the largest whole unit it reaches:
+     * "918ms", "1.73s". Walks the unit ladder (h, m, s, ms) largest-first
+     * and uses the first one the value reaches 1 of; anything under 1ms
+     * drops to μs so it doesn't round away to "0ms".
      */
     public static function duration(int|float|null $milliseconds, string $fallback = '—'): string
     {

@@ -18,8 +18,8 @@ class Requests extends Recorder
     public const UNMATCHED_ROUTE = 'Unmatched Route';
 
     /**
-     * Headers whose values are replaced before storing (lowercase).
-     * Mirrors Nightwatch's header redaction.
+     * Headers whose values are replaced before storing (lowercase), so
+     * secrets/session tokens never land in the stored payload.
      */
     protected const REDACT_HEADERS = [
         'authorization',
@@ -74,7 +74,7 @@ class Requests extends Recorder
         // Requests with no matched Laravel route (404s, arbitrary probed
         // paths) are grouped under one label instead of the raw path, or
         // dynamic/unknown URLs would each fragment the route list into
-        // their own row. Mirrors Nightwatch's "Unmatched Route" grouping.
+        // their own row.
         $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : self::UNMATCHED_ROUTE;
 
         // LARAVEL_START before REQUEST_TIME_FLOAT — see Monitor::beginRequest() for why.
@@ -124,9 +124,9 @@ class Requests extends Recorder
     }
 
     /**
-     * Best-effort response size in bytes, following Nightwatch: the rendered
-     * content when available, the file size for downloads, otherwise the
-     * declared Content-Length (0 for undeclared streamed responses).
+     * Best-effort response size in bytes: the rendered content when
+     * available, the file size for downloads, otherwise the declared
+     * Content-Length (0 for undeclared streamed responses).
      */
     protected function responseSize(Response $response): int
     {
@@ -183,8 +183,7 @@ class Requests extends Recorder
     /**
      * Best-effort request body, redacted and capped in size — skipped for
      * GET/HEAD (query params already show up in the URL, and Laravel has no
-     * concept of a GET body worth capturing separately). Mirrors Nightwatch,
-     * which applies the same method restriction.
+     * concept of a GET body worth capturing separately).
      */
     protected function body(Request $request): ?array
     {

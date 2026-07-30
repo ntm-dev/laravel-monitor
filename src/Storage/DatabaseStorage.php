@@ -994,8 +994,8 @@ class DatabaseStorage implements Storage
 
             $update = ['last_seen' => $lastSeenValue, 'updated_at' => $now];
 
-            // A resolved issue that keeps occurring reopens itself — mirrors
-            // Nightwatch. An ignored one stays ignored until the user
+            // A resolved issue that keeps occurring reopens itself
+            // automatically. An ignored one stays ignored until the user
             // manually reopens it; recurrence alone shouldn't override that.
             if ($row->status === 'resolved'
                 && $row->resolved_at !== null

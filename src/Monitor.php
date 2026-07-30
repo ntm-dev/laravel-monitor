@@ -17,8 +17,8 @@ class Monitor
 
     /**
      * State of the HTTP request currently being recorded, or null outside a
-     * request (console, queue workers). Mirrors Nightwatch's RequestState: a
-     * shared per-request identity plus a *live* lifecycle stage pointer
+     * request (console, queue workers): a shared per-request identity plus
+     * a *live* lifecycle stage pointer
      * (`stage`) — not a set of independent timestamp markers — so every
      * entry recorded during the request can be tagged with the stage it
      * actually happened in (see `record()`), instead of being classified
@@ -213,9 +213,8 @@ class Monitor
      *
      * LARAVEL_START (set on the first line of public/index.php) takes
      * priority over REQUEST_TIME_FLOAT (set by the SAPI before PHP even
-     * starts executing the script) — mirrors Nightwatch's own start-time
-     * resolution, so duration doesn't include webserver/PHP bootstrap time
-     * outside Laravel's own lifecycle.
+     * starts executing the script), so duration doesn't include
+     * webserver/PHP bootstrap time outside Laravel's own lifecycle.
      */
     public function beginRequest(): void
     {
@@ -396,9 +395,8 @@ class Monitor
     }
 
     /**
-     * Count every query executed during the request — mirrors Nightwatch's
-     * `queries` counter, tracked independently of the Queries recorder's
-     * slow/fast tagging.
+     * Count every query executed during the request, tracked independently
+     * of the Queries recorder's slow/fast tagging.
      */
     public function incrementQueryCount(): void
     {
@@ -526,8 +524,7 @@ class Monitor
 
     /**
      * Move to a new named lifecycle stage, closing out the phase the
-     * request was previously in — the live equivalent of Nightwatch's
-     * ExecutionStage state machine. Replaces the old approach of recording
+     * request was previously in. Replaces the old approach of recording
      * a handful of independent timestamp markers and matching every entry's
      * stored start_offset against them after the fact (still available as
      * Support\Timeline::containingPhase(), kept only as a fallback for rows
@@ -578,9 +575,8 @@ class Monitor
      * Complete the buffered root `request` entry right before it is stored:
      * close out whichever stage the request was still in (mirroring every
      * other stage transition), attach the collected phases and extend the
-     * duration to cover the full lifecycle — mirroring Nightwatch, whose
-     * request duration is the sum of all execution stages including
-     * Terminating.
+     * duration to cover the full lifecycle, so the recorded request
+     * duration is the sum of every execution stage including Terminating.
      */
     protected function finalizePendingRequest(): void
     {
@@ -626,8 +622,7 @@ class Monitor
             // Monitoring must never take the application down, but a storage
             // failure (e.g. schema drift after an update whose migration
             // wasn't run) should still be diagnosable instead of silently
-            // dropping every entry — mirrors Nightwatch reporting its own
-            // internal exceptions rather than swallowing them outright.
+            // dropping every entry — reported rather than swallowed outright.
             $this->reportStorageFailure($e);
         } finally {
             $this->recording = true;

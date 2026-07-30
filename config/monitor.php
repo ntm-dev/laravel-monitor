@@ -152,7 +152,7 @@ return [
     |
     | Requests, jobs, queries and outgoing requests at or above these
     | durations (milliseconds) are shown as "over threshold" on the
-    | dashboard, mirroring Nightwatch's per-area threshold cards.
+    | dashboard, one threshold card per monitored area.
     |
     */
 

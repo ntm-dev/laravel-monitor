@@ -211,9 +211,9 @@ class Issues extends Card
     /**
      * Requests, jobs, slow queries and outgoing requests whose max duration
      * breached their own configured threshold, merged into one severity-
-     * ordered feed (worst max duration first) — mirroring how Nightwatch
-     * surfaces every "over threshold" area as a single Issues list rather
-     * than a separate page per area.
+     * ordered feed (worst max duration first), surfacing every "over
+     * threshold" area as a single Issues list rather than a separate page
+     * per area.
      *
      * @return Collection<int, object{type: string, badge: string, label: string, key: string, count: int, max_duration: float}>
      */

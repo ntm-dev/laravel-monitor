@@ -47,8 +47,8 @@ trait BuildsExceptionDetail
     /**
      * Shape occurrence rows for the table: date/message/user plus which
      * request/job/command run the exception happened during, so the
-     * dashboard can link back to it — mirrors Nightwatch tagging every event
-     * with the request/job/command it occurred in. One batched
+     * dashboard can link back to it — every event is tagged with the
+     * request/job/command it occurred in. One batched
      * rootTypesFor()/rootLabelsFor() pair instead of a lookup per row (same
      * approach as NotificationClassDetail's timeline_url).
      *

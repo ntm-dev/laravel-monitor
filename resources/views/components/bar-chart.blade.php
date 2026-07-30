@@ -1,4 +1,4 @@
-{{-- Stacked bar chart with Nightwatch-style dark tooltips.
+{{-- Stacked bar chart with dark hover tooltips.
      $series = [['label', 'dot' (pill class), 'bar' (segment class), 'data' => int[]], ...] --}}
 @props(['series', 'since', 'until', 'height' => 'h-28', 'barWidth' => 'w-[100%]'])
 @php

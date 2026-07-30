@@ -27,6 +27,6 @@ body:
     id: context
     attributes:
       label: Additional context
-      description: Mockups, links to Nightwatch's equivalent feature, related issues, etc.
+      description: Mockups, links to similar features elsewhere, related issues, etc.
     validations:
       required: false

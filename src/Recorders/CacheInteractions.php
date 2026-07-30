@@ -18,20 +18,18 @@ use Illuminate\Contracts\Events\Dispatcher;
 class CacheInteractions extends Recorder
 {
     /**
-     * Subtypes counted as write/delete failures on the Cache page — mirrors
-     * Nightwatch's Failures chart (only mutating operations can fail; hits
-     * and misses can't).
+     * Subtypes counted as write/delete failures on the Cache page (only
+     * mutating operations can fail; hits and misses can't).
      */
     public const FAILURE_SUBTYPES = ['write_failed', 'forget_failed'];
 
     /**
      * When the in-flight cache operation started, set by whichever "before"
      * event Laravel fires just ahead of the store call and read back by the
-     * matching "after" event below — same technique as Nightwatch's
-     * CacheEventSensor. Cache events fire synchronously around a single
-     * driver call with nothing else able to interleave, so one scalar is
-     * enough; it isn't keyed by cache key. Left unset (not reset to null)
-     * after a read, matching Nightwatch: a Cache::many()/putMany() batch
+     * matching "after" event below. Cache events fire synchronously around a
+     * single driver call with nothing else able to interleave, so one scalar
+     * is enough; it isn't keyed by cache key. Left unset (not reset to null)
+     * after a read: a Cache::many()/putMany() batch
      * only fires one "before" event for the whole batch, so every
      * CacheHit/CacheMissed it produces measures elapsed-since-batch-start
      * rather than a true per-key duration — an accepted approximation, not

@@ -3,7 +3,7 @@
      row -- request root, phase header, or event. timeline.blade.php renders
      each row twice, once into each pane, from the same $rows list: the tree
      pane is a plain flex sibling that never joins the chart's horizontal
-     scroll (Nightwatch's own two-pane layout), so it needs no
+     scroll, so it needs no
      sticky-positioning tricks and can't be pushed in front of the page's own
      header the way a shared-scroll-container hack previously could.
      Hover highlighting is kept in sync across both panes via the shared
@@ -18,10 +18,9 @@
 
      Only query/cache events open the inspector panel (see
      TimelineRow::DETAILABLE_TYPES) -- root, phases, and every other event
-     type just show their hover tooltip and aren't clickable, matching
-     Nightwatch. --}}
+     type just show their hover tooltip and aren't clickable. --}}
 @php
-    $depth = match ($kind) { 'phase' => 1, 'event' => 2, default => 0 };
+    $depth = match ($kind) { 'phase', 'attempt' => 1, 'event' => 2, default => 0 };
     $highlightClass = $detailable
         ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
         : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
@@ -34,11 +33,14 @@
         default => '',
     };
     // A root row always stays visible (it's the track's own summary bar,
-    // doubling as the affordance to expand/collapse it) — every other row in
-    // this track only renders while its own track is expanded (see
-    // timeline.blade.php's `expandedTracks` state). Expanding one track never
-    // collapses another — each track's own expand state is independent.
-    $visible = $kind === 'root' ? 'true' : "expandedTracks['{$trackId}']";
+    // doubling as the affordance to expand/collapse it) — same for its own
+    // 'attempt' row directly underneath (see Timeline::__construct()): that
+    // pair is the at-a-glance summary for the whole track, so both stay
+    // visible collapsed or not. Every other row in this track only renders
+    // while its own track is expanded (see timeline.blade.php's
+    // `expandedTracks` state). Expanding one track never collapses another —
+    // each track's own expand state is independent.
+    $visible = in_array($kind, ['root', 'attempt'], true) ? 'true' : "expandedTracks['{$trackId}']";
     $toggleClick = "toggleTrack('{$trackId}')";
 @endphp
 @if ($part === 'label')
@@ -61,6 +63,8 @@
                 @endif
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
+            @elseif ($kind === 'attempt')
+                <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Attempt #{{ $attempt }}</span>
             @elseif ($kind === 'phase')
                 <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
                 @if ($entry->metadata['controller'] ?? null)
@@ -87,6 +91,7 @@
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
         <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable)])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
+             @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
              @if ($detailable) @click="selectRow('{{ $entry->id }}')"
              @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
@@ -96,8 +101,22 @@
                     @if ($status !== null)
                         <span class="inline-flex h-5 shrink-0 items-center rounded px-1 font-mono text-[11px] {{ $statusBadgeClass }}">{{ $status }}</span>
                     @endif
+                    <span class="font-mono text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">{{ $rootLabel }}</span>
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                     <span class="max-w-lg truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ $entry->label }}</span>
+                </div>
+            @elseif ($kind === 'attempt')
+                {{-- Same bar position/width as the root row directly above it
+                     (same underlying entry, see Timeline::__construct()) —
+                     just recoloured to the attempt's own outcome status,
+                     which the root deliberately leaves neutral. --}}
+                <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
+                <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">
+                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">Attempt #{{ $attempt }}</span>
+                    @if ($statusLabel !== null)
+                        <span class="inline-flex h-5 shrink-0 items-center rounded px-1 font-mono text-[11px] {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+                    @endif
+                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                 </div>
             @elseif ($kind === 'phase')
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800"></span>

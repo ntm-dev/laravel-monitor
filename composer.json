@@ -1,7 +1,7 @@
 {
     "name": "ntm-dev/laravel-monitor",
-    "description": "Local-first application monitoring for Laravel — Nightwatch-style insights (requests, queries, jobs, exceptions, cache, mail, ...) on a self-hosted Livewire dashboard like Pulse.",
-    "keywords": ["laravel", "monitoring", "pulse", "nightwatch", "telescope", "observability"],
+    "description": "Local-first application monitoring for Laravel — deep request/job/query insights (requests, queries, jobs, exceptions, cache, mail, ...) on a self-hosted Livewire dashboard like Pulse.",
+    "keywords": ["laravel", "monitoring", "pulse", "telescope", "observability"],
     "homepage": "https://github.com/ntm-dev/laravel-monitor",
     "license": "MIT",
     "type": "library",

@@ -35,7 +35,7 @@ class ScheduleRunController
      * Recorder type => events-summary bucket key. No 'command' entry — a
      * command-based task's own nested command run shows up on the timeline
      * itself (see Support\Timeline::EVENT_TYPES), not as its own summary
-     * tile, mirroring Nightwatch's own scheduled-task detail page.
+     * tile.
      */
     protected const SUMMARY_TYPES = [
         'slow_query' => 'queries',

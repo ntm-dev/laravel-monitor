@@ -1,6 +1,6 @@
 # Laravel Monitor
 
-Local-first application monitoring for Laravel — Nightwatch-style insights on a self-hosted dashboard like Pulse. No external service, no agent, no fee: everything is captured from framework events and stored in your own database.
+Local-first application monitoring for Laravel — deep request/job/query insights on a self-hosted dashboard, in the spirit of Pulse. No external service, no agent, no fee: everything is captured from framework events and stored in your own database.
 
 **What it monitors:**
 
