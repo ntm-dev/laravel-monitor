@@ -44,36 +44,31 @@
         'IP Address' => $payload['ip'] ?? '—',
     ];
 @endphp
-<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-    <x-monitor::card class="p-4">
-        <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">General</h2>
-        <dl class="space-y-2 text-sm">
-            @foreach ($general as $label => $value)
-                <div class="flex items-baseline justify-between gap-3">
-                    <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $label }}</dt>
-                    <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
-                    @if ($label === 'Status Code' && is_numeric($value))
-                        <dd class="shrink-0">
-                            <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ \LaravelMonitor\Support\Format::statusBadgeClass((int) $value) }}">{{ $value }}</span>
-                        </dd>
-                    @else
-                        <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
-                    @endif
-                </div>
-            @endforeach
-        </dl>
-    </x-monitor::card>
-
-    <x-monitor::card class="p-4">
-        <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">User</h2>
-        <dl class="space-y-2 text-sm">
-            @foreach ($user as $label => $value)
-                <div class="flex items-baseline justify-between gap-3">
-                    <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $label }}</dt>
-                    <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+<x-monitor::card class="p-4">
+    <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">General</h2>
+    <dl class="space-y-2 text-sm">
+        @foreach ($general as $label => $value)
+            <div class="flex items-baseline justify-between gap-3">
+                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $label }}</dt>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                @if ($label === 'Status Code' && is_numeric($value))
+                    <dd class="shrink-0">
+                        <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ \LaravelMonitor\Support\Format::statusBadgeClass((int) $value) }}">{{ $value }}</span>
+                    </dd>
+                @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
-                </div>
-            @endforeach
-        </dl>
-    </x-monitor::card>
-</div>
+                @endif
+            </div>
+        @endforeach
+    </dl>
+    <h2 class="mb-3 mt-5 font-semibold text-neutral-900 dark:text-neutral-100">User</h2>
+    <dl class="space-y-2 text-sm">
+        @foreach ($user as $label => $value)
+            <div class="flex items-baseline justify-between gap-3">
+                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $label }}</dt>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
+            </div>
+        @endforeach
+    </dl>
+</x-monitor::card>
