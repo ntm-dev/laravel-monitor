@@ -163,7 +163,13 @@ class Timeline
 
                     return [
                         'badge' => TimelineRow::badgeFor($map['type']),
-                        'detail' => self::labelFor($row, $map['label']),
+                        // labelFor() collapses every query to the literal
+                        // word "Query" (see its own docblock) — the timeline
+                        // proper reads the real SQL out of metadata instead
+                        // (see TimelineRow::resolveDetail()); do the same
+                        // here rather than showing that placeholder for
+                        // every single query in the list.
+                        'detail' => trim((string) ($row->payload['sql'] ?? self::labelFor($row, $map['label']))),
                         'duration' => $row->duration !== null ? (float) $row->duration : null,
                     ];
                 })
