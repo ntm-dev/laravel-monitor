@@ -9,7 +9,6 @@ use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
-use LaravelMonitor\Support\Timeline;
 
 /**
  * Renders the standalone Request Detail page for a single HTTP request:
@@ -53,16 +52,9 @@ class RequestDetailController
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
-
         return view('monitor::request-detail-page', [
             'root' => $root,
-            'timeline' => $timeline,
-            // A merged job execution can extend well past the request's own
-            // duration (a queue worker can pick it up seconds or minutes
-            // later — see Support\Timeline) — the chart's scale has to cover
-            // whichever is longer, not just the request's own duration.
-            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
+            'tracks' => $this->buildTracks($root, $children, 'REQUEST'),
             'summary' => $this->eventsSummary($root, $children),
             'userName' => $userName,
             'groups' => $groups,

@@ -9,7 +9,6 @@ use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
-use LaravelMonitor\Support\Timeline;
 
 /**
  * Renders the standalone Scheduled Task Run Detail page: one scheduled task
@@ -62,12 +61,9 @@ class ScheduleRunController
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
-
         return view('monitor::schedule-run-page', [
             'root' => $root,
-            'timeline' => $timeline,
-            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
+            'tracks' => $this->buildTracks($root, $children, 'SCHEDULED TASK'),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

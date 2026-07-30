@@ -4,7 +4,6 @@ namespace LaravelMonitor\Support;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use LaravelMonitor\View\Components\Requests\TimelineRow;
 
 /**
  * Builds the ordered list of TimelineEntry rows shown on the Request Detail
@@ -59,16 +58,12 @@ class Timeline
     ];
 
     /**
-     * @param  object  $root  the `request` row from Storage::findByRequestId()
+     * @param  object  $root  the `request`/`job`/`command`/`scheduled_task` row this
+     *                        track's own timeline is built around
      * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
-     * @param  ?Collection<string, Collection<int, object{outcome: object, children: Collection}>>  $jobExecutions  from
-     *                                                                                                                Storage::jobExecutionsByJobId(), keyed by job_id — attaches each
-     *                                                                                                                dispatched job's own outcome(s) (see attachJobExecutions()) as an
-     *                                                                                                                expandable, textual sub-list on its dispatch entry, instead of leaving
-     *                                                                                                                it a dead end. Omit when the caller doesn't need this.
      * @return TimelineEntry[]
      */
-    public static function build(object $root, Collection $children, ?Collection $jobExecutions = null): array
+    public static function build(object $root, Collection $children): array
     {
         $duration = (float) ($root->duration ?? 0);
 
@@ -86,96 +81,15 @@ class Timeline
 
         $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null);
 
-        $rawEvents = $children->reject(fn (object $row) => $row->type === 'log');
-        $events = $rawEvents->map(fn (object $row) => self::eventEntry($row, $phases))->all();
-
-        if ($jobExecutions !== null && $jobExecutions->isNotEmpty()) {
-            self::attachJobExecutions($events, $rawEvents, $jobExecutions);
-        }
-
-        $events = self::assignLanes($events);
+        $events = self::assignLanes(
+            $children->reject(fn (object $row) => $row->type === 'log')
+                ->map(fn (object $row) => self::eventEntry($row, $phases))
+                ->all()
+        );
 
         self::assignDuplicateColors($events);
 
         return array_merge([$requestEntry], $phases, $events);
-    }
-
-    /**
-     * Stamps each dispatched-job entry ('queue' type — still just the
-     * dispatch-time marker, its own duration/position on the timeline
-     * unchanged) with its resolved outcome(s) (processed/failed/released —
-     * more than one on a retry) as plain text, under
-     * `metadata['executions']` — the tree pane renders this as an
-     * expandable list beneath the dispatch row (mirroring the vendor-frame
-     * collapse in stack-trace.blade.php), not a second proportional bar: a
-     * queue worker can pick a job up seconds or minutes after dispatch, far
-     * outside the dispatching root's own (often sub-second) duration, so
-     * there's no time scale the two could share without either the root's
-     * own bar or the job's own becoming imperceptible. A job still only
-     * 'queued' is untouched — nothing to expand yet.
-     *
-     * @param  TimelineEntry[]  $events  mutated in place
-     * @param  Collection<int, object>  $rawEvents  the same rows $events was built from, kept around to read payload['job_id']
-     * @param  Collection<string, Collection<int, object{outcome: object, children: Collection}>>  $jobExecutions
-     */
-    protected static function attachJobExecutions(array $events, Collection $rawEvents, Collection $jobExecutions): void
-    {
-        $rawById = $rawEvents->keyBy('id');
-
-        foreach ($events as $entry) {
-            if ($entry->type !== 'queue') {
-                continue;
-            }
-
-            $jobId = $rawById->get((int) $entry->id)?->payload['job_id'] ?? null;
-            $executions = $jobId !== null ? $jobExecutions->get($jobId) : null;
-
-            if ($executions === null || $executions->isEmpty()) {
-                continue;
-            }
-
-            $entry->metadata['executions'] = $executions
-                ->map(fn (object $execution, int $index) => self::executionSummary($execution, $index))
-                ->all();
-        }
-    }
-
-    /**
-     * @return array{subtype: string, duration: ?float, attempt: int, queue: ?string, connection: ?string, attempt_request_id: string, children: list<array{badge: string, detail: string, duration: ?float}>}
-     */
-    protected static function executionSummary(object $execution, int $attemptIndex): array
-    {
-        $outcome = $execution->outcome;
-
-        return [
-            'subtype' => $outcome->subtype,
-            'duration' => $outcome->duration !== null ? (float) $outcome->duration : null,
-            'attempt' => $attemptIndex + 1,
-            'queue' => $outcome->payload['queue'] ?? null,
-            'connection' => $outcome->payload['connection'] ?? null,
-            // What monitor.jobs.attempts.show needs to link to this specific
-            // attempt's own standalone page.
-            'attempt_request_id' => $outcome->request_id,
-            'children' => $execution->children
-                ->reject(fn (object $row) => $row->type === 'log')
-                ->map(function (object $row) {
-                    $map = self::EVENT_TYPES[$row->type] ?? ['type' => $row->type, 'label' => ucfirst($row->type)];
-
-                    return [
-                        'badge' => TimelineRow::badgeFor($map['type']),
-                        // labelFor() collapses every query to the literal
-                        // word "Query" (see its own docblock) — the timeline
-                        // proper reads the real SQL out of metadata instead
-                        // (see TimelineRow::resolveDetail()); do the same
-                        // here rather than showing that placeholder for
-                        // every single query in the list.
-                        'detail' => trim((string) ($row->payload['sql'] ?? self::labelFor($row, $map['label']))),
-                        'duration' => $row->duration !== null ? (float) $row->duration : null,
-                    ];
-                })
-                ->values()
-                ->all(),
-        ];
     }
 
     /**

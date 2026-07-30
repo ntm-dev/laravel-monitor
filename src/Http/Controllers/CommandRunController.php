@@ -10,7 +10,6 @@ use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Sql;
-use LaravelMonitor\Support\Timeline;
 
 /**
  * Renders the standalone Command Run Detail page: one artisan command
@@ -53,12 +52,9 @@ class CommandRunController
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
-
         return view('monitor::command-run-page', [
             'root' => $root,
-            'timeline' => $timeline,
-            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
+            'tracks' => $this->buildTracks($root, $children, 'COMMAND'),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

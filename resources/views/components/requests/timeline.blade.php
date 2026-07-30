@@ -51,11 +51,6 @@
          totalDuration: {{ $totalDuration }},
          selectedId: null,
          hoveredId: null,
-         // Which dispatched-job dispatch rows are expanded to show their own
-         // resolved execution(s) — see timeline-job-executions.blade.php.
-         // Keyed by the dispatch entry's own id; absent/false = collapsed.
-         expandedJobs: {},
-         toggleJobExecutions(id) { this.expandedJobs[id] = ! this.expandedJobs[id] },
          // Toggled true for 5s (see the window listener above) whenever the
          // EventSummary 'N duplicates' badge is clicked, so every dot
          // sharing that query's colour (see TimelineRow::$duplicateColor)
@@ -283,9 +278,6 @@
         <div class="w-1/5 max-w-[250px] shrink-0 overflow-hidden whitespace-nowrap">
             @foreach ($rows as $row)
                 <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
-                @if ($row['entry']->metadata['executions'] ?? null)
-                    <x-monitor::requests.timeline-job-executions :entry="$row['entry']"/>
-                @endif
             @endforeach
 
             @if ($orphanRows !== [])
@@ -295,9 +287,6 @@
                 </div>
                 @foreach ($orphanRows as $row)
                     <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="label"/>
-                    @if ($row['entry']->metadata['executions'] ?? null)
-                        <x-monitor::requests.timeline-job-executions :entry="$row['entry']"/>
-                    @endif
                 @endforeach
             @endif
         </div>
@@ -330,9 +319,6 @@
 
                     @foreach ($rows as $row)
                         <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
-                        @if ($row['entry']->metadata['executions'] ?? null)
-                            <x-monitor::requests.timeline-job-executions :entry="$row['entry']"/>
-                        @endif
                     @endforeach
 
                     {{-- Events that didn't fall inside any recorded phase --}}
@@ -340,9 +326,6 @@
                         <div class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
                         @foreach ($orphanRows as $row)
                             <x-monitor::requests.timeline-row :entry="$row['entry']" :kind="$row['kind']" :total="$totalDuration" :root-label="$rootLabel" part="bar"/>
-                            @if ($row['entry']->metadata['executions'] ?? null)
-                                <x-monitor::requests.timeline-job-executions :entry="$row['entry']"/>
-                            @endif
                         @endforeach
                     @endif
                 </div>

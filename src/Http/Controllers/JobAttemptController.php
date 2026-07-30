@@ -11,7 +11,6 @@ use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
-use LaravelMonitor\Support\Timeline;
 
 /**
  * Renders the standalone Job Attempt Detail page: one queued job execution
@@ -68,12 +67,9 @@ class JobAttemptController
 
         [$groups, $footerTabs] = Nav::grouped();
 
-        $timeline = Timeline::build($root, $children, $this->jobExecutionsFor($children, $root->created_at));
-
         return view('monitor::job-attempt-page', [
             'root' => $root,
-            'timeline' => $timeline,
-            'totalDuration' => max(1, (int) ceil(collect($timeline)->max(fn ($entry) => $entry->end()) ?? ($root->duration ?? 0))),
+            'tracks' => $this->buildTracks($root, $children, 'JOB'),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

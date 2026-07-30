@@ -69,7 +69,7 @@
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
-                <x-monitor::requests.timeline :entries="$timeline" :total-duration="$totalDuration" root-label="JOB"/>
+                <x-monitor::requests.timeline-tracks :tracks="$tracks"/>
             </main>
         </div>
     </div>
