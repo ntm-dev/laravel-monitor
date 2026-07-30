@@ -50,8 +50,8 @@
             <div x-data="{ expanded: false }" class="group rounded-lg border border-neutral-200 dark:border-white/5"
                  :class="expanded ? 'bg-white dark:bg-white/5 shadow-xs' : 'border-dashed border-neutral-300 bg-neutral-50 opacity-90 dark:border-white/10 dark:bg-white/5'">
                 <button type="button" @click="expanded = ! expanded" class="flex h-11 w-full cursor-pointer items-center gap-3 rounded-lg pl-4 pr-2.5 text-left hover:bg-white/50 dark:hover:bg-white/5">
-                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER" x-show="! expanded" x-cloak class="h-3 w-3 shrink-0 text-neutral-400 dark:text-neutral-500"/>
-                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER_OPEN" x-show="expanded" class="h-3 w-3 shrink-0 text-blue-500 dark:text-emerald-500"/>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER" :stroke="2" x-show="! expanded" x-cloak class="h-3 w-3 shrink-0 text-neutral-400 group-hover:text-blue-500 dark:text-neutral-500 dark:group-hover:text-emerald-500"/>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::FOLDER_OPEN" :stroke="2" x-show="expanded" class="h-3 w-3 shrink-0 text-blue-500 dark:text-emerald-500"/>
                     <span class="flex-1 font-mono text-xs leading-3 text-neutral-900 dark:text-neutral-400">{{ $group['count'] }} vendor {{ $group['count'] === 1 ? 'frame' : 'frames' }}</span>
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md dark:border dark:border-white/10"
                           :class="expanded ? 'text-blue-500 dark:text-emerald-500 dark:bg-white/5' : 'text-neutral-500 dark:bg-white/5'">
