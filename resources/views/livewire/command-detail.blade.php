@@ -11,14 +11,14 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::card class="flex flex-col p-4">
-            <x-monitor::metric label="Runs" :value="number_format($success + $failed)">
-                <x-monitor::legend label="Failed" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
-                <x-monitor::legend label="Success" dot="bg-emerald-500" :value="number_format($success)"/>
+            <x-monitor::metric label="Calls" :value="number_format($success + $failed)">
+                <x-monitor::legend label="Unsuccessful" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
+                <x-monitor::legend label="Successful" dot="bg-emerald-500" :value="number_format($success)"/>
             </x-monitor::metric>
             <div class="mt-5">
                 <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                    ['label' => 'Success', 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
-                    ['label' => 'Failed', 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
+                    ['label' => 'Successful', 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
+                    ['label' => 'Unsuccessful', 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
                 ]"/>
             </div>
             <x-monitor::chart-footer :since="$since" :until="$until"/>
