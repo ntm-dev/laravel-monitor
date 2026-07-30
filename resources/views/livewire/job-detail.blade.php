@@ -10,9 +10,9 @@
              setHoverIndex(i) { this.hoverIndex = i },
              clearHoverIndex() { this.hoverIndex = null },
          }">
-        <x-monitor::jobs-chart-card
-            :queued="$queued" :processed="$processed" :failed="$failed" :released="$released"
-            :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets" :released-buckets="$releasedBuckets"
+        <x-monitor::jobs-chart-card label="Attempts"
+            :processed="$processed" :failed="$failed" :released="$released"
+            :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets" :released-buckets="$releasedBuckets"
             :since="$since" :until="$until" height="h-[167px]"/>
         <x-monitor::duration-chart-card label="Job duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
     </div>
