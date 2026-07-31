@@ -330,7 +330,13 @@ class Monitor
             'models' => 0,
         ];
 
-        Context::add(self::SCHEDULED_TASK_CONTEXT_KEY, $id);
+        // Context is Laravel 11+ only (this package supports 10-13) — on 10,
+        // a command-based task's subprocess simply won't correlate back to
+        // its parent scheduled_task entry (same as "no such correlation
+        // exists" elsewhere), rather than fatal on a missing class.
+        if (class_exists(Context::class)) {
+            Context::add(self::SCHEDULED_TASK_CONTEXT_KEY, $id);
+        }
     }
 
     public function scheduledTaskRunId(): ?string
@@ -342,7 +348,10 @@ class Monitor
     public function endScheduledTaskRun(): void
     {
         $this->scheduledTask = null;
-        Context::forget(self::SCHEDULED_TASK_CONTEXT_KEY);
+
+        if (class_exists(Context::class)) {
+            Context::forget(self::SCHEDULED_TASK_CONTEXT_KEY);
+        }
     }
 
     /**
@@ -357,6 +366,10 @@ class Monitor
      */
     public function inheritedScheduledTaskRunId(): ?string
     {
+        if (! class_exists(Context::class)) {
+            return null;
+        }
+
         $id = Context::get(self::SCHEDULED_TASK_CONTEXT_KEY);
 
         return is_string($id) && $id !== '' ? $id : null;
