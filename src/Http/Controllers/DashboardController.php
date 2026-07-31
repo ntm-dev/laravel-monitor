@@ -14,6 +14,7 @@ use LaravelMonitor\Http\Headings\NotificationHeading;
 use LaravelMonitor\Http\Headings\OutgoingHeading;
 use LaravelMonitor\Http\Headings\QueryHeading;
 use LaravelMonitor\Http\Headings\RequestHeading;
+use LaravelMonitor\Http\Headings\ScheduleHeading;
 use LaravelMonitor\Livewire\Card;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
@@ -33,6 +34,7 @@ class DashboardController
         'requests' => 'request',
         'jobs' => 'job',
         'commands' => 'command',
+        'schedule' => 'scheduled_task',
         'queries' => 'slow_query',
         'exceptions' => 'exception',
         'notifications' => 'notification',
@@ -147,6 +149,7 @@ class DashboardController
             'requests' => (new RequestHeading)($key),
             'jobs' => (new JobHeading)($key),
             'commands' => (new CommandHeading)($key),
+            'schedule' => (new ScheduleHeading)($key),
             'exceptions' => app(ExceptionHeading::class)($key),
             'queries' => (new QueryHeading)($key),
             'notifications' => app(NotificationHeading::class)($key),

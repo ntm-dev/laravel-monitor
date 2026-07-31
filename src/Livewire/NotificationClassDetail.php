@@ -8,9 +8,9 @@ namespace LaravelMonitor\Livewire;
  * notification's FQCN, unlike NotificationDetail where $key is one send's
  * own database id. Its "recent sends" list is where a specific occurrence
  * gets picked: each row links to the request/job attempt timeline that
- * triggered it (mirrors Nightwatch — both sides of a mail-channel
- * notification show up together there), falling back to NotificationDetail's
- * own standalone page only when no such correlation exists.
+ * triggered it — both sides of a mail-channel notification show up together
+ * there — falling back to NotificationDetail's own standalone page only when
+ * no such correlation exists.
  */
 class NotificationClassDetail extends Card
 {

@@ -149,6 +149,49 @@ class DatabaseStorage implements Storage
             ->map(fn ($row) => $this->hydrate($row));
     }
 
+    public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
+    {
+        // Narrowed by the existing [type, created_at] index before the JSON
+        // lookup — same reasoning as findByCorrelationId().
+        $row = $this->table()
+            ->where('type', 'job')
+            ->where('subtype', 'queued')
+            ->where('created_at', '>=', $since)
+            ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->where('payload->job_id', $jobId)
+            ->first();
+
+        return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    public function jobExecutionsByJobId(array $jobIds, DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
+    {
+        if ($jobIds === []) {
+            return collect();
+        }
+
+        // Every outcome (processed/failed/released — more than one on a
+        // retry) recorded for these job_ids, grouped back under the id they
+        // share with their own 'queued' dispatch-time placeholder — the
+        // caller already has that placeholder from its own timelineFor()
+        // call, and stitches these children onto it (see Support\Timeline).
+        $outcomes = $this->table()
+            ->where('type', 'job')
+            ->where('subtype', '!=', 'queued')
+            ->whereIn('payload->job_id', $jobIds)
+            ->where('created_at', '>=', $since)
+            ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->get()
+            ->map(fn ($row) => $this->hydrate($row));
+
+        return $outcomes
+            ->groupBy(fn (object $row) => $row->payload['job_id'] ?? '')
+            ->map(fn (Collection $rows) => $rows->map(fn (object $outcome) => (object) [
+                'outcome' => $outcome,
+                'children' => $this->timelineFor($outcome->request_id, 'job'),
+            ]));
+    }
+
     public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
     {
         // GROUP BY key over the raw table, not the sampled subquery below:
@@ -288,7 +331,7 @@ class DatabaseStorage implements Storage
         }
 
         return $this->table()
-            ->whereIn('type', ['request', 'job', 'command'])
+            ->whereIn('type', ['request', 'job', 'command', 'scheduled_task'])
             ->whereIn('request_id', $requestIds)
             ->pluck('type', 'request_id');
     }
@@ -300,7 +343,7 @@ class DatabaseStorage implements Storage
         }
 
         return $this->table()
-            ->whereIn('type', ['request', 'job', 'command'])
+            ->whereIn('type', ['request', 'job', 'command', 'scheduled_task'])
             ->whereIn('request_id', $requestIds)
             ->pluck('key', 'request_id');
     }
@@ -951,8 +994,8 @@ class DatabaseStorage implements Storage
 
             $update = ['last_seen' => $lastSeenValue, 'updated_at' => $now];
 
-            // A resolved issue that keeps occurring reopens itself — mirrors
-            // Nightwatch. An ignored one stays ignored until the user
+            // A resolved issue that keeps occurring reopens itself
+            // automatically. An ignored one stays ignored until the user
             // manually reopens it; recurrence alone shouldn't override that.
             if ($row->status === 'resolved'
                 && $row->resolved_at !== null

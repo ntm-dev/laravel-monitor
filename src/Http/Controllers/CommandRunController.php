@@ -5,11 +5,11 @@ namespace LaravelMonitor\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Sql;
-use LaravelMonitor\Support\Timeline;
 
 /**
  * Renders the standalone Command Run Detail page: one artisan command
@@ -20,6 +20,8 @@ use LaravelMonitor\Support\Timeline;
  */
 class CommandRunController
 {
+    use MergesJobTimelines;
+
     /**
      * Recorder type => events-summary bucket key. No 'command' entry —
      * a command run's own timeline shouldn't summarise itself.
@@ -38,7 +40,7 @@ class CommandRunController
     {
     }
 
-    public function __invoke(string $runId): View
+    public function __invoke(string $runId, ?string $jobId = null): View
     {
         app()->setLocale(Preferences::locale());
 
@@ -49,11 +51,12 @@ class CommandRunController
         $children = $this->storage->timelineFor($runId, 'command');
 
         [$groups, $footerTabs] = Nav::grouped();
+        $tracks = $this->buildTracks($root, $children, 'COMMAND');
 
         return view('monitor::command-run-page', [
             'root' => $root,
-            'timeline' => Timeline::build($root, $children),
-            'totalDuration' => max(1, (int) ($root->duration ?? 0)),
+            'tracks' => $tracks,
+            'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

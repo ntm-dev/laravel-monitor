@@ -27,17 +27,27 @@ class TimelineRow extends Component
         'cache' => 'CACHE',
         'mail' => 'MAIL SENT',
         'notification' => 'NOTIFICATION SENT',
-        'queue' => 'QUEUE',
+        'queue' => 'JOB DISPATCH',
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
+        'command' => 'COMMAND',
     ];
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';
 
     /**
-     * Root bar colour by HTTP status severity — job/command roots have no
-     * status and keep {@see ROOT_COLOR}. Keeps the same light background
-     * tint as ROOT_COLOR/warning; only the border colour signals severity.
+     * A job's own root bar — deliberately plain, not {@see ROOT_COLOR}'s
+     * greenish tint, which reads as a status colour and would visually clash
+     * with (or be mistaken for) the "processed" colour on its own 'attempt'
+     * row directly underneath.
+     */
+    protected const NEUTRAL_ROOT_COLOR = 'border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800';
+
+    /**
+     * Root/attempt bar colour by severity — an HTTP status for a request
+     * root, a job outcome for an 'attempt' row (see {@see JOB_STATUS_SEVERITY}).
+     * Keeps the same light background tint as ROOT_COLOR/warning; only the
+     * border colour signals severity.
      */
     protected const ROOT_STATUS_COLORS = [
         'error' => 'bg-rose-600/15 border border-rose-600 dark:bg-rose-400/10 dark:border-rose-600',
@@ -51,7 +61,19 @@ class TimelineRow extends Component
         'ok' => 'bg-emerald-700 dark:bg-emerald-400 text-white',
     ];
 
-    /** Nightwatch-style neutral event bar; only over-threshold events get a warning colour instead. */
+    /**
+     * A job root's own severity bucket — same {@see STATUS_BADGE_COLORS}/
+     * {@see ROOT_STATUS_COLORS} palette an HTTP status uses, keyed by the
+     * job outcome's own subtype (see MergesJobTimelines::jobTrack()) instead
+     * of a status code range.
+     */
+    protected const JOB_STATUS_SEVERITY = [
+        'failed' => 'error',
+        'released' => 'warning',
+        'processed' => 'ok',
+    ];
+
+    /** Neutral default event bar; only over-threshold events get a warning colour instead. */
     public const NEUTRAL_BAR = 'border border-neutral-200 bg-white group-hover:border-blue-400 dark:border-neutral-700 dark:bg-neutral-800 dark:group-hover:border-blue-500';
 
     public const SLOW_BAR = 'border border-amber-500 bg-amber-500/20 dark:border-amber-400 dark:bg-amber-400/20';
@@ -65,12 +87,7 @@ class TimelineRow extends Component
     ];
 
     /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
-    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception', 'http'];
-
-    /** Bar left edge / width as percentages of the total duration. */
-    public float $left;
-
-    public float $width;
+    protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception', 'http', 'queue'];
 
     public string $durationLabel;
 
@@ -88,11 +105,14 @@ class TimelineRow extends Component
     /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}. */
     public string $color;
 
-    /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. */
+    /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. Two unrelated groups can share this — see {@see $duplicateGroup} for the value that actually identifies one group uniquely. */
     public ?string $duplicateColor;
 
     /** Number of entries sharing this duplicate-SQL group, null when this entry isn't a duplicate. */
     public ?int $duplicateCount;
+
+    /** This duplicate-SQL group's own key (normalized SQL shape), null when this entry isn't a duplicate — what selectRow() in timeline.blade.php actually matches on to pulse just this group's dots, since {@see $duplicateColor} alone can be shared by a different group. */
+    public ?string $duplicateGroup;
 
     /** Badge text colour per event type, matching {@see $color}; neutral by default. */
     public string $badgeTextColor;
@@ -106,17 +126,25 @@ class TimelineRow extends Component
     /** Whether clicking this row opens the inspector panel. */
     public bool $detailable;
 
+    /** Bar background for a 'root' or 'attempt' row — neutral unless that row itself carries a status (an HTTP root's status code, or an attempt row's job outcome). */
     public string $rootColor;
 
     /** HTTP status of the root request, null for job/command roots (no status) or non-root rows. */
     public ?int $status = null;
 
-    /** Status badge background/text classes, empty when {@see $status} is null. */
+    /** A job root's own status text (e.g. "PROCESSED"), null for every other kind of root or non-root row. */
+    public ?string $statusLabel = null;
+
+    /** Status badge background/text classes, empty when both {@see $status} and {@see $statusLabel} are null. */
     public string $statusBadgeClass = '';
 
     public function __construct(
         public TimelineEntry $entry,
-        public int $total,
+        /** Bar left edge / width, as percentages of the page's one fixed time scale (see View\Components\Requests\Timeline) — precomputed there from this row's real wall-clock offset, not clamped to 0-100%, since a row from a non-default track can genuinely fall outside that window. */
+        public float $left,
+        public float $width,
+        /** Which track (see View\Components\Requests\Timeline) this row belongs to — governs only its own expand/collapse visibility (`expandedTracks` in timeline.blade.php), not its position. */
+        public string $trackId,
         public string $kind = 'event',
         /**
          * Which half of the two-pane layout this instance renders: the
@@ -128,13 +156,22 @@ class TimelineRow extends Component
         public string $part = 'bar',
         /** "REQUEST" for the Request Detail timeline, "JOB" for a job attempt's — see JobAttemptController. */
         public string $rootLabel = 'REQUEST',
+        /** Whether clicking this root row toggles its own track's expand state — false when there's only one track (nothing to toggle). */
+        public bool $focusable = false,
+        /** This row's own track's attempt number (see MergesJobTimelines::jobTrack()) — null for a request/command/scheduled-task track, which has no attempt concept. */
+        public ?int $attempt = null,
+        /** This row's own track's job outcome status ('processed'/'failed'/'released' — see MergesJobTimelines::jobTrack()), null for every other kind of track. */
+        public ?string $jobStatus = null,
+        /** Sum of every attempt's own duration for a job track's root row (see MergesJobTimelines::jobTrack()) — shown instead of {@see $entry}'s own duration, which is that root's bounding-box span across every attempt (including idle retry-wait time) rather than how long the job actually ran for. Null for every other kind of row. */
+        public ?int $attemptsDuration = null,
     ) {
-        $this->left = $total > 0 ? min(100, max(0, ($entry->start / $total) * 100)) : 0;
-        $this->width = $total > 0 ? min(100 - $this->left, max(0.15, (($entry->duration ?? 0) / $total) * 100)) : 0.15;
-        $this->durationLabel = $entry->duration !== null ? Format::duration($entry->duration) : '';
+        $this->durationLabel = $attemptsDuration !== null
+            ? Format::duration($attemptsDuration)
+            : ($entry->duration !== null ? Format::duration($entry->duration) : '');
         $this->badge = self::badgeFor($entry->type);
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
         $this->duplicateCount = $entry->metadata['duplicateCount'] ?? null;
+        $this->duplicateGroup = $entry->metadata['duplicateGroup'] ?? null;
         $this->color = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_COLOR,
             $this->duplicateColor !== null => "border border-{$this->duplicateColor}-500 bg-{$this->duplicateColor}-500 dark:border-{$this->duplicateColor}-400 dark:bg-{$this->duplicateColor}-400",
@@ -170,14 +207,31 @@ class TimelineRow extends Component
         $this->tooltipDetail = $this->duplicateCount !== null
             ? "Called {$this->duplicateCount} " . Str::plural('time', $this->duplicateCount) . " — {$this->detail}"
             : $this->detail;
+        // A job root ('root' kind, badge "JOB") is just the attempt(s)'
+        // identity/duration and deliberately stays neutral — the outcome
+        // status (processed/failed/released) belongs on its own 'attempt'
+        // row underneath instead (see Timeline::__construct()), one per
+        // execution, each coloured independently. An HTTP request root is
+        // the only kind that still colours itself, by status code.
+        $severity = null;
+
         if ($kind === 'root' && isset($entry->metadata['status'])) {
             $this->status = (int) $entry->metadata['status'];
-            $this->statusBadgeClass = self::STATUS_BADGE_COLORS[self::severity($this->status)];
+            $severity = self::severity($this->status);
+        } elseif ($kind === 'attempt' && $jobStatus !== null) {
+            $this->statusLabel = strtoupper($jobStatus);
+            $severity = self::JOB_STATUS_SEVERITY[$jobStatus] ?? 'ok';
         }
 
-        $this->rootColor = $this->status !== null
-            ? (self::ROOT_STATUS_COLORS[self::severity($this->status)] ?? self::ROOT_COLOR)
-            : self::ROOT_COLOR;
+        if ($severity !== null) {
+            $this->statusBadgeClass = self::STATUS_BADGE_COLORS[$severity];
+        }
+
+        $this->rootColor = match (true) {
+            $severity !== null => self::ROOT_STATUS_COLORS[$severity] ?? self::ROOT_COLOR,
+            $kind === 'root' && $rootLabel === 'JOB' => self::NEUTRAL_ROOT_COLOR,
+            default => self::ROOT_COLOR,
+        };
     }
 
     /**

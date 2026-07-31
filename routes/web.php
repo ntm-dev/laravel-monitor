@@ -14,6 +14,7 @@ use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\IssueController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
+use LaravelMonitor\Http\Controllers\ScheduleRunController;
 use LaravelMonitor\Http\Controllers\SettingsController;
 use LaravelMonitor\Http\Middleware\Authorize;
 use LaravelMonitor\Http\Middleware\EnsureMonitorAuthenticated;
@@ -46,6 +47,35 @@ Route::domain(config('monitor.domain'))
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');
+            Route::get('/schedule/runs/{runId}', ScheduleRunController::class)->name('monitor.schedule.runs.show');
+
+            // Unnamed twin of each route above, with a trailing {jobId}
+            // segment (rather than a ?job=<uuid> query string — shorter, and
+            // doesn't leak an otherwise-guessable query key) — how a
+            // dispatched job's own page links back into its dispatcher's
+            // merged timeline expanded to that job's track (see
+            // MergesJobTimelines::defaultTrackId() and JobAttemptController's
+            // redirect, which builds this url by string concatenation, not
+            // route()). Can't just make {jobId?} optional on the routes
+            // above instead: Symfony's routing only drops a trailing
+            // optional *parameter*, never a literal path segment ahead of
+            // it, so without a distinct literal segment here, an *unguarded*
+            // /requests/{requestId}/{jobId} would also swallow the plain
+            // (no-job) 2-segment url as a 1-segment match on {requestId}
+            // alone — no conflict there — but would collide with
+            // /requests/routes/{hash} below (also 3 segments) if requestId
+            // could match the literal "routes". The where() constraint
+            // shuts that off: request_id/job's own request_id are always a
+            // uuid (see database/migrations's `request_id` column), which
+            // "routes" and the hash's 32 plain hex chars can never satisfy.
+            // No route name — nothing generates these via route($name,
+            // ...); every existing call site passing a single id keeps
+            // resolving the plain url above unchanged.
+            Route::get('/requests/{requestId}/{jobId}', RequestDetailController::class)
+                ->where(['requestId' => '[0-9a-f-]{36}', 'jobId' => '[0-9a-f-]{36}']);
+            Route::get('/jobs/attempts/{attemptId}/{jobId}', JobAttemptController::class);
+            Route::get('/commands/runs/{runId}/{jobId}', CommandRunController::class);
+            Route::get('/schedule/runs/{runId}/{jobId}', ScheduleRunController::class);
             Route::get('/issues/{uuid}', [IssueController::class, 'show'])->name('monitor.issues.show');
 
             // Hashed-path detail pages, replacing the old ?key=<raw key>
@@ -70,7 +100,7 @@ Route::domain(config('monitor.domain'))
                 return app(RequestDetailController::class)($requestId);
             })->where('hash', '[0-9a-f]{32}')->name('monitor.requests.routes.request');
 
-            foreach (['jobs', 'commands', 'queries', 'exceptions'] as $groupTab) {
+            foreach (['jobs', 'commands', 'schedule', 'queries', 'exceptions'] as $groupTab) {
                 Route::get("/{$groupTab}/{hash}", DashboardController::class)
                     ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
                     ->defaults('tab', $groupTab)

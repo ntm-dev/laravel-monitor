@@ -55,7 +55,7 @@
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
-                <x-monitor::requests.timeline :entries="$timeline" :total-duration="$totalDuration" root-label="COMMAND"/>
+                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack"/>
             </main>
         </div>
     </div>

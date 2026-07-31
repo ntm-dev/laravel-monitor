@@ -9,8 +9,8 @@ namespace LaravelMonitor\Livewire;
  * Recorders\Mail's $groupKey), unlike MailDetail where $key is one send's
  * own database id. Its "recent sends" list is where a specific occurrence
  * gets picked: each row links to the request/job attempt timeline that
- * triggered it (mirrors Nightwatch), falling back to MailDetail's own
- * standalone page only when no such correlation exists.
+ * triggered it, falling back to MailDetail's own standalone page only when
+ * no such correlation exists.
  */
 class MailClassDetail extends Card
 {

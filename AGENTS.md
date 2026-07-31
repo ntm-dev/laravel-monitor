@@ -1,8 +1,8 @@
 # AGENTS.md
 
 ## What this is
-Laravel package (`ntm-dev/laravel-monitor`): local-first, Nightwatch-style
-monitoring dashboard (Livewire) for requests, queries, jobs, exceptions,
+Laravel package (`ntm-dev/laravel-monitor`): local-first monitoring
+dashboard (Livewire) for requests, queries, jobs, exceptions,
 cache, mail, etc. Package root is this repo; source (`autoload: LaravelMonitor\`) lives in `src/`.
 
 ## Commands
@@ -24,7 +24,7 @@ php -l path/to/file.blade.php   # syntax-check a single blade file
   namespace (see `MonitorServiceProvider::boot()`), e.g. `<x-monitor::card>`.
 
 ## Conventions
-- UI mirrors Laravel Nightwatch's dashboard style: dotted-line `dl` metric rows
+- UI style: dotted-line `dl` metric rows
   (see `resources/views/livewire/query-detail.blade.php`, `exception-detail.blade.php`),
   Tailwind CDN JIT, dark mode via `.dark` class.
 - **All user-facing text must go through the translation system** — `__('monitor::messages.<section>.<key>')`,

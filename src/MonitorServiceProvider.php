@@ -100,9 +100,9 @@ class MonitorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Hook the request-lifecycle markers used by the Request Detail timeline,
-     * following Nightwatch's approach: a global middleware brackets the whole
-     * request, and the controller boundary is marked by attaching a marker
+     * Hook the request-lifecycle markers used by the Request Detail
+     * timeline: a global middleware brackets the whole request, and the
+     * controller boundary is marked by attaching a marker
      * middleware directly onto the matched route (not by pushing into a
      * middleware *group* array) — framework events refine the
      * render/terminating phases. All without requiring the host app to edit
@@ -190,6 +190,7 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.request-detail', Cards\RequestDetail::class);
         Livewire::component('monitor.job-detail', Cards\JobDetail::class);
         Livewire::component('monitor.command-detail', Cards\CommandDetail::class);
+        Livewire::component('monitor.schedule-detail', Cards\ScheduleDetail::class);
         Livewire::component('monitor.exception-detail', Cards\ExceptionDetail::class);
         Livewire::component('monitor.query-detail', Cards\QueryDetail::class);
         Livewire::component('monitor.notification-detail', Cards\NotificationDetail::class);

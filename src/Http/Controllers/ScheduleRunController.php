@@ -6,31 +6,44 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
-use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
 
 /**
- * Renders the standalone Request Detail page for a single HTTP request:
- * header, general/user info, event summary and the lifecycle timeline.
- * Unlike the tab-based dashboard views, this page owns its own route
- * (`monitor.requests.show`) and fetches everything it needs itself.
+ * Renders the standalone Scheduled Task Run Detail page: one scheduled task
+ * execution and every event it triggered (queries, mail, notifications,
+ * cache, dispatched jobs), on the same waterfall timeline used for requests,
+ * job attempts and command runs. Owns its own route
+ * (`monitor.schedule.runs.show`), same as JobAttemptController/
+ * CommandRunController.
+ *
+ * A command-based task (`Schedule::command()`) always runs the actual
+ * artisan command in a *separate* `php artisan` subprocess, even when
+ * scheduled "in the foreground" (see Illuminate\Console\Scheduling\Event::execute()).
+ * That subprocess's own `command` entry (and everything it in turn triggers)
+ * still lands in this same timeline: its id rides across the process
+ * boundary via Laravel's own Context dehydration/hydration rather than
+ * anything this controller needs to know about — see
+ * Monitor::beginScheduledTaskRun()/Recorders\Commands::recordStarting().
  */
-class RequestDetailController
+class ScheduleRunController
 {
     use MergesJobTimelines;
-    use ResolvesUserNames;
 
     /**
-     * Recorder type => events-summary bucket key.
+     * Recorder type => events-summary bucket key. No 'command' entry — a
+     * command-based task's own nested command run shows up on the timeline
+     * itself (see Support\Timeline::EVENT_TYPES), not as its own summary
+     * tile.
      */
     protected const SUMMARY_TYPES = [
         'slow_query' => 'queries',
         'cache' => 'cache',
         'mail' => 'mail',
         'notification' => 'notifications',
-        'job' => 'jobs',
         'outgoing_request' => 'outgoing',
+        'job' => 'jobs',
         'lazy_loading' => 'lazy_loading',
     ];
 
@@ -38,42 +51,36 @@ class RequestDetailController
     {
     }
 
-    public function __invoke(string $requestId, ?string $jobId = null): View
+    public function __invoke(string $runId, ?string $jobId = null): View
     {
-        $root = $this->storage->findByRequestId($requestId);
+        $root = $this->storage->findByRequestId($runId, 'scheduled_task');
 
         abort_unless($root !== null, 404);
 
-        $children = $this->storage->timelineFor($requestId);
-
-        $userName = $root->user_id !== null
-            ? ($this->resolveNames([$root->user_id])[$root->user_id] ?? null)
-            : null;
+        $children = $this->storage->timelineFor($runId, 'scheduled_task');
 
         [$groups, $footerTabs] = Nav::grouped();
-        $tracks = $this->buildTracks($root, $children, 'REQUEST');
+        $tracks = $this->buildTracks($root, $children, 'SCHEDULED TASK');
 
-        return view('monitor::request-detail-page', [
+        return view('monitor::schedule-run-page', [
             'root' => $root,
             'tracks' => $tracks,
             'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
-            'summary' => $this->eventsSummary($root, $children),
-            'userName' => $userName,
+            'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'tab' => 'requests',
+            'tab' => 'schedule',
             'range' => [],
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
-            'timezone' => \LaravelMonitor\Support\Format::timezone(),
-            'threshold' => (int) config('monitor.thresholds.request', 1000),
+            'timezone' => Format::timezone(),
         ]);
     }
 
     /**
      * @return array<string, array{count: int, duration: float}>
      */
-    protected function eventsSummary(object $root, Collection $children): array
+    protected function eventsSummary(Collection $children): array
     {
         $summary = collect(self::SUMMARY_TYPES)
             ->flip()
@@ -91,17 +98,7 @@ class RequestDetailController
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
         }
 
-        // `slow_query` rows only exist for queries at/above the configured
-        // threshold, so counting them undercounts (or, as often happens,
-        // shows zero for a request that ran several fast queries). The
-        // request payload carries a true total incremented on every query —
-        // fall back to the slow-query count for older rows recorded before
-        // that counter existed.
         $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
-
-        if (isset($root->payload['query_count'])) {
-            $summary['queries']['count'] = (int) $root->payload['query_count'];
-        }
 
         return $summary;
     }

@@ -36,6 +36,13 @@ class Timeline
         'job' => ['type' => 'queue', 'label' => 'Queued Job'],
         'outgoing_request' => ['type' => 'http', 'label' => 'Outgoing Request'],
         'lazy_loading' => ['type' => 'lazy_loading', 'label' => 'Lazy Load'],
+        // A command-based scheduled task's own `php artisan` subprocess
+        // reports its own 'command' entry tagged with the scheduled task's
+        // id (see Monitor::beginScheduledTaskRun()) — nesting it here as a
+        // child, exactly like 'job' above, is what makes it show up as a
+        // "HANDLE ..." row under the SCHEDULED TASK root instead of only
+        // ever rendering as its own separate root (CommandRunController).
+        'command' => ['type' => 'command', 'label' => 'Command'],
     ];
 
     /**
@@ -51,7 +58,8 @@ class Timeline
     ];
 
     /**
-     * @param  object  $root  the `request` row from Storage::findByRequestId()
+     * @param  object  $root  the `request`/`job`/`command`/`scheduled_task` row this
+     *                        track's own timeline is built around
      * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
      * @return TimelineEntry[]
      */
@@ -88,7 +96,14 @@ class Timeline
      * Groups this timeline's query entries by normalized SQL shape and
      * stamps every entry in a group of 2+ with the same `duplicateColor`
      * metadata — the EventSummary "N duplicates" badge highlights these
-     * dots with a heartbeat animation (see timeline-row.blade.php).
+     * dots with a heartbeat animation (see timeline-row.blade.php). Also
+     * stamps `duplicateGroup` with the group's own key — clicking one dot
+     * pulses every dot sharing that exact key (see selectRow() in
+     * timeline.blade.php), not every dot sharing its *colour*: the palette
+     * below only has 10 entries, picked by `crc32($key) % 10`, so two
+     * unrelated groups on a busy page can and do land on the same colour by
+     * coincidence. Matching on colour alone would pulse both groups
+     * together whenever that happens.
      *
      * @param  TimelineEntry[]  $entries
      */
@@ -108,6 +123,7 @@ class Timeline
             foreach ($group as $entry) {
                 $entry->metadata['duplicateColor'] = $color;
                 $entry->metadata['duplicateCount'] = $group->count();
+                $entry->metadata['duplicateGroup'] = (string) $key;
             }
         }
     }
