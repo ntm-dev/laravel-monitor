@@ -96,7 +96,14 @@ class Timeline
      * Groups this timeline's query entries by normalized SQL shape and
      * stamps every entry in a group of 2+ with the same `duplicateColor`
      * metadata — the EventSummary "N duplicates" badge highlights these
-     * dots with a heartbeat animation (see timeline-row.blade.php).
+     * dots with a heartbeat animation (see timeline-row.blade.php). Also
+     * stamps `duplicateGroup` with the group's own key — clicking one dot
+     * pulses every dot sharing that exact key (see selectRow() in
+     * timeline.blade.php), not every dot sharing its *colour*: the palette
+     * below only has 10 entries, picked by `crc32($key) % 10`, so two
+     * unrelated groups on a busy page can and do land on the same colour by
+     * coincidence. Matching on colour alone would pulse both groups
+     * together whenever that happens.
      *
      * @param  TimelineEntry[]  $entries
      */
@@ -116,6 +123,7 @@ class Timeline
             foreach ($group as $entry) {
                 $entry->metadata['duplicateColor'] = $color;
                 $entry->metadata['duplicateCount'] = $group->count();
+                $entry->metadata['duplicateGroup'] = (string) $key;
             }
         }
     }

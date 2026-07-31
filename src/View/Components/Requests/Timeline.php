@@ -314,10 +314,15 @@ class Timeline extends Component
                 'metadata' => $entry->metadata,
                 // The colour of the duplicate-SQL group this query belongs
                 // to (see Support\Timeline::assignDuplicateColors()), null
-                // for a non-duplicate — lets the inspector panel pulse
-                // every dot in the same group when this one's selected
-                // (see selectRow() in timeline.blade.php).
+                // for a non-duplicate.
                 'duplicateColor' => $entry->metadata['duplicateColor'] ?? null,
+                // This group's own key, null for a non-duplicate — lets the
+                // inspector panel pulse every dot in the *same* group when
+                // this one's selected (see selectRow() in timeline.blade.php).
+                // Not duplicateColor above: two unrelated groups can share a
+                // colour (only 10 in the palette), which would otherwise
+                // pulse both together.
+                'duplicateGroup' => $entry->metadata['duplicateGroup'] ?? null,
                 'duplicateCount' => $entry->type === 'query'
                     ? $queryDuplicateCounts[Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label)]
                     : null,

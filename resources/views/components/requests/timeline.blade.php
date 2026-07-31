@@ -89,9 +89,12 @@
          heartbeatActive: false,
          heartbeatTimer: null,
          // Same pulse, scoped to just the clicked query's own duplicate
-         // group (see selectRow() below) rather than every group on the page.
-         heartbeatColor: null,
-         heartbeatColorTimer: null,
+         // group (see selectRow() below) rather than every group on the
+         // page — keyed by TimelineRow::$duplicateGroup, not $duplicateColor:
+         // the 10-colour palette repeats, so two unrelated groups can share
+         // a colour and would otherwise pulse together.
+         heartbeatGroup: null,
+         heartbeatGroupTimer: null,
          tooltip: { text: '', top: 0, left: 0 },
          sqlCopied: false,
          dragging: false,
@@ -194,13 +197,13 @@
              if (this.dragMoved) return;
              this.selectedId = (this.selectedId === id ? null : id);
              // Selecting a duplicate query pulses every dot sharing its own
-             // group's colour (see TimelineRow::$duplicateColor), so an N+1
-             // is obvious without hunting for the EventSummary badge.
-             clearTimeout(this.heartbeatColorTimer);
-             const color = this.selectedId !== null ? this.data[this.selectedId]?.duplicateColor : null;
-             this.heartbeatColor = color ?? null;
-             if (color) {
-                 this.heartbeatColorTimer = setTimeout(() => this.heartbeatColor = null, 6000);
+             // group (see TimelineRow::$duplicateGroup), so an N+1 is
+             // obvious without hunting for the EventSummary badge.
+             clearTimeout(this.heartbeatGroupTimer);
+             const group = this.selectedId !== null ? this.data[this.selectedId]?.duplicateGroup : null;
+             this.heartbeatGroup = group ?? null;
+             if (group) {
+                 this.heartbeatGroupTimer = setTimeout(() => this.heartbeatGroup = null, 6000);
              }
              if (this.selectedId === null) return;
              // The tree pane's row is always vertically in view (it's what was

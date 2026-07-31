@@ -105,11 +105,14 @@ class TimelineRow extends Component
     /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}. */
     public string $color;
 
-    /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. */
+    /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. Two unrelated groups can share this — see {@see $duplicateGroup} for the value that actually identifies one group uniquely. */
     public ?string $duplicateColor;
 
     /** Number of entries sharing this duplicate-SQL group, null when this entry isn't a duplicate. */
     public ?int $duplicateCount;
+
+    /** This duplicate-SQL group's own key (normalized SQL shape), null when this entry isn't a duplicate — what selectRow() in timeline.blade.php actually matches on to pulse just this group's dots, since {@see $duplicateColor} alone can be shared by a different group. */
+    public ?string $duplicateGroup;
 
     /** Badge text colour per event type, matching {@see $color}; neutral by default. */
     public string $badgeTextColor;
@@ -168,6 +171,7 @@ class TimelineRow extends Component
         $this->badge = self::badgeFor($entry->type);
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
         $this->duplicateCount = $entry->metadata['duplicateCount'] ?? null;
+        $this->duplicateGroup = $entry->metadata['duplicateGroup'] ?? null;
         $this->color = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_COLOR,
             $this->duplicateColor !== null => "border border-{$this->duplicateColor}-500 bg-{$this->duplicateColor}-500 dark:border-{$this->duplicateColor}-400 dark:bg-{$this->duplicateColor}-400",

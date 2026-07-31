@@ -73,7 +73,7 @@
             @else
                 @if ($duplicateColor)
                     <span class="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-{{ $duplicateColor }}-500 pl-px text-[8px] font-bold leading-none text-{{ $duplicateColor }}-500 dark:border-{{ $duplicateColor }}-400 dark:text-{{ $duplicateColor }}-400"
-                          :class="(heartbeatActive || heartbeatColor === '{{ $duplicateColor }}') ? 'monitor-heartbeat' : ''">D</span>
+                          :class="(heartbeatActive || heartbeatGroup === @js($duplicateGroup)) ? 'monitor-heartbeat' : ''">D</span>
                 @else
                     <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                         <span class="relative h-1.5 w-1.5 rounded-full {{ $color }}"></span>
