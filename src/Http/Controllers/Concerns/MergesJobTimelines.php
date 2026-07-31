@@ -20,7 +20,7 @@ use LaravelMonitor\Support\Timeline;
 trait MergesJobTimelines
 {
     /**
-     * @return list<array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts?: list<array{attempt: int, status: string, outcomeId: int, start: float, duration: int, entries: array}>, totalAttemptsDuration?: int}>
+     * @return list<array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: array}>, totalAttemptsDuration?: int}>
      */
     protected function buildTracks(object $root, Collection $children, string $rootBadge): array
     {
@@ -76,7 +76,7 @@ trait MergesJobTimelines
      * single, deliberately neutral root — see TimelineRow).
      *
      * @param  Collection<int, object>  $executions
-     * @return array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts: list<array{attempt: int, status: string, outcomeId: int, start: float, duration: int, entries: array}>, totalAttemptsDuration: int}
+     * @return array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: array}>, totalAttemptsDuration: int}
      */
     protected function jobTrack(Collection $executions, float $rootStart): array
     {
@@ -97,9 +97,11 @@ trait MergesJobTimelines
                 // a request root (see View\Components\Requests\TimelineRow).
                 'status' => $outcome->subtype,
                 // The specific outcome row this attempt came from — lets
-                // defaultTrackId() find this track from a `?job=<id>` that
-                // names any one of its attempts, not just the first.
-                'outcomeId' => $outcome->id,
+                // defaultTrackId() find this track from a `?job=<uuid>` that
+                // names any one of its attempts, not just the first. Its
+                // request_id (not the int primary key), matching the uuid
+                // every other cross-page link in this package already uses.
+                'outcomeId' => $outcome->request_id,
                 'start' => $start,
                 'duration' => max(1, (int) $duration),
                 'entries' => Timeline::build($outcome, $execution->children),
@@ -152,23 +154,21 @@ trait MergesJobTimelines
     /**
      * Which track starts expanded (and doubles as the fixed scale every bar
      * on the page is positioned against — see View\Components\Requests\Timeline).
-     * Defaults to the root ('root') unless a `?job=<id>` query string names
-     * one of this page's own job tracks — set by JobAttemptController when it
-     * redirects a directly-visited, already-tracked job attempt here, so
-     * landing on this page from that job's own link expands (and scales
-     * around) *that* job instead of the root. `<id>` is a specific outcome's
-     * own row id, not the track id — a retried job's track holds several
-     * attempts (see jobTrack()), so this matches against every attempt's own
-     * 'outcomeId' rather than assuming the linked attempt is the track's
-     * first one.
+     * Defaults to the root ('root') unless $requestedOutcomeId names one of
+     * this page's own job tracks — the route's own trailing {jobId} segment
+     * (see routes/web.php's unnamed twin of this page's own named route),
+     * forwarded by the calling controller, set by JobAttemptController when
+     * it redirects a directly-visited, already-tracked job attempt here, so
+     * landing on this page from that job's own link expands (and
+     * scales around) *that* job instead of the root. It's a specific
+     * outcome's own request_id, not the track id — a retried job's track
+     * holds several attempts (see jobTrack()), so this matches against every
+     * attempt's own 'outcomeId' rather than assuming the linked attempt is
+     * the track's first one.
      */
-    protected function defaultTrackId(array $tracks): string
+    protected function defaultTrackId(array $tracks, ?string $requestedOutcomeId = null): string
     {
-        $requestedOutcomeId = request()->query('job');
-
         if ($requestedOutcomeId !== null) {
-            $requestedOutcomeId = (int) $requestedOutcomeId;
-
             $match = collect($tracks)->first(
                 fn (array $track) => collect($track['attempts'] ?? [])->contains('outcomeId', $requestedOutcomeId)
             );

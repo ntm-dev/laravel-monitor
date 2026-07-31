@@ -38,7 +38,7 @@ class RequestDetailController
     {
     }
 
-    public function __invoke(string $requestId): View
+    public function __invoke(string $requestId, ?string $jobId = null): View
     {
         $root = $this->storage->findByRequestId($requestId);
 
@@ -56,7 +56,7 @@ class RequestDetailController
         return view('monitor::request-detail-page', [
             'root' => $root,
             'tracks' => $tracks,
-            'defaultTrack' => $this->defaultTrackId($tracks),
+            'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($root, $children),
             'userName' => $userName,
             'groups' => $groups,

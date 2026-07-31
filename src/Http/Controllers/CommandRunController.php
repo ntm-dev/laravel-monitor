@@ -40,7 +40,7 @@ class CommandRunController
     {
     }
 
-    public function __invoke(string $runId): View
+    public function __invoke(string $runId, ?string $jobId = null): View
     {
         app()->setLocale(Preferences::locale());
 
@@ -56,7 +56,7 @@ class CommandRunController
         return view('monitor::command-run-page', [
             'root' => $root,
             'tracks' => $tracks,
-            'defaultTrack' => $this->defaultTrackId($tracks),
+            'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

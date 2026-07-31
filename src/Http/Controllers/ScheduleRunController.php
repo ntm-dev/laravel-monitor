@@ -51,7 +51,7 @@ class ScheduleRunController
     {
     }
 
-    public function __invoke(string $runId): View
+    public function __invoke(string $runId, ?string $jobId = null): View
     {
         $root = $this->storage->findByRequestId($runId, 'scheduled_task');
 
@@ -65,7 +65,7 @@ class ScheduleRunController
         return view('monitor::schedule-run-page', [
             'root' => $root,
             'tracks' => $tracks,
-            'defaultTrack' => $this->defaultTrackId($tracks),
+            'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

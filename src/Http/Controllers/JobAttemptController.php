@@ -53,19 +53,25 @@ class JobAttemptController
     {
     }
 
-    public function __invoke(string $attemptId): View|RedirectResponse
+    public function __invoke(string $attemptId, ?string $jobId = null): View|RedirectResponse
     {
         $root = $this->storage->findByRequestId($attemptId, 'job');
 
         abort_unless($root !== null, 404);
 
         if (($ancestorUrl = $this->ancestorUrl($root)) !== null) {
-            // `job=` tells the landing page to expand (and scale its whole
-            // timeline around) *this* job's own track instead of its
-            // default root — see MergesJobTimelines::defaultTrackId().
-            $separator = str_contains($ancestorUrl, '?') ? '&' : '?';
-
-            return redirect("{$ancestorUrl}{$separator}job={$root->id}");
+            // A trailing <uuid> segment (not a ?job= query string, and no
+            // "/job" literal in between — shorter, and doesn't leak an
+            // otherwise-guessable query key) tells the landing page to
+            // expand (and scale its whole timeline around) *this* job's own
+            // track instead of its default root — see
+            // MergesJobTimelines::defaultTrackId() and the matching unnamed
+            // route registered right after each named show route in
+            // routes/web.php. Its request_id (the uuid this very route was
+            // reached with as $attemptId), not the int primary key, matching
+            // the uuid every other cross-page link in this package already
+            // uses.
+            return redirect("{$ancestorUrl}/{$root->request_id}");
         }
 
         $children = $this->storage->timelineFor($attemptId, 'job');
@@ -76,7 +82,7 @@ class JobAttemptController
         return view('monitor::job-attempt-page', [
             'root' => $root,
             'tracks' => $tracks,
-            'defaultTrack' => $this->defaultTrackId($tracks),
+            'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

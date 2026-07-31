@@ -61,7 +61,7 @@ class Timeline extends Component
     public int $totalDuration;
 
     /**
-     * @param  list<array{id: string, badge: string, label: string, start: float, duration: int, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: int, start: float, duration: int, entries: TimelineEntry[]}>, totalAttemptsDuration?: int}>  $tracks
+     * @param  list<array{id: string, badge: string, label: string, start: float, duration: int, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: TimelineEntry[]}>, totalAttemptsDuration?: int}>  $tracks
      */
     public function __construct(public array $tracks, public string $defaultTrack = 'root')
     {
@@ -179,7 +179,7 @@ class Timeline extends Component
      * track's bounding-box start).
      *
      * @param  array{id: string, badge: string, label: string, start: float, duration: int}  $track
-     * @param  array{attempt: int, status: string, outcomeId: int, start: float, duration: int, entries: TimelineEntry[]}  $attempt
+     * @param  array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: TimelineEntry[]}  $attempt
      */
     protected function addAttemptRows(array $track, array $attempt, float $trackBarStartOffset, array &$entriesById): void
     {
