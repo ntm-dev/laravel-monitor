@@ -4,38 +4,61 @@ namespace LaravelMonitor;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Routing\Events\RouteMatched;
-use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Hooks\ControllerStartHook;
 use LaravelMonitor\Livewire as Cards;
 use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
 
 class MonitorServiceProvider extends ServiceProvider
 {
+    private float $timestamp;
+
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/monitor.php', 'monitor');
+        try {
+            $this->captureTimestamp();
+            $this->mergeConfigFrom(__DIR__.'/../config/monitor.php', 'monitor');
+            if ($this->app['config']->get('monitor.enabled', false)) {
+                $this->registerBindings();
+                $this->registerResources();
+                $this->registerRecorders();
+                if (!$this->app->runningInConsole()) {
+                    $this->registerRequestHooks();
+                }
+                $this->app->terminating($this->app->make(Monitor::class)->flush(...));
+            }
+            } catch (\Throwable $th) {
+                report($th);
+        }
+    }
 
+    private function registerBindings(): void
+    {
         $this->app->singleton(Monitor::class);
+        $this->app->singleton(ControllerStartHook::class);
         $this->app->singleton(StorageManager::class);
         $this->app->bind(Storage::class, fn ($app) => $app[StorageManager::class]->driver());
-        $this->registerResources();
-        $this->registerRecorders();
-        $this->registerRequestTimeline();
-        $this->registerLivewireComponents();
-        $this->registerAuthorization();
-        $this->registerAuth();
-        $this->registerOAuth();
+    }
 
-        $this->app->terminating(fn () => $this->app->make(Monitor::class)->flush());
+    private function captureTimestamp(): void
+    {
+        $this->timestamp = match (true) {
+            \defined('LARAVEL_START') => LARAVEL_START,
+            default => $_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true),
+        };
     }
 
     public function boot(): void
     {
-        Support\Settings::apply();
+        try {
+            if (!$this->app['config']->get('monitor.enabled', false)) {
+                return;
+            }
+            Support\Settings::apply();
         $this->registerAppleOAuthDriver();
 
         // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
@@ -46,9 +69,12 @@ class MonitorServiceProvider extends ServiceProvider
         // dashboard's lists don't need Livewire's implicit wire:key diffing, so disable it.
         config(['livewire.smart_wire_keys' => false]);
 
-        if ($this->app->runningInConsole()) {
-            $this->registerPublications();
-            $this->registerCommands();
+            if ($this->app->runningInConsole()) {
+                $this->registerPublications();
+                $this->registerCommands();
+            }
+        } catch (\Throwable $th) {
+            report($th);
         }
     }
 
@@ -83,11 +109,9 @@ class MonitorServiceProvider extends ServiceProvider
 
     protected function registerRecorders(): void
     {
-        if (! $this->app['config']->get('monitor.enabled', true)) {
-            return;
-        }
-
         $monitor = $this->app->make(Monitor::class);
+        $monitor->timestamp($this->timestamp);
+        $this->app->booted($monitor->beginRequest(...));
         $events = $this->app->make(Dispatcher::class);
 
         foreach ($this->app['config']->get('monitor.recorders', []) as $recorder => $config) {
@@ -101,29 +125,25 @@ class MonitorServiceProvider extends ServiceProvider
 
     /**
      * Hook the request-lifecycle markers used by the Request Detail
-     * timeline: a global middleware brackets the whole request, and the
-     * controller boundary is marked by attaching a marker
-     * middleware directly onto the matched route (not by pushing into a
+     * timeline: `beginRequest()` fires once the app has finished booting —
+     * before any middleware (global or route) runs — so the "middleware"
+     * stage covers the *entire* middleware pipeline instead of only the
+     * portion after a middleware pushed onto the kernel's stack. The
+     * controller boundary is marked by ControllerStartHook, which attaches
+     * itself directly onto the matched route (not by pushing into a
      * middleware *group* array) — framework events refine the
-     * render/terminating phases. All without requiring the host app to edit
-     * its HTTP kernel.
+     * render/terminating phases. All without requiring the host app to
+     * edit its HTTP kernel.
      */
-    protected function registerRequestTimeline(): void
+    protected function registerRequestHooks(): void
     {
-        if (! $this->app['config']->get('monitor.enabled', true)) {
-            return;
-        }
-
-        $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
-
-        if ($kernel instanceof \Illuminate\Foundation\Http\Kernel) {
-            $kernel->pushMiddleware(Http\Middleware\RecordTimeline::class);
-        }
-
         $monitor = $this->app->make(Monitor::class);
         $events = $this->app->make(Dispatcher::class);
 
-        $events->listen(RouteMatched::class, fn (RouteMatched $event) => $this->attachControllerStartMarker($event->route));
+        $events->listen(
+            RouteMatched::class,
+            fn (RouteMatched $event) => $this->app->make(ControllerStartHook::class)->attachMiddlewareToRoute($event->route)
+        );
 
         // PreparingResponse/ResponsePrepared fire back to back, from
         // Router::prepareResponse() — still deep inside the route's own
@@ -131,38 +151,18 @@ class MonitorServiceProvider extends ServiceProvider
         // middleware's post-`$next()` code. That's what lets "render" mean
         // only the controller/view's own work.
         if (class_exists(\Illuminate\Routing\Events\PreparingResponse::class)) {
-            $events->listen(\Illuminate\Routing\Events\PreparingResponse::class, fn () => $monitor->markRenderStart());
-            $events->listen(\Illuminate\Routing\Events\ResponsePrepared::class, fn () => $monitor->markUnwinding());
+            $events->listen(\Illuminate\Routing\Events\PreparingResponse::class, $monitor->markRenderStart(...));
+            $events->listen(\Illuminate\Routing\Events\ResponsePrepared::class, $monitor->markUnwinding(...));
         }
 
-        $events->listen(\Illuminate\Foundation\Http\Events\RequestHandled::class, fn () => $monitor->markResponseReady());
-
+        $events->listen(\Illuminate\Foundation\Http\Events\RequestHandled::class, $monitor->markResponseReady(...));
         if (class_exists(\Illuminate\Foundation\Events\Terminating::class)) {
-            $events->listen(\Illuminate\Foundation\Events\Terminating::class, fn () => $monitor->markTerminating());
+            $events->listen(\Illuminate\Foundation\Events\Terminating::class, $monitor->markTerminating(...));
         }
-    }
-
-    /**
-     * Attach the controller-boundary marker directly onto the matched route.
-     *
-     * Pushing onto a middleware *group* array (e.g. Router::pushMiddlewareToGroup)
-     * doesn't stick: Illuminate\Foundation\Http\Kernel::syncMiddlewareToRouter()
-     * overwrites the router's group arrays wholesale whenever any other
-     * package calls e.g. $kernel->appendMiddlewareToGroup() afterwards
-     * (commonly from another provider's boot(), which runs after this one's
-     * register()), silently dropping our addition. Mutating the resolved
-     * Route's own middleware list at RouteMatched time is immune to that.
-     */
-    protected function attachControllerStartMarker(Route $route): void
-    {
-        $middleware = (array) ($route->action['middleware'] ?? []);
-
-        if (in_array(Http\Middleware\MarkControllerStart::class, $middleware, true)) {
-            return;
-        }
-
-        $middleware[] = Http\Middleware\MarkControllerStart::class;
-        $route->action['middleware'] = $middleware;
+        $this->registerLivewireComponents();
+        $this->registerAuthorization();
+        $this->registerAuth();
+        $this->registerOAuth();
     }
 
     protected function registerLivewireComponents(): void
@@ -232,15 +232,13 @@ class MonitorServiceProvider extends ServiceProvider
         }
     }
 
-    protected function registerCommands(): void
+    private function registerCommands(): void
     {
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                Commands\PruneCommand::class,
-                Commands\ClearCommand::class,
-                Commands\AggregateCommand::class,
-            ]);
-        }
+        $this->commands([
+            Commands\PruneCommand::class,
+            Commands\ClearCommand::class,
+            Commands\AggregateCommand::class,
+        ]);
     }
 
     /**

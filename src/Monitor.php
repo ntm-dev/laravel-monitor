@@ -10,6 +10,8 @@ use Throwable;
 
 class Monitor
 {
+    private float $timestamp;
+
     /** @var Entry[] */
     protected array $entries = [];
 
@@ -95,6 +97,11 @@ class Monitor
 
     public function __construct(protected Application $app)
     {
+    }
+
+    public function timestamp(float $timestamp): float
+    {
+        return $this->timestamp ??= $timestamp;
     }
 
     /**
@@ -207,9 +214,11 @@ class Monitor
     }
 
     /**
-     * Start tracking the current HTTP request. Called by the RecordTimeline
-     * global middleware; offsets are measured from PHP's request start so
-     * they line up with the recorded request duration.
+     * Start tracking the current HTTP request. Called from
+     * MonitorServiceProvider's app->booted() callback, once the framework
+     * has finished booting but before any middleware has run; offsets are
+     * measured from PHP's request start so they line up with the recorded
+     * request duration.
      *
      * LARAVEL_START (set on the first line of public/index.php) takes
      * priority over REQUEST_TIME_FLOAT (set by the SAPI before PHP even
@@ -218,11 +227,9 @@ class Monitor
      */
     public function beginRequest(): void
     {
-        $start = (float) (\defined('LARAVEL_START') ? LARAVEL_START : (request()->server('REQUEST_TIME_FLOAT') ?: microtime(true)));
-
         $this->request = [
             'id' => (string) Str::uuid(),
-            'start' => $start,
+            'start' => $this->timestamp ?? microtime(true),
             'phases' => [],
             'stage' => 'middleware',
             'stage_start' => 0,
@@ -480,10 +487,11 @@ class Monitor
     }
 
     /**
-     * Marks the middleware → controller boundary. Called by the
-     * MarkControllerStart route-group middleware — attached directly onto
-     * the matched route at RouteMatched time, i.e. before any route
-     * middleware's own `handle()` runs.
+     * Marks the middleware → controller boundary. Called from a closure
+     * middleware attached directly onto the matched route at RouteMatched
+     * time (see Hooks\ControllerStartHook), as the route's own last
+     * middleware entry — i.e. after every other route middleware's
+     * `handle()` has run, right before the controller.
      */
     public function markControllerStart(): void
     {
