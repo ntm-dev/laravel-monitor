@@ -67,7 +67,7 @@
          init() {
              if (! {{ $defaultTrack !== ($tracks[0]['id'] ?? null) ? 'true' : 'false' }}) return;
              this.$nextTick(() => {
-                 this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+                 this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
              });
          },
          toggleTrack(id) {
@@ -77,7 +77,7 @@
              // several tracks stacked on the page, the one you just opened
              // can easily be scrolled off well below the fold.
              this.$nextTick(() => {
-                 this.$refs.rows.querySelector(`[data-track-root='${id}']`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                 this.$refs.rows.querySelector(`[data-track-root='${id}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
              });
          },
          selectedId: null,

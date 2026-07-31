@@ -89,7 +89,7 @@
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
-        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable)])
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
