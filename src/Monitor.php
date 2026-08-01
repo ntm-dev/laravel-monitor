@@ -45,17 +45,25 @@ class Monitor
     protected ?Entry $pendingRequest = null;
 
     /**
-     * State of the queued job attempt currently being processed, or null
-     * outside one — same shape/purpose as $request but for jobs, so
-     * everything a job's handle() triggers (queries, mail, notifications)
-     * can be correlated onto a job attempt timeline the same way request
-     * children are. A worker process handles jobs one at a time and never
-     * concurrently with an HTTP request, so at most one of $request/$job is
-     * ever set.
+     * Stack of queued job attempts currently being processed, outermost
+     * first — same shape/purpose as $request but for jobs, so everything a
+     * job's handle() triggers (queries, mail, notifications) can be
+     * correlated onto a job attempt timeline the same way request children
+     * are. A worker process handles jobs from the queue one at a time and
+     * never concurrently with an HTTP request, so $request and this stack
+     * are never both non-empty — but a job's own handle() can still dispatch
+     * another job synchronously (e.g. dispatchSync(), or any queue
+     * connection like 'sync' that fires JobProcessing/JobProcessed
+     * in-process instead of through a separate worker), nesting a second
+     * attempt inside the first. A stack (rather than a single nullable
+     * frame) keeps the outer attempt's id/start/models intact while the
+     * inner one is active, so entries recorded after the inner attempt ends
+     * still correlate back onto the outer one instead of losing correlation
+     * entirely.
      *
-     * @var array{id: string, start: float, models: int}|null
+     * @var list<array{id: string, start: float, models: int}>
      */
-    protected ?array $job = null;
+    protected array $jobStack = [];
 
     /**
      * State of the artisan command currently running, or null outside one —
@@ -155,7 +163,7 @@ class Monitor
             // right before this specific task ran, must win so everything
             // it triggers correlates onto *this* task's run, not onto
             // schedule:run itself.
-            $this->request['id'] ?? $this->job['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
+            $this->request['id'] ?? $this->currentJob()['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -187,12 +195,12 @@ class Monitor
             return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
         }
 
-        if ($this->job !== null) {
+        if (($job = $this->currentJob()) !== null) {
             if ($type === 'job') {
                 return 0.0;
             }
 
-            $elapsed = max(0.0, round((microtime(true) - $this->job['start']) * 1000, 3));
+            $elapsed = max(0.0, round((microtime(true) - $job['start']) * 1000, 3));
 
             return max(0.0, round($elapsed - ($duration ?? 0), 3));
         }
@@ -269,7 +277,7 @@ class Monitor
      */
     public function beginJobAttempt(): void
     {
-        $this->job = [
+        $this->jobStack[] = [
             'id' => (string) Str::uuid(),
             'start' => microtime(true),
             'models' => 0,
@@ -278,13 +286,24 @@ class Monitor
 
     public function jobAttemptId(): ?string
     {
-        return $this->job['id'] ?? null;
+        return $this->currentJob()['id'] ?? null;
     }
 
-    /** Called by the Jobs recorder once the attempt's own `job` entry has been recorded. */
+    /**
+     * Called by the Jobs recorder once the attempt's own `job` entry has
+     * been recorded. Pops just the innermost attempt — if handle() dispatched
+     * a nested job synchronously, this restores the outer attempt as current
+     * rather than clearing job-tracking state entirely.
+     */
     public function endJobAttempt(): void
     {
-        $this->job = null;
+        array_pop($this->jobStack);
+    }
+
+    /** @return array{id: string, start: float, models: int}|null */
+    protected function currentJob(): ?array
+    {
+        return $this->jobStack === [] ? null : $this->jobStack[array_key_last($this->jobStack)];
     }
 
     /**
@@ -457,8 +476,8 @@ class Monitor
 
         if ($this->request !== null) {
             $this->request['models']++;
-        } elseif ($this->job !== null) {
-            $this->job['models']++;
+        } elseif ($this->jobStack !== []) {
+            $this->jobStack[array_key_last($this->jobStack)]['models']++;
         } elseif ($this->scheduledTask !== null) {
             $this->scheduledTask['models']++;
         } elseif ($this->command !== null) {
@@ -468,7 +487,7 @@ class Monitor
 
     public function modelCount(): int
     {
-        return $this->request['models'] ?? $this->job['models'] ?? $this->scheduledTask['models'] ?? $this->command['models'] ?? 0;
+        return $this->request['models'] ?? $this->currentJob()['models'] ?? $this->scheduledTask['models'] ?? $this->command['models'] ?? 0;
     }
 
     /** Milliseconds elapsed since the request started, or null outside one. */

@@ -31,8 +31,8 @@ class MonitorServiceProvider extends ServiceProvider
                 }
                 $this->app->terminating($this->app->make(Monitor::class)->flush(...));
             }
-            } catch (\Throwable $th) {
-                report($th);
+        } catch (\Throwable $th) {
+            report($th);
         }
     }
 
@@ -111,7 +111,6 @@ class MonitorServiceProvider extends ServiceProvider
     {
         $monitor = $this->app->make(Monitor::class);
         $monitor->timestamp($this->timestamp);
-        $this->app->booted($monitor->beginRequest(...));
         $events = $this->app->make(Dispatcher::class);
 
         foreach ($this->app['config']->get('monitor.recorders', []) as $recorder => $config) {
@@ -138,6 +137,7 @@ class MonitorServiceProvider extends ServiceProvider
     protected function registerRequestHooks(): void
     {
         $monitor = $this->app->make(Monitor::class);
+        $this->app->booted($monitor->beginRequest(...));
         $events = $this->app->make(Dispatcher::class);
 
         $events->listen(
