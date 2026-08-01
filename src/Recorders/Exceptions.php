@@ -9,6 +9,24 @@ use Illuminate\Support\Str;
 use LaravelMonitor\Support\Fingerprint;
 use Throwable;
 
+use function array_map;
+use function array_slice;
+use function array_unshift;
+use function array_values;
+use function count;
+use function debug_backtrace;
+use function get_class;
+use function gethostname;
+use function is_array;
+use function is_bool;
+use function is_float;
+use function is_int;
+use function is_null;
+use function is_object;
+use function is_resource;
+use function str_replace;
+use function str_starts_with;
+
 class Exceptions extends Recorder
 {
     public function register(Dispatcher $events): void
@@ -34,23 +52,23 @@ class Exceptions extends Recorder
 
     public function record(Throwable $exception): void
     {
-        $class = \get_class($exception);
+        $class = get_class($exception);
         $message = Str::limit($exception->getMessage(), 500);
-        $file = $this->relativePath($exception->getFile());
+        [$file, $line] = $this->monitor->location->forException($exception);
         $frames = $this->frames($exception);
         $handled = $this->wasReportedDeliberately();
 
         $this->monitor->record(
             type: 'exception',
-            key: Fingerprint::for($class, $exception->getMessage(), $file.':'.$exception->getLine()),
+            key: Fingerprint::for($class, $exception->getMessage(), "{$file}:{$line}"),
             payload: [
                 'class' => $class,
                 'message' => $message,
                 'file' => $file,
-                'line' => $exception->getLine(),
+                'line' => $line,
                 'handled' => $handled,
                 'php_version' => PHP_VERSION,
-                'laravel_version' => $this->laravelVersion(),
+                'laravel_version' => $this->monitor->laravelVersion(),
                 'server' => gethostname() ?: null,
                 'frames' => $frames,
                 // Kept for backward compatibility with existing consumers.
@@ -163,15 +181,6 @@ class Exceptions extends Recorder
         return str_starts_with($path, 'vendor'.DIRECTORY_SEPARATOR)
             || str_starts_with($path, 'vendor/')
             || $path === '[internal]';
-    }
-
-    protected function laravelVersion(): ?string
-    {
-        try {
-            return app()->version();
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     protected function relativePath(string $path): string

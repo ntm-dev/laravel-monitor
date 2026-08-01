@@ -6,6 +6,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Support\Location;
 use Throwable;
 
 class Monitor
@@ -95,13 +96,24 @@ class Monitor
      */
     protected const SCHEDULED_TASK_CONTEXT_KEY = 'monitor_scheduled_task_id';
 
-    public function __construct(protected Application $app)
-    {
+    public function __construct(
+        protected Application $app,
+        public Location $location,
+    ) {
     }
 
     public function timestamp(float $timestamp): float
     {
         return $this->timestamp ??= $timestamp;
+    }
+
+    public function laravelVersion(): ?string
+    {
+        try {
+            return $this->app->version();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
