@@ -12,7 +12,6 @@
                 <span class="block truncate text-sm font-semibold leading-tight">{{ config('app.name', 'Laravel') }}</span>
                 <span class="block text-xs leading-tight text-neutral-500 dark:text-neutral-400">{{ ucfirst(app()->environment()) }}</span>
             </span>
-            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_UP_DOWN" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
         </div>
     </div>
 

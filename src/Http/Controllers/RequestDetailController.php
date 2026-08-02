@@ -53,15 +53,23 @@ class RequestDetailController
         [$groups, $footerTabs] = Nav::grouped();
         $tracks = $this->buildTracks($root, $children, 'REQUEST');
 
+        // Landed here via a job's own <request_url>/<job_id> link (see
+        // JobAttemptController::ancestorUrl()) rather than the plain request
+        // url — the page still renders this request's own merged timeline,
+        // but the General info card and the active nav tab switch to that
+        // job instead, since that's what the visitor actually came to see.
+        $job = $jobId !== null ? $this->storage->findByRequestId($jobId, 'job') : null;
+
         return view('monitor::request-detail-page', [
             'root' => $root,
+            'job' => $job,
             'tracks' => $tracks,
             'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($root, $children),
             'userName' => $userName,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'tab' => 'requests',
+            'tab' => $job !== null ? 'jobs' : 'requests',
             'range' => [],
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),

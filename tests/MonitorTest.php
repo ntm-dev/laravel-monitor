@@ -11,6 +11,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\RequestDetail;
@@ -1041,6 +1042,100 @@ class MonitorTest extends TestCase
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $this->get('/monitor/requests/does-not-exist')->assertNotFound();
+    }
+
+    /**
+     * A dispatching request and the job it queued always live in two
+     * separate PHP processes in practice (the request itself, then whatever
+     * later picks the job off the queue) — each with its own Monitor
+     * instance, so the job's own row never actually shares the dispatching
+     * request's request_id. Inserted directly here (rather than firing
+     * real JobQueued/JobProcessed events in-process, which would incorrectly
+     * nest under this same test's still-open beginRequest() context) to
+     * reproduce that same two-request_id shape.
+     *
+     * @return array{0: string, 1: string} [$requestId, $jobRequestId]
+     */
+    protected function seedRequestThatDispatchedAJob(): array
+    {
+        $requestId = (string) Str::uuid();
+        $jobRequestId = (string) Str::uuid();
+
+        DB::table('monitor_entries')->insert([
+            [
+                'type' => 'request',
+                'subtype' => '2xx',
+                'key' => 'GET /users',
+                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'duration' => 50,
+                'request_id' => $requestId,
+                'created_at' => now(),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'queued',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123']),
+                'duration' => null,
+                'request_id' => $requestId,
+                'created_at' => now(),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'processed',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123', 'attempts' => 1]),
+                'duration' => 30,
+                'request_id' => $jobRequestId,
+                'created_at' => now(),
+            ],
+        ]);
+
+        return [$requestId, $jobRequestId];
+    }
+
+    /**
+     * Visiting a dispatched job's own <request_url>/<job_id> link (built by
+     * JobAttemptController::ancestorUrl() when that job's dispatcher is a
+     * tracked request) still renders the request's own merged timeline, but
+     * swaps the General info card for the job's own info and activates the
+     * Jobs nav tab instead of Requests — see RequestDetailController.
+     */
+    public function test_request_detail_page_shows_the_jobs_own_info_and_activates_the_jobs_tab_when_visited_via_its_job_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$requestId, $jobRequestId] = $this->seedRequestThatDispatchedAJob();
+
+        $this->get("/monitor/requests/{$requestId}/{$jobRequestId}")
+            ->assertOk()
+            ->assertViewHas('tab', 'jobs')
+            ->assertSee('SendWelcomeEmail')
+            ->assertSee('Timeline');
+    }
+
+    /**
+     * A directly-visited job attempt whose dispatcher is a tracked request
+     * redirects to that request's own page (JobAttemptController::ancestorUrl())
+     * — in whichever url form the Requests tab itself would link to that
+     * same instance (hashed by its route's key, see
+     * monitor.requests.routes.request), with a trailing job id so the
+     * landing page expands that job's own track.
+     */
+    public function test_job_attempt_page_redirects_to_its_dispatching_requests_hashed_url_with_a_trailing_job_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$requestId, $jobRequestId] = $this->seedRequestThatDispatchedAJob();
+
+        $expectedUrl = route('monitor.requests.routes.request', ['hash' => KeyHash::for('GET /users'), 'requestId' => $requestId])."/{$jobRequestId}";
+
+        $this->get("/monitor/jobs/attempts/{$jobRequestId}")->assertRedirect($expectedUrl);
+
+        $this->get($expectedUrl)
+            ->assertOk()
+            ->assertViewHas('tab', 'jobs')
+            ->assertSee('SendWelcomeEmail');
     }
 
     public function test_hashed_route_resolves_to_the_requests_list_for_that_route(): void

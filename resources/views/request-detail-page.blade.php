@@ -13,7 +13,13 @@
             <x-monitor::requests.header :root="$root" :range="$range"/>
 
             <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
-                <x-monitor::requests.summary :root="$root" :user-name="$userName" :timezone="$timezone"/>
+                {{-- start card general info --}}
+                @if ($job)
+                    <x-monitor::jobs.summary :root="$job"/>
+                @else
+                    <x-monitor::requests.summary :root="$root" :user-name="$userName" :timezone="$timezone"/>
+                @endif
+                {{-- end card general info --}}
                 <x-monitor::requests.headers-section
                     :request-headers="$root->payload['request_headers'] ?? []"
                     :response-headers="$root->payload['response_headers'] ?? []"

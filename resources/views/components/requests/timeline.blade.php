@@ -398,7 +398,7 @@
              page load (stayed at width 0 until toggled a second time) —
              verified by removing just x-transition, everything else equal.
              Plain x-show still switches display instantly and correctly. --}}
-        <div x-show="selectedId !== null" class="w-80 shrink-0">
+        <div x-show="selectedId !== null" class="monitor-timeline-scrollbar w-80 shrink-0">
             <div class="sticky top-[169px] max-h-[calc(100vh-169px)] divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
