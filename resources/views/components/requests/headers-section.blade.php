@@ -5,8 +5,11 @@
 <x-monitor::card class="p-0" x-data="{ open: false }">
     <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-4 py-3 text-left">
         <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">Headers</h2>
-        <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
-            class="h-4 w-4 text-neutral-400 transition-transform" x-bind:class="open ? 'rotate-180' : ''"/>
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md dark:border dark:border-white/10"
+            :class="open ? 'text-blue-500 dark:text-emerald-500 dark:bg-white/5' : 'text-neutral-500 dark:bg-white/5'">
+            <x-monitor::chevrons-updown x-show="open" direction="down-up"/>
+            <x-monitor::chevrons-updown x-show="! open" x-cloak direction="up-down"/>
+        </span>
     </button>
     <div x-show="open" x-cloak x-transition class="border-t border-neutral-100 dark:border-neutral-800">
         <div class="grid grid-cols-1 divide-y divide-neutral-100 md:grid-cols-2 md:divide-x md:divide-y-0 dark:divide-neutral-800">
