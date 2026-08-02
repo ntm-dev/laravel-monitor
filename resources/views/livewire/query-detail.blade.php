@@ -144,7 +144,8 @@
                                                 <button type="button" @click.stop="navigator.clipboard.writeText(@js($location)); copied = true; setTimeout(() => copied = false, 1200)"
                                                         class="shrink-0 text-neutral-400 opacity-0 hover:text-neutral-700 group-hover:opacity-100 dark:text-neutral-500 dark:hover:text-neutral-200">
                                                     <x-monitor::icon :path="Icons::COPY" :stroke="1.8" class="h-3 w-3" x-show="! copied"/>
-                                                    <x-monitor::icon :path="Icons::CHECK" :stroke="2" class="h-3 w-3 text-emerald-500" x-show="copied" x-cloak/>
+                                                    <x-monitor::icon :path="Icons::CHECK" :stroke="2" class="h-3 w-3 text-emerald-500" x-show="copied" x-cloak
+                                                        x-transition:enter="transition-[clip-path] ease-out duration-1000" x-transition:enter-start="[clip-path:inset(0_100%_0_0)]" x-transition:enter-end="[clip-path:inset(0_0_0_0)]"/>
                                                 </button>
                                             @endif
                                         </span>

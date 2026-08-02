@@ -51,7 +51,42 @@
          dark variant exists to swap in, so override just the token colours
          that read poorly against a dark background instead of loading a
          second stylesheet. --}}
-    <style>.dark .hljs-string { color: #60748c; }</style>
+    <style>
+        .dark .hljs-string { color: #60748c; }
+
+        /* Firefox: thumb colour matched to neutral-300/neutral-700 (light/dark),
+           transparent track so it doesn't add its own bar under the chart.
+           Set on html (not body) since that's where .dark is toggled — a rule
+           scoped to body would always win over an inherited value from html,
+           leaving body's own scrollbar stuck light regardless of theme. */
+        html {
+            scrollbar-color: rgb(212 212 212) transparent;
+        }
+        html.dark {
+            scrollbar-color: rgb(64 64 64) transparent;
+        }
+        /* Chromium/Safari: the default scrollbar otherwise stays light-themed
+           (native OS chrome) even inside a dark-mode page. */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgb(212 212 212);
+            border-radius: 9999px;
+        }
+        /* ".dark ::-webkit-scrollbar-thumb" alone only matches descendants of
+           .dark — it can't reach html's own scrollbar (the outer page/viewport
+           bar), since html isn't a descendant of itself. Add the self-selector
+           too so that one darkens as well. */
+        .dark ::-webkit-scrollbar-thumb,
+        html.dark::-webkit-scrollbar-thumb {
+            background-color: rgb(64 64 64);
+        }
+    </style>
     @livewireStyles
 </head>
 <body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">

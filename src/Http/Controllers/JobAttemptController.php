@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
 
@@ -151,7 +152,7 @@ class JobAttemptController
             $dispatcherType = $this->storage->rootTypesFor([$dispatcherId])->get($dispatcherId);
 
             $url = match ($dispatcherType) {
-                'request' => route('monitor.requests.show', $dispatcherId),
+                'request' => $this->requestUrl($dispatcherId),
                 'command' => route('monitor.commands.runs.show', $dispatcherId),
                 'scheduled_task' => route('monitor.schedule.runs.show', $dispatcherId),
                 default => null,
@@ -177,5 +178,23 @@ class JobAttemptController
         }
 
         return null;
+    }
+
+    /**
+     * The dispatching request's own url, in whichever form the Requests tab
+     * itself would link to that same instance — hashed (grouped by its
+     * route, see Nav/DashboardController) when its key is still resolvable,
+     * falling back to the plain, non-hashed url otherwise (a pruned/missing
+     * key, or any other lookup miss).
+     */
+    protected function requestUrl(string $requestId): string
+    {
+        $key = $this->storage->rootLabelsFor([$requestId])->get($requestId);
+
+        if ($key === null) {
+            return route('monitor.requests.show', $requestId);
+        }
+
+        return route('monitor.requests.routes.request', ['hash' => KeyHash::for($key), 'requestId' => $requestId]);
     }
 }

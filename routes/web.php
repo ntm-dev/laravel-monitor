@@ -96,9 +96,21 @@ Route::domain(config('monitor.domain'))
             // closure below binds both by name (closures ARE matched to
             // route parameters in URI order, which is what we want here)
             // and forwards just the one the controller actually needs.
-            Route::get('/requests/routes/{hash}/{requestId}', function (string $hash, string $requestId) {
-                return app(RequestDetailController::class)($requestId);
-            })->where('hash', '[0-9a-f]{32}')->name('monitor.requests.routes.request');
+            Route::get(
+                '/requests/routes/{hash}/{requestId}',
+                fn (string $hash, string $requestId) => app(RequestDetailController::class)($requestId)
+            )->where('hash', '[0-9a-f]{32}')->name('monitor.requests.routes.request');
+
+            // Trailing-{jobId} twin of the named route above, same purpose
+            // as the unnamed `/requests/{requestId}/{jobId}` twin further up
+            // this file — JobAttemptController::ancestorUrl() links back to
+            // whichever of the two forms matches how the dispatching
+            // request's own url is built (hashed when a KeyHash for its
+            // route is resolvable, plain otherwise).
+            Route::get(
+                '/requests/routes/{hash}/{requestId}/{jobId}',
+                fn (string $hash, string $requestId, string $jobId) => app(RequestDetailController::class)($requestId, $jobId)
+            )->where(['hash' => '[0-9a-f]{32}', 'jobId' => '[0-9a-f-]{36}']);
 
             foreach (['jobs', 'commands', 'schedule', 'queries', 'exceptions'] as $groupTab) {
                 Route::get("/{$groupTab}/{hash}", DashboardController::class)
