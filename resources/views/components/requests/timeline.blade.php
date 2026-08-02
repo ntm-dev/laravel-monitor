@@ -330,7 +330,7 @@
                         <span class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
                     </div>
                 @else
-                    <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" part="label"/>
+                    <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" :job-url="$row['jobUrl']" part="label"/>
                 @endif
             @endforeach
         </div>
@@ -365,7 +365,7 @@
                         @if ($row['kind'] === 'divider')
                             <div x-show="expandedTracks['{{ $row['track'] }}']" class="h-9 border-t border-neutral-50 dark:border-neutral-800/40"></div>
                         @else
-                            <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" part="bar"/>
+                            <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']" :kind="$row['kind']" :track-id="$row['track']" :root-label="$row['rootLabel']" :focusable="$row['focusable']" :attempt="$row['attempt']" :job-status="$row['jobStatus']" :attempts-duration="$row['attemptsDuration']" :job-url="$row['jobUrl']" part="bar"/>
                         @endif
                     @endforeach
                 </div>

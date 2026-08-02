@@ -10,25 +10,31 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            <x-monitor::requests.header :root="$root" :range="$range"/>
+            <x-monitor::requests.header :root="$root" :range="$range" :job="$job" :breadcrumb-tab="$breadcrumbTab" :breadcrumb-label="$breadcrumbLabel" :breadcrumb-url="$breadcrumbUrl"/>
 
             <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
                 {{-- start card general info --}}
                 @if ($job)
-                    <x-monitor::jobs.summary :root="$job"/>
+                    <x-monitor::jobs.summary :root="$job" :queued-at="$queuedAt"/>
                 @else
                     <x-monitor::requests.summary :root="$root" :user-name="$userName" :timezone="$timezone"/>
                 @endif
                 {{-- end card general info --}}
-                <x-monitor::requests.headers-section
-                    :request-headers="$root->payload['request_headers'] ?? []"
-                    :response-headers="$root->payload['response_headers'] ?? []"
-                />
-                <x-monitor::requests.body-section :body="$root->payload['body'] ?? null"/>
+                {{-- Headers/Body are HTTP-specific — a job has neither, same
+                     as the standalone Job Attempt page (job-attempt-page.blade.php),
+                     so both hide rather than keep showing the request's own
+                     data while a job is the page's active entity. --}}
+                @unless ($job)
+                    <x-monitor::requests.headers-section
+                        :request-headers="$root->payload['request_headers'] ?? []"
+                        :response-headers="$root->payload['response_headers'] ?? []"
+                    />
+                    <x-monitor::requests.body-section :body="$root->payload['body'] ?? null"/>
+                @endunless
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
-                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack"/>
+                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack" :job-base-url="$jobBaseUrl"/>
 
             </main>
         </div>

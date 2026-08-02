@@ -62,8 +62,9 @@ class Timeline extends Component
 
     /**
      * @param  list<array{id: string, badge: string, label: string, start: float, duration: int, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: TimelineEntry[]}>, totalAttemptsDuration?: int}>  $tracks
+     * @param  ?string  $jobBaseUrl  This page's own url (see RequestDetailController::requestUrl()) a job track's own row appends its latest attempt's outcome id onto, so clicking it navigates there instead of merely expanding in place — null on every other page this component renders on (job/command/schedule detail), which has nowhere of that kind to navigate a job track to.
      */
-    public function __construct(public array $tracks, public string $defaultTrack = 'root')
+    public function __construct(public array $tracks, public string $defaultTrack = 'root', public ?string $jobBaseUrl = null)
     {
         $primary = collect($tracks)->firstWhere('id', $defaultTrack) ?? $tracks[0];
         $primaryDuration = max(1, (int) $primary['duration']);
@@ -105,6 +106,13 @@ class Timeline extends Component
                     'attempt' => null,
                     'jobStatus' => null,
                     'attemptsDuration' => $track['totalAttemptsDuration'],
+                    // The track's own latest attempt (last = most recent —
+                    // see jobTrack()'s own docblock) is what a click on this
+                    // row navigates to; there's no single "outcome" for a
+                    // whole track otherwise.
+                    'jobUrl' => $this->jobBaseUrl !== null
+                        ? $this->jobBaseUrl.'/'.end($track['attempts'])['outcomeId']
+                        : null,
                 ];
 
                 foreach ($track['attempts'] as $attempt) {
@@ -268,6 +276,11 @@ class Timeline extends Component
                 'attempt' => $isAttempt ? $attemptNumber : null,
                 'jobStatus' => $isAttempt ? $attemptStatus : null,
                 'attemptsDuration' => null,
+                // Only a job track's own synthetic root row (built directly
+                // in __construct(), not here) ever carries one — every row
+                // built through here is either a non-job track's root (no
+                // "other job" to navigate to) or a plain event/phase/attempt row.
+                'jobUrl' => null,
             ];
         }
 
@@ -291,6 +304,7 @@ class Timeline extends Component
                     'attempt' => null,
                     'jobStatus' => null,
                     'attemptsDuration' => null,
+                    'jobUrl' => null,
                 ];
             }
         }

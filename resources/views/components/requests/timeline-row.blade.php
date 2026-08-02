@@ -42,21 +42,34 @@
     // each track's own expand state is independent.
     $visible = in_array($kind, ['root', 'attempt'], true) ? 'true' : "expandedTracks['{$trackId}']";
     $toggleClick = "toggleTrack('{$trackId}')";
+    // A job track's own root row navigates to that job's own page instead
+    // of toggling in place (see View\Components\Requests\Timeline's
+    // $jobBaseUrl/$jobUrl) -- landing there already expands (and scales the
+    // whole page around) this exact job, same as expanding it here would
+    // have, so nothing is lost by replacing the toggle with a real navigation.
+    // But when this exact track is already expanded (it's the one the page
+    // navigated here to view), clicking again should still collapse it in
+    // place -- navigating to the page we're already on wouldn't visibly do
+    // anything, which is the bug this ternary fixes.
+    $navigateClick = $jobUrl !== null
+        ? "expandedTracks['{$trackId}'] ? ({$toggleClick}) : (window.location = ".json_encode($jobUrl).')'
+        : null;
 @endphp
 @if ($part === 'label')
     <div x-show="{{ $visible }}"
-         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable)])
+         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable)])
          :class="{{ $highlightClass }}"
          @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
          @mouseleave="hoveredId = null; hideTooltip()"
          @if ($detailable) @click="selectRow('{{ $entry->id }}')"
+         @elseif ($navigateClick) @click="{{ $navigateClick }}"
          @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
         <div class="flex min-w-0 translate-y-px items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
-                @if ($focusable)
+                @if ($navigateClick || $focusable)
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
                                       class="h-3 w-3 shrink-0 text-neutral-400 transition-transform dark:text-neutral-500"
                                       x-bind:class="expandedTracks['{{ $trackId }}'] ? '' : '-rotate-90'"/>
@@ -89,11 +102,12 @@
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
-        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
              @if ($detailable) @click="selectRow('{{ $entry->id }}')"
+             @elseif ($navigateClick) @click="{{ $navigateClick }}"
              @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
             @if ($kind === 'root')
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>

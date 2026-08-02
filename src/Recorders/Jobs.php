@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobPopping;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobQueued;
@@ -18,6 +19,7 @@ class Jobs extends Recorder
     public function register(Dispatcher $events): void
     {
         $events->listen(JobQueued::class, [$this, 'recordQueued']);
+        $events->listen(JobPopping::class, [$this, 'resetPeakMemory']);
         $events->listen(JobProcessing::class, [$this, 'recordProcessing']);
         $events->listen(JobProcessed::class, [$this, 'recordProcessed']);
         $events->listen(JobFailed::class, [$this, 'recordFailed']);
@@ -48,6 +50,19 @@ class Jobs extends Recorder
         );
     }
 
+    /**
+     * Fires before the job is even popped off the queue, ahead of
+     * JobProcessing — a long-running worker never restarts its PHP process
+     * between jobs, so without this reset memory_get_peak_usage() in
+     * recordProcessed()/recordFailed()/recordReleased() would report the
+     * cumulative peak across every job that process has ever run, not this
+     * one's own.
+     */
+    public function resetPeakMemory(JobPopping $event): void
+    {
+        memory_reset_peak_usage();
+    }
+
     public function recordProcessing(JobProcessing $event): void
     {
         $this->startedAt[$event->job->getJobId() ?: spl_object_hash($event->job)] = microtime(true);
@@ -69,6 +84,8 @@ class Jobs extends Recorder
                 'job_id' => $this->jobId($event->job->getJobId()),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
+                'server' => gethostname() ?: null,
+                'peak_memory' => memory_get_peak_usage(true),
             ], fn ($value) => $value !== null),
             duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
             subtype: 'processed',
@@ -91,6 +108,8 @@ class Jobs extends Recorder
                 'job_id' => $this->jobId($event->job->getJobId()),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
+                'server' => gethostname() ?: null,
+                'peak_memory' => memory_get_peak_usage(true),
                 'exception' => get_class($event->exception),
                 'message' => Str::limit($event->exception->getMessage(), 500),
             ], fn ($value) => $value !== null),
@@ -121,6 +140,8 @@ class Jobs extends Recorder
                 'job_id' => $this->jobId($event->job->getJobId()),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
+                'server' => gethostname() ?: null,
+                'peak_memory' => memory_get_peak_usage(true),
                 // backoff only exists on this event from Laravel 12 onward (#58414);
                 // `??` avoids an "Undefined property" error under E_ALL on older versions.
                 'backoff' => $event->backoff ?? null,
