@@ -115,18 +115,8 @@ class Queries extends Recorder
      */
     protected function location(): ?string
     {
-        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50) as $frame) {
-            $file = $frame['file'] ?? null;
+        [$file, $line] = $this->monitor->location->forQueryTrace(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50));
 
-            if ($file === null) {
-                continue;
-            }
-
-            if (str_starts_with($file, base_path()) && ! str_contains($file, DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR)) {
-                return str_replace(base_path().DIRECTORY_SEPARATOR, '', $file).':'.($frame['line'] ?? 0);
-            }
-        }
-
-        return null;
+        return $file ? ("{$file}:".($line ?? 0)) : null;
     }
 }

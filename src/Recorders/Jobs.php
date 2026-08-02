@@ -54,7 +54,7 @@ class Jobs extends Recorder
 
         // Before handle() runs, so everything it triggers (queries, mail,
         // notifications) correlates onto this attempt's own timeline —
-        // mirrors RecordTimeline's beginRequest() for HTTP requests.
+        // mirrors the booted-callback beginRequest() for HTTP requests.
         $this->monitor->beginJobAttempt();
     }
 

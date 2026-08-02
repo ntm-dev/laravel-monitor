@@ -1282,6 +1282,45 @@ class MonitorTest extends TestCase
         }
     }
 
+    /**
+     * Regression test: a job's own handle() dispatching another job
+     * synchronously (dispatchSync(), or any connection like 'sync' whose
+     * queue fires JobProcessing/JobProcessed in-process) used to overwrite
+     * Monitor's single job-tracking frame, losing the outer job's id/start
+     * once the inner one finished — anything the outer job recorded
+     * afterwards lost its correlation entirely. Monitor::$jobStack now nests
+     * attempts instead.
+     */
+    public function test_nested_synchronous_job_dispatch_does_not_lose_the_outer_jobs_correlation(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $outer = $this->syncJob('outer-job-id');
+        $inner = $this->syncJob('inner-job-id');
+
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $outer));
+        $outerAttemptId = $monitor->jobAttemptId();
+
+        // Inner job dispatched synchronously from within the outer job's handle().
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $inner));
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $inner));
+
+        // Still inside the outer job's handle(), after the nested dispatch returned.
+        $this->assertSame($outerAttemptId, $monitor->jobAttemptId());
+        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 5);
+
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $outer));
+
+        Monitor::flush();
+
+        $queryRow = DB::table('monitor_entries')->where('type', 'slow_query')->first();
+        $outerRow = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->get()
+            ->first(fn ($row) => json_decode($row->payload, true)['job_id'] === 'outer-job-id');
+
+        $this->assertNotNull($outerRow);
+        $this->assertNotNull($queryRow->request_id);
+        $this->assertSame($outerRow->request_id, $queryRow->request_id);
+    }
+
     public function test_job_recorder_captures_attempts_on_failure(): void
     {
         $job = $this->syncJob();

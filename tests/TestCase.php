@@ -42,7 +42,22 @@ abstract class TestCase extends Orchestra
      */
     protected function setUp(): void
     {
+        // MonitorServiceProvider::captureTimestamp() falls back to
+        // $_SERVER['REQUEST_TIME_FLOAT'] as the request's start time (no
+        // LARAVEL_START constant here, since nothing goes through
+        // public/index.php). Under a real per-request PHP process that value
+        // is fresh every time, but the CLI SAPI sets it once for the whole
+        // `phpunit` process — left untouched, every test after the first
+        // would compute its request "duration" against however long the
+        // entire suite has been running rather than just this test, growing
+        // without bound the more tests ran before it (see
+        // Monitor::finalizePendingRequest()). Resetting it here keeps every
+        // test's request start time realistic.
+        $_SERVER['REQUEST_TIME_FLOAT'] = microtime(true);
+
         parent::setUp();
+
+        $this->registerRequestHooks();
 
         $owner = MonitorUser::create([
             'name' => 'Test Owner',
@@ -62,6 +77,47 @@ abstract class TestCase extends Orchestra
         Auth::guard(MonitorUser::guardName())->logout();
 
         return $this;
+    }
+
+    /**
+     * PHPUnit always runs via the CLI SAPI, so Application::runningInConsole()
+     * reports true even for tests simulating an HTTP request — which means
+     * MonitorServiceProvider::register() never calls registerRequestHooks()
+     * (guard/OAuth/Livewire component/gate registration), since that's
+     * correctly gated behind `!runningInConsole()` for real console usage.
+     * Invoke it directly here instead of loosening that production-side
+     * check: this mirrors what actually happens on a real HTTP request
+     * without touching Laravel's own runningInConsole()-gated behavior
+     * elsewhere (e.g. VerifyCsrfToken's test-bypass relies on the same flag
+     * staying true).
+     */
+    protected function registerRequestHooks(): void
+    {
+        $provider = $this->app->getProvider(MonitorServiceProvider::class);
+
+        (new \ReflectionMethod($provider, 'registerRequestHooks'))->invoke($provider);
+
+        // registerRequestHooks() also registers Monitor::beginRequest() as an
+        // app->booted() callback — since the app has already finished
+        // booting by the time we call this (parent::setUp() already ran),
+        // Laravel fires it immediately, tagging $this->request for the rest
+        // of the test even if it never makes an HTTP call. That's wrong for
+        // tests driving command/job/scheduled-task tracking directly: with
+        // $this->request non-null, record()'s correlation fallback picks it
+        // over $this->command['id']/currentJob()['id'], mis-tagging those
+        // entries with a phantom request id. Reset it here; call() below
+        // re-establishes it right before an actual HTTP-style test request,
+        // mirroring how a real HTTP process only ever calls beginRequest()
+        // once, for the one request it's handling.
+        (new \ReflectionProperty(Monitor::class, 'request'))->setValue($this->app->make(Monitor::class), null);
+    }
+
+    /** @return \Illuminate\Testing\TestResponse */
+    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
+    {
+        $this->app->make(Monitor::class)->beginRequest();
+
+        return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
     }
 
     protected function getPackageProviders($app): array
