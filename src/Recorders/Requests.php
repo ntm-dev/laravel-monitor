@@ -106,6 +106,11 @@ class Requests extends Recorder
                 'request_headers' => $this->headers($request->headers),
                 'response_headers' => $this->headers($event->response->headers),
                 'body' => $this->body($request),
+                // Recorded here rather than reconstructed later from
+                // created_at - duration (see MergesJobTimelines::buildTracks(),
+                // which prefers this when present) — this is the exact
+                // moment the request actually started, not an approximation.
+                'started_at' => $startTime ?: null,
             ], fn ($value) => $value !== null),
             duration: $duration,
             subtype: $this->statusGroup($status),

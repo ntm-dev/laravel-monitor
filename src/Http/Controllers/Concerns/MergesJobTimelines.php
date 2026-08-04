@@ -24,29 +24,33 @@ trait MergesJobTimelines
      */
     protected function buildTracks(object $root, Collection $children, string $rootBadge): array
     {
-        $jobExecutions = $this->jobExecutionsFor($children, $root->created_at);
+        // Wall clock, not proportional — see this trait's own docblock.
+        // Computed up front, not just for this track's own offsets below:
+        // it's also the correct lower bound for finding a dispatched job's
+        // own outcomes — $root->created_at is stamped at the request's own
+        // END (see startedAt()'s own docblock), so a worker that finishes a
+        // job before the dispatching request itself completes (common — see
+        // jobTrack()'s docblock) would otherwise fall outside a window
+        // floored at that later timestamp and never resolve to a track.
+        $rootStart = $this->startedAt($root);
+
+        $jobExecutions = $this->jobExecutionsFor($children, CarbonImmutable::createFromFormat('U.u', number_format($rootStart, 6, '.', '')));
 
         // Every 'queued' placeholder whose job_id resolved to at least one
-        // outcome becomes its own track below instead of staying in the
-        // root's own — everything else (unresolved queued jobs, every other
-        // event type) stays exactly where it already was.
-        $resolvedJobIds = [];
-
-        $rootChildren = $children->reject(function (object $row) use ($jobExecutions, &$resolvedJobIds) {
-            if ($row->type !== 'job' || $row->subtype !== 'queued') {
-                return false;
-            }
-
-            $jobId = $row->payload['job_id'] ?? null;
-
-            if ($jobId === null || ! $jobExecutions->has($jobId)) {
-                return false;
-            }
-
-            $resolvedJobIds[$jobId] = true;
-
-            return true;
-        });
+        // outcome ALSO gets its own track below (see the foreach further
+        // down) — but, unlike an earlier version of this method, its own
+        // "JOB DISPATCH" row stays right where it already was among the
+        // root's own children instead of being removed. Dropping it hid the
+        // only marker of *when* (and in which phase) the root actually
+        // called dispatch(); the separate track below only shows what
+        // happened to the job afterwards (queue wait + however long it took
+        // to run, often well outside the dispatching root's own duration),
+        // which isn't a substitute for that.
+        $resolvedJobIds = $children
+            ->filter(fn (object $row) => $row->type === 'job' && $row->subtype === 'queued')
+            ->map(fn (object $row) => $row->payload['job_id'] ?? null)
+            ->filter(fn (?string $jobId) => $jobId !== null && $jobExecutions->has($jobId))
+            ->unique();
 
         $tracks = [[
             'id' => 'root',
@@ -54,13 +58,10 @@ trait MergesJobTimelines
             'label' => $root->key ?? $rootBadge,
             'start' => 0.0,
             'duration' => max(1, (int) ($root->duration ?? 0)),
-            'entries' => Timeline::build($root, $rootChildren),
+            'entries' => Timeline::build($root, $children),
         ]];
 
-        // Wall clock, not proportional — see this trait's own docblock.
-        $rootStart = (float) CarbonImmutable::parse($root->created_at)->format('U.u');
-
-        foreach (array_keys($resolvedJobIds) as $jobId) {
+        foreach ($resolvedJobIds as $jobId) {
             $tracks[] = $this->jobTrack($jobExecutions->get($jobId), $rootStart);
         }
 
@@ -84,10 +85,7 @@ trait MergesJobTimelines
             $outcome = $execution->outcome;
             $duration = $outcome->duration !== null ? (float) $outcome->duration : 0.0;
 
-            // The outcome's own created_at is stamped when it finished (see
-            // Recorders\Jobs) — its processing start is that minus its own
-            // duration, the same math the job's own standalone timeline uses.
-            $processingStartedAt = (float) CarbonImmutable::parse($outcome->created_at)->format('U.u') - $duration / 1000;
+            $processingStartedAt = $this->startedAt($outcome);
             $start = max(0.0, ($processingStartedAt - $rootStart) * 1000);
 
             return [
@@ -133,6 +131,27 @@ trait MergesJobTimelines
             // wall-clock span.
             'totalAttemptsDuration' => max(1, (int) array_sum(array_column($attempts, 'duration'))),
         ];
+    }
+
+    /**
+     * The real wall-clock moment an entry (root or job outcome) actually
+     * started, as a Unix timestamp with microsecond precision. Prefers the
+     * 'started_at' payload field recorded directly at that moment (see
+     * Recorders\Requests/Jobs) over reconstructing it from created_at -
+     * duration — created_at is stamped when the entry is recorded
+     * (RequestHandled/JobProcessed et al.), i.e. at its own END, not its
+     * start. The subtraction fallback below only exists for rows persisted
+     * before 'started_at' existed.
+     */
+    protected function startedAt(object $entry): float
+    {
+        $startedAt = $entry->payload['started_at'] ?? null;
+
+        if ($startedAt !== null) {
+            return (float) $startedAt;
+        }
+
+        return (float) CarbonImmutable::parse($entry->created_at)->format('U.u') - (float) ($entry->duration ?? 0) / 1000;
     }
 
     protected function jobExecutionsFor(Collection $children, DateTimeInterface $since): Collection

@@ -1095,6 +1095,26 @@ class MonitorTest extends TestCase
     }
 
     /**
+     * Regression test: once a dispatched job's 'queued' placeholder resolves
+     * to an outcome, it used to be dropped entirely from the dispatching
+     * request's own timeline (replaced solely by the separate job track
+     * further down the page) — leaving no trace of *when*, within the
+     * request's own lifecycle, it actually called dispatch(). See
+     * MergesJobTimelines::buildTracks(): the resolved job still gets its own
+     * track, but its dispatch-time row now stays inline too.
+     */
+    public function test_request_detail_page_still_shows_the_job_dispatch_row_once_the_job_resolves_to_an_outcome(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$requestId] = $this->seedRequestThatDispatchedAJob();
+
+        $this->get(route('monitor.requests.show', $requestId))
+            ->assertOk()
+            ->assertSee('JOB DISPATCH');
+    }
+
+    /**
      * Visiting a dispatched job's own <request_url>/<job_id> link (built by
      * JobAttemptController::ancestorUrl() when that job's dispatcher is a
      * tracked request) still renders the request's own merged timeline, but
@@ -1136,6 +1156,190 @@ class MonitorTest extends TestCase
             ->assertOk()
             ->assertViewHas('tab', 'jobs')
             ->assertSee('SendWelcomeEmail');
+    }
+
+    /**
+     * Regression test: a job track's own "start" offset on the merged
+     * request timeline must be measured from the dispatching request's
+     * actual start, not from $root->created_at — Entry stamps created_at
+     * when the row is recorded (RequestHandled), i.e. the request's own
+     * END, not its start (see MergesJobTimelines::buildTracks()). A worker
+     * that finishes processing before the dispatching request itself
+     * completes (common — the worker is already polling when the job
+     * lands) used to compute a negative offset here, clamped to 0ms, making
+     * the job look dispatched at the exact same instant as the request
+     * instead of partway through it.
+     */
+    public function test_job_track_start_offset_is_measured_from_the_requests_actual_start_not_its_created_at(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $requestId = (string) Str::uuid();
+        $jobRequestId = (string) Str::uuid();
+
+        // 1000ms request whose created_at (00:00:10) is stamped at the end
+        // of its run — it actually started at 00:00:09.
+        $requestCreatedAt = CarbonImmutable::parse('2024-01-01 00:00:10.000000');
+
+        // Processed 400ms into the request's real run (00:00:09.400) and
+        // took 100ms — finished well before the request itself did.
+        $jobCreatedAt = CarbonImmutable::parse('2024-01-01 00:00:09.500000');
+
+        // Formatted explicitly with microseconds rather than passed as
+        // Carbon instances: the query builder stringifies a DateTimeInterface
+        // binding via the grammar's own date format ('Y-m-d H:i:s', no
+        // sub-second component — see Connection::prepareBindings()), which
+        // would silently round both these timestamps down to the whole
+        // second and defeat this test's own sub-second assertions below.
+        DB::table('monitor_entries')->insert([
+            [
+                'type' => 'request',
+                'subtype' => '2xx',
+                'key' => 'GET /users',
+                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'duration' => 1000,
+                'request_id' => $requestId,
+                'created_at' => $requestCreatedAt->format('Y-m-d H:i:s.u'),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'queued',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123']),
+                'duration' => null,
+                'request_id' => $requestId,
+                'created_at' => $requestCreatedAt->format('Y-m-d H:i:s.u'),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'processed',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123', 'attempts' => 1]),
+                'duration' => 100,
+                'request_id' => $jobRequestId,
+                'created_at' => $jobCreatedAt->format('Y-m-d H:i:s.u'),
+            ],
+        ]);
+
+        // Job started processing at 09.500 - 0.100s = 09.400, i.e. 400ms
+        // after the request's real 09.000 start — 40% of its 1000ms span.
+        $this->get(route('monitor.requests.show', $requestId))
+            ->assertOk()
+            ->assertSee('margin-left: 40%', false);
+    }
+
+    /**
+     * Regression test: Storage::jobExecutionsByJobId() must return a job's
+     * retried outcomes oldest-first — MergesJobTimelines::jobTrack() numbers
+     * "Attempt #N" purely by position in that collection (see its own
+     * docblock), so an unordered query result (previously: no orderBy() at
+     * all, leaving it to whatever the DB engine/index happened to return)
+     * can hand a later retry a lower attempt number than an earlier one —
+     * e.g. "Attempt #3" starting before "Attempt #2" even begins. Inserted
+     * deliberately out of chronological order (the last outcome first) so
+     * passing this test actually proves the query orders by created_at
+     * rather than merely preserving insertion order by coincidence.
+     */
+    public function test_job_executions_by_job_id_returns_outcomes_oldest_first_regardless_of_insertion_order(): void
+    {
+        $jobId = 'job-retries-1';
+
+        $third = ['created_at' => CarbonImmutable::parse('2024-01-01 00:00:07'), 'subtype' => 'processed', 'attempts' => 3];
+        $first = ['created_at' => CarbonImmutable::parse('2024-01-01 00:00:05'), 'subtype' => 'released', 'attempts' => 1];
+        $second = ['created_at' => CarbonImmutable::parse('2024-01-01 00:00:06'), 'subtype' => 'released', 'attempts' => 2];
+
+        // Inserted last-outcome-first: a naive unordered query would return
+        // rows in this same (wrong) order.
+        foreach ([$third, $first, $second] as $outcome) {
+            DB::table('monitor_entries')->insert([
+                'type' => 'job',
+                'subtype' => $outcome['subtype'],
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['job_id' => $jobId, 'attempts' => $outcome['attempts']]),
+                'duration' => 10,
+                'request_id' => (string) Str::uuid(),
+                'created_at' => $outcome['created_at'],
+            ]);
+        }
+
+        $executions = app(Storage::class)->jobExecutionsByJobId([$jobId], CarbonImmutable::parse('2024-01-01 00:00:00'));
+
+        $orderedAttempts = $executions->get($jobId)->map(fn ($execution) => $execution->outcome->payload['attempts'])->values()->all();
+
+        $this->assertSame([1, 2, 3], $orderedAttempts);
+    }
+
+    /**
+     * Regression test: MergesJobTimelines::startedAt() must prefer a row's
+     * own 'started_at' payload field (see Recorders\Requests/Jobs) over
+     * reconstructing it from created_at - duration. Same 1000ms
+     * request / 400ms-in / 100ms job shape (and the same expected 40%) as
+     * {@see test_job_track_start_offset_is_measured_from_the_requests_actual_start_not_its_created_at()},
+     * which exercises the created_at-minus-duration fallback — but here
+     * created_at is deliberately set to something else entirely (it'd put
+     * the job's processing start at/before the request's own created_at if
+     * 'started_at' were ignored, clamping the offset to 0%) while
+     * 'started_at' itself still carries the correct moment. 40% only comes
+     * out if the explicit field wins over created_at/duration.
+     */
+    public function test_job_track_prefers_the_stored_started_at_payload_field_over_created_at_minus_duration(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $requestId = (string) Str::uuid();
+        $jobRequestId = (string) Str::uuid();
+
+        $requestStartedAt = CarbonImmutable::parse('2024-01-01 00:00:09.000000');
+        $jobStartedAt = CarbonImmutable::parse('2024-01-01 00:00:09.400000');
+
+        // Neither created_at below is consistent with its own
+        // started_at/duration pairing above — reconstructing a start time
+        // from them (the old fallback math) would land somewhere else
+        // entirely, not at 00:00:09.000/00:00:09.400.
+        $wrongRequestCreatedAt = CarbonImmutable::parse('2024-01-01 00:00:20.000000');
+        $wrongJobCreatedAt = CarbonImmutable::parse('2024-01-01 00:00:21.000000');
+
+        DB::table('monitor_entries')->insert([
+            [
+                'type' => 'request',
+                'subtype' => '2xx',
+                'key' => 'GET /users',
+                'payload' => json_encode([
+                    'method' => 'GET', 'path' => '/users', 'status' => 200,
+                    'started_at' => (float) $requestStartedAt->format('U.u'),
+                ]),
+                'duration' => 1000,
+                'request_id' => $requestId,
+                'created_at' => $wrongRequestCreatedAt,
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'queued',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123']),
+                'duration' => null,
+                'request_id' => $requestId,
+                'created_at' => $requestStartedAt,
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'processed',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode([
+                    'connection' => 'database', 'queue' => 'default', 'job_id' => 'job-abc123', 'attempts' => 1,
+                    'started_at' => (float) $jobStartedAt->format('U.u'),
+                ]),
+                'duration' => 100,
+                'request_id' => $jobRequestId,
+                'created_at' => $wrongJobCreatedAt,
+            ],
+        ]);
+
+        // Same math as the created_at-fallback test: 400ms after the
+        // request's real 00:00:09.000 start, over its own 1000ms span, is 40%.
+        $this->get(route('monitor.requests.show', $requestId))
+            ->assertOk()
+            ->assertSee('margin-left: 40%', false);
     }
 
     public function test_hashed_route_resolves_to_the_requests_list_for_that_route(): void
@@ -1339,6 +1543,99 @@ class MonitorTest extends TestCase
         $this->assertSame('job-abc123', $queuedPayload['job_id']);
         $this->assertSame('job-abc123', $processedPayload['job_id']);
         $this->assertSame(1, $processedPayload['attempts']);
+    }
+
+    /**
+     * Regression test: JobQueued::$job is the raw, as-dispatched job — for
+     * Mail::queue()/Notification::send(..., queue), that's Laravel's own
+     * Illuminate\Mail\SendQueuedMailable/SendQueuedNotifications wrapper,
+     * not the Mailable/Notification itself. recordQueued() used to record
+     * this wrapper's own class name via a plain get_class(), so every
+     * queued mail showed up as an indistinguishable
+     * "Illuminate\Mail\SendQueuedMailable" job — unlike the eventual
+     * processed/failed/released entry for that same dispatch, which
+     * already resolves to the wrapped class via Job::resolveName(). See
+     * Recorders\Jobs::displayName().
+     */
+    public function test_job_recorder_resolves_a_wrapped_jobs_display_name_for_its_queued_entry(): void
+    {
+        // Stands in for Illuminate\Mail\SendQueuedMailable, which defines
+        // displayName() to return the wrapped Mailable's own class instead
+        // of its own.
+        $wrapper = new class
+        {
+            public function displayName(): string
+            {
+                return 'App\\Mail\\WelcomeMail';
+            }
+        };
+
+        event($this->jobQueuedEvent('database', 'default', 'job-abc123', $wrapper, json_encode([])));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('App\\Mail\\WelcomeMail', $row->key);
+    }
+
+    /**
+     * Regression test: JobQueued::$queue is null whenever the job was
+     * dispatched onto a connection's default queue rather than an explicit
+     * one via onQueue() — Recorders\Jobs::resolveQueue() must then fall back
+     * to that connection's own configured default queue name (config
+     * queue.connections.<connection>.queue), not silently coerce to ''.
+     */
+    public function test_job_recorder_falls_back_to_the_connections_configured_default_queue(): void
+    {
+        config(['queue.connections.custom' => ['driver' => 'database', 'queue' => 'orders']]);
+
+        $job = new class
+        {
+            public $queue = null;
+        };
+
+        event(new \Illuminate\Queue\Events\JobQueued('custom', null, 'job-abc123', $job, json_encode([]), null));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('orders', json_decode($row->payload, true)['queue']);
+    }
+
+    /**
+     * Regression test: normalizeQueue() must recognize an sqs connection via
+     * its actual config (queue.connections.<connection>.driver) and strip
+     * that connection's configured prefix/suffix — an SQS queue's "name" is
+     * really its full URL, unusable as a display value without this.
+     */
+    public function test_job_recorder_strips_the_sqs_connections_prefix_and_suffix_from_the_queue_name(): void
+    {
+        config(['queue.connections.sqs' => [
+            'driver' => 'sqs',
+            'prefix' => 'https://sqs.us-east-1.amazonaws.com/123456789012',
+            'suffix' => '.fifo',
+        ]]);
+
+        $job = $this->syncJob('job-abc123');
+
+        event($this->jobQueuedEvent(
+            'sqs',
+            'https://sqs.us-east-1.amazonaws.com/123456789012/orders.fifo',
+            'job-abc123',
+            $job,
+            json_encode([])
+        ));
+
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('orders', json_decode($row->payload, true)['queue']);
     }
 
     public function test_job_recorder_omits_job_id_for_sync_jobs_without_a_driver_assigned_id(): void

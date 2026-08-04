@@ -2,6 +2,8 @@
 
 namespace LaravelMonitor\Recorders;
 
+use BackedEnum;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobPopping;
@@ -10,9 +12,17 @@ use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Str;
+use LaravelMonitor\Http\Controllers\Concerns\NormalizesQueue;
+use ReflectionClass;
+
+use function is_object;
+use function is_string;
+use function get_class;
 
 class Jobs extends Recorder
 {
+    use NormalizesQueue;
+
     /** @var array<string, float> */
     protected array $startedAt = [];
 
@@ -30,12 +40,10 @@ class Jobs extends Recorder
     {
         $this->monitor->record(
             type: 'job',
-            key: is_object($event->job) ? get_class($event->job) : (string) $event->job,
+            key: $this->displayName($event->job),
             payload: array_filter([
                 'connection' => $event->connectionName,
-                'queue' => method_exists($event, 'queue') || property_exists($event, 'queue')
-                    ? ($event->queue ?? 'default')
-                    : 'default',
+                'queue' => $this->normalizeQueue($event->connectionName, $this->resolveQueue($event)),
                 // The driver-assigned queue job id, present for real queue
                 // connections (database, redis, sqs, ...) and empty for sync
                 // — it's the only thing both this dispatch-time entry and
@@ -75,6 +83,8 @@ class Jobs extends Recorder
 
     public function recordProcessed(JobProcessed $event): void
     {
+        $id = $event->job->getJobId() ?: spl_object_hash($event->job);
+
         $this->monitor->record(
             type: 'job',
             key: $event->job->resolveName(),
@@ -86,8 +96,13 @@ class Jobs extends Recorder
                 'model_count' => $this->monitor->modelCount(),
                 'server' => gethostname() ?: null,
                 'peak_memory' => memory_get_peak_usage(true),
+                // Recorded here rather than reconstructed later from
+                // created_at - duration (see MergesJobTimelines::jobTrack(),
+                // which prefers this when present) — this is the exact
+                // moment JobProcessing fired, not an approximation of it.
+                'started_at' => $this->startedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
-            duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
+            duration: $this->duration($id),
             subtype: 'processed',
         );
 
@@ -99,6 +114,8 @@ class Jobs extends Recorder
 
     public function recordFailed(JobFailed $event): void
     {
+        $id = $event->job->getJobId() ?: spl_object_hash($event->job);
+
         $this->monitor->record(
             type: 'job',
             key: $event->job->resolveName(),
@@ -112,8 +129,11 @@ class Jobs extends Recorder
                 'peak_memory' => memory_get_peak_usage(true),
                 'exception' => get_class($event->exception),
                 'message' => Str::limit($event->exception->getMessage(), 500),
+                // See recordProcessed()'s own 'started_at' for why this is
+                // recorded here instead of reconstructed later.
+                'started_at' => $this->startedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
-            duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
+            duration: $this->duration($id),
             subtype: 'failed',
         );
 
@@ -131,6 +151,8 @@ class Jobs extends Recorder
      */
     public function recordReleased(JobReleasedAfterException $event): void
     {
+        $id = $event->job->getJobId() ?: spl_object_hash($event->job);
+
         $this->monitor->record(
             type: 'job',
             key: $event->job->resolveName(),
@@ -145,8 +167,11 @@ class Jobs extends Recorder
                 // backoff only exists on this event from Laravel 12 onward (#58414);
                 // `??` avoids an "Undefined property" error under E_ALL on older versions.
                 'backoff' => $event->backoff ?? null,
+                // See recordProcessed()'s own 'started_at' for why this is
+                // recorded here instead of reconstructed later.
+                'started_at' => $this->startedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
-            duration: $this->duration($event->job->getJobId() ?: spl_object_hash($event->job)),
+            duration: $this->duration($id),
             subtype: 'released',
         );
 
@@ -163,9 +188,78 @@ class Jobs extends Recorder
         return $startedAt !== null ? round((microtime(true) - $startedAt) * 1000, 2) : null;
     }
 
+    /**
+     * JobQueued::$job is the raw, as-dispatched job — for a job pushed via
+     * Mail::queue()/Notification::send(..., queue), that's Laravel's own
+     * Illuminate\Mail\SendQueuedMailable/SendQueuedNotifications wrapper,
+     * not the Mailable/Notification itself, so a plain get_class() here
+     * would record every queued mail as an indistinguishable "job" of that
+     * one wrapper class. Both of those (and any other job customizing
+     * displayName()) already resolve to the *wrapped* class instead once
+     * processed (see Illuminate\Queue\Jobs\Job::resolveName(), which
+     * recordProcessed()/recordFailed()/recordReleased() rely on via
+     * $event->job->resolveName()) — mirroring that same resolution here
+     * keeps this dispatch-time entry's own key consistent with its
+     * eventual outcome's.
+     */
+    protected function displayName(mixed $job): string
+    {
+        if (! is_object($job)) {
+            return (string) $job;
+        }
+
+        return method_exists($job, 'displayName') ? $job->displayName() : get_class($job);
+    }
+
     /** Sync jobs never receive a real driver-assigned id — treat '' as absent. */
     protected function jobId(string $id): ?string
     {
         return $id !== '' ? $id : null;
+    }
+
+    private function resolveQueue(JobQueued $event): string
+    {
+        /**
+         * This property has not always had the correct type. It was missing,
+         * added, removed, and re-added through time. We will force the type
+         * here so we know what we are dealing with across all versions.
+         *
+         * @see https://github.com/laravel/framework/pull/55058
+         *
+         * @var string|null $queue
+         */
+        $queue = $event->queue;
+
+        if ($queue !== null) {
+            return $this->parseQueue($queue);
+        }
+
+        if (is_object($event->job)) {
+            if (property_exists($event->job, 'queue') && $event->job->queue !== null) {
+                return $event->job->queue;
+            }
+
+            if ($event->job instanceof CallQueuedListener) {
+                $queue = $this->resolveQueuedListenerQueue($event->job);
+            }
+        }
+
+        return $queue ?? config("queue.connections.{$event->connectionName}.queue", '');
+    }
+
+    private function parseQueue(string|BackedEnum $queue): string
+    {
+        return is_string($queue) ? $queue : (string) $queue->value;
+    }
+
+    private function resolveQueuedListenerQueue(CallQueuedListener $listener): ?string
+    {
+        $reflectionJob = (new ReflectionClass($listener->class))->newInstanceWithoutConstructor();
+
+        if (method_exists($reflectionJob, 'viaQueue')) {
+            return $reflectionJob->viaQueue($listener->data[0] ?? null);
+        }
+
+        return $reflectionJob->queue ?? null;
     }
 }

@@ -125,6 +125,20 @@
             const count = this.selected()?.metadata?.attachments || 0;
             return names.length ? count + ' (' + names.join(', ') + ')' : String(count);
         },
+        {{-- Same B/KB/MB/... scaling as jobs/summary.blade.php's own PHP
+             $bytes formatter, mirrored here since the queue detail panel
+             below renders client-side from the JSON entry map, not Blade. --}}
+        formatBytes(value) {
+            if (!value) return '';
+            if (value < 1024) return value + ' B';
+            const units = ['KB', 'MB', 'GB', 'TB'];
+            let scaled = value;
+            for (const unit of units) {
+                scaled /= 1024;
+                if (scaled < 1024) return scaled.toFixed(1) + ' ' + unit;
+            }
+            return scaled.toFixed(1) + ' TB';
+        },
         mailClass() {
             const m = this.selected()?.metadata;
             return m?.mailable || m?.notification || '';
@@ -758,11 +772,28 @@
                                     x-text="selected()?.metadata?.connection"></dd>
                             </div>
                         </template>
-                        <template x-if="selected()?.metadata?.attempt">
+                        <template x-if="selected()?.metadata?.attempts">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                                 <dt class="text-neutral-500 dark:text-neutral-400">Attempt</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                                    x-text="'#' + selected()?.metadata?.attempt"></dd>
+                                    x-text="'#' + selected()?.metadata?.attempts"></dd>
+                            </div>
+                        </template>
+                        {{-- Only set once a job outcome (processed/failed/released) has
+                             actually been recorded -- see Recorders\Jobs -- so absent
+                             for a still-'queued' placeholder that hasn't run yet. --}}
+                        <template x-if="selected()?.metadata?.peak_memory">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Peak Memory</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                                    x-text="formatBytes(selected()?.metadata?.peak_memory)"></dd>
+                            </div>
+                        </template>
+                        <template x-if="selected()?.metadata?.server">
+                            <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                                <dt class="text-neutral-500 dark:text-neutral-400">Server</dt>
+                                <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                                    x-text="selected()?.metadata?.server"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">

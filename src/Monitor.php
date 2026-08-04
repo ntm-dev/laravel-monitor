@@ -281,6 +281,7 @@ class Monitor
             'id' => (string) Str::uuid(),
             'start' => microtime(true),
             'models' => 0,
+            'attempts' => 1,
         ];
     }
 

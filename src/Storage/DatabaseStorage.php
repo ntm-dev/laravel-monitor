@@ -175,12 +175,19 @@ class DatabaseStorage implements Storage
         // share with their own 'queued' dispatch-time placeholder — the
         // caller already has that placeholder from its own timelineFor()
         // call, and stitches these children onto it (see Support\Timeline).
+        // Ordered oldest-first: jobTrack() numbers attempts by this
+        // collection's own array position (index + 1), so an unordered
+        // result here — left to whatever the DB engine/index happens to
+        // return — can hand a later retry a lower attempt number than an
+        // earlier one, showing e.g. "Attempt #3" starting before "Attempt #2".
         $outcomes = $this->table()
             ->where('type', 'job')
             ->where('subtype', '!=', 'queued')
             ->whereIn('payload->job_id', $jobIds)
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->get()
             ->map(fn ($row) => $this->hydrate($row));
 
