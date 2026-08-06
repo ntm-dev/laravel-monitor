@@ -1620,7 +1620,17 @@ class MonitorTest extends TestCase
             'suffix' => '.fifo',
         ]]);
 
-        $job = $this->syncJob('job-abc123');
+        // JobQueued::$job is the raw, as-dispatched job (see displayName()'s
+        // own docblock) — a real ShouldQueue job carries its queue via the
+        // public Illuminate\Bus\Queueable::$queue, not the protected $queue
+        // on the wrapped Illuminate\Queue\Jobs\Job that only later events
+        // (JobProcessing, JobProcessed, ...) receive. This is also
+        // resolveQueue()'s only source of the queue on Laravel versions
+        // before JobQueued::$queue existed (pre-#55058).
+        $job = new class
+        {
+            public $queue = 'orders';
+        };
 
         event($this->jobQueuedEvent(
             'sqs',

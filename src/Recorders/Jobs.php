@@ -220,23 +220,32 @@ class Jobs extends Recorder
     private function resolveQueue(JobQueued $event): string
     {
         /**
-         * This property has not always had the correct type. It was missing,
-         * added, removed, and re-added through time. We will force the type
-         * here so we know what we are dealing with across all versions.
+         * This property has not always existed, and its type has not always
+         * been correct either. It was missing, added, removed, and re-added
+         * through time — `property_exists` avoids an "Undefined property"
+         * error under E_ALL on versions where it's absent, and the docblock
+         * forces the type on versions where it is.
          *
          * @see https://github.com/laravel/framework/pull/55058
          *
          * @var string|null $queue
          */
-        $queue = $event->queue;
+        $queue = property_exists($event, 'queue') ? $event->queue : null;
 
         if ($queue !== null) {
             return $this->parseQueue($queue);
         }
 
         if (is_object($event->job)) {
-            if (property_exists($event->job, 'queue') && $event->job->queue !== null) {
-                return $event->job->queue;
+            // get_object_vars(), called from outside the job's own class,
+            // only returns its *public* properties — unlike property_exists(),
+            // which doesn't care about visibility and would let us try to
+            // read a protected $queue (e.g. Illuminate\Queue\Jobs\Job's own)
+            // and fatal with "Cannot access protected property".
+            $jobVars = get_object_vars($event->job);
+
+            if (array_key_exists('queue', $jobVars) && $jobVars['queue'] !== null) {
+                return $jobVars['queue'];
             }
 
             if ($event->job instanceof CallQueuedListener) {
