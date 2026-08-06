@@ -15,9 +15,11 @@ use Illuminate\Support\Str;
 use LaravelMonitor\Http\Controllers\Concerns\NormalizesQueue;
 use ReflectionClass;
 
+use function array_key_exists;
+use function get_class;
+use function get_object_vars;
 use function is_object;
 use function is_string;
-use function get_class;
 
 class Jobs extends Recorder
 {
