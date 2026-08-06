@@ -167,8 +167,8 @@ class Timeline extends Component
                 continue;
             }
 
-            $row['left'] = $totalDuration > 0 ? ($row['barStart'] / $totalDuration) * 100 : 0.0;
-            $row['width'] = $totalDuration > 0 ? max(0.15, (($row['entry']->duration ?? 0) / $totalDuration) * 100) : 0.15;
+            $row['left'] = $totalDuration > 0 ? round(($row['barStart'] / $totalDuration) * 100, 4) : 0.0;
+            $row['width'] = $totalDuration > 0 ? max(0.15, round((($row['entry']->duration ?? 0) / $totalDuration) * 100, 4)) : 0.15;
         }
     }
 

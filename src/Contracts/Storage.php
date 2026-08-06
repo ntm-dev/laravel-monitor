@@ -234,7 +234,10 @@ interface Storage
      * whatever request/command/scheduled task dispatched it, producing a
      * single merged trace view instead of a bare, dead-end
      * "queued" placeholder. Keyed by job_id; a job_id with no matching
-     * outcome yet is simply absent.
+     * outcome yet is simply absent. Each job_id's own outcomes are ordered
+     * oldest-first — MergesJobTimelines::jobTrack() numbers "Attempt #N"
+     * purely by position in this collection, so an unordered implementation
+     * would risk mislabeling which retry is which.
      *
      * @param  string[]  $jobIds
      * @return Collection<string, Collection<int, object{outcome: object, children: Collection}>>
