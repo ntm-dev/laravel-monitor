@@ -1,7 +1,7 @@
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ACTIVITY" title="Activity">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ACTIVITY" :title="__('monitor::messages.group.activity')">
         <x-slot:actions>
-            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'requests'] + $range)" external>Requests</x-monitor::link-button>
+            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'requests'] + $range)" external>{{ __('monitor::messages.nav.requests') }}</x-monitor::link-button>
         </x-slot:actions>
 
         <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-2"

@@ -23,7 +23,7 @@
                 <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
                     <a href="{{ route('monitor.dashboard', ['tab' => 'commands'] + $range) }}"
                        class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
-                        ← Commands
+                        ← {{ __('monitor::messages.nav.commands') }}
                     </a>
 
                     <div class="mt-1 flex flex-wrap items-center gap-2.5">
@@ -36,19 +36,19 @@
             <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Exit Code</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.exit_code') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ $root->payload['exit_code'] ?? '—' }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Duration</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ Format::duration($root->duration) }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Ran at</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.ran_at') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ Format::datetime($root->created_at) }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Models Loaded</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.models_loaded') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($root->payload['model_count'] ?? 0) }}</p>
                     </x-monitor::card>
                 </div>

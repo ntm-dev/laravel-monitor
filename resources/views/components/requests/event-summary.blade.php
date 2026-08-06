@@ -9,13 +9,13 @@
     // (see Support\Timeline::EVENT_TYPES) — used below to scroll the timeline to the
     // nearest matching row when a non-query card is clicked.
     $cards = [
-        'queries' => ['label' => 'Queries', 'icon' => Icons::QUERIES],
-        'cache' => ['label' => 'Cache', 'icon' => Icons::CACHE, 'type' => 'cache'],
-        'mail' => ['label' => 'Mail', 'icon' => Icons::MAIL, 'type' => 'mail'],
-        'notifications' => ['label' => 'Notifications', 'icon' => Icons::NOTIFICATIONS, 'type' => 'notification'],
-        'jobs' => ['label' => 'Queued Jobs', 'icon' => Icons::JOBS, 'type' => 'queue'],
-        'outgoing' => ['label' => 'Outgoing Requests', 'icon' => Icons::OUTGOING, 'type' => 'http'],
-        'lazy_loading' => ['label' => 'Lazy Loads', 'icon' => Icons::EXCEPTIONS, 'type' => 'lazy_loading'],
+        'queries' => ['label' => __('monitor::messages.nav.queries'), 'icon' => Icons::QUERIES],
+        'cache' => ['label' => __('monitor::messages.nav.cache'), 'icon' => Icons::CACHE, 'type' => 'cache'],
+        'mail' => ['label' => __('monitor::messages.nav.mail'), 'icon' => Icons::MAIL, 'type' => 'mail'],
+        'notifications' => ['label' => __('monitor::messages.nav.notifications'), 'icon' => Icons::NOTIFICATIONS, 'type' => 'notification'],
+        'jobs' => ['label' => __('monitor::messages.common.queued_jobs'), 'icon' => Icons::JOBS, 'type' => 'queue'],
+        'outgoing' => ['label' => __('monitor::messages.nav.outgoing'), 'icon' => Icons::OUTGOING, 'type' => 'http'],
+        'lazy_loading' => ['label' => __('monitor::messages.common.lazy_loads'), 'icon' => Icons::EXCEPTIONS, 'type' => 'lazy_loading'],
     ];
 
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
@@ -46,7 +46,7 @@
                          (see timeline.blade.php's monitor-duplicates-heartbeat
                          listener) rather than navigating anywhere. --}}
                     <span class="cursor-pointer font-mono text-[11px] text-amber-600 hover:underline dark:text-amber-400"
-                          onclick="window.dispatchEvent(new CustomEvent('monitor-duplicates-heartbeat'))">{{ $stats['duplicates'] }} {{ $stats['duplicates'] === 1 ? 'duplicate' : 'duplicates' }}</span>
+                          onclick="window.dispatchEvent(new CustomEvent('monitor-duplicates-heartbeat'))">{{ $stats['duplicates'] }} {{ trans_choice('monitor::messages.common.duplicate_count', $stats['duplicates']) }}</span>
                 @endif
             </div>
         </x-monitor::card>

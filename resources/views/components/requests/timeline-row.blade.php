@@ -77,7 +77,7 @@
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
             @elseif ($kind === 'attempt')
-                <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Attempt #{{ $attempt }}</span>
+                <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.attempt') }} #{{ $attempt }}</span>
             @elseif ($kind === 'phase')
                 <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
                 @if ($entry->metadata['controller'] ?? null)
@@ -126,7 +126,7 @@
                      which the root deliberately leaves neutral. --}}
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">
-                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">Attempt #{{ $attempt }}</span>
+                    <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.attempt') }} #{{ $attempt }}</span>
                     @if ($statusLabel !== null)
                         <span class="inline-flex h-5 shrink-0 items-center rounded px-1 font-mono text-[11px] {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
                     @endif

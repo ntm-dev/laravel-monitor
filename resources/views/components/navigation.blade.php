@@ -61,15 +61,15 @@
         <div class="flex items-center gap-2.5 border-t border-neutral-100 px-2 pb-1 pt-2.5 dark:border-neutral-800">
             <span class="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ strtoupper(mb_substr($navActor?->name ?? $appInitial, 0, 1)) }}</span>
             <span class="truncate text-sm text-neutral-700 dark:text-neutral-300">{{ $navActor?->name ?? config('app.name', 'Laravel') }}</span>
-            <span class="ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" title="Live · refreshes every {{ $refresh }}s">
+            <span class="ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" title="{{ __('monitor::messages.nav.live_refresh', ['seconds' => $refresh]) }}">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
             </span>
             <form method="POST" action="{{ route('monitor.logout') }}">
                 @csrf
-                <button type="submit" title="Sign out"
+                <button type="submit" title="{{ __('monitor::messages.nav.sign_out') }}"
                         class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-100">
-                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::OUTGOING" class="h-4 w-4 shrink-0"/>
-                    <span class="sr-only">Sign out</span>
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SIGN_OUT" class="h-4 w-4 shrink-0"/>
+                    <span class="sr-only">{{ __('monitor::messages.nav.sign_out') }}</span>
                 </button>
             </form>
         </div>

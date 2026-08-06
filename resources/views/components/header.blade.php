@@ -40,10 +40,10 @@
                     to: '{{ $to }}',
                     error: '',
                     apply() {
-                        if (! this.from || ! this.to) { this.error = 'Pick both dates.'; return; }
+                        if (! this.from || ! this.to) { this.error = @js(__('monitor::messages.header.pick_both_dates')); return; }
                         const now = new Date();
                         if (new Date(this.to) > now) { this.to = now.toISOString().slice(0, 16); }
-                        if (new Date(this.from) >= new Date(this.to)) { this.error = 'Start must be before end.'; return; }
+                        if (new Date(this.from) >= new Date(this.to)) { this.error = @js(__('monitor::messages.header.start_before_end')); return; }
                         const params = new URLSearchParams({ from: this.from, to: this.to });
                         window.location = '{{ route($currentRouteName, $currentRouteParams) }}?' + params.toString();
                     },
@@ -64,17 +64,17 @@
                      class="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20">
                     <div class="grid grid-cols-2 gap-0.5 rounded-md bg-neutral-800 p-0.5 font-mono text-xs">
                         <button type="button" @click="mode = 'utc'" class="rounded px-2 py-1.5" :class="mode === 'utc' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">{{ $timezone }}</button>
-                        <button type="button" @click="mode = 'local'" class="rounded px-2 py-1.5" :class="mode === 'local' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">LOCAL</button>
+                        <button type="button" @click="mode = 'local'" class="rounded px-2 py-1.5" :class="mode === 'local' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">{{ __('monitor::messages.header.timezone_local') }}</button>
                     </div>
-                    <label class="mt-3 block text-xs text-neutral-400">Starting date</label>
+                    <label class="mt-3 block text-xs text-neutral-400">{{ __('monitor::messages.header.starting_date') }}</label>
                     <input type="datetime-local" x-model="from" max="{{ $rangeMax }}"
                            class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
-                    <label class="mt-3 block text-xs text-neutral-400">Ending date</label>
+                    <label class="mt-3 block text-xs text-neutral-400">{{ __('monitor::messages.header.ending_date') }}</label>
                     <input type="datetime-local" x-model="to" max="{{ $rangeMax }}"
                            class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
                     <p x-show="error" x-text="error" class="mt-2 text-xs text-rose-400"></p>
                     <button type="button" @click="apply()"
-                            class="mt-3 w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Apply</button>
+                            class="mt-3 w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.header.apply') }}</button>
                 </div>
             </div>
         </div>

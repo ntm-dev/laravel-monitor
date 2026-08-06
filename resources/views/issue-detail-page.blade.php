@@ -9,7 +9,7 @@
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
                 <div class="mx-auto flex w-full max-w-[1600px] items-center gap-3 px-4 py-5 md:px-8">
-                    <a href="{{ route('monitor.dashboard', ['tab' => 'issues']) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">← Issues</a>
+                    <a href="{{ route('monitor.dashboard', ['tab' => 'issues']) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">← {{ __('monitor::messages.nav.issues') }}</a>
                     <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">#{{ $issue->id }}</span>
                 </div>
             </header>
@@ -19,12 +19,12 @@
                     @if ($type === 'exception')
                         @if (! $exists)
                             <x-monitor::card class="p-10 text-center">
-                                <p class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Exception not found</p>
-                                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">This exception has no recorded occurrences.</p>
+                                <p class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.issue.exception_not_found') }}</p>
+                                <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.no_occurrences') }}</p>
                             </x-monitor::card>
                         @else
                             <x-monitor::card class="p-4">
-                                <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Summary</p>
+                                <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.summary') }}</p>
                                 <dl class="mt-3 grid grid-cols-1 gap-x-4 gap-y-3">
                                     @foreach ($summary as [$label, $value])
                                         <div class="flex max-w-full items-baseline gap-2 h-6 text-sm font-mono">
@@ -52,7 +52,7 @@
                                         <button type="button" @click="copy()"
                                                 class="group flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/50 px-1.5 text-xs leading-none text-neutral-600 dark:text-neutral-300 hover:border-blue-500 hover:bg-white dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-100 active:translate-y-px active:bg-neutral-100 dark:active:bg-neutral-800">
                                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 group-hover:text-blue-600 dark:group-hover:text-blue-400"/>
-                                            <span x-text="copied ? 'Copied!' : 'Copy as Markdown'"></span>
+                                            <span x-text="copied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy_as_markdown'))"></span>
                                         </button>
                                     </div>
                                     <div class="mt-1 min-w-0 flex-1 break-all text-2xl/none font-semibold {{ $handled ? 'text-neutral-900 dark:text-neutral-100' : 'text-rose-600 dark:text-rose-400' }}" title="{{ $class }}">{{ $class }}</div>
@@ -63,24 +63,24 @@
                                 @if (! empty($frameGroups))
                                     <x-monitor::stack-trace :groups="$frameGroups"/>
                                 @else
-                                    <x-monitor::card class="p-8 text-center text-sm text-neutral-400 dark:text-neutral-500">No stack trace was captured for this exception.</x-monitor::card>
+                                    <x-monitor::card class="p-8 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.issue.no_stack_trace') }}</x-monitor::card>
                                 @endif
                             </div>
 
                             <div>
                                 <div class="flex items-center gap-2 px-1 pb-3">
                                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOCK" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-                                    <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($occurrences->count()) }} {{ $occurrences->count() === 1 ? 'Occurrence' : 'Occurrences' }}</h3>
+                                    <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($occurrences->count()) }} {{ trans_choice('monitor::messages.issue.occurrence_count', $occurrences->count()) }}</h3>
                                 </div>
                                 <x-monitor::card class="p-4">
                                     <div class="overflow-x-auto">
                                         <table class="w-full min-w-[640px] text-sm">
                                             <thead>
                                                 <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                                                    <th class="pb-2 font-normal">Date</th>
-                                                    <th class="pb-2 font-normal">Source</th>
-                                                    <th class="pb-2 font-normal">Message</th>
-                                                    <th class="pb-2 font-normal">User</th>
+                                                    <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                                                    <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
+                                                    <th class="pb-2 font-normal">{{ __('monitor::messages.common.message') }}</th>
+                                                    <th class="pb-2 font-normal">{{ __('monitor::messages.common.user') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -106,15 +106,15 @@
                             <p class="mt-3 break-all font-mono text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ $label }}</p>
                             <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <dt class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Occurrences</dt>
+                                    <dt class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.occurrences') }}</dt>
                                     <dd class="mt-1 font-mono text-neutral-900 dark:text-neutral-100">{{ number_format($count) }}</dd>
                                 </div>
                                 <div>
-                                    <dt class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Max duration</dt>
+                                    <dt class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.max_duration') }}</dt>
                                     <dd class="mt-1 font-mono text-amber-600 dark:text-amber-400">{{ \LaravelMonitor\Support\Format::duration($maxDuration) }}</dd>
                                 </div>
                             </dl>
-                            <a href="{{ $targetUrl }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">View details →</a>
+                            <a href="{{ $targetUrl }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">{{ __('monitor::messages.issue.view_details') }} →</a>
                         </x-monitor::card>
                     @endif
                 </div>

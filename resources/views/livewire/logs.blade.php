@@ -1,8 +1,8 @@
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::LOGS" title="Logs">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::LOGS" :title="__('monitor::messages.nav.logs')">
         <x-slot:actions>
             <select wire:model.live="level" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
-                <option value="">All levels</option>
+                <option value="">{{ __('monitor::messages.common.all_levels') }}</option>
                 @foreach (['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info'] as $option)
                     <option value="{{ $option }}">{{ ucfirst($option) }}</option>
                 @endforeach
@@ -10,7 +10,7 @@
         </x-slot:actions>
 
         @if ($logs->isEmpty())
-            <x-monitor::empty-state label="Logs" message="No log entries" :period-phrase="$periodPhrase"/>
+            <x-monitor::empty-state :label="__('monitor::messages.nav.logs')" :message="__('monitor::messages.common.no_log_entries')" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card>
                 <div class="divide-y divide-neutral-100 dark:divide-neutral-800">

@@ -6,7 +6,7 @@
     @php($bodyJson = json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE))
     <x-monitor::card class="p-0" x-data="{ open: false, bodyCopied: false }">
         <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-4 py-3 text-left">
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">Body</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.body') }}</h2>
             <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md dark:border dark:border-white/10"
                 :class="open ? 'text-blue-500 dark:text-emerald-500 dark:bg-white/5' : 'text-neutral-500 dark:bg-white/5'">
                 <x-monitor::chevrons-updown x-show="open" direction="down-up"/>
@@ -15,10 +15,10 @@
         </button>
         <div x-show="open" x-cloak x-transition class="border-t border-neutral-100 p-4 dark:border-neutral-800">
             @if ($body['_truncated'] ?? false)
-                <p class="text-xs text-neutral-400 dark:text-neutral-500">Body omitted — {{ number_format($body['_size'] ?? 0) }} bytes exceeds the stored size limit.</p>
+                <p class="text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.body_omitted', ['size' => number_format($body['_size'] ?? 0)]) }}</p>
             @else
                 <div class="relative max-h-96 overflow-auto rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                    <button type="button" title="Copy"
+                    <button type="button" title="{{ __('monitor::messages.common.copy') }}"
                             @click="navigator.clipboard.writeText(@js($bodyJson)); bodyCopied = true; setTimeout(() => bodyCopied = false, 1500)"
                             class="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-neutral-400 backdrop-blur hover:text-neutral-700 dark:bg-neutral-900/80 dark:hover:text-neutral-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5" x-show="! bodyCopied"/>

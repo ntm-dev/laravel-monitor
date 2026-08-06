@@ -3,24 +3,25 @@
      job-detail.blade.php) omits them on purpose — a queued-but-not-yet-attempted job isn't an attempt outcome,
      only failed/processed/released are — while the Overview page's smaller Application widget still passes them,
      unchanged. --}}
-@props(['queued' => null, 'processed', 'failed', 'released' => null, 'queuedBuckets' => null, 'processedBuckets', 'failedBuckets', 'releasedBuckets' => null, 'since', 'until', 'size' => 'lg', 'height' => 'h-28', 'footer' => true, 'label' => 'Jobs'])
+@props(['queued' => null, 'processed', 'failed', 'released' => null, 'queuedBuckets' => null, 'processedBuckets', 'failedBuckets', 'releasedBuckets' => null, 'since', 'until', 'size' => 'lg', 'height' => 'h-28', 'footer' => true, 'label' => null])
+@php($label ??= __('monitor::messages.nav.jobs'))
 <x-monitor::card :class="trim('flex flex-col p-4 '.($attributes->get('class') ?? ''))">
     <x-monitor::metric :label="$label" :value="number_format(($queued ?? 0) + $processed + $failed + ($released ?? 0))" :size="$size">
-        <x-monitor::legend label="Failed" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'" :size="$size"/>
+        <x-monitor::legend :label="__('monitor::messages.common.failed')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'" :size="$size"/>
         @if ($released !== null)
-            <x-monitor::legend label="Released" dot="bg-orange-500" :value="number_format($released)" :color="$released > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-neutral-900 dark:text-neutral-100'" :size="$size"/>
+            <x-monitor::legend :label="__('monitor::messages.common.released')" dot="bg-orange-500" :value="number_format($released)" :color="$released > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-neutral-900 dark:text-neutral-100'" :size="$size"/>
         @endif
-        <x-monitor::legend label="Processed" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($processed)" :size="$size"/>
+        <x-monitor::legend :label="__('monitor::messages.common.processed')" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($processed)" :size="$size"/>
         @if ($queued !== null)
-            <x-monitor::legend label="Queued" dot="bg-amber-500" :value="number_format($queued)" :size="$size"/>
+            <x-monitor::legend :label="__('monitor::messages.common.queued')" dot="bg-amber-500" :value="number_format($queued)" :size="$size"/>
         @endif
     </x-monitor::metric>
     <div class="{{ $size === 'lg' ? 'mt-5' : 'mt-4' }}">
         <x-monitor::bar-chart :since="$since" :until="$until" :height="$height" :series="[
-            ['label' => 'Processed', 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $processedBuckets],
-            ...($queuedBuckets !== null ? [['label' => 'Queued', 'dot' => 'bg-amber-500', 'data' => $queuedBuckets]] : []),
-            ...($releasedBuckets !== null ? [['label' => 'Released', 'dot' => 'bg-orange-500', 'data' => $releasedBuckets]] : []),
-            ['label' => 'Failed', 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
+            ['label' => __('monitor::messages.common.processed'), 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $processedBuckets],
+            ...($queuedBuckets !== null ? [['label' => __('monitor::messages.common.queued'), 'dot' => 'bg-amber-500', 'data' => $queuedBuckets]] : []),
+            ...($releasedBuckets !== null ? [['label' => __('monitor::messages.common.released'), 'dot' => 'bg-orange-500', 'data' => $releasedBuckets]] : []),
+            ['label' => __('monitor::messages.common.failed'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
         ]"/>
     </div>
     @if ($footer)

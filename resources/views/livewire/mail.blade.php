@@ -5,11 +5,11 @@
     $fmt = fn ($ms) => Format::duration($ms);
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::MAIL" title="Mail">
+    <x-monitor::section :icon="Icons::MAIL" :title="__('monitor::messages.nav.mail')">
         <x-slot:actions>
             <div class="relative">
                 <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search mail…"
+                <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_mail') }}"
                        class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
             </div>
         </x-slot:actions>
@@ -22,39 +22,39 @@
                  clearHoverIndex() { this.hoverIndex = null },
              }">
             <x-monitor::card class="flex flex-col p-4">
-                <x-monitor::metric label="Mails" :value="number_format($direct + $viaNotification)">
-                    <x-monitor::legend label="Direct" dot="bg-blue-500" :value="number_format($direct)"/>
-                    <x-monitor::legend label="Via notification" dot="bg-purple-500" :value="number_format($viaNotification)"/>
+                <x-monitor::metric :label="__('monitor::messages.common.mails')" :value="number_format($direct + $viaNotification)">
+                    <x-monitor::legend :label="__('monitor::messages.common.direct')" dot="bg-blue-500" :value="number_format($direct)"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.via_notification')" dot="bg-purple-500" :value="number_format($viaNotification)"/>
                 </x-monitor::metric>
                 <div class="mt-5">
                     <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                        ['label' => 'Direct', 'dot' => 'bg-blue-500', 'data' => $directBuckets],
-                        ['label' => 'Via notification', 'dot' => 'bg-purple-500', 'data' => $viaNotificationBuckets],
+                        ['label' => __('monitor::messages.common.direct'), 'dot' => 'bg-blue-500', 'data' => $directBuckets],
+                        ['label' => __('monitor::messages.common.via_notification'), 'dot' => 'bg-purple-500', 'data' => $viaNotificationBuckets],
                     ]"/>
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>
             </x-monitor::card>
 
-            <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
+            <x-monitor::duration-chart-card :label="__('monitor::messages.common.duration')" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
         </div>
 
         {{-- Grouped by mailable/notification class --}}
         <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
-            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($groups->count()) }} Mail</h3>
+            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($groups->count()) }} {{ __('monitor::messages.nav.mail') }}</h3>
         </div>
 
         @if ($groups->isEmpty())
-            <x-monitor::empty-state label="Mail" message="No mail sent" :period-phrase="$periodPhrase"/>
+            <x-monitor::empty-state :label="__('monitor::messages.nav.mail')" :message="__('monitor::messages.common.no_mail_sent')" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card class="p-4">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">Mail</th>
-                            <th class="pb-2 text-right font-normal">Count</th>
-                            <th class="pb-2 text-right font-normal">Avg</th>
-                            <th class="pb-2 text-right font-normal">P95</th>
-                            <th class="pb-2 text-right font-normal">Last sent</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.nav.mail') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.count') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.avg') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.p95') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.last_sent') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>

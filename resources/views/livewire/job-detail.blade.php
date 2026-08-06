@@ -10,30 +10,30 @@
              setHoverIndex(i) { this.hoverIndex = i },
              clearHoverIndex() { this.hoverIndex = null },
          }">
-        <x-monitor::jobs-chart-card label="Attempts"
+        <x-monitor::jobs-chart-card :label="__('monitor::messages.common.attempts')"
             :processed="$processed" :failed="$failed" :released="$released"
             :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets" :released-buckets="$releasedBuckets"
             :since="$since" :until="$until" height="h-[167px]"/>
-        <x-monitor::duration-chart-card label="Job duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
+        <x-monitor::duration-chart-card :label="__('monitor::messages.common.job_duration')" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
     </div>
 
     {{-- Individual job runs --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::JOBS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ $totalEntries === 1 ? 'Job Run' : 'Job Runs' }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.job_run_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
-                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">No job runs recorded in this period.</p>
+                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_job_runs_recorded_in_period') }}</p>
             @else
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">Date</th>
-                            <th class="pb-2 font-normal">Queue</th>
-                            <th class="pb-2 font-normal">Status</th>
-                            <th class="pb-2 text-right font-normal">Duration</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.queue') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
@@ -57,7 +57,7 @@
                                         'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
                                     ])>{{ $entry->subtype }}</span>
                                     @if (($entry->payload['attempts'] ?? null) !== null)
-                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" title="Attempt count">#{{ $entry->payload['attempts'] }}</span>
+                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" title="{{ __('monitor::messages.common.attempt_count') }}">#{{ $entry->payload['attempts'] }}</span>
                                     @endif
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
@@ -75,13 +75,13 @@
 
                 @if ($lastPage > 1)
                     <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                        <span>Showing {{ $from + 1 }}–{{ min($from + $perPage, $totalEntries) }} of {{ number_format($totalEntries) }}</span>
+                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalEntries), 'total' => number_format($totalEntries)]) }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Prev</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
                             <span>{{ $page }} / {{ $lastPage }}</span>
                             <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Next</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
                         </div>
                     </div>
                 @endif

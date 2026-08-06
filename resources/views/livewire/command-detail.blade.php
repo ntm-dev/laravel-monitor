@@ -11,38 +11,38 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::card class="flex flex-col p-4">
-            <x-monitor::metric label="Calls" :value="number_format($success + $failed)">
-                <x-monitor::legend label="Unsuccessful" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
-                <x-monitor::legend label="Successful" dot="bg-emerald-500" :value="number_format($success)"/>
+            <x-monitor::metric :label="__('monitor::messages.common.calls')" :value="number_format($success + $failed)">
+                <x-monitor::legend :label="__('monitor::messages.common.unsuccessful')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
+                <x-monitor::legend :label="__('monitor::messages.common.successful')" dot="bg-emerald-500" :value="number_format($success)"/>
             </x-monitor::metric>
             <div class="mt-5">
                 <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                    ['label' => 'Successful', 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
-                    ['label' => 'Unsuccessful', 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
+                    ['label' => __('monitor::messages.common.successful'), 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
+                    ['label' => __('monitor::messages.common.unsuccessful'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
                 ]"/>
             </div>
             <x-monitor::chart-footer :since="$since" :until="$until"/>
         </x-monitor::card>
-        <x-monitor::duration-chart-card label="Duration" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
+        <x-monitor::duration-chart-card :label="__('monitor::messages.common.duration')" :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
     </div>
 
     {{-- Individual runs --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COMMANDS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ $totalEntries === 1 ? 'Run' : 'Runs' }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.run_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
-                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">No runs recorded in this period.</p>
+                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_runs_recorded_in_period') }}</p>
             @else
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">Date</th>
-                            <th class="pb-2 font-normal">Status</th>
-                            <th class="pb-2 text-right font-normal">Exit Code</th>
-                            <th class="pb-2 text-right font-normal">Duration</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.exit_code') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
@@ -75,13 +75,13 @@
 
                 @if ($lastPage > 1)
                     <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                        <span>Showing {{ $from + 1 }}–{{ min($from + $perPage, $totalEntries) }} of {{ number_format($totalEntries) }}</span>
+                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalEntries), 'total' => number_format($totalEntries)]) }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Prev</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
                             <span>{{ $page }} / {{ $lastPage }}</span>
                             <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Next</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
                         </div>
                     </div>
                 @endif

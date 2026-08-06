@@ -1,15 +1,15 @@
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::USER" title="Users">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::USER" :title="__('monitor::messages.nav.users')">
         <x-slot:actions>
-            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'users'] + $range)" external>Users</x-monitor::link-button>
+            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'users'] + $range)" external>{{ __('monitor::messages.nav.users') }}</x-monitor::link-button>
         </x-slot:actions>
 
         <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
             {{-- Users impacted by exceptions --}}
             @if ($impactedUsers->isNotEmpty())
                 <x-monitor::card class="flex flex-col p-4">
-                    <x-monitor::badge>Exceptions</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $impactedUsers->count() }} {{ $impactedUsers->count() === 1 ? 'user' : 'users' }} impacted by exceptions {{ $periodPhrase }}.</p>
+                    <x-monitor::badge>{{ __('monitor::messages.nav.exceptions') }}</x-monitor::badge>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $impactedUsers->count() }} {{ trans_choice('monitor::messages.common.user_count', $impactedUsers->count()) }} {{ __('monitor::messages.common.impacted_by_exceptions') }} {{ $periodPhrase }}.</p>
                     <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($impactedUsers as $user)
                             <div class="flex items-center gap-2.5 py-2 text-xs">
@@ -21,14 +21,14 @@
                     </div>
                 </x-monitor::card>
             @else
-                <x-monitor::empty-state label="Exceptions" message="No users impacted by exceptions" :period-phrase="$periodPhrase"/>
+                <x-monitor::empty-state :label="__('monitor::messages.nav.exceptions')" :message="__('monitor::messages.common.no_users_impacted_by_exceptions')" :period-phrase="$periodPhrase"/>
             @endif
 
             {{-- Most active users --}}
             @if ($topUsers->isNotEmpty())
                 <x-monitor::card class="flex flex-col p-4">
-                    <x-monitor::badge>Requests</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">Most active users {{ $periodPhrase }}.</p>
+                    <x-monitor::badge>{{ __('monitor::messages.nav.requests') }}</x-monitor::badge>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.most_active_users') }} {{ $periodPhrase }}.</p>
                     <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($topUsers as $user)
                             <div class="flex items-center gap-2.5 py-2 text-xs">
@@ -40,19 +40,19 @@
                     </div>
                 </x-monitor::card>
             @else
-                <x-monitor::empty-state label="Requests" message="No active users" :period-phrase="$periodPhrase"/>
+                <x-monitor::empty-state :label="__('monitor::messages.nav.requests')" :message="__('monitor::messages.common.no_active_users')" :period-phrase="$periodPhrase"/>
             @endif
 
             {{-- Authenticated users + auth events --}}
             <div class="flex flex-col gap-1.5">
                 <x-monitor::card class="p-4">
-                    <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Authenticated users</p>
+                    <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.authenticated_users') }}</p>
                     <p class="mt-1 font-mono text-xl font-semibold leading-none text-neutral-900 dark:text-neutral-100">{{ number_format($authenticatedUsers) }}</p>
                 </x-monitor::card>
                 <x-monitor::card class="flex-1 p-4">
-                    <p class="mb-2 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Auth events</p>
+                    <p class="mb-2 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.auth_events') }}</p>
                     @if ($authEvents->isEmpty())
-                        <p class="py-3 text-xs text-neutral-400 dark:text-neutral-500">No logins in this period.</p>
+                        <p class="py-3 text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_logins_in_period') }}</p>
                     @else
                         <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($authEvents as $event)

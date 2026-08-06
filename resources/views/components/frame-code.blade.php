@@ -3,7 +3,7 @@
      Laravel's own exception renderer). $lines is prepared by the component. --}}
 @props(['lines' => []])
 @if (empty($lines))
-    <div class="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-4 py-6 text-center font-mono text-xs text-neutral-400 dark:text-neutral-500">Source not available for this frame.</div>
+    <div class="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-4 py-6 text-center font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.source_not_available') }}</div>
 @else
     <div class="overflow-x-auto border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 py-1 font-mono text-xs leading-relaxed" data-frame-code>
         @foreach ($lines as $srcLine)

@@ -4,11 +4,11 @@
      for infrequent, non-reactive mutations on this dashboard. --}}
 @props(['issue', 'statuses', 'priorities'])
 <div class="rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-    <p class="border-b border-neutral-100 dark:border-neutral-800 px-4 py-3 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Manage</p>
+    <p class="border-b border-neutral-100 dark:border-neutral-800 px-4 py-3 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.manage') }}</p>
 
     <div class="space-y-4 p-4">
         <div>
-            <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Status</label>
+            <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.status') }}</label>
             <form method="POST" action="{{ route('monitor.issues.status', $issue->uuid) }}" class="mt-2 flex gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 p-0.5">
                 @csrf
                 @foreach ($statuses as $status)
@@ -23,7 +23,7 @@
         </div>
 
         <div>
-            <label for="priority" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Priority</label>
+            <label for="priority" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.priority') }}</label>
             <form method="POST" action="{{ route('monitor.issues.priority', $issue->uuid) }}" class="mt-2">
                 @csrf
                 <select name="priority" id="priority" onchange="this.form.submit()"

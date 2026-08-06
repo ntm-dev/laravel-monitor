@@ -1,5 +1,5 @@
 {{-- Forgot-password request page. See Http\Controllers\Auth\PasswordResetController. --}}
-<x-monitor::layout title="Forgot password">
+<x-monitor::layout :title="__('monitor::messages.auth.forgot_password')">
     <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
         <div class="w-full max-w-sm">
             <div class="mb-6 flex items-center justify-center gap-2.5">
@@ -26,11 +26,11 @@
                 <form method="POST" action="{{ route('monitor.password.request.store') }}" class="mt-4 space-y-4">
                     @csrf
                     <div>
-                        <label for="email" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Email</label>
+                        <label for="email" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.email') }}</label>
                         <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
                                class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
                     </div>
-                    <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Send reset link</button>
+                    <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.auth.send_reset_link') }}</button>
                 </form>
             </div>
         </div>

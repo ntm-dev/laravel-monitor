@@ -24,7 +24,7 @@
                 <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
                     <a href="{{ route('monitor.dashboard', ['tab' => 'schedule'] + $range) }}"
                        class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
-                        ← Scheduled Tasks
+                        ← {{ __('monitor::messages.nav.schedule') }}
                     </a>
 
                     <div class="mt-1 flex flex-wrap items-center gap-2.5">
@@ -37,32 +37,32 @@
             <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Schedule</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.schedule.expression') }}</p>
                         <p class="mt-1.5 truncate font-mono text-xl font-semibold text-neutral-900 dark:text-neutral-100" title="{{ $root->payload['expression'] ?? '' }}">{{ $root->payload['expression'] ?? '—' }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Timezone</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.timezone') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ $root->payload['timezone'] ?? '—' }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Duration</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ $root->duration !== null ? Format::duration($root->duration) : '—' }}</p>
                     </x-monitor::card>
                     <x-monitor::card class="p-3">
-                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Ran at</p>
+                        <p class="font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.ran_at') }}</p>
                         <p class="mt-1.5 text-xl font-semibold text-neutral-900 dark:text-neutral-100">{{ Format::datetime($root->created_at) }}</p>
                     </x-monitor::card>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
                     @if ($root->payload['without_overlapping'] ?? false)
-                        <span class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">Without overlapping</span>
+                        <span class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">{{ __('monitor::messages.schedule.without_overlapping') }}</span>
                     @endif
                     @if ($root->payload['run_in_background'] ?? false)
-                        <span class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">Runs in background</span>
+                        <span class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">{{ __('monitor::messages.schedule.runs_in_background') }}</span>
                     @endif
                     @if ($root->payload['even_in_maintenance_mode'] ?? false)
-                        <span class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">Runs in maintenance mode</span>
+                        <span class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">{{ __('monitor::messages.schedule.runs_in_maintenance_mode') }}</span>
                     @endif
                 </div>
 

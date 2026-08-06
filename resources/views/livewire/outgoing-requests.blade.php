@@ -1,17 +1,17 @@
 @php($fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms))
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::OUTGOING" title="Outgoing Requests">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::OUTGOING" :title="__('monitor::messages.nav.outgoing')">
         @if ($requests->isEmpty())
-            <x-monitor::empty-state label="Outgoing requests" message="No outgoing requests" :period-phrase="$periodPhrase"/>
+            <x-monitor::empty-state :label="__('monitor::messages.nav.outgoing')" :message="__('monitor::messages.common.no_outgoing_requests')" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card class="p-4">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">Endpoint</th>
-                            <th class="pb-2 text-right font-normal">Count</th>
-                            <th class="pb-2 text-right font-normal">Errors</th>
-                            <th class="pb-2 text-right font-normal">Avg</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.endpoint') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.count') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.errors') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.avg') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">

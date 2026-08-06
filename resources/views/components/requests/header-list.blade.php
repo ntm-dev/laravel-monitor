@@ -2,7 +2,7 @@
      (label ... dotted line ... value) instead of a plain two-column list. --}}
 @props(['headers' => []])
 @if (empty($headers))
-    <p class="text-xs text-neutral-400 dark:text-neutral-500">No headers recorded.</p>
+    <p class="text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_headers_recorded') }}</p>
 @else
     <dl class="space-y-2 text-sm">
         @foreach ($headers as $name => $value)

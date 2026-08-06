@@ -283,7 +283,7 @@
     <div
         class="sticky top-[120px] z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">Timeline</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.timeline') }}</h2>
             <div class="flex items-center gap-1.5">
                 <input type="range" :min="minZoom" :max="maxZoom" step="0.1" :value="zoom"
                     @input="setZoom($event.target.valueAsNumber)"
@@ -346,7 +346,7 @@
                         class="flex h-9 items-center border-t border-neutral-50 pr-3 dark:border-neutral-800/40">
                         <span class="h-9 w-4 shrink-0 border-l border-neutral-300 dark:border-neutral-700"></span>
                         <span
-                            class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Other</span>
+                            class="pl-2 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.other') }}</span>
                     </div>
                 @else
                     <x-monitor::requests.timeline-row :entry="$row['entry']" :left="$row['left']" :width="$row['width']"
@@ -438,31 +438,31 @@
                     </div>
                     <div class="flex shrink-0 items-center gap-1">
                         <template x-if="selected()?.type === 'query'">
-                            <a :href="selected()?.queryUrl" title="View Query"
+                            <a :href="selected()?.queryUrl" title="{{ __('monitor::messages.common.view_query') }}"
                                 class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'notification'">
-                            <a :href="selected()?.notificationUrl" title="View Notification"
+                            <a :href="selected()?.notificationUrl" title="{{ __('monitor::messages.common.view_notification') }}"
                                 class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'mail'">
-                            <a :href="selected()?.mailUrl" title="View Mail"
+                            <a :href="selected()?.mailUrl" title="{{ __('monitor::messages.common.view_mail') }}"
                                 class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'exception'">
-                            <a :href="selected()?.exceptionUrl" title="View Exception"
+                            <a :href="selected()?.exceptionUrl" title="{{ __('monitor::messages.common.view_exception') }}"
                                 class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'http'">
-                            <a :href="selected()?.outgoingUrl" title="View Outgoing Request"
+                            <a :href="selected()?.outgoingUrl" title="{{ __('monitor::messages.common.view_outgoing_request') }}"
                                 class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-neutral-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
@@ -480,8 +480,8 @@
                     <div class="p-4">
                         <div class="mb-1.5 flex items-center justify-between">
                             <span
-                                class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">SQL</span>
-                            <button type="button" @click="copySql()" title="Copy"
+                                class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.sql') }}</span>
+                            <button type="button" @click="copySql()" title="{{ __('monitor::messages.common.copy') }}"
                                 class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! sqlCopied" />
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2"
@@ -500,19 +500,19 @@
                 <template x-if="selected()?.type === 'query'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration + 'ms'"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duplicates</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duplicates') }}</dt>
                             <dd class="font-mono"
                                 :class="selected()?.duplicateCount > 1 ? 'font-medium text-amber-600 dark:text-amber-400' :
                                     'text-neutral-800 dark:text-neutral-200'"
                                 x-text="selected()?.duplicateCount"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Connection</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>
                             <dd class="flex items-center gap-1.5 font-mono text-neutral-800 dark:text-neutral-200">
                                 <span x-text="selected()?.metadata?.connection"></span>
                                 {{-- The actual PDO connection role Laravel routed this query to
@@ -535,7 +535,7 @@
                         </div>
                         <template x-if="selected()?.metadata?.location">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">File</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.file') }}</dt>
                                 {{-- direction:rtl + text-align:left truncates the *front* of the
                                      string (the path) while keeping the tail (file:line) visible. --}}
                                 <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -549,31 +549,31 @@
                 <template x-if="selected()?.type === 'cache'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Key</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.key') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                 :title="selected()?.metadata?.key" x-text="selected()?.metadata?.key"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Operation</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.operation') }}</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.metadata?.subtype"></dd>
                         </div>
                         <template x-if="selected()?.metadata?.store">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Store</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.store') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.store"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.ttl">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">TTL</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.ttl') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.ttl + 's'"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration + 'ms'"></dd>
                         </div>
@@ -583,7 +583,7 @@
                 <template x-if="selected()?.type === 'notification'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Notification</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.notification') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
                                  FQCN, keeping the class name itself (the tail) visible. --}}
                             <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -591,20 +591,20 @@
                                 x-text="selected()?.label"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Channel</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.channel') }}</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.metadata?.channel"></dd>
                         </div>
                         <template x-if="selected()?.metadata?.notifiable">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Notifiable</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.notifiable') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     :title="selected()?.metadata?.notifiable"
                                     x-text="selected()?.metadata?.notifiable"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration + 'ms'"></dd>
                         </div>
@@ -614,39 +614,39 @@
                 <template x-if="selected()?.type === 'mail'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Subject</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.subject') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                 :title="selected()?.metadata?.subject" x-text="selected()?.metadata?.subject"></dd>
                         </div>
                         <template x-if="mailRecipients()">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Recipients</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.recipients') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="mailRecipients()"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">To</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.to') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                 :title="selected()?.metadata?.to" x-text="selected()?.metadata?.to"></dd>
                         </div>
                         <template x-if="selected()?.metadata?.cc">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Cc</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.cc') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     :title="selected()?.metadata?.cc" x-text="selected()?.metadata?.cc"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.bcc">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Bcc</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.bcc') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     :title="selected()?.metadata?.bcc" x-text="selected()?.metadata?.bcc"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.notification">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Via</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.via') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     :title="selected()?.metadata?.notification"
                                     x-text="selected()?.metadata?.notification"></dd>
@@ -654,19 +654,19 @@
                         </template>
                         <template x-if="selected()?.metadata?.attachments">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Attachments</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.attachments') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     :title="mailAttachments()" x-text="mailAttachments()"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration + 'ms'"></dd>
                         </div>
                         <template x-if="mailClass()">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.class') }}</dt>
                                 {{-- direction:rtl + text-align:left truncates the *front* of the
                                      FQCN, keeping the class name itself (the tail) visible. --}}
                                 <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -676,7 +676,7 @@
                         </template>
                         <template x-if="selected()?.metadata?.mailer">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Mailer</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.mailer') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.mailer"></dd>
                             </div>
@@ -687,7 +687,7 @@
                 <template x-if="selected()?.type === 'lazy_loading'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Model</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.model') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
                                  FQCN, keeping the class name itself (the tail) visible. --}}
                             <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -695,13 +695,13 @@
                                 x-text="selected()?.metadata?.model"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Relation</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.relation') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.metadata?.relation"></dd>
                         </div>
                         <template x-if="selected()?.metadata?.id">
                             <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Record ID</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.record_id') }}</dt>
                                 <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.id"></dd>
                             </div>
@@ -712,12 +712,12 @@
                 <template x-if="selected()?.type === 'http'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Method</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.method') }}</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.metadata?.method"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Status</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.status') }}</dt>
                             <dd class="font-mono font-medium"
                                 :class="selected()?.metadata?.status == null ? 'text-neutral-400 dark:text-neutral-500' :
                                     selected()?.metadata?.status >= 500 ? 'text-rose-600 dark:text-rose-400' :
@@ -726,12 +726,12 @@
                                 x-text="selected()?.metadata?.status ?? 'Failed'"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">URL</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.url') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                                 :title="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
                         </div>
@@ -741,7 +741,7 @@
                 <template x-if="selected()?.type === 'queue'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Job</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.job') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
                                  FQCN, keeping the class name itself (the tail) visible. --}}
                             <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -749,7 +749,7 @@
                                 x-text="selected()?.metadata?.key"></dd>
                         </div>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Status</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.status') }}</dt>
                             <dd class="font-mono font-medium uppercase"
                                 :class="({ processed: 'text-emerald-600 dark:text-emerald-400',
                                     failed: 'text-rose-600 dark:text-rose-400',
@@ -760,21 +760,21 @@
                         </div>
                         <template x-if="selected()?.metadata?.queue">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Queue</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.queue') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.queue"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.connection">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Connection</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.connection"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.attempts">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Attempt</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.attempt') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="'#' + selected()?.metadata?.attempts"></dd>
                             </div>
@@ -784,20 +784,20 @@
                              for a still-'queued' placeholder that hasn't run yet. --}}
                         <template x-if="selected()?.metadata?.peak_memory">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Peak Memory</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.peak_memory') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="formatBytes(selected()?.metadata?.peak_memory)"></dd>
                             </div>
                         </template>
                         <template x-if="selected()?.metadata?.server">
                             <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                                <dt class="text-neutral-500 dark:text-neutral-400">Server</dt>
+                                <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.server') }}</dt>
                                 <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                     x-text="selected()?.metadata?.server"></dd>
                             </div>
                         </template>
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                            <dt class="text-neutral-500 dark:text-neutral-400">Duration</dt>
+                            <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                                 x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
                         </div>
@@ -807,7 +807,7 @@
                 <template x-if="selected()?.type === 'exception'">
                     <div class="p-4">
                         <span
-                            class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">Message</span>
+                            class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.message') }}</span>
                         <p class="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-800 dark:text-neutral-200"
                             x-text="selected()?.metadata?.message"></p>
                     </div>
@@ -815,7 +815,7 @@
                 <template x-if="selected()?.type === 'exception'">
                     <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Class</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.class') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
                                  FQCN, keeping the class name itself (the tail) visible. --}}
                             <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -823,7 +823,7 @@
                                 x-text="selected()?.metadata?.class"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">File</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.file') }}</dt>
                             {{-- direction:rtl + text-align:left is the standard trick for
                                  truncating the *front* of a string while text-overflow
                                  ellipsis keeps the tail (filename:line) visible. --}}
@@ -832,7 +832,7 @@
                                 x-text="exceptionLocation()"></dd>
                         </div>
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
-                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">Handled</dt>
+                            <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.handled') }}</dt>
                             <dd class="font-mono font-medium"
                                 :class="selected()?.metadata?.handled ? 'text-emerald-600 dark:text-emerald-400' :
                                     'text-rose-600 dark:text-rose-400'"
