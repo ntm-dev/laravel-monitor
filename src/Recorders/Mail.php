@@ -18,7 +18,9 @@ class Mail extends Recorder
 
     public function register(Dispatcher $events): void
     {
-        $events->listen(MessageSending::class, fn () => $this->startedAt = microtime(true));
+        $events->listen(MessageSending::class, function () {
+            $this->startedAt = microtime(true);
+        });
         $events->listen(MessageSent::class, [$this, 'record']);
     }
 
