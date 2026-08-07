@@ -1,5 +1,5 @@
 {{-- Invite-acceptance page. See Http\Controllers\Auth\InvitationController. --}}
-<x-monitor::layout title="Accept invitation">
+<x-monitor::layout :title="__('monitor::messages.auth.accept_invitation')">
     <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
         <div class="w-full max-w-sm">
             <div class="mb-6 flex items-center justify-center gap-2.5">
@@ -9,7 +9,7 @@
 
             <div class="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                 @if ($expired)
-                    <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">This invitation has expired</h1>
+                    <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.auth.invitation_expired') }}</h1>
                     <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Ask an owner or admin to invite {{ $invitation->email }} again.</p>
                 @else
                     <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Join {{ config('app.name', 'Laravel') }} Monitor</h1>
@@ -24,21 +24,21 @@
                     <form method="POST" action="{{ route('monitor.invitations.store', $token) }}" class="mt-4 space-y-4">
                         @csrf
                         <div>
-                            <label for="name" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Name</label>
+                            <label for="name" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.name') }}</label>
                             <input type="text" name="name" id="name" value="{{ old('name') }}" required autofocus
                                    class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
                         </div>
                         <div>
-                            <label for="password" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Password</label>
+                            <label for="password" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.password') }}</label>
                             <input type="password" name="password" id="password" required
                                    class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
                         </div>
                         <div>
-                            <label for="password_confirmation" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Confirm password</label>
+                            <label for="password_confirmation" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.confirm_password') }}</label>
                             <input type="password" name="password_confirmation" id="password_confirmation" required
                                    class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
                         </div>
-                        <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Create account</button>
+                        <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.auth.create_account') }}</button>
                     </form>
                 @endif
             </div>

@@ -13,10 +13,10 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::card class="flex flex-col p-4">
-            <x-monitor::metric label="Mail" :value="number_format($total)"/>
+            <x-monitor::metric :label="__('monitor::messages.nav.mail')" :value="number_format($total)"/>
             <div class="mt-5">
                 <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]"
-                    :series="[['label' => 'Mail', 'dot' => 'bg-blue-500', 'data' => $volumeBuckets]]"/>
+                    :series="[['label' => __('monitor::messages.nav.mail'), 'dot' => 'bg-blue-500', 'data' => $volumeBuckets]]"/>
             </div>
             <x-monitor::chart-footer :since="$since" :until="$until"/>
         </x-monitor::card>
@@ -27,19 +27,19 @@
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="Icons::MAIL" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ $entries->count() === 1 ? 'Send' : 'Sends' }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ trans_choice('monitor::messages.common.send_count', $entries->count()) }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
-                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">No sends recorded in this period.</p>
+                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_sends_recorded_in_period') }}</p>
             @else
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">Date</th>
-                            <th class="pb-2 font-normal">Subject</th>
-                            <th class="pb-2 font-normal">To</th>
-                            <th class="pb-2 text-right font-normal">Duration</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.subject') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.to') }}</th>
+                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>

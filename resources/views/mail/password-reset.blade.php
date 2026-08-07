@@ -1,5 +1,5 @@
 {{-- Password reset email. See Mail\PasswordResetMail. --}}
-<p>Someone requested a password reset for your {{ config('app.name', 'Laravel') }} Monitor account.</p>
-<p><a href="{{ $resetUrl }}">Reset your password</a></p>
-<p>If you didn't request this, you can safely ignore this email.</p>
-<p>This link expires in 60 minutes.</p>
+<p>{{ __('monitor::messages.email.password_reset_intro', ['app' => config('app.name', 'Laravel')]) }}</p>
+<p><a href="{{ $resetUrl }}">{{ __('monitor::messages.email.password_reset_link') }}</a></p>
+<p>{{ __('monitor::messages.email.password_reset_ignore') }}</p>
+<p>{{ __('monitor::messages.email.expires_in_60_minutes') }}</p>

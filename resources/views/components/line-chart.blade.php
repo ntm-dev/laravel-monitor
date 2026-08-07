@@ -59,11 +59,11 @@
                     <p class="font-mono text-[11px] text-neutral-200">{{ $tooltip['time'] }} <span class="text-neutral-500">{{ $timezone }}</span></p>
                     <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
                         <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
-                            <span class="inline-block h-2.5 w-1 rounded-full bg-neutral-600"></span>Avg
+                            <span class="inline-block h-2.5 w-1 rounded-full bg-neutral-600"></span>{{ __('monitor::messages.common.avg') }}
                             <span class="ml-auto text-neutral-100">{{ $tooltip['avg'] }}</span>
                         </p>
                         <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
-                            <span class="inline-block h-2.5 w-1 rounded-full bg-amber-500"></span>P95
+                            <span class="inline-block h-2.5 w-1 rounded-full bg-amber-500"></span>{{ __('monitor::messages.common.p95') }}
                             <span class="ml-auto text-neutral-100">{{ $tooltip['p95'] }}</span>
                         </p>
                     </div>

@@ -2,22 +2,22 @@
     use LaravelMonitor\Support\Icons;
 
     $columns = [
-        'key' => ['label' => 'Key', 'align' => 'left'],
-        'hit_ratio' => ['label' => 'Hit %', 'align' => 'right'],
-        'deletes' => ['label' => 'Deletes', 'align' => 'right'],
-        'hits' => ['label' => 'Hits', 'align' => 'right'],
-        'misses' => ['label' => 'Misses', 'align' => 'right'],
-        'writes' => ['label' => 'Writes', 'align' => 'right'],
-        'failures' => ['label' => 'Failures', 'align' => 'right'],
-        'total' => ['label' => 'Total', 'align' => 'right'],
+        'key' => ['label' => __('monitor::messages.common.key'), 'align' => 'left'],
+        'hit_ratio' => ['label' => __('monitor::messages.common.hit_ratio'), 'align' => 'right'],
+        'deletes' => ['label' => __('monitor::messages.common.deletes'), 'align' => 'right'],
+        'hits' => ['label' => __('monitor::messages.common.hits'), 'align' => 'right'],
+        'misses' => ['label' => __('monitor::messages.common.misses'), 'align' => 'right'],
+        'writes' => ['label' => __('monitor::messages.common.writes'), 'align' => 'right'],
+        'failures' => ['label' => __('monitor::messages.common.failures'), 'align' => 'right'],
+        'total' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
     ];
 
     $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::CACHE" title="Cache">
+    <x-monitor::section :icon="Icons::CACHE" :title="__('monitor::messages.nav.cache')">
         <x-slot:actions>
-            <button type="button" wire:click="$refresh" title="Refresh"
+            <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
                     class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                 <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
             </button>
@@ -30,17 +30,17 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::cache-chart-card label="Events" :total="$events" :series="$eventSeries" :since="$since" :until="$until" height="h-[167px]"/>
-            <x-monitor::cache-chart-card label="Failures" :total="$failures" :series="$failureSeries" :since="$since" :until="$until" height="h-[167px]"/>
+            <x-monitor::cache-chart-card :label="__('monitor::messages.common.events')" :total="$events" :series="$eventSeries" :since="$since" :until="$until" height="h-[167px]"/>
+            <x-monitor::cache-chart-card :label="__('monitor::messages.common.failures')" :total="$failures" :series="$failureSeries" :since="$since" :until="$until" height="h-[167px]"/>
         </div>
 
         {{-- Key table --}}
         <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
-            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalKeys) }} {{ $totalKeys === 1 ? 'Key' : 'Keys' }}</h3>
+            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalKeys) }} {{ trans_choice('monitor::messages.common.key_count', $totalKeys) }}</h3>
         </div>
 
         @if ($keys->isEmpty())
-            <x-monitor::empty-state label="Cache" message="No cache activity recorded" :period-phrase="$periodPhrase"/>
+            <x-monitor::empty-state :label="__('monitor::messages.nav.cache')" :message="__('monitor::messages.common.no_cache_activity_recorded')" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card class="p-4">
                 <table class="w-full text-sm">
@@ -77,13 +77,13 @@
 
                 @if ($lastPage > 1)
                     <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                        <span>Showing {{ $from + 1 }}–{{ min($from + $perPage, $totalKeys) }} of {{ number_format($totalKeys) }}</span>
+                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalKeys), 'total' => number_format($totalKeys)]) }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Prev</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
                             <span>{{ $page }} / {{ $lastPage }}</span>
                             <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">Next</button>
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
                         </div>
                     </div>
                 @endif

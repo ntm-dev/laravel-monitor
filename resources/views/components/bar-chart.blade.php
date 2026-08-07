@@ -48,7 +48,7 @@
                                 <span class="ml-auto text-neutral-100">{{ number_format($chartSerie['data'][$chartI] ?? 0) }}</span>
                             </p>
                         @endforeach
-                        <p class="flex items-center gap-1.5 border-t border-neutral-700/60 pt-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">Total<span class="ml-auto text-neutral-100">{{ number_format($chartTotals[$chartI] ?? 0) }}</span></p>
+                        <p class="flex items-center gap-1.5 border-t border-neutral-700/60 pt-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">{{ __('monitor::messages.common.total') }}<span class="ml-auto text-neutral-100">{{ number_format($chartTotals[$chartI] ?? 0) }}</span></p>
                     </div>
                 </div>
             </div>

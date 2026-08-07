@@ -21,7 +21,7 @@
     };
 @endphp
 <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
-    <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
+    <div class="mx-auto w-full max-w-[calc(100%-10px)] px-4 py-5 md:px-8">
         <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
             <a href="{{ route('monitor.dashboard', ['tab' => $breadcrumbTab] + $range) }}"
                class="shrink-0 hover:text-neutral-900 dark:hover:text-neutral-100">

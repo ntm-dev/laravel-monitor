@@ -1,4 +1,4 @@
 {{-- Team invitation email. See Mail\TeamInvitationMail. --}}
-<p>{{ $inviterName }} invited you to join the {{ config('app.name', 'Laravel') }} Monitor dashboard as <strong>{{ ucfirst($role) }}</strong>.</p>
-<p><a href="{{ $acceptUrl }}">Accept the invitation</a></p>
-<p>This link expires in 2 hours.</p>
+<p>{{ __('monitor::messages.email.invitation_intro_before', ['inviter' => $inviterName, 'app' => config('app.name', 'Laravel')]) }} <strong>{{ ucfirst($role) }}</strong>{{ __('monitor::messages.email.invitation_intro_after') }}</p>
+<p><a href="{{ $acceptUrl }}">{{ __('monitor::messages.email.invitation_link') }}</a></p>
+<p>{{ __('monitor::messages.email.expires_in_2_hours') }}</p>

@@ -1,17 +1,17 @@
 @php($fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms))
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::APPLICATION" title="Application">
+    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::APPLICATION" :title="__('monitor::messages.common.application')">
         <x-slot:actions>
-            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'jobs'] + $range)" external>Jobs</x-monitor::link-button>
+            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'jobs'] + $range)" external>{{ __('monitor::messages.nav.jobs') }}</x-monitor::link-button>
         </x-slot:actions>
 
         <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
             {{-- Exceptions --}}
             @if ($exceptions > 0)
                 <x-monitor::card class="flex flex-col p-4">
-                    <x-monitor::badge>Exceptions</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($exceptions) }} exceptions reported {{ $periodPhrase }}.</p>
-                    <p class="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">Errors have impacted {{ $impactedUsers }} {{ $impactedUsers === 1 ? 'user' : 'users' }}.</p>
+                    <x-monitor::badge>{{ __('monitor::messages.nav.exceptions') }}</x-monitor::badge>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($exceptions) }} {{ __('monitor::messages.common.exceptions_reported_phrase') }} {{ $periodPhrase }}.</p>
+                    <p class="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.errors_have_impacted') }} {{ $impactedUsers }} {{ trans_choice('monitor::messages.common.user_count', $impactedUsers) }}.</p>
                     <div class="mt-6 flex-1"
                          x-data="{
                              hoverIndex: null,
@@ -19,25 +19,25 @@
                              clearHoverIndex() { this.hoverIndex = null },
                          }">
                         <x-monitor::bar-chart :since="$since" :until="$until" height="h-36"
-                            :series="[['label' => 'Unhandled', 'dot' => 'bg-rose-500', 'data' => $exceptionBuckets]]"/>
+                            :series="[['label' => __('monitor::messages.common.unhandled'), 'dot' => 'bg-rose-500', 'data' => $exceptionBuckets]]"/>
                     </div>
                     <div class="mt-3 flex items-center justify-center gap-4 font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-neutral-300 dark:bg-neutral-600"></span>0 Handled</span>
-                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-rose-500"></span>{{ number_format($exceptions) }} Unhandled</span>
+                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-neutral-300 dark:bg-neutral-600"></span>0 {{ __('monitor::messages.common.handled') }}</span>
+                        <span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-1 rounded-full bg-rose-500"></span>{{ number_format($exceptions) }} {{ __('monitor::messages.common.unhandled') }}</span>
                     </div>
                     <div class="mt-4 flex justify-end">
-                        <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'exceptions'] + $range)">View</x-monitor::link-button>
+                        <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'exceptions'] + $range)">{{ __('monitor::messages.common.view') }}</x-monitor::link-button>
                     </div>
                 </x-monitor::card>
             @else
-                <x-monitor::empty-state label="Exceptions" message="No exceptions reported" :period-phrase="$periodPhrase"/>
+                <x-monitor::empty-state :label="__('monitor::messages.nav.exceptions')" :message="__('monitor::messages.common.no_exceptions_reported')" :period-phrase="$periodPhrase"/>
             @endif
 
             {{-- Routes over threshold --}}
             @if ($slowRouteCount > 0)
                 <x-monitor::card class="flex flex-col p-4">
-                    <x-monitor::badge>Routes</x-monitor::badge>
-                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($slowRouteCount) }} {{ $slowRouteCount === 1 ? 'route' : 'routes' }} exceeded thresholds {{ $periodPhrase }}.</p>
+                    <x-monitor::badge>{{ __('monitor::messages.common.routes') }}</x-monitor::badge>
+                    <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ number_format($slowRouteCount) }} {{ trans_choice('monitor::messages.common.route_count', $slowRouteCount) }} {{ __('monitor::messages.common.exceeded_thresholds') }} {{ $periodPhrase }}.</p>
                     <div class="mt-5 space-y-2">
                         @foreach ($slowRoutes as $route)
                             <a href="{{ route('monitor.requests.routes.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($route->key)] + $range) }}"
@@ -46,16 +46,16 @@
                                     <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>
                                     <span class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \Illuminate\Support\Str::after($route->key, ' ') }}</span>
                                 </span>
-                                <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">MAX <span class="text-amber-600 dark:text-amber-400">{{ $fmt($route->max_duration) }}</span></span>
+                                <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.max_abbr') }} <span class="text-amber-600 dark:text-amber-400">{{ $fmt($route->max_duration) }}</span></span>
                             </a>
                         @endforeach
                     </div>
                     <div class="mt-auto flex justify-end pt-4">
-                        <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'requests'] + $range)">View</x-monitor::link-button>
+                        <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'requests'] + $range)">{{ __('monitor::messages.common.view') }}</x-monitor::link-button>
                     </div>
                 </x-monitor::card>
             @else
-                <x-monitor::empty-state label="Routes" message="No routes exceeded thresholds" :period-phrase="$periodPhrase"/>
+                <x-monitor::empty-state :label="__('monitor::messages.common.routes')" :message="__('monitor::messages.common.no_routes_exceeded_thresholds')" :period-phrase="$periodPhrase"/>
             @endif
 
             {{-- Jobs --}}
@@ -69,7 +69,7 @@
                     :queued="$queuedJobs" :processed="$processedJobs" :failed="$failedJobs"
                     :queued-buckets="$queuedBuckets" :processed-buckets="$processedBuckets" :failed-buckets="$failedBuckets"
                     :since="$since" :until="$until" size="sm" height="h-24" :footer="false"/>
-                <x-monitor::duration-chart-card class="flex-1" label="Job duration" :duration="$jobDuration"
+                <x-monitor::duration-chart-card class="flex-1" :label="__('monitor::messages.common.job_duration')" :duration="$jobDuration"
                     :since="$since" :until="$until" size="sm" height="h-24" :footer="false"/>
             </div>
         </div>

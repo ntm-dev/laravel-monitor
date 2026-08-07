@@ -12,7 +12,7 @@
         <div class="flex min-w-0 flex-1 flex-col">
             <x-monitor::requests.header :root="$root" :range="$range" :job="$job" :breadcrumb-tab="$breadcrumbTab" :breadcrumb-label="$breadcrumbLabel" :breadcrumb-url="$breadcrumbUrl"/>
 
-            <main class="mx-auto w-full max-w-[1600px] flex-1 space-y-4 px-4 pb-10 md:px-8">
+            <main class="mx-auto w-full max-w-[calc(100%-10px)] flex-1 space-y-4 px-4 pb-10 md:px-8">
                 {{-- start card general info --}}
                 @if ($job)
                     <x-monitor::jobs.summary :root="$job" :queued-at="$queuedAt"/>

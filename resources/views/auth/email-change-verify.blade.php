@@ -1,5 +1,5 @@
 {{-- Email-change verification prompt. See Http\Controllers\Auth\EmailChangeController. --}}
-<x-monitor::layout title="Verify email">
+<x-monitor::layout :title="__('monitor::messages.auth.verify_email')">
     <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
         <div class="w-full max-w-sm">
             <div class="mb-6 flex items-center justify-center gap-2.5">
@@ -8,12 +8,12 @@
             </div>
 
             <div class="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Confirm this email address</h1>
+                <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.auth.confirm_email_address') }}</h1>
                 <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Confirm that <strong>{{ $emailChange->new_email }}</strong> belongs to you to update your {{ config('app.name', 'Laravel') }} Monitor account email.</p>
 
                 <form method="POST" action="{{ route('monitor.email-changes.store', $token) }}" class="mt-4">
                     @csrf
-                    <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">Confirm this is my email</button>
+                    <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.auth.confirm_email_button') }}</button>
                 </form>
             </div>
         </div>

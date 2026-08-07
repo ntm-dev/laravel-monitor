@@ -1,4 +1,4 @@
 {{-- Email-change verification email. See Mail\EmailChangeVerificationMail. --}}
-<p>Confirm this is your email address to finish updating your {{ config('app.name', 'Laravel') }} Monitor account.</p>
-<p><a href="{{ $verifyUrl }}">Verify this email address</a></p>
-<p>This link expires in 60 minutes.</p>
+<p>{{ __('monitor::messages.email.change_verification_intro', ['app' => config('app.name', 'Laravel')]) }}</p>
+<p><a href="{{ $verifyUrl }}">{{ __('monitor::messages.email.change_verification_link') }}</a></p>
+<p>{{ __('monitor::messages.email.expires_in_60_minutes') }}</p>

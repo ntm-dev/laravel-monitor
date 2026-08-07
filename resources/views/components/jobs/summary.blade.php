@@ -38,23 +38,33 @@
     };
 
     $general = array_filter([
-        'Status' => $status,
-        'Queued' => $queuedAt !== null ? \LaravelMonitor\Support\Format::datetime($queuedAt) : null,
-        'End Time' => \LaravelMonitor\Support\Format::datetime($root->created_at),
-        'Connection' => $payload['connection'] ?? '—',
-        'Queue' => $payload['queue'] ?? 'default',
-        'Peak Memory' => $bytes($payload['peak_memory'] ?? null),
-        'Server' => $payload['server'] ?? null,
+        'status' => $status,
+        'queued_at' => $queuedAt !== null ? \LaravelMonitor\Support\Format::datetime($queuedAt) : null,
+        'end_time' => \LaravelMonitor\Support\Format::datetime($root->created_at),
+        'connection' => $payload['connection'] ?? '—',
+        'queue' => $payload['queue'] ?? 'default',
+        'peak_memory' => $bytes($payload['peak_memory'] ?? null),
+        'server' => $payload['server'] ?? null,
     ], fn ($value) => $value !== null);
+
+    $generalLabels = [
+        'status' => __('monitor::messages.common.status'),
+        'queued_at' => __('monitor::messages.job.queued_at'),
+        'end_time' => __('monitor::messages.job.end_time'),
+        'connection' => __('monitor::messages.common.connection'),
+        'queue' => __('monitor::messages.common.queue'),
+        'peak_memory' => __('monitor::messages.common.peak_memory'),
+        'server' => __('monitor::messages.common.server'),
+    ];
 @endphp
 <x-monitor::card class="p-4">
-    <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">General</h2>
+    <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.general') }}</h2>
     <dl class="space-y-2 text-sm">
-        @foreach ($general as $label => $value)
+        @foreach ($general as $key => $value)
             <div class="flex items-baseline justify-between gap-3">
-                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $label }}</dt>
+                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
                 <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
-                @if ($label === 'Status')
+                @if ($key === 'status')
                     <dd class="shrink-0">
                         <span class="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase {{ $badgeClass }}">{{ $value }}</span>
                     </dd>

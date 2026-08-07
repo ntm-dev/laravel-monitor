@@ -13,30 +13,30 @@
          its own vertical scroll for pathologically long queries. --}}
     <x-monitor::card class="flex flex-col gap-6 p-4 md:flex-row">
         <div class="md:w-1/2">
-            <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Info</h3>
+            <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.info') }}</h3>
             <dl class="flex flex-col gap-3">
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Total Time</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.total_time') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($totalTime) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Avg Time</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.avg_time') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->avg) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">P95</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.p95') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->p95) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Calls</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.calls') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ number_format($calls) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Connection</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="flex flex-wrap justify-end gap-1">
                         @forelse ($connections as $conn)
@@ -52,7 +52,7 @@
                     </dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
-                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">First seen</dt>
+                    <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.first_seen') }}</dt>
                     <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $firstSeen ? Format::datetime($firstSeen).' '.$tz : '—' }}</dd>
                 </div>
@@ -73,10 +73,10 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::card class="flex flex-col p-4">
-            <x-monitor::metric label="Calls" :value="number_format($calls)"/>
+            <x-monitor::metric :label="__('monitor::messages.common.calls')" :value="number_format($calls)"/>
             <div class="mt-5">
                 <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]"
-                    :series="[['label' => 'Calls', 'dot' => 'bg-blue-500', 'data' => $callBuckets]]"/>
+                    :series="[['label' => __('monitor::messages.common.calls'), 'dot' => 'bg-blue-500', 'data' => $callBuckets]]"/>
             </div>
             <x-monitor::chart-footer :since="$since" :until="$until"/>
         </x-monitor::card>
@@ -87,21 +87,21 @@
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="Icons::QUERIES" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ $entries->count() === 1 ? 'Call' : 'Calls' }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ trans_choice('monitor::messages.common.call_count', $entries->count()) }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
-                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">No calls recorded in this period.</p>
+                <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_calls_recorded_in_period') }}</p>
             @else
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[760px] text-sm">
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                                <th class="pb-2 font-normal">Date</th>
-                                <th class="pb-2 font-normal">Source</th>
-                                <th class="pb-2 font-normal">Connection</th>
-                                <th class="pb-2 font-normal">Location</th>
-                                <th class="pb-2 text-right font-normal">Duration</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.connection') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.location') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
@@ -119,12 +119,12 @@
                                     <td class="max-w-[16rem] py-2 pr-3">
                                         @if ($requestUrl)
                                             <span class="flex items-center gap-1.5">
-                                                <span class="shrink-0 rounded-md border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-blue-600 dark:text-blue-400">Request</span>
+                                                <span class="shrink-0 rounded-md border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-blue-600 dark:text-blue-400">{{ __('monitor::messages.exception.source_request') }}</span>
                                                 <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" title="{{ $requestLabel }}">{{ $requestLabel ?? '—' }}</span>
                                             </span>
                                         @else
                                             <span class="flex items-center gap-1.5">
-                                                <span class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-neutral-500 dark:text-neutral-400">Command</span>
+                                                <span class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.exception.source_command') }}</span>
                                                 <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" title="{{ $commandName }}">{{ $commandName ?? '—' }}</span>
                                             </span>
                                         @endif
@@ -153,7 +153,7 @@
                                     <td class="py-2 text-right font-mono text-xs {{ $entry->subtype === 'slow' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
                                     <td class="py-2 pl-2 text-right">
                                         @if ($requestUrl)
-                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" title="Open request">
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" title="{{ __('monitor::messages.common.open_request') }}">
                                                 <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                             </span>
                                         @endif
