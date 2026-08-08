@@ -772,6 +772,12 @@ class Monitor
         $this->recordCommandPhase($this->command['stage'], $this->command['stage_start'], $elapsed - $this->command['stage_start']);
 
         $entry->payload['phases'] = $this->command['phases'];
+        // The run's real start (LARAVEL_START), stamped the same way
+        // Recorders\Requests/Jobs stamp theirs — created_at is only stored
+        // at second precision and marks the run's *end*, so reconstructing
+        // "started at" from created_at - duration disagrees with this by up
+        // to a whole second (see Support\Format::startedAt()).
+        $entry->payload['started_at'] = $this->command['start'];
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
     }
 

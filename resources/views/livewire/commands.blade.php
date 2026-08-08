@@ -8,7 +8,9 @@
         'key' => ['label' => __('monitor::messages.common.command'), 'align' => 'left'],
         'success' => ['label' => __('monitor::messages.common.success'), 'align' => 'right'],
         'failed' => ['label' => __('monitor::messages.common.failed'), 'align' => 'right'],
+        'total' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
+        'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
     ];
 
     $from = ($page - 1) * $perPage;
@@ -83,7 +85,9 @@
                                 <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $command->key }}">{{ $command->key }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">{{ number_format($command->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $command->failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($command->failed) }}</td>
+                                <td class="py-2 text-right font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ number_format($command->total) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($command->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($command->avg_duration) }}</td>
+                                <td class="py-2 text-right font-mono text-xs {{ ($command->p95_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($command->p95_duration) }}</td>
                                 <td class="py-2 pl-2 text-right">
                                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
                                         <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>

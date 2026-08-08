@@ -1,5 +1,10 @@
 @php
     $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
+    $startedAt = function ($entry) {
+        $start = \LaravelMonitor\Support\Format::startedAt($entry);
+
+        return $start !== null ? \LaravelMonitor\Support\Format::datetime($start) : '—';
+    };
     $tz = \LaravelMonitor\Support\Format::timezone();
     $from = ($page - 1) * $perPage;
 @endphp
@@ -39,7 +44,8 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.command') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.exit_code') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
@@ -51,7 +57,11 @@
                             @php($runUrl = ($entry->request_id ?? null) ? route('monitor.commands.runs.show', $entry->request_id) : null)
                             <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                {{-- The run's start, not its created_at: entries are stamped when
+                                     they finish, so showing created_at here put this row a second
+                                     ahead of the "Started at" on the very run page it links to. --}}
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $entry->payload['command'] ?? '' }}">{{ $entry->payload['command'] ?? '—' }}</td>
                                 <td class="py-2 pr-3">
                                     <span @class([
                                         'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
