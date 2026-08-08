@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
  */
 class Timeline
 {
-    public const PHASES = ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'terminating'];
+    public const PHASES = ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'action', 'terminating'];
 
     /**
      * Phase name => display label, for the few phases whose name doesn't

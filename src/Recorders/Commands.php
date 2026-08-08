@@ -58,6 +58,15 @@ class Commands extends Recorder
         $duration = round((microtime(true) - $this->startedAt) * 1000, 2);
         $this->startedAt = null;
 
+        // Closes out the 'action' phase (everything since CommandStarting)
+        // and opens 'terminating' — mirrors markTerminating() for requests,
+        // just with no controller/render/unwinding steps of its own to close
+        // first. Must happen before record() below so the entry's own
+        // finalizePendingCommand() (run from flush() just after) closes
+        // 'terminating' against a phase list that already has 'bootstrap'
+        // and 'action' in it.
+        $this->monitor->markCommandTerminating();
+
         $this->monitor->record(
             type: 'command',
             key: $event->command,
@@ -69,10 +78,13 @@ class Commands extends Recorder
             subtype: $event->exitCode === 0 ? 'success' : 'failed',
         );
 
-        $this->monitor->endCommandRun();
-
         // Console commands never hit the request lifecycle, persist now.
+        // Before endCommandRun(): flush() finalizes the pending 'command'
+        // entry (phases, full-lifecycle duration) using $this->command,
+        // which endCommandRun() would otherwise have already cleared.
         $this->monitor->flush();
+
+        $this->monitor->endCommandRun();
     }
 
     /** Monitor's own housekeeping commands shouldn't show up as recorded commands themselves. */

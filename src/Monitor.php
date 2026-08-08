@@ -73,9 +73,21 @@ class Monitor
      * one command at a time, never concurrently with a request or a queued
      * job attempt, so at most one of $request/$job/$command is ever set.
      *
-     * @var array{id: string, name: string, start: float, models: int}|null
+     * @var array{
+     *     id: string,
+     *     name: string,
+     *     start: float,
+     *     phases: array<int, array{name: string, start: float, duration: float}>,
+     *     stage: string,
+     *     stage_start: float,
+     *     models: int,
+     *     pid: ?int,
+     * }|null
      */
     protected ?array $command = null;
+
+    /** The buffered root `command` entry, finalised (phases, duration) on flush — mirrors $pendingRequest. */
+    protected ?Entry $pendingCommand = null;
 
     /**
      * State of the scheduled task currently running, or null outside one —
@@ -140,13 +152,15 @@ class Monitor
             return;
         }
 
-        // Live-tag the entry with the request's current stage — the fix for
-        // queries that run while a middleware is unwinding after `$next()`
-        // (e.g. session persistence) getting swept into whatever phase
-        // happened to be open the longest, purely because their stored
-        // start_offset fell inside that phase's interval.
+        // Live-tag the entry with the request's (or command's) current stage
+        // — the fix for queries that run while a middleware is unwinding
+        // after `$next()` (e.g. session persistence) getting swept into
+        // whatever phase happened to be open the longest, purely because
+        // their stored start_offset fell inside that phase's interval.
         if ($type !== 'request' && $this->request !== null) {
             $payload['phase'] = $this->request['stage'];
+        } elseif ($type !== 'command' && $this->command !== null) {
+            $payload['phase'] = $this->command['stage'];
         }
 
         $entry = new Entry(
@@ -171,9 +185,31 @@ class Monitor
             $this->pendingRequest = $entry;
         }
 
+        if ($type === 'command' && $this->command !== null) {
+            $this->pendingCommand = $entry;
+        }
+
         $this->entries[] = $entry;
 
-        if (count($this->entries) >= (int) $this->app['config']->get('monitor.buffer', 200)) {
+        // `php artisan tinker` forks the whole PsySH REPL loop into a child
+        // process (Psy\ExecutionLoop\ProcessForker), so every query/job/mail/
+        // notification/... a user triggers interactively runs there — then
+        // the child reports back over a socket and SIGKILLs itself. SIGKILL
+        // skips PHP shutdown functions entirely, so CommandFinished (and the
+        // flush() Commands::recordFinished() triggers from it) only ever
+        // fires back in the *parent*, which never executed any of that code
+        // and has nothing of it buffered. Detecting the fork — the live pid
+        // no longer matches the one recorded when the run began — and
+        // flushing immediately closes that window: a doomed child persists
+        // its own entries before it can be killed, instead of losing them.
+        if (
+            $this->command !== null
+            && $this->command['pid'] !== null
+            && function_exists('posix_getpid')
+            && posix_getpid() !== $this->command['pid']
+        ) {
+            $this->flush();
+        } elseif (count($this->entries) >= (int) $this->app['config']->get('monitor.buffer', 200)) {
             $this->flush();
         }
     }
@@ -328,9 +364,70 @@ class Monitor
         $this->command = [
             'id' => $inheritedId ?? (string) Str::uuid(),
             'name' => $name,
-            'start' => microtime(true),
+            // LARAVEL_START (the artisan entry script sets this the same way
+            // public/index.php does for requests) rather than "now" — so the
+            // 'bootstrap' phase below, and every child entry's start_offset,
+            // account for the framework boot that already happened before
+            // CommandStarting fired, the same way beginRequest() does.
+            'start' => $this->timestamp ?? microtime(true),
+            'phases' => [],
+            'stage' => 'action',
+            'stage_start' => 0.0,
             'models' => 0,
+            // The pid this run actually started under — see record()'s fork
+            // detection, which this exists solely to support.
+            'pid' => function_exists('posix_getpid') ? posix_getpid() : null,
         ];
+
+        $elapsed = $this->commandElapsedMsPrecise() ?? 0.0;
+
+        $this->recordCommandPhase('bootstrap', 0, $elapsed);
+        $this->command['stage_start'] = $elapsed;
+    }
+
+    /** Milliseconds elapsed since the running command's own process started (LARAVEL_START), or null outside one. */
+    public function commandElapsedMsPrecise(): ?float
+    {
+        if ($this->command === null) {
+            return null;
+        }
+
+        return max(0.0, round((microtime(true) - $this->command['start']) * 1000, 3));
+    }
+
+    /** Append a named lifecycle phase for the running command (offsets/durations in ms, microsecond precision). */
+    public function recordCommandPhase(string $name, int|float $start, int|float $duration): void
+    {
+        if ($this->command === null) {
+            return;
+        }
+
+        $this->command['phases'][] = [
+            'name' => $name,
+            'start' => max(0, $start),
+            'duration' => max(0, $duration),
+        ];
+    }
+
+    /**
+     * Marks the handle()-done → terminating boundary. Called by the Commands
+     * recorder on CommandFinished, before the command's own entry is
+     * recorded — mirrors markTerminating(), but a command only ever has the
+     * one 'action' phase to close out first (no controller/render/unwinding
+     * steps of its own).
+     */
+    public function markCommandTerminating(): void
+    {
+        if ($this->command === null || $this->command['stage'] === 'terminating') {
+            return;
+        }
+
+        $now = $this->commandElapsedMsPrecise();
+
+        $this->recordCommandPhase($this->command['stage'], $this->command['stage_start'], $now - $this->command['stage_start']);
+
+        $this->command['stage'] = 'terminating';
+        $this->command['stage_start'] = $now;
     }
 
     public function commandRunId(): ?string
@@ -652,6 +749,33 @@ class Monitor
     }
 
     /**
+     * Complete the buffered root `command` entry right before it is stored —
+     * mirrors finalizePendingRequest(): closes out whichever stage the
+     * command was still in (always 'terminating' in practice, since
+     * Commands::recordFinished() calls markCommandTerminating() just before
+     * recording this entry), attaches the collected phases and extends the
+     * duration to cover the full lifecycle (bootstrap through terminating),
+     * not just the action/handle() portion Commands.php itself measures.
+     */
+    protected function finalizePendingCommand(): void
+    {
+        $entry = $this->pendingCommand;
+
+        if ($entry === null || $this->command === null) {
+            return;
+        }
+
+        $this->pendingCommand = null;
+
+        $elapsed = $this->commandElapsedMsPrecise();
+
+        $this->recordCommandPhase($this->command['stage'], $this->command['stage_start'], $elapsed - $this->command['stage_start']);
+
+        $entry->payload['phases'] = $this->command['phases'];
+        $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
+    }
+
+    /**
      * Persist all buffered entries through the configured storage driver.
      * Recording is paused while flushing so the storage writes themselves
      * (e.g. database queries) are never captured.
@@ -659,6 +783,7 @@ class Monitor
     public function flush(): void
     {
         $this->finalizePendingRequest();
+        $this->finalizePendingCommand();
 
         if ($this->entries === []) {
             return;
