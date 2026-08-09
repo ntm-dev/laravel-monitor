@@ -6,31 +6,6 @@
 @php
     $payload = $root->payload ?? [];
 
-    // Same B/KB/MB/... scaling as requests/summary.blade.php's own $bytes —
-    // duplicated rather than shared since it's a 4-line, view-local formatter.
-    $bytes = function (?int $value): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        if ($value < 1024) {
-            return $value.' B';
-        }
-
-        $units = ['KB', 'MB', 'GB', 'TB'];
-        $scaled = $value;
-
-        foreach ($units as $unit) {
-            $scaled /= 1024;
-
-            if ($scaled < 1024) {
-                return number_format($scaled, 1).' '.$unit;
-            }
-        }
-
-        return number_format($scaled, 1).' TB';
-    };
-
     $startedAt = \LaravelMonitor\Support\Format::startedAt($root);
 
     $general = array_filter([
@@ -41,7 +16,7 @@
         'command' => $payload['command'] ?? null,
         'started_at' => $startedAt !== null ? \LaravelMonitor\Support\Format::datetime($startedAt) : null,
         'duration' => \LaravelMonitor\Support\Format::duration($root->duration),
-        'peak_memory' => $bytes($payload['peak_memory'] ?? null),
+        'peak_memory' => \LaravelMonitor\Support\Number::fileSize($payload['peak_memory'] ?? null),
         'model_count' => isset($payload['model_count']) ? number_format($payload['model_count']) : null,
         'server' => $payload['server'] ?? null,
     ], fn ($value) => $value !== null);

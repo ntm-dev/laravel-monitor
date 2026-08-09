@@ -4,29 +4,6 @@
 @php
     $payload = $root->payload ?? [];
 
-    $bytes = function (?int $value): string {
-        if ($value === null) {
-            return '—';
-        }
-
-        if ($value < 1024) {
-            return $value.' B';
-        }
-
-        $units = ['KB', 'MB', 'GB', 'TB'];
-        $scaled = $value;
-
-        foreach ($units as $unit) {
-            $scaled /= 1024;
-
-            if ($scaled < 1024) {
-                return number_format($scaled, 1).' '.$unit;
-            }
-        }
-
-        return number_format($scaled, 1).' TB';
-    };
-
     $general = array_filter([
         'date' => \LaravelMonitor\Support\Format::datetime($root->created_at).' '.$timezone,
         'status_code' => $payload['status'] ?? '—',
@@ -34,8 +11,8 @@
         'action' => $payload['route_action'] ?? null,
         'domain' => $payload['route_domain'] ?? null,
         'server' => $payload['server'] ?? '—',
-        'response_size' => $bytes($payload['response_size'] ?? null),
-        'peak_memory' => $bytes($payload['peak_memory'] ?? null),
+        'response_size' => \LaravelMonitor\Support\Number::fileSize($payload['response_size'] ?? null, '—'),
+        'peak_memory' => \LaravelMonitor\Support\Number::fileSize($payload['peak_memory'] ?? null, '—'),
         'model_count' => isset($payload['model_count']) ? number_format($payload['model_count']) : null,
     ], fn ($value) => $value !== null);
 
