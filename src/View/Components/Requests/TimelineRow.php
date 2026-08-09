@@ -31,6 +31,12 @@ class TimelineRow extends Component
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
         'command' => 'COMMAND',
+        // A phase, not an event type — phase rows are badged through this
+        // same map (see badgeFor()). Only a command root ever opens an
+        // 'action' phase (see Monitor::beginCommandRun()), and on a command
+        // "Handle" names what it actually is: the command's own handle()
+        // call, bracketed by Bootstrap and Terminating.
+        'action' => 'HANDLE',
     ];
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';

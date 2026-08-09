@@ -136,6 +136,32 @@ class Format
         return Carbon::instance($date)->setTimezone(Preferences::timezone())->format(self::DATETIME);
     }
 
+    /**
+     * When an entry's own work actually began. Entries are stamped when they
+     * *finish* — `created_at` is the run's end, and only at second precision
+     * — so a list showing created_at and a detail page showing "started at"
+     * disagree by a full second on anything slower than that. Prefers the
+     * exact `started_at` the recorder captured at the moment the run began
+     * (see Recorders\Requests/Jobs and Monitor::finalizePendingCommand()),
+     * falling back to walking the duration back off created_at for rows
+     * persisted before that field existed. Float-timestamp twin of
+     * Http\Controllers\Concerns\MergesJobTimelines::startedAt().
+     */
+    public static function startedAt(object $entry): ?Carbon
+    {
+        $startedAt = $entry->payload['started_at'] ?? null;
+
+        if ($startedAt !== null) {
+            return Carbon::createFromTimestamp((float) $startedAt);
+        }
+
+        if ($entry->created_at === null) {
+            return null;
+        }
+
+        return Carbon::instance($entry->created_at)->subMilliseconds((int) round((float) ($entry->duration ?? 0)));
+    }
+
     public static function timezone(): string
     {
         return strtoupper(Preferences::timezone());

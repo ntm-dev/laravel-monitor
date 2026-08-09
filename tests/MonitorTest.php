@@ -484,6 +484,64 @@ class MonitorTest extends TestCase
         $this->assertSame(1, json_decode($row->payload, true)['exit_code']);
     }
 
+    public function test_command_recorder_captures_the_arguments_the_command_was_invoked_with(): void
+    {
+        $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data', '--day=3']);
+        $output = new \Symfony\Component\Console\Output\NullOutput();
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $row = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        // `key` stays the bare name — the Commands list groups by it, and one
+        // row per argument combination would fragment a command's history.
+        $this->assertSame('app:sync-data', $row->key);
+        $this->assertSame('app:sync-data --day=3', json_decode($row->payload, true)['command']);
+    }
+
+    public function test_command_recorder_omits_the_invocation_when_it_adds_nothing_to_the_name(): void
+    {
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $row = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->assertArrayNotHasKey('command', json_decode($row->payload, true));
+    }
+
+    public function test_command_recorder_records_the_run_start_so_it_survives_second_precision_timestamps(): void
+    {
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $row = DB::table('monitor_entries')->where('type', 'command')->first();
+        $payload = json_decode($row->payload, true);
+
+        // created_at is stored at second precision and marks the run's END,
+        // so the run page and the runs list can only agree on "started at"
+        // if the exact start was recorded (see Support\Format::startedAt()).
+        $this->assertArrayHasKey('started_at', $payload);
+        $this->assertEqualsWithDelta(microtime(true), $payload['started_at'], 60);
+    }
+
+    public function test_command_recorder_ignores_the_scheduler_own_finish_subprocess(): void
+    {
+        [$input, $output] = $this->commandEvents('schedule:finish');
+
+        event(new \Illuminate\Console\Events\CommandStarting('schedule:finish', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('schedule:finish', $input, $output, 0));
+
+        // Laravel appends this bookkeeping subprocess to every background
+        // scheduled task, and it inherits the task's run id — recording it
+        // put a second, overlapping COMMAND bar on the task's timeline.
+        $this->assertDatabaseCount('monitor_entries', 0);
+    }
+
     public function test_command_recorder_ignores_the_package_own_housekeeping_commands(): void
     {
         [$input, $output] = $this->commandEvents('monitor:aggregate');
@@ -525,6 +583,99 @@ class MonitorTest extends TestCase
             ->assertOk()
             ->assertSeeText('app:sync-data')
             ->assertSeeText('QUERY');
+    }
+
+    public function test_command_run_page_links_to_its_scheduled_task_instead_of_charting_it(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $task = $schedule->command('inspire')->runInBackground();
+
+        // Stands in for the scheduler process: the run id it mints is what a
+        // command-based task's own `php artisan` subprocess inherits through
+        // Context (see Monitor::inheritedScheduledTaskRunId()).
+        Monitor::beginScheduledTaskRun();
+        $runId = app(\LaravelMonitor\Monitor::class)->scheduledTaskRunId();
+
+        $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data', '--day=3']);
+        $output = new \Symfony\Component\Console\Output\NullOutput();
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        event(new \Illuminate\Console\Events\ScheduledTaskFinished($task, 0.02));
+
+        $response = $this->get('/monitor/commands/runs/'.$runId)->assertOk();
+
+        // The arguments the run was actually invoked with...
+        $response->assertSeeText('app:sync-data --day=3');
+
+        // ...and its parent task as a link, not as a bar drawn at offset 0
+        // against the scheduler process's own, unrelated clock.
+        $response->assertSee(route('monitor.schedule.runs.show', $runId), false);
+        $response->assertDontSee('SCHEDULED_TASK');
+    }
+
+    public function test_commands_list_reports_a_total_and_a_p95_alongside_the_success_failure_split(): void
+    {
+        foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as $duration) {
+            Monitor::record('command', 'app:sync-data', ['exit_code' => 0], $duration, 'success');
+        }
+        Monitor::record('command', 'app:sync-data', ['exit_code' => 1], 200, 'failed');
+        Monitor::flush();
+
+        $row = Livewire::test(\LaravelMonitor\Livewire\Commands::class)
+            ->viewData('commands')
+            ->firstWhere('key', 'app:sync-data');
+
+        $this->assertSame(10, $row->success);
+        $this->assertSame(1, $row->failed);
+        $this->assertSame(11, $row->total);
+
+        // p95 has to come from the actual duration values — the failed run's
+        // 200ms is the slowest of the eleven, so it must be the one reported.
+        $this->assertSame(200.0, $row->p95_duration);
+        $this->assertGreaterThan($row->avg_duration, $row->p95_duration);
+    }
+
+    public function test_command_run_page_breadcrumb_links_back_to_that_command_own_runs(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->get('/monitor/commands/runs/'.$commandRow->request_id)
+            ->assertOk()
+            // Hashed by the command's *name*, which is what its runs list is
+            // keyed by — not by this run's own invocation.
+            ->assertSee(route('monitor.commands.show', ['hash' => \LaravelMonitor\Support\KeyHash::for('app:sync-data')]), false);
+    }
+
+    public function test_command_timeline_names_the_action_phase_handle(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        [$input, $output] = $this->commandEvents('app:sync-data');
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        $this->get('/monitor/commands/runs/'.$commandRow->request_id)
+            ->assertOk()
+            // Both spellings: the tree/bar row renders the phase's *label*
+            // (uppercased in CSS, so it stays "Handle" in the markup) while
+            // the Alpine inspector's entry map carries the badge.
+            ->assertSee('Handle')
+            ->assertSee('HANDLE')
+            ->assertDontSee('Action')
+            ->assertDontSee('ACTION');
     }
 
     public function test_command_run_page_returns_404_for_unknown_run(): void

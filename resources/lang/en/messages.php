@@ -50,7 +50,6 @@ return [
         'preferences' => 'Preferences',
         'preferences_hint' => 'These settings are stored in your browser and only affect how the dashboard looks for you.',
         'environment' => 'Environment',
-        'environment_hint' => 'Read-only values from config/monitor.php. Change them via your config file or environment variables.',
         'recorders' => 'Recorders',
 
         'theme' => 'Theme',
@@ -60,8 +59,6 @@ return [
         'language' => 'Language',
         'timezone' => 'Timezone',
         'use_browser_timezone' => 'Use browser timezone',
-        'save' => 'Save preferences',
-        'saved' => 'Preferences saved.',
 
         'environment_editable_hint' => 'Overrides for config/monitor.php defaults. Saved values win; anything left at its default keeps following the config file.',
         'save_system' => 'Save settings',
@@ -77,7 +74,6 @@ return [
         'tz_search' => 'Search timezone…',
         'tz_no_match' => 'No timezone found.',
         'storage_note' => 'Advanced — changing the storage or dashboard path applies from the next request; the dashboard reloads at the new URL. Storage changes can hide existing data until the new table is populated.',
-        'path_help' => 'The URL prefix the dashboard is served from.',
         'recorders_hint' => 'Toggle which framework events are recorded.',
 
         'recording' => 'Recording',
@@ -92,10 +88,6 @@ return [
         'job_threshold' => 'Job threshold',
         'query_threshold' => 'Query threshold',
         'outgoing_request_threshold' => 'Outgoing request threshold',
-
-        'enabled' => 'Enabled',
-        'disabled' => 'Disabled',
-        'hours' => ':count hours',
     ],
 
     'team' => [
@@ -449,6 +441,11 @@ return [
     'job' => [
         'queued_at' => 'Queued',
         'end_time' => 'End Time',
+    ],
+
+    'command' => [
+        'started_at' => 'Started at',
+        'scheduled_task' => 'Scheduled task',
     ],
 
     'issue' => [

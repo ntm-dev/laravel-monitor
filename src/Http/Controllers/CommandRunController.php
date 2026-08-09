@@ -50,11 +50,24 @@ class CommandRunController
 
         $children = $this->storage->timelineFor($runId, 'command');
 
+        // A command-based scheduled task's subprocess adopts the task's own
+        // run id (see Monitor::beginCommandRun()), so the `scheduled_task`
+        // row shares this timeline — but it is this run's *parent*, recorded
+        // back in the scheduler's process against that process's own clock.
+        // Left among the children it drew a bar at offset 0 (its own root
+        // offset) while being filed under whichever phase it was tagged
+        // with, i.e. a 20ms "SCHEDULED TASK" sitting inside BOOTSTRAP but
+        // listed under ACTION. It belongs in the General card as a link to
+        // the task's own run page instead.
+        $scheduledTask = $children->firstWhere('type', 'scheduled_task');
+        $children = $children->reject(fn (object $row) => $row->type === 'scheduled_task')->values();
+
         [$groups, $footerTabs] = Nav::grouped();
         $tracks = $this->buildTracks($root, $children, 'COMMAND');
 
         return view('monitor::command-run-page', [
             'root' => $root,
+            'scheduledTask' => $scheduledTask,
             'tracks' => $tracks,
             'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
             'summary' => $this->eventsSummary($children),

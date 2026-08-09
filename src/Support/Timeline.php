@@ -22,6 +22,12 @@ class Timeline
      */
     protected const PHASE_LABELS = [
         'unwinding' => 'Middleware',
+        // Phase rows render their *label*, not their badge (see
+        // components/requests/timeline-row.blade.php), so renaming this
+        // phase in the UI takes both this entry and TimelineRow::BADGES —
+        // one drives the tree/bar text, the other the Alpine inspector's
+        // entry map, and they have to agree.
+        'action' => 'Handle',
     ];
 
     /**

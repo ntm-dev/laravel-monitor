@@ -12,38 +12,13 @@
         default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     };
 
-    // Same B/KB/MB/... scaling as requests/summary.blade.php's own $bytes —
-    // duplicated rather than shared since it's a 4-line, view-local formatter.
-    $bytes = function (?int $value): ?string {
-        if ($value === null) {
-            return null;
-        }
-
-        if ($value < 1024) {
-            return $value.' B';
-        }
-
-        $units = ['KB', 'MB', 'GB', 'TB'];
-        $scaled = $value;
-
-        foreach ($units as $unit) {
-            $scaled /= 1024;
-
-            if ($scaled < 1024) {
-                return number_format($scaled, 1).' '.$unit;
-            }
-        }
-
-        return number_format($scaled, 1).' TB';
-    };
-
     $general = array_filter([
         'status' => $status,
         'queued_at' => $queuedAt !== null ? \LaravelMonitor\Support\Format::datetime($queuedAt) : null,
         'end_time' => \LaravelMonitor\Support\Format::datetime($root->created_at),
         'connection' => $payload['connection'] ?? '—',
         'queue' => $payload['queue'] ?? 'default',
-        'peak_memory' => $bytes($payload['peak_memory'] ?? null),
+        'peak_memory' => \LaravelMonitor\Support\Number::fileSize($payload['peak_memory'] ?? null),
         'server' => $payload['server'] ?? null,
     ], fn ($value) => $value !== null);
 
