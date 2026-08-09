@@ -125,9 +125,9 @@
             const count = this.selected()?.metadata?.attachments || 0;
             return names.length ? count + ' (' + names.join(', ') + ')' : String(count);
         },
-        {{-- Same B/KB/MB/... scaling as jobs/summary.blade.php's own PHP
-             $bytes formatter, mirrored here since the queue detail panel
-             below renders client-side from the JSON entry map, not Blade. --}}
+        {{-- Same B/KB/MB/... scaling as Support\Number::fileSize(), mirrored
+             here since the queue detail panel below renders client-side from
+             the JSON entry map, not Blade. --}}
         formatBytes(value) {
             if (!value) return '';
             if (value < 1024) return value + ' B';

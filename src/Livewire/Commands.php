@@ -6,7 +6,7 @@ class Commands extends Card
 {
     public const PER_PAGE = 15;
 
-    public const SORTABLE = ['key', 'success', 'failed', 'avg_duration'];
+    public const SORTABLE = ['key', 'success', 'failed', 'total', 'avg_duration', 'p95_duration'];
 
     /** See Jobs::MAX_KEYS for why this replaces the previous top-10 cap. */
     protected const MAX_KEYS = 5000;
@@ -64,31 +64,31 @@ class Commands extends Card
 
         $bySubtype = $storage->statsBySubtype('command', $since, $until);
 
-        $success = $storage->aggregateByKey('command', $since, 'success', self::MAX_KEYS, 'count', $until);
-        $failed = $storage->aggregateByKey('command', $since, 'failed', self::MAX_KEYS, 'count', $until);
+        // keyStats() rather than a second aggregateByKey(): the whole-command
+        // figures (total runs, avg, p95) have to come from one pass over the
+        // actual duration values, because a percentile isn't computable in
+        // portable SQL — aggregateByKey(), which groups in the database, has
+        // no p95 to offer. It carries no subtype dimension of its own, so the
+        // failed count still comes from an aggregateByKey() call and success
+        // is the remainder.
+        $groups = $storage->keyStats('command', $since, $until);
+        $failed = $storage->aggregateByKey('command', $since, 'failed', self::MAX_KEYS, 'count', $until)->keyBy('key');
 
-        $commands = collect();
+        $commands = $groups->map(function (object $group) use ($failed) {
+            // Both sides are independently sampled at high volume (see
+            // DatabaseStorage::MAX_SAMPLE_ROWS), so clamp rather than trust
+            // the subtraction to stay non-negative.
+            $failedCount = (int) ($failed->get($group->key)?->count ?? 0);
 
-        foreach ([$success, $failed] as $index => $groups) {
-            $column = ['success', 'failed'][$index];
-
-            foreach ($groups as $group) {
-                $command = $commands->get($group->key) ?? (object) [
-                    'key' => $group->key,
-                    'success' => 0,
-                    'failed' => 0,
-                    'avg_duration' => null,
-                ];
-
-                $command->{$column} = $group->count;
-
-                if ($column === 'success') {
-                    $command->avg_duration = $group->avg_duration;
-                }
-
-                $commands->put($group->key, $command);
-            }
-        }
+            return (object) [
+                'key' => $group->key,
+                'success' => max(0, $group->count - $failedCount),
+                'failed' => $failedCount,
+                'total' => $group->count,
+                'avg_duration' => $group->avg_duration,
+                'p95_duration' => $group->p95_duration,
+            ];
+        })->values();
 
         if ($this->search !== '') {
             $needle = strtolower($this->search);
