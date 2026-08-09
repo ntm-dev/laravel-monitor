@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Recorders;
 
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskSkipped;
@@ -13,7 +14,9 @@ use Illuminate\Support\Str;
 use function gethostname;
 use function memory_get_peak_usage;
 use function memory_reset_peak_usage;
+use function preg_replace;
 use function str_contains;
+use function str_replace;
 use function trim;
 
 class ScheduledTasks extends Recorder
@@ -127,20 +130,35 @@ class ScheduledTasks extends Recorder
     /**
      * The task's command exactly as `schedule:list` prints it — e.g.
      * "php artisan app:sync-chain-data" — or null for a closure, which has
-     * no command string to normalize. Illuminate\Console\Scheduling\Event's
-     * own formatter, so the dashboard reads the same thing that command
-     * generates, rather than re-deriving a `php artisan` prefix by hand.
+     * no command string to normalize.
+     *
+     * Reimplements Illuminate\Console\Scheduling\Event::normalizeCommand()
+     * rather than calling it: that method is Laravel 11+ only (this package
+     * supports ^10.0 too, and calling it there throws — Event only extends
+     * Macroable, so a missing method surfaces as a runtime
+     * BadMethodCallException, not a compile-time error). The one-line
+     * str_replace it wraps is reproduced here instead, built from
+     * Application::phpBinary()/artisanBinary() — stable since command-based
+     * scheduling itself, long before normalizeCommand() existed.
      *
      * Normalizing here, inside the CLI process that just ran the task,
      * rather than later when the dashboard renders it, is what keeps this
-     * accurate: normalizeCommand() swaps in whatever
-     * Illuminate\Support\php_binary() resolves to *right now*, and that can
-     * differ under the web server process rendering the dashboard from what
-     * it was under this CLI process — normalizing on the spot means the
-     * stored string is already correct and the dashboard just displays it.
+     * accurate: phpBinary() swaps in whatever PhpExecutableFinder resolves
+     * to *right now*, and that can differ under the web server process
+     * rendering the dashboard from what it was under this CLI process —
+     * normalizing on the spot means the stored string is already correct
+     * and the dashboard just displays it.
      */
     protected function fullCommand(ScheduledEvent $task): ?string
     {
-        return $task->command !== null ? ScheduledEvent::normalizeCommand($task->command) : null;
+        if ($task->command === null) {
+            return null;
+        }
+
+        return str_replace(
+            [ConsoleApplication::phpBinary(), ConsoleApplication::artisanBinary()],
+            ['php', preg_replace("#['\"]#", '', ConsoleApplication::artisanBinary())],
+            $task->command,
+        );
     }
 }
