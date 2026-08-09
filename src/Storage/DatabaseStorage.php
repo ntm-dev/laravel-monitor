@@ -878,8 +878,9 @@ class DatabaseStorage implements Storage
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
         ?int $userId = null,
+        ?string $subtype = null,
     ): Collection {
-        $rows = $this->query($type, $since, null, null, $until, $userId)
+        $rows = $this->query($type, $since, $subtype, null, $until, $userId)
             // created_at, not id, as the primary sort — see cacheKeyStats()
             // for why. Rows arrive newest-first, so the first row seen per
             // key is its last_seen. `id` is added as a deterministic
@@ -921,6 +922,33 @@ class DatabaseStorage implements Storage
         }
 
         return collect($result);
+    }
+
+    public function latestPayloadByKey(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        int $limit = 1000,
+    ): Collection {
+        // Two narrow queries rather than one sampled scan: the GROUP BY reads
+        // only ids, so the payload column — by far the widest in the table —
+        // is fetched for one row per key instead of for the whole sample.
+        // `max(id)`, not max(created_at), so a tie within the same second
+        // still resolves to a single, actually-latest row.
+        $ids = $this->query($type, $since, null, null, $until)
+            ->selectRaw('max(id) as latest_id')
+            ->groupBy('key')
+            ->limit($limit)
+            ->pluck('latest_id');
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return $this->table()
+            ->whereIn('id', $ids->all())
+            ->get(['key', 'payload'])
+            ->mapWithKeys(static fn ($row) => [$row->key => json_decode($row->payload ?? '[]', true) ?: []]);
     }
 
     public function exceptionGroups(

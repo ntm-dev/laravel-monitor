@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Support;
 
+use Carbon\CarbonInterval;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
 
@@ -39,6 +40,13 @@ class Format
         'direct' => 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 text-neutral-500 dark:text-neutral-400',
     ];
 
+    /**
+     * Memoized durationUnits() results, keyed by locale.
+     *
+     * @var array<string, array<string, string>>
+     */
+    protected static array $durationUnits = [];
+
     /** Duration units, largest first, as [milliseconds-per-unit, suffix]. */
     protected const DURATION_UNITS = [
         [3_600_000, 'h'],
@@ -70,6 +78,57 @@ class Format
         }
 
         return rtrim(rtrim(number_format($milliseconds, 2), '0'), '.').'ms';
+    }
+
+    /**
+     * `:count`-templated suffix per duration unit, keyed by the letter a
+     * caller groups by: `[':countd', ':counth', ...]` in English,
+     * `[':count ngày', ':count giờ', ...]` in Vietnamese. Read out of Carbon
+     * rather than hardcoded, so a locale the package itself doesn't ship
+     * still gets its own units.
+     *
+     * Laravel never syncs Carbon's locale to the app's — nothing listens for
+     * LocaleUpdated — so it is set per interval here rather than assumed.
+     * The template is recovered by rendering a probe count and putting the
+     * placeholder back, because only the rendered form has been through
+     * Carbon's own plural selection.
+     *
+     * Keyed off the app locale, not Preferences::locale(), so these always
+     * agree with the __() strings beside them; the middleware has already
+     * pushed the preference onto the app. Memoized because a table renders
+     * one countdown per row and Preferences::availableLocales() globs the
+     * lang directory on every call.
+     *
+     * @return array<string, string>
+     */
+    public static function durationUnits(): array
+    {
+        $locale = app()->getLocale();
+
+        if (isset(self::$durationUnits[$locale])) {
+            return self::$durationUnits[$locale];
+        }
+
+        $probe = 2;
+
+        $intervals = [
+            'd' => CarbonInterval::days($probe),
+            'h' => CarbonInterval::hours($probe),
+            'm' => CarbonInterval::minutes($probe),
+            's' => CarbonInterval::seconds($probe),
+        ];
+
+        $units = [];
+
+        foreach ($intervals as $key => $interval) {
+            $units[$key] = str_replace(
+                (string) $probe,
+                ':count',
+                $interval->locale($locale)->forHumans(['short' => true]),
+            );
+        }
+
+        return self::$durationUnits[$locale] = $units;
     }
 
     public static function datetime(DateTimeInterface $date): string

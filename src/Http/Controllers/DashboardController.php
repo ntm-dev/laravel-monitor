@@ -149,7 +149,7 @@ class DashboardController
             'requests' => (new RequestHeading)($key),
             'jobs' => (new JobHeading)($key),
             'commands' => (new CommandHeading)($key),
-            'schedule' => (new ScheduleHeading)($key),
+            'schedule' => app(ScheduleHeading::class)($key),
             'exceptions' => app(ExceptionHeading::class)($key),
             'queries' => (new QueryHeading)($key),
             'notifications' => app(NotificationHeading::class)($key),

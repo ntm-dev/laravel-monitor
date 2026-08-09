@@ -43,10 +43,14 @@ class Commands extends Recorder
         // rather than starting an unrelated one of its own.
         $inheritedId = $this->monitor->inheritedScheduledTaskRunId();
 
+        // Rides alongside $inheritedId (see Monitor::inheritedScheduledTaskStart()
+        // for why this run needs the scheduled task's own *start*, not just its id).
+        $inheritedStart = $this->monitor->inheritedScheduledTaskStart();
+
         // Before the command's own handle() runs, so everything it triggers
         // (queries, mail, notifications, dispatched jobs) correlates onto
         // this run's own timeline — mirrors beginRequest()/beginJobAttempt().
-        $this->monitor->beginCommandRun($event->command, $inheritedId);
+        $this->monitor->beginCommandRun($event->command, $inheritedId, $inheritedStart);
     }
 
     public function recordFinished(CommandFinished $event): void

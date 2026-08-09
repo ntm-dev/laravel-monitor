@@ -57,7 +57,15 @@ class ScheduleRunController
 
         abort_unless($root !== null, 404);
 
-        $children = $this->storage->timelineFor($runId, 'scheduled_task');
+        // Only the Event Summary's own categories (see SUMMARY_TYPES) — a
+        // command-based task's own nested 'command' run (its
+        // `php artisan the:command` subprocess) is dropped here rather than
+        // shown as a timeline row: it isn't one of this task's *triggered*
+        // events, it's a re-report of the task itself, already named by the
+        // page's own header.
+        $children = $this->storage
+            ->timelineFor($runId, 'scheduled_task')
+            ->whereIn('type', array_keys(self::SUMMARY_TYPES));
 
         [$groups, $footerTabs] = Nav::grouped();
         $tracks = $this->buildTracks($root, $children, 'SCHEDULED TASK');

@@ -156,12 +156,32 @@ interface Storage
      * count/avg_duration/max_duration aggregateByKey() computes in SQL.
      * Sampled at high volume — see durationStats() — so `count` is exact
      * only up to DatabaseStorage::MAX_SAMPLE_ROWS matching rows.
+     *
+     * `$subtype` narrows the sample to one status, for types whose duration
+     * only means something on a subset of their entries (a scheduled task's
+     * `failed`/`skipped` rows carry no duration at all, so an unfiltered p95
+     * would be diluted by them).
      */
     public function keyStats(
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
         ?int $userId = null,
+        ?string $subtype = null,
+    ): Collection;
+
+    /**
+     * The payload of the most recent entry of each key of a type, as
+     * `key => payload array`. Used where a list row needs the task/job's
+     * current *definition* (a scheduled task's cron expression, say) rather
+     * than a statistic — the aggregate methods above never return payloads.
+     * Exact, not sampled, but capped at `$limit` distinct keys.
+     */
+    public function latestPayloadByKey(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until = null,
+        int $limit = 1000,
     ): Collection;
 
     /**

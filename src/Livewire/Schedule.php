@@ -2,20 +2,25 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Support\Cron;
+
 class Schedule extends Card
 {
     public const PER_PAGE = 15;
 
-    public const SORTABLE = ['key', 'finished', 'skipped', 'failed', 'avg_duration'];
+    public const SORTABLE = [
+        'key', 'next_run_at', 'finished', 'skipped',
+        'failed', 'total', 'avg_duration', 'p95_duration',
+    ];
 
     /** See Jobs::MAX_KEYS for why this replaces a plain top-N cap. */
     protected const MAX_KEYS = 5000;
 
     public string $search = '';
 
-    public string $sortBy = 'finished';
+    public string $sortBy = 'key';
 
-    public string $sortDirection = 'desc';
+    public string $sortDirection = 'asc';
 
     public int $page = 1;
 
@@ -68,6 +73,15 @@ class Schedule extends Card
         $failed = $storage->aggregateByKey('scheduled_task', $since, 'failed', self::MAX_KEYS, 'count', $until);
         $skipped = $storage->aggregateByKey('scheduled_task', $since, 'skipped', self::MAX_KEYS, 'count', $until);
 
+        // p95 can't be computed in SQL portably, so it comes from the sampled
+        // per-key breakdown rather than from aggregateByKey() above; scoped to
+        // `finished` to match avg_duration, since failed/skipped runs record
+        // no duration at all.
+        $durations = $storage->keyStats('scheduled_task', $since, $until, subtype: 'finished')->keyBy('key');
+
+        // Each task's own cron expression, off the payload of its latest run.
+        $definitions = $storage->latestPayloadByKey('scheduled_task', $since, $until, self::MAX_KEYS);
+
         $tasks = collect();
 
         foreach ([$finished, $failed, $skipped] as $index => $groups) {
@@ -92,9 +106,25 @@ class Schedule extends Card
             }
         }
 
+        foreach ($tasks as $task) {
+            $payload = $definitions->get($task->key, []);
+
+            $task->total = $task->finished + $task->failed + $task->skipped;
+            $task->p95_duration = $durations->get($task->key)?->p95_duration;
+            $task->command = $payload['command'] ?? null;
+            $task->expression = $payload['expression'] ?? null;
+            $task->schedule = Cron::describe($task->expression, $payload['repeat_seconds'] ?? null);
+            $task->next_run_at = Cron::nextRunAt(
+                $task->expression,
+                $payload['timezone'] ?? null,
+                $payload['repeat_seconds'] ?? null,
+            );
+        }
+
         if ($this->search !== '') {
             $needle = strtolower($this->search);
-            $tasks = $tasks->filter(fn ($task) => str_contains(strtolower($task->key), $needle))->values();
+            $tasks = $tasks->filter(static fn ($task) => str_contains(strtolower($task->key), $needle)
+                || str_contains(strtolower($task->command ?? ''), $needle))->values();
         }
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'finished';

@@ -16,6 +16,8 @@ class Heading
         public readonly string $pageTitle = '',
         /** Wrap onto multiple lines instead of single-line CSS truncation — for long, meaningful text like SQL where clipping loses information. */
         public readonly bool $wrap = false,
+        /** Render the badge after the heading text instead of before it — for a badge that annotates the heading (e.g. a schedule's cadence) rather than classifying it (e.g. an HTTP method). */
+        public readonly bool $badgeAfter = false,
     ) {
     }
 }
