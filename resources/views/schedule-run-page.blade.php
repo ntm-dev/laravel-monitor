@@ -5,15 +5,24 @@
      command-run-page.blade.php: a simple status header, the event summary
      and the shared waterfall timeline, with no HTTP-specific sections. --}}
 @php
+    use LaravelMonitor\Support\Cron;
     use LaravelMonitor\Support\Format;
+    use LaravelMonitor\Support\KeyHash;
 
-    $command = $root->payload['command'] ?? $root->key ?? 'Scheduled Task';
+    $key = $root->key ?? 'Scheduled Task';
+    $command = $root->payload['command'] ?? $key;
     $status = $root->subtype ?? 'finished';
     $badgeClass = match ($status) {
         'failed' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
         'skipped' => 'bg-neutral-200/70 text-neutral-600 dark:bg-neutral-500/10 dark:text-neutral-400',
         default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     };
+
+    // Same cadence phrase as the badge on the schedule-show page's own
+    // header (see Http\Headings\ScheduleHeading) — badged after the
+    // command here too, for the same reason: it annotates the command
+    // rather than classifying it the way the (now-removed) status badge did.
+    $schedule = Cron::describe($root->payload['expression'] ?? null, $root->payload['repeat_seconds'] ?? null);
 
     // Same B/KB/MB/... scaling as requests/summary.blade.php's own $bytes.
     $bytes = function (?int $value): string {
@@ -70,14 +79,30 @@
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
                 <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
-                    <a href="{{ route('monitor.dashboard', ['tab' => 'schedule'] + $range) }}"
-                       class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
-                        ← {{ __('monitor::messages.nav.schedule') }}
-                    </a>
+                    {{-- start breadcrumb scheduled task run --}}
+                    <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+                        <a href="{{ route('monitor.dashboard', ['tab' => 'schedule'] + $range) }}"
+                           class="shrink-0 hover:text-neutral-900 dark:hover:text-neutral-100">
+                            {{ __('monitor::messages.nav.schedule') }}
+                        </a>
+                        <span class="shrink-0">›</span>
+                        {{-- The task's *key*, not this run's own full command: it
+                             links back to that task's own list of runs, which is
+                             keyed by the short grouping key (see
+                             Recorders\ScheduledTasks::name()). --}}
+                        <a href="{{ route('monitor.schedule.show', ['hash' => KeyHash::for($key)] + $range) }}"
+                           title="{{ $key }}"
+                           class="min-w-0 truncate font-mono hover:text-neutral-900 dark:hover:text-neutral-100">
+                            {{ $key }}
+                        </a>
+                    </nav>
+                    {{-- end breadcrumb scheduled task run --}}
 
                     <div class="mt-1 flex flex-wrap items-center gap-2.5">
-                        <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $badgeClass }}">{{ __("monitor::messages.common.{$status}") }}</span>
                         <h1 class="min-w-0 truncate font-mono text-2xl font-bold tracking-tight" title="{{ $command }}">{{ $command }}</h1>
+                        @if ($schedule !== null)
+                            <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight bg-neutral-200/70 text-neutral-600">{{ $schedule }}</span>
+                        @endif
                     </div>
                 </div>
             </header>
@@ -87,11 +112,11 @@
                 <x-monitor::card class="p-4">
                     <h2 class="mb-3 font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.general') }}</h2>
                     <dl class="space-y-2 text-sm">
-                        @foreach ($general as $key => $value)
+                        @foreach ($general as $field => $value)
                             <div class="flex items-baseline justify-between gap-3">
-                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$field] }}</dt>
                                 <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
-                                @if ($key === 'status')
+                                @if ($field === 'status')
                                     <dd class="shrink-0">
                                         <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ $badgeClass }}">{{ $value }}</span>
                                     </dd>
