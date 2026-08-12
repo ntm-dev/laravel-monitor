@@ -27,7 +27,7 @@ class SettingsTest extends TestCase
 
         $this->assertSame(['enabled' => false, 'refresh' => 30], Settings::all());
 
-        $path = storage_path('app/monitor-settings.php');
+        $path = app()->bootstrapPath('cache/monitor-settings.php');
 
         $this->assertFileExists($path);
         $this->assertStringStartsWith('<?php', file_get_contents($path));
@@ -40,11 +40,11 @@ class SettingsTest extends TestCase
     public function test_reset_deletes_the_file_and_clears_saved_overrides(): void
     {
         Settings::save(['enabled' => false]);
-        $this->assertFileExists(storage_path('app/monitor-settings.php'));
+        $this->assertFileExists(app()->bootstrapPath('cache/monitor-settings.php'));
 
         Settings::reset();
 
-        $this->assertFileDoesNotExist(storage_path('app/monitor-settings.php'));
+        $this->assertFileDoesNotExist(app()->bootstrapPath('cache/monitor-settings.php'));
         $this->assertSame([], Settings::all());
     }
 

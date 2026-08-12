@@ -638,6 +638,50 @@ class MonitorTest extends TestCase
         $this->assertGreaterThan($row->avg_duration, $row->p95_duration);
     }
 
+    public function test_command_detail_runs_list_falls_back_to_the_bare_name_when_no_invocation_was_captured(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // A command invoked with no arguments (e.g. an interactive `tinker`
+        // session, not `tinker --execute=...`) carries nothing extra to show —
+        // Recorders\Commands::commandLine() deliberately omits `command` from
+        // the payload rather than duplicating `key`. The runs list must still
+        // show the bare name instead of leaving the cell blank.
+        Monitor::record('command', 'tinker', ['exit_code' => 0], 50, 'success');
+        Monitor::flush();
+
+        $this->get('/monitor/commands/'.\LaravelMonitor\Support\KeyHash::for('tinker'))
+            ->assertOk()
+            // The run row's own command cell specifically (its class list is
+            // unique on the page) — the page heading already shows the bare
+            // name regardless of this fallback, so asserting "tinker" alone
+            // would pass either way.
+            ->assertSee('dark:text-neutral-400" title="tinker">tinker</td>', false);
+    }
+
+    public function test_command_run_page_truncates_a_long_invocation_instead_of_overflowing_the_card(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $longArgument = str_repeat('a', 300);
+        $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data', "--day={$longArgument}"]);
+        $output = new \Symfony\Component\Console\Output\NullOutput();
+
+        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+
+        // The General card's `command` row must shrink/truncate like every
+        // other value with no length limit on this page (breadcrumb, h1) —
+        // not the fixed-width `shrink-0` every other row in that card uses,
+        // which would push the card wider than its column instead of
+        // eliding the text.
+        $this->get('/monitor/commands/runs/'.$commandRow->request_id)
+            ->assertOk()
+            ->assertSee('min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" title="app:sync-data --day='.$longArgument.'"', false);
+    }
+
     public function test_command_run_page_breadcrumb_links_back_to_that_command_own_runs(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
