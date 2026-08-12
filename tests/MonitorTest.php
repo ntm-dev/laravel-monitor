@@ -21,6 +21,7 @@ use LaravelMonitor\Support\Preferences;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
+use ReflectionProperty;
 use RuntimeException;
 
 class MonitorTest extends TestCase
@@ -451,6 +452,37 @@ class MonitorTest extends TestCase
         ];
     }
 
+    /**
+     * Hides the *scheduler's own* in-process scheduled-task frame from
+     * $callback, restoring it afterwards — simulating the process boundary a
+     * command-based task's own subprocess actually starts fresh across (its
+     * Monitor instance never has $scheduledTask set at all — see
+     * Monitor::inheritedScheduledTaskRunId()). A test that calls
+     * beginScheduledTaskRun() and then fires CommandStarting/QueryExecuted/
+     * CommandFinished in the same process, without this, leaves both
+     * $scheduledTask and $command non-null at once for the command events —
+     * an impossible state in production — under which record()'s request_id
+     * fallback picks $scheduledTask['id'] ahead of $command['id'], masking
+     * correlation_id bugs these tests exist to catch. Restored (rather than
+     * left null) so a ScheduledTaskFinished fired after $callback — standing
+     * in for control returning to the scheduler process — still records its
+     * own `scheduled_task` entry under the right id.
+     */
+    protected function withoutScheduledTaskFrame(callable $callback): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+        $property = new ReflectionProperty(\LaravelMonitor\Monitor::class, 'scheduledTask');
+
+        $frame = $property->getValue($monitor);
+        $property->setValue($monitor, null);
+
+        try {
+            $callback();
+        } finally {
+            $property->setValue($monitor, $frame);
+        }
+    }
+
     public function test_command_recorder_captures_exit_code_and_duration(): void
     {
         [$input, $output] = $this->commandEvents('app:sync-data');
@@ -593,27 +625,111 @@ class MonitorTest extends TestCase
         $task = $schedule->command('inspire')->runInBackground();
 
         // Stands in for the scheduler process: the run id it mints is what a
-        // command-based task's own `php artisan` subprocess inherits through
-        // Context (see Monitor::inheritedScheduledTaskRunId()).
+        // command-based task's own `php artisan` subprocess references (as a
+        // correlation_id, not as its own request_id — see
+        // Monitor::inheritedScheduledTaskRunId()/beginCommandRun()).
         Monitor::beginScheduledTaskRun();
-        $runId = app(\LaravelMonitor\Monitor::class)->scheduledTaskRunId();
+        $scheduledTaskRunId = app(\LaravelMonitor\Monitor::class)->scheduledTaskRunId();
 
         $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data', '--day=3']);
         $output = new \Symfony\Component\Console\Output\NullOutput();
 
-        event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
-        event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        $this->withoutScheduledTaskFrame(function () use ($input, $output) {
+            event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+            event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        });
+
         event(new \Illuminate\Console\Events\ScheduledTaskFinished($task, 0.02));
 
-        $response = $this->get('/monitor/commands/runs/'.$runId)->assertOk();
+        // The command run's own id — a fresh one of its own, not the
+        // scheduled task's, which is why the URL below can't just reuse
+        // $scheduledTaskRunId the way a shared-timeline design would.
+        $commandRunId = DB::table('monitor_entries')->where('type', 'command')->value('request_id');
+
+        $response = $this->get('/monitor/commands/runs/'.$commandRunId)->assertOk();
 
         // The arguments the run was actually invoked with...
         $response->assertSeeText('app:sync-data --day=3');
 
-        // ...and its parent task as a link, not as a bar drawn at offset 0
-        // against the scheduler process's own, unrelated clock.
-        $response->assertSee(route('monitor.schedule.runs.show', $runId), false);
+        // ...and its dispatching task as a link, not as a bar drawn at
+        // offset 0 against the scheduler process's own, unrelated clock.
+        $response->assertSee(route('monitor.schedule.runs.show', $scheduledTaskRunId), false);
         $response->assertDontSee('SCHEDULED_TASK');
+    }
+
+    public function test_command_run_pages_query_is_positioned_on_the_commands_own_clock_not_the_schedulers(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $task = $schedule->command('app:sync-data')->runInBackground();
+
+        Monitor::beginScheduledTaskRun();
+        $scheduledTaskRunId = app(\LaravelMonitor\Monitor::class)->scheduledTaskRunId();
+
+        $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data']);
+        $output = new \Symfony\Component\Console\Output\NullOutput();
+
+        $this->withoutScheduledTaskFrame(function () use ($input, $output) {
+            event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+            event(new QueryExecuted('select 1', [], 5.0, DB::connection()));
+            event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        });
+
+        event(new \Illuminate\Console\Events\ScheduledTaskFinished($task, 0.02));
+
+        $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
+        $duration = (float) $commandRow->duration;
+
+        // The query belongs entirely to the command's own run — a fresh,
+        // independent id and timeline (see Monitor::beginCommandRun()) — so
+        // its offset is naturally measured against the command's own clock
+        // with no rebase needed, and it never lands on the scheduled task's
+        // own (much shorter) timeline at all.
+        $tracks = $this->get('/monitor/commands/runs/'.$commandRow->request_id)
+            ->assertOk()
+            ->viewData('tracks');
+
+        $queryEntry = collect($tracks[0]['entries'])->firstWhere('type', 'query');
+
+        $this->assertNotNull($queryEntry);
+        $this->assertLessThanOrEqual($duration, $queryEntry->start);
+
+        $scheduleTracks = $this->get('/monitor/schedule/runs/'.$scheduledTaskRunId)
+            ->assertOk()
+            ->viewData('tracks');
+
+        // Only the root bar itself — Timeline::build() always includes that
+        // — no 'query' event nested under it the way a shared-timeline
+        // design would.
+        $this->assertNull(collect($scheduleTracks[0]['entries'])->firstWhere('type', 'query'));
+    }
+
+    public function test_schedule_run_page_links_to_the_command_it_dispatched(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $task = $schedule->command('app:sync-data')->runInBackground();
+
+        Monitor::beginScheduledTaskRun();
+        $scheduledTaskRunId = app(\LaravelMonitor\Monitor::class)->scheduledTaskRunId();
+
+        $input = new \Symfony\Component\Console\Input\ArgvInput(['artisan', 'app:sync-data']);
+        $output = new \Symfony\Component\Console\Output\NullOutput();
+
+        $this->withoutScheduledTaskFrame(function () use ($input, $output) {
+            event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
+            event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        });
+
+        event(new \Illuminate\Console\Events\ScheduledTaskFinished($task, 0.02));
+
+        $commandRunId = DB::table('monitor_entries')->where('type', 'command')->value('request_id');
+
+        $this->get('/monitor/schedule/runs/'.$scheduledTaskRunId)
+            ->assertOk()
+            ->assertSee(route('monitor.commands.runs.show', $commandRunId), false);
     }
 
     public function test_commands_list_reports_a_total_and_a_p95_alongside_the_success_failure_split(): void

@@ -40,16 +40,36 @@
           x-data="{
               target: {{ $target }},
               units: @js(\LaravelMonitor\Support\Format::durationUnits()),
+              // Guards the setTimeout below so it fires once per due countdown,
+              // not on every tick 'due now' stays the current label. Nothing
+              // client-side can compute this task's *actual* next occurrence
+              // (that's the cron expression, evaluated server-side) — so
+              // instead of sitting on 'due now' for however long is left
+              // until this row's own wire:poll tick happens to land, ask
+              // Livewire to refresh shortly after going due, swapping in a
+              // fresh $at (and therefore a fresh countdown) almost at once.
+              refreshRequested: false,
+              refreshTimer: null,
               init() {
                   if (! Alpine.store('monitorClock')) {
                       Alpine.store('monitorClock', { now: Math.floor(Date.now() / 1000) })
                       setInterval(() => Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000), 1000)
                   }
               },
+              destroy() {
+                  clearTimeout(this.refreshTimer)
+              },
               get label() {
                   const left = this.target - this.$store.monitorClock.now
 
-                  if (left <= 0) return @js(__('monitor::messages.schedule.due_now'))
+                  if (left <= 0) {
+                      if (! this.refreshRequested) {
+                          this.refreshRequested = true
+                          this.refreshTimer = setTimeout(() => $wire.$refresh(), 1000)
+                      }
+
+                      return @js(__('monitor::messages.schedule.due_now'))
+                  }
 
                   return [
                       [Math.floor(left / 86400), 'd'],

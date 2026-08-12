@@ -479,6 +479,7 @@ return [
         'runs_in_maintenance_mode' => 'Chạy khi bảo trì',
         'next_run' => 'Chạy kế tiếp',
         'due_now' => 'Ngay bây giờ',
+        'command_run' => 'Lần chạy command',
 
         // Human phrasing for a task's cron expression — see Support\Cron.
         'frequency' => [

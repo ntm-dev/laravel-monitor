@@ -479,6 +479,7 @@ return [
         'runs_in_maintenance_mode' => 'Runs in maintenance mode',
         'next_run' => 'Next Run',
         'due_now' => 'due now',
+        'command_run' => 'Command run',
 
         // Human phrasing for a task's cron expression — see Support\Cron.
         'frequency' => [

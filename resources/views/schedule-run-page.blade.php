@@ -125,6 +125,19 @@
                                 @endif
                             </div>
                         @endforeach
+
+                        {{-- start row command run --}}
+                        @if ($commandRun !== null)
+                            <div class="flex items-baseline justify-between gap-3">
+                                <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.schedule.command_run') }}</dt>
+                                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                                <dd class="min-w-0 shrink font-mono text-xs">
+                                    <a href="{{ route('monitor.commands.runs.show', $commandRun->request_id) }}"
+                                       class="truncate text-blue-600 hover:underline dark:text-blue-400">{{ $commandRun->payload['command'] ?? $commandRun->key }}</a>
+                                </dd>
+                            </div>
+                        @endif
+                        {{-- end row command run --}}
                     </dl>
                 </x-monitor::card>
                 {{-- end card general info --}}
