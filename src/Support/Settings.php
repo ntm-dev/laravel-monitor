@@ -228,7 +228,7 @@ class Settings
 
     protected static function path(): string
     {
-        return storage_path('app/monitor-settings.php');
+        return app()->bootstrapPath('cache/monitor-settings.php');
     }
 
     /**

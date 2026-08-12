@@ -61,7 +61,12 @@
                                      they finish, so showing created_at here put this row a second
                                      ahead of the "Started at" on the very run page it links to. --}}
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
-                                <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $entry->payload['command'] ?? '' }}">{{ $entry->payload['command'] ?? '—' }}</td>
+                                {{-- Falls back to the bare command name (the key every run here
+                                     shares) when payload.command is absent — a command invoked
+                                     without any arguments carries nothing extra to show (see
+                                     Recorders\Commands::commandLine()), same fallback as
+                                     command-run-page.blade.php's $invocation. --}}
+                                <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $entry->payload['command'] ?? $entry->key }}">{{ $entry->payload['command'] ?? $entry->key }}</td>
                                 <td class="py-2 pr-3">
                                     <span @class([
                                         'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
