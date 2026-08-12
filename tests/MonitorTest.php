@@ -710,6 +710,10 @@ class MonitorTest extends TestCase
 
     public function test_command_run_page_links_to_its_scheduled_task_instead_of_charting_it(): void
     {
+        if (! class_exists(\Illuminate\Support\Facades\Context::class)) {
+            $this->markTestSkipped('Illuminate\Support\Facades\Context was added in Laravel 11; the correlation_id link this test checks is a documented no-op without it (see Monitor::inheritedScheduledTaskRunId()).');
+        }
+
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
@@ -798,6 +802,10 @@ class MonitorTest extends TestCase
 
     public function test_schedule_run_page_links_to_the_command_it_dispatched(): void
     {
+        if (! class_exists(\Illuminate\Support\Facades\Context::class)) {
+            $this->markTestSkipped('Illuminate\Support\Facades\Context was added in Laravel 11; the correlation_id link this test checks is a documented no-op without it (see Monitor::inheritedScheduledTaskRunId()).');
+        }
+
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
