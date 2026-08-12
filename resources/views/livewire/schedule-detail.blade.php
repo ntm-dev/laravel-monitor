@@ -59,7 +59,7 @@
                                         'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'finished',
                                         'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400' => $entry->subtype === 'skipped',
                                         'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
-                                    ])>{{ $entry->subtype }}</span>
+                                    ])>{{ __("monitor::messages.common.{$entry->subtype}") }}</span>
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
                                 <td class="py-2 pl-2 text-right">

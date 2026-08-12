@@ -288,6 +288,8 @@ return [
         'user_number' => 'User #:id',
         'ip_address' => 'IP Address',
         'date' => 'Date',
+        'yes' => 'Yes',
+        'no' => 'No',
         'status_code' => 'Status Code',
         'route' => 'Route',
         'action' => 'Action',
@@ -472,8 +474,34 @@ return [
     'schedule' => [
         'expression' => 'Schedule',
         'without_overlapping' => 'Without overlapping',
+        'on_one_server' => 'Runs on one server',
         'runs_in_background' => 'Runs in background',
         'runs_in_maintenance_mode' => 'Runs in maintenance mode',
+        'next_run' => 'Next Run',
+        'due_now' => 'due now',
+        'command_run' => 'Command run',
+        'no_longer_scheduled' => 'No longer scheduled',
+
+        // Human phrasing for a task's cron expression — see Support\Cron.
+        'frequency' => [
+            'every_second' => 'Every second',
+            'every_seconds' => 'Every :count seconds',
+            'every_minute' => 'Every minute',
+            'every_minutes' => 'Every :count minutes',
+            'every_hour' => 'Every hour',
+            'every_hours' => 'Every :count hours',
+            'every_odd_hour' => 'Every odd hour',
+            'hourly' => 'Hourly',
+            'hourly_at' => 'Hourly at minute :minute',
+            'daily_at' => 'Daily at :time',
+            'twice_daily' => 'Daily at :first and :second',
+            'weekly_on' => 'Weekly on :day at :time',
+            'monthly_on' => 'Monthly on day :day at :time',
+            'twice_monthly' => 'Monthly on days :first and :second at :time',
+            'last_day_of_month' => 'Last day of the month at :time',
+            'quarterly' => 'Quarterly on day :day at :time',
+            'yearly' => 'Yearly at :time',
+        ],
     ],
 
 ];

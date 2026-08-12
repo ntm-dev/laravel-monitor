@@ -82,6 +82,7 @@ class Monitor
      *     stage_start: float,
      *     models: int,
      *     pid: ?int,
+     *     scheduled_task_run_id: ?string,
      * }|null
      */
     protected ?array $command = null;
@@ -95,10 +96,13 @@ class Monitor
      * tasks executing directly in the scheduler's own process. Command-based
      * tasks (`Schedule::command()`) always run as a *separate* `php artisan`
      * subprocess even when "foreground" (see
-     * Illuminate\Console\Scheduling\Event::execute()) — their own timeline
-     * is stitched back onto this same id via Laravel's own Context
-     * dehydration/hydration instead (see beginScheduledTaskRun(),
-     * Recorders\Commands::recordStarting()), not via this in-process field.
+     * Illuminate\Console\Scheduling\Event::execute()) — that subprocess mints
+     * its own, independent `command` entry (own id, own timeline) rather than
+     * sharing this one, and only references this run's id in its payload
+     * (see beginScheduledTaskRun(), Recorders\Commands::recordStarting()):
+     * everything the subprocess triggers happened well after the scheduler
+     * itself finished dispatching it, so it belongs on the command's own
+     * timeline, not this one.
      *
      * @var array{id: string, start: float, models: int}|null
      */
@@ -106,13 +110,14 @@ class Monitor
 
     /**
      * Context key a scheduled task's own id rides under across the process
-     * boundary a command-based task's own `php artisan` subprocess creates.
-     * Laravel's scheduler already dehydrates the whole Context into that
-     * subprocess's `__LARAVEL_CONTEXT` env var and rehydrates it there before
-     * any application code runs (see Illuminate\Log\Context\ContextServiceProvider) —
-     * riding on that existing, framework-native mechanism instead of a
-     * bespoke env var means no changes are needed to how the subprocess is
-     * spawned at all.
+     * boundary a command-based task's own `php artisan` subprocess creates,
+     * so that subprocess's own `command` entry can reference which task
+     * dispatched it. Laravel's scheduler already dehydrates the whole
+     * Context into that subprocess's `__LARAVEL_CONTEXT` env var and
+     * rehydrates it there before any application code runs (see
+     * Illuminate\Log\Context\ContextServiceProvider) — riding on that
+     * existing, framework-native mechanism instead of a bespoke env var means
+     * no changes are needed to how the subprocess is spawned at all.
      */
     protected const SCHEDULED_TASK_CONTEXT_KEY = 'monitor_scheduled_task_id';
 
@@ -348,21 +353,27 @@ class Monitor
      * recorder on CommandStarting, before the command's own handle() runs —
      * everything it triggers (queries, mail, notifications, jobs) picks up
      * this id via record()'s request_id fallback, the same way an HTTP
-     * request's or a job attempt's children do.
+     * request's or a job attempt's children do. Always mints its own fresh
+     * id, even for a command-based scheduled task's own subprocess — see
+     * $scheduledTaskRunId.
      *
-     * @param  ?string  $inheritedId  when this run is a command-based
-     *                                 scheduled task's own subprocess, its
-     *                                 inherited scheduled-task-run id (see
-     *                                 inheritedScheduledTaskRunId()) — adopted
-     *                                 as this run's own id instead of minting
-     *                                 a fresh one, so it (and everything it
-     *                                 triggers) nests onto that task's
-     *                                 timeline rather than starting its own.
+     * @param  ?string  $scheduledTaskRunId  when this run is a command-based
+     *                                 scheduled task's own subprocess, the
+     *                                 dispatching task's own run id (see
+     *                                 inheritedScheduledTaskRunId()) — stamped
+     *                                 into this run's own entry (see
+     *                                 finalizePendingCommand()) purely as a
+     *                                 cross-reference the dashboard uses to
+     *                                 link the two runs together. Everything
+     *                                 this subprocess triggers still belongs
+     *                                 on *its own* timeline: it all happened
+     *                                 after the scheduler already finished
+     *                                 dispatching it.
      */
-    public function beginCommandRun(string $name, ?string $inheritedId = null): void
+    public function beginCommandRun(string $name, ?string $scheduledTaskRunId = null): void
     {
         $this->command = [
-            'id' => $inheritedId ?? (string) Str::uuid(),
+            'id' => (string) Str::uuid(),
             'name' => $name,
             // LARAVEL_START (the artisan entry script sets this the same way
             // public/index.php does for requests) rather than "now" — so the
@@ -377,6 +388,7 @@ class Monitor
             // The pid this run actually started under — see record()'s fork
             // detection, which this exists solely to support.
             'pid' => function_exists('posix_getpid') ? posix_getpid() : null,
+            'scheduled_task_run_id' => $scheduledTaskRunId,
         ];
 
         $elapsed = $this->commandElapsedMsPrecise() ?? 0.0;
@@ -450,11 +462,10 @@ class Monitor
     /**
      * Starts tracking a scheduled task run. Called by the ScheduledTasks
      * recorder on ScheduledTaskStarting, before the task itself runs —
-     * everything it triggers in-process (a closure/`Schedule::call()` task's
-     * own code, or anything running between here and the subprocess spawn
-     * for a command-based one) picks up this id via record()'s request_id
-     * fallback. Also stamped onto Context so a command-based task's own
-     * subprocess inherits it — see SCHEDULED_TASK_CONTEXT_KEY.
+     * everything a closure/`Schedule::call()` task triggers in-process picks
+     * up this id via record()'s request_id fallback. Also stamped onto
+     * Context so a command-based task's own subprocess can reference it —
+     * see SCHEDULED_TASK_CONTEXT_KEY.
      */
     public function beginScheduledTaskRun(): void
     {
@@ -495,10 +506,12 @@ class Monitor
      * via Laravel's own Context dehydration/hydration, or null when running
      * standalone (a manually-invoked command, or one running outside any
      * scheduled task). Read by the Commands recorder on CommandStarting so a
-     * command-based task's own subprocess correlates its `command` entry (and
-     * everything it in turn triggers) onto the *same* timeline as the
-     * scheduled_task entry recorded back in the scheduler's process, instead
-     * of minting an unrelated id of its own — see beginScheduledTaskRun().
+     * command-based task's own subprocess can stamp which scheduled task
+     * dispatched it into its own `command` entry's payload (see
+     * beginCommandRun()) — a reference for the dashboard to link the two
+     * runs together, not an id this run adopts as its own: everything this
+     * subprocess triggers happened after the scheduler already finished
+     * dispatching it, so it belongs on *this* run's own timeline instead.
      */
     public function inheritedScheduledTaskRunId(): ?string
     {
@@ -778,6 +791,19 @@ class Monitor
         // "started at" from created_at - duration disagrees with this by up
         // to a whole second (see Support\Format::startedAt()).
         $entry->payload['started_at'] = $this->command['start'];
+
+        // Only set for a command-based scheduled task's own subprocess (see
+        // beginCommandRun()'s $scheduledTaskRunId param) — the same
+        // correlation_id mechanism Recorders\Mail/Notifications use to pair
+        // their own two entries (see Contracts\Storage::findByCorrelationId()),
+        // reused here so CommandRunController can look up the dispatching
+        // scheduled_task entry to link to, and ScheduleRunController the
+        // reverse. Purely a cross-reference — this run's own timeline stays
+        // entirely its own regardless (see startOffsetFor()).
+        if ($this->command['scheduled_task_run_id'] !== null) {
+            $entry->payload['correlation_id'] = $this->command['scheduled_task_run_id'];
+        }
+
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
     }
 

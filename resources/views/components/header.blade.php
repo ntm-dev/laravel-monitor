@@ -9,11 +9,14 @@
                 <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">{{ $tabs[$tab]['label'] }}</a>
                 @if ($detail->badge !== null || $detail->heading !== null)
                     <div class="mt-0.5 flex min-w-0 gap-2.5 {{ $detail->wrap ? 'items-start' : 'items-center' }}">
-                        @if ($detail->badge !== null)
+                        @if (! $detail->badgeAfter && $detail->badge !== null)
                             <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $detail->badgeClass }}">{{ $detail->badge }}</span>
                         @endif
                         @if ($detail->heading !== null)
                             <h1 class="{{ $detail->wrap ? 'whitespace-pre-wrap break-words font-mono text-base font-semibold' : 'truncate text-2xl font-bold' }} tracking-tight" @if ($detail->titleAttr) title="{{ $detail->titleAttr }}" @endif>{{ $detail->heading }}</h1>
+                        @endif
+                        @if ($detail->badgeAfter && $detail->badge !== null)
+                            <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $detail->badgeClass }}">{{ $detail->badge }}</span>
                         @endif
                     </div>
                 @endif

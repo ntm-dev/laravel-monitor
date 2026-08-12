@@ -50,16 +50,33 @@ class CommandRunController
 
         $children = $this->storage->timelineFor($runId, 'command');
 
-        // A command-based scheduled task's subprocess adopts the task's own
-        // run id (see Monitor::beginCommandRun()), so the `scheduled_task`
-        // row shares this timeline — but it is this run's *parent*, recorded
-        // back in the scheduler's process against that process's own clock.
-        // Left among the children it drew a bar at offset 0 (its own root
-        // offset) while being filed under whichever phase it was tagged
-        // with, i.e. a 20ms "SCHEDULED TASK" sitting inside BOOTSTRAP but
-        // listed under ACTION. It belongs in the General card as a link to
-        // the task's own run page instead.
-        $scheduledTask = $children->firstWhere('type', 'scheduled_task');
+        // A command-based scheduled task's own subprocess mints its own
+        // fresh id (see Monitor::beginCommandRun()) and stamps which task
+        // dispatched it into its own payload instead (see
+        // Monitor::finalizePendingCommand()) — looked up here via the same
+        // correlation_id mechanism Recorders\Mail/Notifications use to pair
+        // their own two entries (see Contracts\Storage::findByCorrelationId())
+        // to link back to it from the General card, rather than sharing a
+        // timeline with it: everything on this page happened after the
+        // scheduler already finished dispatching this run, so it belongs on
+        // this run's own clock, not the scheduler's.
+        $scheduledTaskRunId = $root->payload['correlation_id'] ?? null;
+        $scheduledTask = $scheduledTaskRunId !== null
+            ? $this->storage->findByRequestId($scheduledTaskRunId, 'scheduled_task')
+            : null;
+
+        // A run recorded before the correlation_id link above existed shared
+        // its request_id with the scheduled_task row outright instead (see
+        // Monitor::beginCommandRun()'s old $inheritedId behavior) — filtered
+        // out of $children rather than drawn as its own bar: it is this
+        // run's *parent*, recorded back in the scheduler's process against
+        // that process's own clock, so it drew a bar at offset 0 while being
+        // filed under whichever phase it was tagged with, i.e. a 20ms
+        // "SCHEDULED TASK" sitting inside BOOTSTRAP but listed under ACTION.
+        if ($scheduledTask === null) {
+            $scheduledTask = $children->firstWhere('type', 'scheduled_task');
+        }
+
         $children = $children->reject(fn (object $row) => $row->type === 'scheduled_task')->values();
 
         [$groups, $footerTabs] = Nav::grouped();

@@ -61,16 +61,17 @@ class Commands extends Recorder
         // own Context dehydration/hydration (see
         // Monitor::beginScheduledTaskRun()), so it's already available here,
         // in the fresh subprocess, before any application code has run.
-        // Adopting it as this run's own id — instead of minting a fresh one
-        // — is what nests this command (and everything it triggers: queries,
-        // mail, dispatched jobs, ...) onto the scheduled task's own timeline
-        // rather than starting an unrelated one of its own.
-        $inheritedId = $this->monitor->inheritedScheduledTaskRunId();
+        // Stamped onto this run's own entry purely as a cross-reference
+        // (see Monitor::beginCommandRun()'s $scheduledTaskRunId param) — this
+        // run still gets its own fresh id and its own timeline, since
+        // everything it triggers happened after the scheduler already
+        // finished dispatching it.
+        $scheduledTaskRunId = $this->monitor->inheritedScheduledTaskRunId();
 
         // Before the command's own handle() runs, so everything it triggers
         // (queries, mail, notifications, dispatched jobs) correlates onto
         // this run's own timeline — mirrors beginRequest()/beginJobAttempt().
-        $this->monitor->beginCommandRun($event->command, $inheritedId);
+        $this->monitor->beginCommandRun($event->command, $scheduledTaskRunId);
     }
 
     public function recordFinished(CommandFinished $event): void

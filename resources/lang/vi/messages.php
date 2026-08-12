@@ -288,6 +288,8 @@ return [
         'user_number' => 'Người dùng #:id',
         'ip_address' => 'Địa chỉ IP',
         'date' => 'Ngày',
+        'yes' => 'Có',
+        'no' => 'Không',
         'status_code' => 'Mã trạng thái',
         'route' => 'Route',
         'action' => 'Action',
@@ -472,8 +474,34 @@ return [
     'schedule' => [
         'expression' => 'Lịch chạy',
         'without_overlapping' => 'Không chồng lấn',
+        'on_one_server' => 'Chạy trên một máy chủ',
         'runs_in_background' => 'Chạy nền',
         'runs_in_maintenance_mode' => 'Chạy khi bảo trì',
+        'next_run' => 'Chạy kế tiếp',
+        'due_now' => 'Ngay bây giờ',
+        'command_run' => 'Lần chạy command',
+        'no_longer_scheduled' => 'Không còn được lên lịch',
+
+        // Human phrasing for a task's cron expression — see Support\Cron.
+        'frequency' => [
+            'every_second' => 'Mỗi giây',
+            'every_seconds' => 'Mỗi :count giây',
+            'every_minute' => 'Mỗi phút',
+            'every_minutes' => 'Mỗi :count phút',
+            'every_hour' => 'Mỗi giờ',
+            'every_hours' => 'Mỗi :count giờ',
+            'every_odd_hour' => 'Mỗi giờ lẻ',
+            'hourly' => 'Hàng giờ',
+            'hourly_at' => 'Hàng giờ vào phút :minute',
+            'daily_at' => 'Hàng ngày lúc :time',
+            'twice_daily' => 'Hàng ngày lúc :first và :second',
+            'weekly_on' => 'Hàng tuần vào :day lúc :time',
+            'monthly_on' => 'Hàng tháng vào ngày :day lúc :time',
+            'twice_monthly' => 'Hàng tháng vào ngày :first và :second lúc :time',
+            'last_day_of_month' => 'Ngày cuối tháng lúc :time',
+            'quarterly' => 'Hàng quý vào ngày :day lúc :time',
+            'yearly' => 'Hàng năm lúc :time',
+        ],
     ],
 
 ];

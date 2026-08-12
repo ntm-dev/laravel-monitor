@@ -71,14 +71,14 @@ class Timeline
      */
     public static function build(object $root, Collection $children): array
     {
-        $duration = (float) ($root->duration ?? 0);
+        $visibleChildren = $children->reject(fn (object $row) => $row->type === 'log');
 
         $requestEntry = new TimelineEntry(
             id: 'request',
             type: 'request',
             label: $root->key ?? 'Request',
             start: 0,
-            duration: $duration,
+            duration: self::rootDuration($root, $visibleChildren),
             // Only requests carry an HTTP status; job/command roots leave
             // this unset, so TimelineRow's root-bar coloring falls back to
             // its neutral default for those.
@@ -88,7 +88,7 @@ class Timeline
         $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null);
 
         $events = self::assignLanes(
-            $children->reject(fn (object $row) => $row->type === 'log')
+            $visibleChildren
                 ->map(fn (object $row) => self::eventEntry($row, $phases))
                 ->all()
         );
@@ -96,6 +96,32 @@ class Timeline
         self::assignDuplicateColors($events);
 
         return array_merge([$requestEntry], $phases, $events);
+    }
+
+    /**
+     * The root's own displayed duration: normally just $root->duration, but
+     * stretched to cover the latest end among its children when one of them
+     * reaches past it. A command-based scheduled task run in the background
+     * is the case this matters for: the scheduler backgrounds the whole
+     * subprocess and moves on rather than waiting on it (see
+     * Illuminate\Console\Scheduling\CommandBuilder::buildBackgroundCommand()),
+     * so ScheduledTaskFinished's own $runtime — and therefore the
+     * scheduled_task entry's own duration — only covers how long *spawning*
+     * it took, not running it; everything that subprocess goes on to trigger
+     * (queries, mail, ...) can land hundreds of ms past that. Without this,
+     * the root bar rendered as a sliver at the very start of the timeline
+     * while its real children sat stranded past its right edge, outside the
+     * visible bar entirely.
+     */
+    protected static function rootDuration(object $root, Collection $children): float
+    {
+        $duration = (float) ($root->duration ?? 0);
+
+        $latestChildEnd = $children->max(
+            fn (object $row) => (float) ($row->start_offset ?? 0) + (float) ($row->duration ?? 0),
+        ) ?? 0.0;
+
+        return max($duration, $latestChildEnd);
     }
 
     /**

@@ -6,10 +6,14 @@
 
     $columns = [
         'key' => ['label' => __('monitor::messages.common.task'), 'align' => 'left'],
+        'schedule' => ['label' => __('monitor::messages.schedule.expression'), 'align' => 'left'],
+        'next_run_at' => ['label' => __('monitor::messages.schedule.next_run'), 'align' => 'right'],
         'finished' => ['label' => __('monitor::messages.common.finished'), 'align' => 'right'],
         'skipped' => ['label' => __('monitor::messages.common.skipped'), 'align' => 'right'],
         'failed' => ['label' => __('monitor::messages.common.failed'), 'align' => 'right'],
+        'total' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
+        'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
     ];
 
     $from = ($page - 1) * $perPage;
@@ -81,13 +85,27 @@
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($tasks as $task)
-                            <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                            {{-- Cells below carry their own `title` (full command,
+                                 full expression) — a plain title on the <tr> alone
+                                 would be shadowed by those whenever the cursor is
+                                 actually over one, which is most of the row. Swap
+                                 each to this note instead of relying on the row's
+                                 own when inactive. --}}
+                            @php($inactiveNote = $task->isActive ? null : __('monitor::messages.schedule.no_longer_scheduled'))
+                            <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 {{ $task->isActive ? '' : 'line-through opacity-50' }}"
+                                title="{{ $inactiveNote }}"
                                 onclick="window.location='{{ route('monitor.schedule.show', ['hash' => KeyHash::for($task->key)] + $range) }}'">
-                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $task->key }}">{{ $task->key }}</td>
+                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $inactiveNote ?? ($task->command ?? $task->key) }}">{{ $task->command ?? $task->key }}</td>
+                                <td class="max-w-[12rem] truncate py-2 pr-2 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $inactiveNote ?? ($task->expression ?? '') }}">{{ $task->schedule ?? '—' }}</td>
+                                <td class="py-2 pr-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">
+                                    <x-monitor::countdown :at="$task->next_run_at" :scope="$task->key"/>
+                                </td>
                                 <td class="py-2 text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">{{ number_format($task->finished) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $task->skipped > 0 ? 'text-neutral-500 dark:text-neutral-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($task->skipped) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $task->failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($task->failed) }}</td>
+                                <td class="py-2 text-right font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ number_format($task->total) }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($task->avg_duration) }}</td>
+                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($task->p95_duration) }}</td>
                                 <td class="py-2 pl-2 text-right">
                                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
                                         <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
