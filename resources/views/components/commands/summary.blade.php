@@ -38,7 +38,11 @@
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
                 <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
-                <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
+                @if ($key === 'command')
+                    <dd class="min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" title="{{ $value }}">{{ $value }}</dd>
+                @else
+                    <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
+                @endif
             </div>
         @endforeach
 

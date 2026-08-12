@@ -22,6 +22,8 @@ class MonitorServiceProvider extends ServiceProvider
         try {
             $this->captureTimestamp();
             $this->mergeConfigFrom(__DIR__.'/../config/monitor.php', 'monitor');
+
+            Support\Settings::apply();
             if ($this->app['config']->get('monitor.enabled', false)) {
                 $this->registerBindings();
                 $this->registerResources();
@@ -58,7 +60,6 @@ class MonitorServiceProvider extends ServiceProvider
             if (!$this->app['config']->get('monitor.enabled', false)) {
                 return;
             }
-            Support\Settings::apply();
         $this->registerAppleOAuthDriver();
 
         // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
