@@ -85,10 +85,18 @@
                     </thead>
                     <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($tasks as $task)
-                            <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                            {{-- Cells below carry their own `title` (full command,
+                                 full expression) — a plain title on the <tr> alone
+                                 would be shadowed by those whenever the cursor is
+                                 actually over one, which is most of the row. Swap
+                                 each to this note instead of relying on the row's
+                                 own when inactive. --}}
+                            @php($inactiveNote = $task->isActive ? null : __('monitor::messages.schedule.no_longer_scheduled'))
+                            <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 {{ $task->isActive ? '' : 'line-through opacity-50' }}"
+                                title="{{ $inactiveNote }}"
                                 onclick="window.location='{{ route('monitor.schedule.show', ['hash' => KeyHash::for($task->key)] + $range) }}'">
-                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $task->command ?? $task->key }}">{{ $task->command ?? $task->key }}</td>
-                                <td class="max-w-[12rem] truncate py-2 pr-2 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $task->expression ?? '' }}">{{ $task->schedule ?? '—' }}</td>
+                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $inactiveNote ?? ($task->command ?? $task->key) }}">{{ $task->command ?? $task->key }}</td>
+                                <td class="max-w-[12rem] truncate py-2 pr-2 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $inactiveNote ?? ($task->expression ?? '') }}">{{ $task->schedule ?? '—' }}</td>
                                 <td class="py-2 pr-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">
                                     <x-monitor::countdown :at="$task->next_run_at" :scope="$task->key"/>
                                 </td>

@@ -2,7 +2,10 @@
 
 namespace LaravelMonitor\Livewire;
 
+use Illuminate\Console\Scheduling\Schedule as ConsoleSchedule;
+use LaravelMonitor\Recorders\ScheduledTasks;
 use LaravelMonitor\Support\Cron;
+use LaravelMonitor\Support\Percentile;
 
 class Schedule extends Card
 {
@@ -13,8 +16,15 @@ class Schedule extends Card
         'failed', 'total', 'avg_duration', 'p95_duration',
     ];
 
-    /** See Jobs::MAX_KEYS for why this replaces a plain top-N cap. */
-    protected const MAX_KEYS = 5000;
+    /**
+     * Every scheduled_task row within the selected period gets pulled
+     * (payload included) to group by (key, cadence) rather than by key
+     * alone — see data(). Unlike Requests/Queries, scheduled-task volume is
+     * bounded by how many cron jobs a human configured, so even at a
+     * pathological everySecond() this stays well short of the cap within
+     * any period this dashboard offers.
+     */
+    protected const MAX_SAMPLE_ROWS = 20000;
 
     public string $search = '';
 
@@ -69,56 +79,87 @@ class Schedule extends Card
 
         $bySubtype = $storage->statsBySubtype('scheduled_task', $since, $until);
 
-        $finished = $storage->aggregateByKey('scheduled_task', $since, 'finished', self::MAX_KEYS, 'count', $until);
-        $failed = $storage->aggregateByKey('scheduled_task', $since, 'failed', self::MAX_KEYS, 'count', $until);
-        $skipped = $storage->aggregateByKey('scheduled_task', $since, 'skipped', self::MAX_KEYS, 'count', $until);
+        // `Schedule::events()` reflects whatever the *currently running* app
+        // code actually registers — available in this web request the same
+        // as in a console one, since scheduled tasks are normally registered
+        // from a service provider's `booted()` hook, not gated to console
+        // (see Recorders\ScheduledTasks::name()'s own docblock). Keyed by
+        // command, expression, *and* repeat_seconds: a task whose cadence
+        // changed needs its own row for the cadence no longer live, not
+        // just one whose command was removed outright. repeat_seconds
+        // matters on its own — everySecond()/everyFiveSeconds()/... all
+        // reduce to the same 5-field `* * * * *` expression as everyMinute()
+        // (see Illuminate\Console\Scheduling\ManagesFrequencies::repeatEvery()),
+        // distinguished only by this separate property.
+        $liveCadences = collect(app(ConsoleSchedule::class)->events())
+            ->mapWithKeys(static fn ($event) => [
+                ScheduledTasks::name($event) => "{$event->expression}\0{$event->repeatSeconds}",
+            ]);
 
-        // p95 can't be computed in SQL portably, so it comes from the sampled
-        // per-key breakdown rather than from aggregateByKey() above; scoped to
-        // `finished` to match avg_duration, since failed/skipped runs record
-        // no duration at all.
-        $durations = $storage->keyStats('scheduled_task', $since, $until, subtype: 'finished')->keyBy('key');
+        // Grouped by (key, cadence) rather than by key alone — a task whose
+        // cadence changed shows as two rows, its old cadence's own history
+        // staying put (and marked inactive below) instead of quietly
+        // merging into whatever the *latest* run happens to be scheduled
+        // under. Storage::aggregateByKey()/latestPayloadByKey() only group
+        // by the raw `key` column and can't make that split, so this pulls
+        // every row (payload included) instead — see self::MAX_SAMPLE_ROWS
+        // for why that stays cheap for this type.
+        $groups = [];
 
-        // Each task's own cron expression, off the payload of its latest run.
-        $definitions = $storage->latestPayloadByKey('scheduled_task', $since, $until, self::MAX_KEYS);
+        foreach ($storage->recent('scheduled_task', $since, self::MAX_SAMPLE_ROWS, null, null, $until) as $row) {
+            $expression = $row->payload['expression'] ?? null;
+            $repeatSeconds = $row->payload['repeat_seconds'] ?? null;
+            $groupKey = "{$row->key}\0{$expression}\0{$repeatSeconds}";
 
-        $tasks = collect();
+            $group = $groups[$groupKey] ??= (object) [
+                'key' => $row->key,
+                'expression' => $expression,
+                'repeat_seconds' => $repeatSeconds,
+                'command' => $row->payload['command'] ?? null,
+                'timezone' => $row->payload['timezone'] ?? null,
+                'finished' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'durations' => [],
+            ];
 
-        foreach ([$finished, $failed, $skipped] as $index => $groups) {
-            $column = ['finished', 'failed', 'skipped'][$index];
+            if (in_array($row->subtype, ['finished', 'failed', 'skipped'], true)) {
+                $group->{$row->subtype}++;
+            }
 
-            foreach ($groups as $group) {
-                $task = $tasks->get($group->key) ?? (object) [
-                    'key' => $group->key,
-                    'finished' => 0,
-                    'failed' => 0,
-                    'skipped' => 0,
-                    'avg_duration' => null,
-                ];
-
-                $task->{$column} = $group->count;
-
-                if ($column === 'finished') {
-                    $task->avg_duration = $group->avg_duration;
-                }
-
-                $tasks->put($group->key, $task);
+            if ($row->subtype === 'finished' && $row->duration !== null) {
+                $group->durations[] = (float) $row->duration;
             }
         }
 
-        foreach ($tasks as $task) {
-            $payload = $definitions->get($task->key, []);
+        $tasks = collect();
 
-            $task->total = $task->finished + $task->failed + $task->skipped;
-            $task->p95_duration = $durations->get($task->key)?->p95_duration;
-            $task->command = $payload['command'] ?? null;
-            $task->expression = $payload['expression'] ?? null;
-            $task->schedule = Cron::describe($task->expression, $payload['repeat_seconds'] ?? null);
-            $task->next_run_at = Cron::nextRunAt(
-                $task->expression,
-                $payload['timezone'] ?? null,
-                $payload['repeat_seconds'] ?? null,
-            );
+        foreach ($groups as $group) {
+            $durations = $group->durations;
+            $cadence = "{$group->expression}\0{$group->repeat_seconds}";
+            // has() first: a key absent from the live schedule and a group
+            // with no recorded expression (pre-dating that payload field)
+            // would otherwise both read as null and compare equal.
+            $isActive = $liveCadences->has($group->key) && $liveCadences->get($group->key) === $cadence;
+
+            $tasks->push((object) [
+                'key' => $group->key,
+                'command' => $group->command,
+                'expression' => $group->expression,
+                'repeat_seconds' => $group->repeat_seconds,
+                'finished' => $group->finished,
+                'failed' => $group->failed,
+                'skipped' => $group->skipped,
+                'total' => $group->finished + $group->failed + $group->skipped,
+                'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
+                'p95_duration' => Percentile::of($durations, 0.95),
+                'isActive' => $isActive,
+                'schedule' => Cron::describe($group->expression, $group->repeat_seconds),
+                // No next run to count down to when this cadence isn't the
+                // live one any more — countdown.blade.php already renders
+                // its own fallback for null.
+                'next_run_at' => $isActive ? Cron::nextRunAt($group->expression, $group->timezone, $group->repeat_seconds) : null,
+            ]);
         }
 
         if ($this->search !== '') {

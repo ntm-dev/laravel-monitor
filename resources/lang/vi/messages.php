@@ -480,6 +480,7 @@ return [
         'next_run' => 'Chạy kế tiếp',
         'due_now' => 'Ngay bây giờ',
         'command_run' => 'Lần chạy command',
+        'no_longer_scheduled' => 'Không còn được lên lịch',
 
         // Human phrasing for a task's cron expression — see Support\Cron.
         'frequency' => [

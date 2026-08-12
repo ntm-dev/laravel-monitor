@@ -79,7 +79,7 @@ class ScheduledTasks extends Recorder
     {
         $this->monitor->record(
             type: 'scheduled_task',
-            key: $this->name($task),
+            key: self::name($task),
             payload: array_filter([
                 'command' => $this->fullCommand($task),
                 'description' => $task->description,
@@ -114,8 +114,14 @@ class ScheduledTasks extends Recorder
      * `fullCommand()`) can differ from one scheduler run to the next even on
      * the same box (a cron entry invoking a different php-cli than a
      * `schedule:work` daemon does, say).
+     *
+     * Public and static so Livewire\Schedule can compute the same identity
+     * for the *currently* registered `Schedule::events()` (available in any
+     * process — `Schedule::events()` is normally registered from a service
+     * provider's `booted()` hook, not gated to console) and tell which
+     * historical keys are still actually scheduled.
      */
-    protected function name(ScheduledEvent $task): string
+    public static function name(ScheduledEvent $task): string
     {
         $command = $task->command ?? '';
 

@@ -444,6 +444,97 @@ class MonitorTest extends TestCase
         $this->assertSame('UTC', $payload['timezone']);
     }
 
+    public function test_schedule_list_marks_a_task_no_longer_in_the_current_schedule_as_inactive(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // Still registered in Schedule::events() for this process.
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $liveTask = $schedule->command('app:sync-data')->everyMinute();
+        event(new \Illuminate\Console\Events\ScheduledTaskFinished($liveTask, 20.0));
+
+        // Recorded once, but nothing currently registers this command any
+        // more — renamed or removed from the app's own Schedule::events().
+        Monitor::record('scheduled_task', 'app:removed-task', [
+            'command' => 'php artisan app:removed-task',
+            'expression' => '* * * * *',
+        ], 20.0, 'finished');
+        Monitor::flush();
+
+        $tasks = Livewire::test(\LaravelMonitor\Livewire\Schedule::class)->viewData('tasks');
+
+        $live = $tasks->firstWhere('key', 'app:sync-data');
+        $removed = $tasks->firstWhere('key', 'app:removed-task');
+
+        $this->assertTrue($live->isActive);
+        $this->assertNotNull($live->next_run_at);
+
+        $this->assertFalse($removed->isActive);
+        $this->assertNull($removed->next_run_at);
+
+        $this->get('/monitor/schedule')
+            ->assertOk()
+            ->assertSee('line-through', false);
+    }
+
+    public function test_schedule_list_splits_a_task_into_its_own_row_when_only_its_cadence_changed(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // everySecond()/everyFiveSeconds()/... reduce to the very same
+        // `* * * * *` expression as everyMinute() — only repeatSeconds
+        // differs (see ManagesFrequencies::repeatEvery()) — so this has to
+        // split on that too, not just the expression string, to actually
+        // exercise the scenario reported: switching --day=3 from every
+        // minute to every second.
+        $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
+        $oldTask = $schedule->command('app:sync-data')->everyMinute();
+
+        // Historical runs recorded under the *old* cadence.
+        Monitor::record('scheduled_task', 'app:sync-data', [
+            'command' => 'php artisan app:sync-data',
+            'expression' => $oldTask->expression,
+            'repeat_seconds' => $oldTask->repeatSeconds,
+        ], 20.0, 'finished');
+        Monitor::flush();
+
+        // The code has since changed to run every second instead. Schedule
+        // doesn't expose a way to *unregister* $oldTask, but that's fine
+        // here: Livewire\Schedule::data() only cares about each key's own
+        // *final* live cadence, and a command scheduled twice in the same
+        // process resolves to whichever registration is last in
+        // Schedule::events() — the same outcome an app that actually
+        // replaced the old ->everyMinute() call with this one would produce.
+        $newTask = $schedule->command('app:sync-data')->everySecond();
+
+        // At least one run has already happened under the new cadence too
+        // — a cadence with zero runs yet wouldn't have a row to find.
+        Monitor::record('scheduled_task', 'app:sync-data', [
+            'command' => 'php artisan app:sync-data',
+            'expression' => $newTask->expression,
+            'repeat_seconds' => $newTask->repeatSeconds,
+        ], 20.0, 'finished');
+        Monitor::flush();
+
+        $tasks = Livewire::test(\LaravelMonitor\Livewire\Schedule::class)->viewData('tasks');
+        $rows = $tasks->where('key', 'app:sync-data')->values();
+
+        $this->assertCount(2, $rows);
+
+        $old = $rows->first(fn ($task) => (string) $task->repeat_seconds === (string) $oldTask->repeatSeconds);
+        $new = $rows->first(fn ($task) => (string) $task->repeat_seconds === (string) $newTask->repeatSeconds);
+
+        $this->assertNotNull($old);
+        $this->assertFalse($old->isActive);
+        $this->assertNull($old->next_run_at);
+        $this->assertSame(1, $old->finished);
+
+        $this->assertNotNull($new);
+        $this->assertTrue($new->isActive);
+        $this->assertNotNull($new->next_run_at);
+        $this->assertSame(1, $new->finished);
+    }
+
     protected function commandEvents(string $command): array
     {
         return [

@@ -480,6 +480,7 @@ return [
         'next_run' => 'Next Run',
         'due_now' => 'due now',
         'command_run' => 'Command run',
+        'no_longer_scheduled' => 'No longer scheduled',
 
         // Human phrasing for a task's cron expression — see Support\Cron.
         'frequency' => [

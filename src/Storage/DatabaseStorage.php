@@ -1224,15 +1224,7 @@ class DatabaseStorage implements Storage
      */
     protected function percentile(array $values, float $percentile): ?float
     {
-        if ($values === []) {
-            return null;
-        }
-
-        sort($values);
-
-        $index = (int) ceil($percentile * count($values)) - 1;
-
-        return round((float) $values[max(0, min($index, count($values) - 1))], 2);
+        return \LaravelMonitor\Support\Percentile::of($values, $percentile);
     }
 
     protected function query(
