@@ -29,15 +29,20 @@ return new class extends Migration
             $table->string('subtype', 32)->nullable();
             $table->string('key', 255)->nullable();
             $table->text('payload')->nullable();
-            // 3 decimal places (microsecond precision) so request/phase
-            // timing measured via microtime() isn't floored away — see
-            // Monitor::elapsedMsPrecise(). Entries whose duration comes from
-            // a Laravel core event (e.g. QueryExecuted::$time) already arrive
-            // rounded to 2 decimals upstream, so the extra digit is simply 0.
-            $table->decimal('duration', 13, 3)->unsigned()->nullable();
+            // 6 decimal places so request/phase timing measured via
+            // microtime() is stored at its full native precision, not
+            // floored away — see Monitor::elapsedMsPrecise() and Entry::toArray(),
+            // neither of which round the value before it reaches here.
+            // microtime(true) itself only resolves to whole microseconds
+            // (3 decimal ms places), so 6 is a deliberately generous margin
+            // above that, not a claim of sub-microsecond accuracy. Entries
+            // whose duration comes from a Laravel core event (e.g.
+            // QueryExecuted::$time) already arrive rounded upstream, so the
+            // extra digits are simply 0 there.
+            $table->decimal('duration', 16, 6)->unsigned()->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('request_id', 36)->nullable();
-            $table->decimal('start_offset', 13, 3)->unsigned()->nullable();
+            $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
             $table->timestamp('created_at');
 
             // Two indexes sharing the [type, created_at] prefix, on purpose:

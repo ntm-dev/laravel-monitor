@@ -176,6 +176,22 @@ class Monitor
             $duration,
             $subtype,
             $userId,
+            // currentJob() before request: a job processed synchronously
+            // inside the same process as the request that dispatched it
+            // (e.g. a route that calls Artisan::call('queue:work') itself,
+            // rather than a separate worker process) still has $this->request
+            // set the whole time — without this, every entry the job's own
+            // handle() produces (its own 'processed'/'failed' entry included)
+            // would correlate onto the outer request instead of this specific
+            // attempt, so findByRequestId($attemptId, 'job') could never find
+            // it again by its own id, and its 'processed' entry would show up
+            // as a stray extra "Queued Job" row among the request's own
+            // children (see Support\Timeline::EVENT_TYPES, which doesn't
+            // distinguish a job entry's subtype). A real, separate queue
+            // worker process never has $this->request set at all, so this
+            // reordering changes nothing for that (overwhelmingly more
+            // common) case.
+            //
             // scheduledTask before command: a command-based scheduled task's
             // own subprocess starts life already inside the outer
             // schedule:run command's own $command context (its
@@ -183,7 +199,7 @@ class Monitor
             // right before this specific task ran, must win so everything
             // it triggers correlates onto *this* task's run, not onto
             // schedule:run itself.
-            $this->request['id'] ?? $this->currentJob()['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
+            $this->currentJob()['id'] ?? $this->request['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -224,8 +240,10 @@ class Monitor
      * Where on the request timeline this entry started, in ms: an event's
      * start is "now minus how long it took". The root request itself starts
      * at zero. Measured via elapsedMsPrecise() (not elapsedMs()) so the
-     * offset keeps microsecond precision instead of being floored to a
-     * whole millisecond before it ever reaches storage.
+     * offset keeps microtime()'s own microsecond precision instead of being
+     * floored to a whole millisecond before it ever reaches storage — see
+     * elapsedMsPrecise()'s own docs for why that still means round(x, 3),
+     * not leaving the raw subtraction unrounded.
      */
     protected function startOffsetFor(RecordType $type, ?float $duration): ?float
     {
@@ -234,7 +252,7 @@ class Monitor
                 return 0.0;
             }
 
-            return max(0.0, round($this->elapsedMsPrecise() - ($duration ?? 0), 3));
+            return max(0.0, $this->elapsedMsPrecise() - ($duration ?? 0));
         }
 
         if (($job = $this->currentJob()) !== null) {
@@ -244,7 +262,7 @@ class Monitor
 
             $elapsed = max(0.0, round((microtime(true) - $job['start']) * 1000, 3));
 
-            return max(0.0, round($elapsed - ($duration ?? 0), 3));
+            return max(0.0, $elapsed - ($duration ?? 0));
         }
 
         if ($this->scheduledTask !== null) {
@@ -254,7 +272,7 @@ class Monitor
 
             $elapsed = max(0.0, round((microtime(true) - $this->scheduledTask['start']) * 1000, 3));
 
-            return max(0.0, round($elapsed - ($duration ?? 0), 3));
+            return max(0.0, $elapsed - ($duration ?? 0));
         }
 
         if ($this->command !== null) {
@@ -264,7 +282,7 @@ class Monitor
 
             $elapsed = max(0.0, round((microtime(true) - $this->command['start']) * 1000, 3));
 
-            return max(0.0, round($elapsed - ($duration ?? 0), 3));
+            return max(0.0, $elapsed - ($duration ?? 0));
         }
 
         return null;
@@ -398,7 +416,18 @@ class Monitor
         $this->command['stage_start'] = $elapsed;
     }
 
-    /** Milliseconds elapsed since the running command's own process started (LARAVEL_START), or null outside one. */
+    /**
+     * Milliseconds elapsed since the running command's own process started
+     * (LARAVEL_START), or null outside one. round(x, 3): microtime() and
+     * $this->command['start'] are both ~1.7-billion-magnitude Unix epoch
+     * floats, so subtracting them is a textbook floating-point catastrophic
+     * cancellation — the large integer part eats into a double's ~15-17
+     * significant digits, so what should be an exact "918" can come out as
+     * "918.00000762939453125". Rounding to 3 decimals (microtime()'s own
+     * microsecond resolution — the true precision ceiling here) snaps the
+     * result back to the value it actually represents; this is cleanup of
+     * an arithmetic artifact, not a premature display-rounding shortcut.
+     */
     public function commandElapsedMsPrecise(): ?float
     {
         if ($this->command === null) {
@@ -618,7 +647,17 @@ class Monitor
      * `start_offset` is derived from wall-clock time, including lifecycle
      * phase boundaries (bootstrap/middleware/...) — a whole-millisecond
      * elapsedMs() would round phases shorter than 1ms (e.g. "sending") down
-     * to a reported 0ms.
+     * to a reported 0ms. The round(x, 3) here isn't a premature
+     * display-rounding shortcut: microtime() and $this->request['start']
+     * are both ~1.7-billion-magnitude Unix epoch floats, so subtracting
+     * them is a textbook floating-point catastrophic cancellation — the
+     * large integer part eats into a double's ~15-17 significant digits, so
+     * what should be an exact "400" can come out as
+     * "400.00009536743164062500". Rounding to 3 decimals (microtime()'s own
+     * microsecond resolution — the true precision ceiling of this
+     * subtraction) snaps it back to the value it actually represents,
+     * before that noise reaches Support\Timeline or
+     * View\Components\Requests\Timeline's own percentage math.
      */
     public function elapsedMsPrecise(): ?float
     {

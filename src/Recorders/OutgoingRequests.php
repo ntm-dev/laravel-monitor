@@ -59,7 +59,7 @@ class OutgoingRequests extends Recorder
             $stats = $event->response->transferStats;
 
             return $stats?->getTransferTime() !== null
-                ? round($stats->getTransferTime() * 1000, 2)
+                ? $stats->getTransferTime() * 1000
                 : null;
         } catch (Throwable) {
             return null;

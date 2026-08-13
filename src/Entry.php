@@ -29,10 +29,15 @@ class Entry
             'subtype' => $this->subtype !== null ? mb_substr($this->subtype, 0, 32) : null,
             'key' => $this->key !== null ? mb_substr($this->key, 0, 255) : null,
             'payload' => $this->payload,
-            'duration' => $this->duration !== null ? round($this->duration, 3) : null,
+            // Unrounded: neither Monitor::elapsedMsPrecise() nor any Recorder
+            // rounds duration/startOffset before constructing an Entry, so
+            // the DB's own decimal(16,6) column (see the monitor_entries
+            // migration) is the one and only place these get truncated to a
+            // fixed precision.
+            'duration' => $this->duration,
             'user_id' => $this->userId,
             'request_id' => $this->requestId,
-            'start_offset' => $this->startOffset !== null ? round($this->startOffset, 3) : null,
+            'start_offset' => $this->startOffset,
             'created_at' => $this->timestamp,
         ];
     }

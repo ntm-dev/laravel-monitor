@@ -20,7 +20,7 @@ use LaravelMonitor\Support\Timeline;
 trait MergesJobTimelines
 {
     /**
-     * @return list<array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: array}>, totalAttemptsDuration?: int}>
+     * @return list<array{id: string, badge: string, label: string, start: float, duration: float, entries: array, attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: array}>, totalAttemptsDuration?: float}>
      */
     protected function buildTracks(object $root, Collection $children, string $rootBadge): array
     {
@@ -57,7 +57,7 @@ trait MergesJobTimelines
             'badge' => $rootBadge,
             'label' => $root->key ?? $rootBadge,
             'start' => 0.0,
-            'duration' => max(1, (int) ($root->duration ?? 0)),
+            'duration' => max(0.0, (float) ($root->duration ?? 0)),
             'entries' => Timeline::build($root, $children),
         ]];
 
@@ -77,7 +77,7 @@ trait MergesJobTimelines
      * single, deliberately neutral root — see TimelineRow).
      *
      * @param  Collection<int, object>  $executions
-     * @return array{id: string, badge: string, label: string, start: float, duration: int, entries: array, attempts: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: array}>, totalAttemptsDuration: int}
+     * @return array{id: string, badge: string, label: string, start: float, duration: float, entries: array, attempts: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: array}>, totalAttemptsDuration: float}
      */
     protected function jobTrack(Collection $executions, float $rootStart): array
     {
@@ -86,7 +86,21 @@ trait MergesJobTimelines
             $duration = $outcome->duration !== null ? (float) $outcome->duration : 0.0;
 
             $processingStartedAt = $this->startedAt($outcome);
-            $start = max(0.0, ($processingStartedAt - $rootStart) * 1000);
+            // round(..., 3): not a display concern (see
+            // View\Components\Requests\Timeline, which renders this
+            // unrounded) — startedAt() returns a raw Unix-epoch-scale float
+            // (~1.7 billion), and subtracting two such floats to get a small
+            // millisecond-range result is a textbook case of floating-point
+            // catastrophic cancellation: the ~10 integer digits already
+            // consume most of a double's ~15-17 significant digits, so what
+            // should be an exact "400" can come out as
+            // "400.00009536743164062500". Rounding to 3 decimals (matching
+            // microtime()'s own microsecond resolution — the true precision
+            // ceiling of every value startedAt() can return) snaps it back
+            // to the value it actually represents, before this noise
+            // propagates into the bounding-box math below and the
+            // percentage math in View\Components\Requests\Timeline.
+            $start = round(max(0.0, ($processingStartedAt - $rootStart) * 1000), 3);
 
             return [
                 'attempt' => $index + 1,
@@ -101,7 +115,7 @@ trait MergesJobTimelines
                 // every other cross-page link in this package already uses.
                 'outcomeId' => $outcome->request_id,
                 'start' => $start,
-                'duration' => max(1, (int) $duration),
+                'duration' => max(0.0, $duration),
                 'entries' => Timeline::build($outcome, $execution->children),
             ];
         })->all();
@@ -119,7 +133,7 @@ trait MergesJobTimelines
             // of its attempts' bars, same as any other parent/child pair on
             // the timeline.
             'start' => $earliestStart,
-            'duration' => max(1, (int) ($latestEnd - $earliestStart)),
+            'duration' => max(0.0, $latestEnd - $earliestStart),
             // No entries of its own — every event belongs to one specific
             // attempt (see 'attempts' below), never to the track as a whole.
             'entries' => [],
@@ -129,7 +143,7 @@ trait MergesJobTimelines
             // time between retries) — this is "how long the job actually
             // ran for", shown on the track's own root row instead of that
             // wall-clock span.
-            'totalAttemptsDuration' => max(1, (int) array_sum(array_column($attempts, 'duration'))),
+            'totalAttemptsDuration' => max(0.0, array_sum(array_column($attempts, 'duration'))),
         ];
     }
 

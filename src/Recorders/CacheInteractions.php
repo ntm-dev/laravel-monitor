@@ -66,6 +66,10 @@ class CacheInteractions extends Recorder
         // Laravel versions/stores that never dispatch the "before" event
         // (older Laravel, a custom driver) simply leave this null — falls
         // back to today's behaviour (no duration) instead of guessing.
+        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
+        // floats, so subtracting them is a floating-point catastrophic
+        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
+        // decimals matches microtime()'s own microsecond resolution.
         $duration = $this->startedAt !== null
             ? round((microtime(true) - $this->startedAt) * 1000, 3)
             : null;

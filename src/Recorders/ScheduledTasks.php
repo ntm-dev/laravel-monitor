@@ -56,7 +56,7 @@ class ScheduledTasks extends Recorder
 
     public function recordFinished(ScheduledTaskFinished $event): void
     {
-        $this->record($event->task, 'finished', round($event->runtime * 1000, 2));
+        $this->record($event->task, 'finished', $event->runtime * 1000);
         $this->monitor->endScheduledTaskRun();
     }
 

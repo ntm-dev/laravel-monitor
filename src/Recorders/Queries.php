@@ -58,7 +58,7 @@ class Queries extends Recorder
                 // resolves that back to "METHOD /path" itself.
                 'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
             ],
-            duration: round($event->time, 2),
+            duration: $event->time,
         );
     }
 

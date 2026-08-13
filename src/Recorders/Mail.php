@@ -69,6 +69,10 @@ class Mail extends Recorder
         $notification = $event->data['__laravel_notification'] ?? null;
         $mailable = $event->data['__laravel_mailable'] ?? null;
 
+        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
+        // floats, so subtracting them is a floating-point catastrophic
+        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
+        // decimals matches microtime()'s own microsecond resolution.
         $duration = $this->startedAt !== null
             ? round((microtime(true) - $this->startedAt) * 1000, 3)
             : null;
