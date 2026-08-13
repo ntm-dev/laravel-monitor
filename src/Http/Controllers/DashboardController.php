@@ -35,7 +35,7 @@ class DashboardController
         'jobs' => 'job',
         'commands' => 'command',
         'schedule' => 'scheduled_task',
-        'queries' => 'slow_query',
+        'queries' => 'query',
         'exceptions' => 'exception',
         'notifications' => 'notification',
         'mail' => 'mail',

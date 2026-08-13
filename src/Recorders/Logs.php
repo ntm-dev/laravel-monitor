@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 class Logs extends Recorder
@@ -32,7 +33,7 @@ class Logs extends Recorder
             ->all();
 
         $this->monitor->record(
-            type: 'log',
+            type: RecordType::Log,
             key: Str::limit((string) $event->message, 250),
             payload: [
                 'message' => Str::limit((string) $event->message, 1000),

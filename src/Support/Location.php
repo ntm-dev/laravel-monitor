@@ -207,6 +207,19 @@ final class Location
 
     private function joinPaths(string $basePath, string ...$paths): string
     {
+        // $this->basePath already carries its own trailing separator (see
+        // __construct()) — without this rtrim, every path built from it
+        // (vendorPath, artisanPath, and everything joined from vendorPath
+        // in turn, like frameworkPath/monitorPath) doubled up the
+        // separator, so str_starts_with() against a real single-separator
+        // file path from debug_backtrace() never matched. isVendorFile()/
+        // isInternalFile() silently returned false for every vendor file,
+        // so forQueryTrace() always stopped at the first stack frame after
+        // the internal service-provider frame — typically inside
+        // Illuminate\Events\Dispatcher — and reported that as the query's
+        // origin instead of skipping past it to find the real caller.
+        $basePath = rtrim($basePath, DIRECTORY_SEPARATOR);
+
         foreach ($paths as $index => $path) {
             if (empty($path) && $path !== '0') {
                 unset($paths[$index]);

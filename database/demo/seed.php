@@ -338,7 +338,7 @@ for ($hour = clone $start; $hour < $now; $hour = $hour->add(new DateInterval('PT
     // Slow queries surface a couple of times per hour.
     if (mt_rand(1, 2) === 1) {
         [$sql, $location] = $slowQueries[array_rand($slowQueries)];
-        $record($randomTime($hour), 'slow_query', null, $sql, [
+        $record($randomTime($hour), 'query', null, $sql, [
             'sql' => $sql,
             'connection' => 'mysql',
             'location' => $location,

@@ -7,6 +7,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Support\Str;
 use LaravelMonitor\Support\Fingerprint;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 use function array_map;
@@ -59,7 +60,7 @@ class Exceptions extends Recorder
         $handled = $this->wasReportedDeliberately();
 
         $this->monitor->record(
-            type: 'exception',
+            type: RecordType::Exception,
             key: Fingerprint::for($class, $exception->getMessage(), "{$file}:{$line}"),
             payload: [
                 'class' => $class,

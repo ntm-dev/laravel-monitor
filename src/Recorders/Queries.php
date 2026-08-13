@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
+use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Sql;
 
 class Queries extends Recorder
@@ -26,27 +27,18 @@ class Queries extends Recorder
             return;
         }
 
-        // Count every query for the request's total, regardless of the
-        // slow-query threshold below — otherwise a request whose queries
-        // all ran under threshold looks like it made zero queries at all.
         $this->monitor->incrementQueryCount();
 
-        $threshold = (float) ($this->config['threshold'] ?? 100);
-        $isSlow = $event->time >= $threshold;
-
         // Persist every query regardless of duration or execution context
-        // (request, console command, queue worker) — tagging it slow/fast
-        // so the dedicated Slow Queries digest can still filter down to
-        // just the slow ones. A long-running worker can generate a lot of
+        // (request, console command, queue worker) — the dashboard decides
+        // what counts as "slow" at render time (see QueryDetail::data()'s
+        // $slowThreshold), comparing the live config threshold against
+        // each row's actual duration, rather than a fixed tag baked in
+        // here at record time. A long-running worker can generate a lot of
         // rows this way; monitor.retention.hours / `monitor:prune` is the
         // backstop, not a per-query filter.
-        //
-        // The stored `type` stays 'slow_query' even though this recorder no
-        // longer only records slow ones — changing it would orphan every
-        // already-recorded row (and every Storage call keyed on that
-        // string) for what's otherwise a same-behavior rename.
         $this->monitor->record(
-            type: 'slow_query',
+            type: RecordType::Query,
             key: Sql::normalizeKey($event->sql),
             payload: [
                 'sql' => $event->sql,
@@ -67,7 +59,6 @@ class Queries extends Recorder
                 'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
             ],
             duration: round($event->time, 2),
-            subtype: $isSlow ? 'slow' : 'fast',
         );
     }
 

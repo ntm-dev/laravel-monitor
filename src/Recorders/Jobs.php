@@ -13,6 +13,7 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Str;
 use LaravelMonitor\Http\Controllers\Concerns\NormalizesQueue;
+use LaravelMonitor\Support\RecordType;
 use ReflectionClass;
 
 use function array_key_exists;
@@ -41,7 +42,7 @@ class Jobs extends Recorder
     public function recordQueued(JobQueued $event): void
     {
         $this->monitor->record(
-            type: 'job',
+            type: RecordType::Job,
             key: $this->displayName($event->job),
             payload: array_filter([
                 'connection' => $event->connectionName,
@@ -88,7 +89,7 @@ class Jobs extends Recorder
         $id = $event->job->getJobId() ?: spl_object_hash($event->job);
 
         $this->monitor->record(
-            type: 'job',
+            type: RecordType::Job,
             key: $event->job->resolveName(),
             payload: array_filter([
                 'connection' => $event->connectionName,
@@ -119,7 +120,7 @@ class Jobs extends Recorder
         $id = $event->job->getJobId() ?: spl_object_hash($event->job);
 
         $this->monitor->record(
-            type: 'job',
+            type: RecordType::Job,
             key: $event->job->resolveName(),
             payload: array_filter([
                 'connection' => $event->connectionName,
@@ -156,7 +157,7 @@ class Jobs extends Recorder
         $id = $event->job->getJobId() ?: spl_object_hash($event->job);
 
         $this->monitor->record(
-            type: 'job',
+            type: RecordType::Job,
             key: $event->job->resolveName(),
             payload: array_filter([
                 'connection' => $event->connectionName,

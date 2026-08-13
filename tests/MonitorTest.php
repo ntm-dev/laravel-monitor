@@ -18,6 +18,7 @@ use LaravelMonitor\Livewire\RequestDetail;
 use LaravelMonitor\Support\Fingerprint;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Preferences;
+use LaravelMonitor\Support\RecordType;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
@@ -30,8 +31,8 @@ class MonitorTest extends TestCase
 
     public function test_records_entries_and_flushes_to_storage(): void
     {
-        Monitor::record('request', 'GET /users', ['status' => 200], 120, '2xx', 1);
-        Monitor::record('request', 'GET /users', ['status' => 200], 80, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 80, '2xx', 1);
         Monitor::flush();
 
         $this->assertDatabaseCount('monitor_entries', 2);
@@ -45,9 +46,9 @@ class MonitorTest extends TestCase
 
     public function test_stats_by_subtype_groups_in_a_single_query(): void
     {
-        Monitor::record('request', 'GET /users', [], 100, '2xx');
-        Monitor::record('request', 'GET /users', [], 300, '2xx');
-        Monitor::record('request', 'GET /posts', [], 50, '4xx');
+        Monitor::record(RecordType::Request, 'GET /users', [], 100, '2xx');
+        Monitor::record(RecordType::Request, 'GET /users', [], 300, '2xx');
+        Monitor::record(RecordType::Request, 'GET /posts', [], 50, '4xx');
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -68,9 +69,9 @@ class MonitorTest extends TestCase
 
     public function test_aggregates_by_key(): void
     {
-        Monitor::record('request', 'GET /users', [], 100, '2xx');
-        Monitor::record('request', 'GET /users', [], 300, '2xx');
-        Monitor::record('request', 'GET /posts', [], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /users', [], 100, '2xx');
+        Monitor::record(RecordType::Request, 'GET /users', [], 300, '2xx');
+        Monitor::record(RecordType::Request, 'GET /posts', [], 50, '2xx');
         Monitor::flush();
 
         $groups = app(Storage::class)->aggregateByKey('request', CarbonImmutable::now()->subHour());
@@ -84,7 +85,7 @@ class MonitorTest extends TestCase
 
     public function test_stats_and_recent_and_purge(): void
     {
-        Monitor::record('exception', 'RuntimeException', ['message' => 'boom']);
+        Monitor::record(RecordType::Exception, 'RuntimeException', ['message' => 'boom']);
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -97,10 +98,8 @@ class MonitorTest extends TestCase
         $this->assertDatabaseCount('monitor_entries', 0);
     }
 
-    public function test_slow_query_recorder_captures_every_query_and_tags_slow_ones(): void
+    public function test_query_recorder_captures_every_query_regardless_of_duration(): void
     {
-        config(['monitor.recorders.'.\LaravelMonitor\Recorders\Queries::class.'.threshold' => 100]);
-
         event(new QueryExecuted('select * from users', [], 250.0, DB::connection()));
         event(new QueryExecuted('select * from posts', [], 5.0, DB::connection()));
 
@@ -108,20 +107,47 @@ class MonitorTest extends TestCase
 
         $this->assertDatabaseCount('monitor_entries', 2);
         $this->assertDatabaseHas('monitor_entries', [
-            'type' => 'slow_query',
+            'type' => 'query',
             'key' => 'select * from users',
             'duration' => 250,
-            'subtype' => 'slow',
         ]);
         $this->assertDatabaseHas('monitor_entries', [
-            'type' => 'slow_query',
+            'type' => 'query',
             'key' => 'select * from posts',
             'duration' => 5,
-            'subtype' => 'fast',
         ]);
     }
 
-    public function test_slow_query_recorder_normalizes_in_clauses_and_bulk_inserts_into_one_group(): void
+    /**
+     * Regression test for a path-joining bug in Support\Location: basePath
+     * already carries a trailing separator, and joinPaths() unconditionally
+     * added another one for every segment, doubling the slash between the
+     * app root and "vendor" (".../app//vendor/..."). str_starts_with()
+     * against a real, single-separator file path from debug_backtrace()
+     * then never matched, so isVendorFile()/isInternalFile() treated every
+     * vendor/framework file as application code — forQueryTrace() stopped
+     * at the very first frame after the internal one (typically inside
+     * Illuminate\Events\Dispatcher, the query listener's own caller)
+     * instead of skipping past it to find the real caller.
+     */
+    public function test_query_trace_skips_vendor_and_framework_frames_to_find_the_real_caller(): void
+    {
+        $location = $this->app->make(\LaravelMonitor\Support\Location::class);
+
+        $trace = [
+            ['file' => base_path('vendor/ntm-dev/laravel-monitor/src/Recorders/Queries.php'), 'line' => 63],
+            ['file' => base_path('vendor/laravel/framework/src/Illuminate/Events/Dispatcher.php'), 'line' => 50],
+            ['file' => base_path('vendor/laravel/framework/src/Illuminate/Database/Connection.php'), 'line' => 800],
+            ['file' => base_path('app/Repositories/BookingRepository.php'), 'line' => 95],
+        ];
+
+        [$file, $line] = $location->forQueryTrace($trace);
+
+        $this->assertSame('app/Repositories/BookingRepository.php', $file);
+        $this->assertSame(95, $line);
+    }
+
+    public function test_query_recorder_normalizes_in_clauses_and_bulk_inserts_into_one_group(): void
     {
         event(new QueryExecuted('select * from users where id in (?, ?, ?)', [], 10.0, DB::connection()));
         event(new QueryExecuted('select * from users where id in (?, ?, ?, ?, ?)', [], 20.0, DB::connection()));
@@ -129,7 +155,7 @@ class MonitorTest extends TestCase
 
         Monitor::flush();
 
-        $keys = DB::table('monitor_entries')->where('type', 'slow_query')->pluck('key');
+        $keys = DB::table('monitor_entries')->where('type', 'query')->pluck('key');
 
         $this->assertSame(
             ['insert into logs (a, b) VALUES (?, ?)', 'select * from users where id IN (?)'],
@@ -159,7 +185,7 @@ class MonitorTest extends TestCase
         $this->assertSame($expected, \LaravelMonitor\Support\Sql::normalizeKey($input));
     }
 
-    public function test_slow_query_recorder_ignores_its_own_storage_table(): void
+    public function test_query_recorder_ignores_its_own_storage_table(): void
     {
         event(new QueryExecuted('select * from monitor_entries', [], 1.0, DB::connection()));
 
@@ -176,7 +202,7 @@ class MonitorTest extends TestCase
      * entries-table writes, not the monitored application's.
      */
     #[DataProvider('ownTableProvider')]
-    public function test_slow_query_recorder_ignores_all_of_monitors_own_tables(string $table): void
+    public function test_query_recorder_ignores_all_of_monitors_own_tables(string $table): void
     {
         event(new QueryExecuted("select * from {$table}", [], 1.0, DB::connection()));
 
@@ -455,7 +481,7 @@ class MonitorTest extends TestCase
 
         // Recorded once, but nothing currently registers this command any
         // more — renamed or removed from the app's own Schedule::events().
-        Monitor::record('scheduled_task', 'app:removed-task', [
+        Monitor::record(RecordType::ScheduledTask, 'app:removed-task', [
             'command' => 'php artisan app:removed-task',
             'expression' => '* * * * *',
         ], 20.0, 'finished');
@@ -491,7 +517,7 @@ class MonitorTest extends TestCase
         $oldTask = $schedule->command('app:sync-data')->everyMinute();
 
         // Historical runs recorded under the *old* cadence.
-        Monitor::record('scheduled_task', 'app:sync-data', [
+        Monitor::record(RecordType::ScheduledTask, 'app:sync-data', [
             'command' => 'php artisan app:sync-data',
             'expression' => $oldTask->expression,
             'repeat_seconds' => $oldTask->repeatSeconds,
@@ -509,7 +535,7 @@ class MonitorTest extends TestCase
 
         // At least one run has already happened under the new cadence too
         // — a cadence with zero runs yet wouldn't have a row to find.
-        Monitor::record('scheduled_task', 'app:sync-data', [
+        Monitor::record(RecordType::ScheduledTask, 'app:sync-data', [
             'command' => 'php artisan app:sync-data',
             'expression' => $newTask->expression,
             'repeat_seconds' => $newTask->repeatSeconds,
@@ -684,7 +710,7 @@ class MonitorTest extends TestCase
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
-        $queryRow = DB::table('monitor_entries')->where('type', 'slow_query')->first();
+        $queryRow = DB::table('monitor_entries')->where('type', 'query')->first();
 
         $this->assertNotNull($commandRow->request_id);
         $this->assertSame($commandRow->request_id, $queryRow->request_id);
@@ -834,9 +860,9 @@ class MonitorTest extends TestCase
     public function test_commands_list_reports_a_total_and_a_p95_alongside_the_success_failure_split(): void
     {
         foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as $duration) {
-            Monitor::record('command', 'app:sync-data', ['exit_code' => 0], $duration, 'success');
+            Monitor::record(RecordType::Command, 'app:sync-data', ['exit_code' => 0], $duration, 'success');
         }
-        Monitor::record('command', 'app:sync-data', ['exit_code' => 1], 200, 'failed');
+        Monitor::record(RecordType::Command, 'app:sync-data', ['exit_code' => 1], 200, 'failed');
         Monitor::flush();
 
         $row = Livewire::test(\LaravelMonitor\Livewire\Commands::class)
@@ -862,7 +888,7 @@ class MonitorTest extends TestCase
         // Recorders\Commands::commandLine() deliberately omits `command` from
         // the payload rather than duplicating `key`. The runs list must still
         // show the bare name instead of leaving the cell blank.
-        Monitor::record('command', 'tinker', ['exit_code' => 0], 50, 'success');
+        Monitor::record(RecordType::Command, 'tinker', ['exit_code' => 0], 50, 'success');
         Monitor::flush();
 
         $this->get('/monitor/commands/'.\LaravelMonitor\Support\KeyHash::for('tinker'))
@@ -948,7 +974,7 @@ class MonitorTest extends TestCase
     {
         config(['monitor.enabled' => false]);
 
-        Monitor::record('request', 'GET /users');
+        Monitor::record(RecordType::Request, 'GET /users');
         Monitor::flush();
 
         $this->assertDatabaseCount('monitor_entries', 0);
@@ -1037,9 +1063,9 @@ class MonitorTest extends TestCase
     {
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 1);
-        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 2);
-        Monitor::record('exception', $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'handled', 2);
+        Monitor::record(RecordType::Exception, $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 1);
+        Monitor::record(RecordType::Exception, $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'unhandled', 2);
+        Monitor::record(RecordType::Exception, $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'handled', 2);
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -1060,7 +1086,7 @@ class MonitorTest extends TestCase
 
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record('exception', $key, [
+        Monitor::record(RecordType::Exception, $key, [
             'class' => 'App\\Services\\Boom',
             'message' => 'Kaboom',
             'file' => 'app/X.php',
@@ -1085,8 +1111,8 @@ class MonitorTest extends TestCase
 
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record('request', 'GET /users', ['status' => 500], 20, '5xx');
-        Monitor::record('exception', $key, [
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 500], 20, '5xx');
+        Monitor::record(RecordType::Exception, $key, [
             'class' => 'App\\Services\\Boom',
             'message' => 'Kaboom',
             'file' => 'app/X.php',
@@ -1113,8 +1139,8 @@ class MonitorTest extends TestCase
 
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record('command', 'app:sync-data', ['exit_code' => 1], 20, 'failure');
-        Monitor::record('exception', $key, [
+        Monitor::record(RecordType::Command, 'app:sync-data', ['exit_code' => 1], 20, 'failure');
+        Monitor::record(RecordType::Exception, $key, [
             'class' => 'App\\Services\\Boom',
             'message' => 'Kaboom',
             'file' => 'app/X.php',
@@ -1141,7 +1167,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record('request', 'GET /users', ['status' => 200], 120, '2xx');
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx');
         Monitor::flush();
 
         $this->get('/monitor')
@@ -1154,18 +1180,18 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record('request', 'GET /users', ['status' => 200], 120, '2xx', 1);
-        Monitor::record('exception', 'RuntimeException', ['class' => 'RuntimeException', 'message' => 'boom', 'file' => 'app/X.php', 'line' => 1]);
-        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 250);
-        Monitor::record('job', 'App\\Jobs\\SendEmail', ['queue' => 'default'], 40, 'processed');
-        Monitor::record('command', 'app:sync-data', ['exit_code' => 0], 15, 'success');
-        Monitor::record('scheduled_task', 'inspire', ['command' => 'inspire'], 12, 'finished');
-        Monitor::record('cache', 'users:1', [], null, 'hit');
-        Monitor::record('outgoing_request', 'GET https://api.example.com', ['status' => 200], 90, 'success');
-        Monitor::record('mail', 'Welcome', ['subject' => 'Welcome', 'to' => 'a@b.c']);
-        Monitor::record('notification', 'App\\Notifications\\Invoice', ['channel' => 'mail'], null, 'mail');
-        Monitor::record('log', 'Something happened', ['message' => 'Something happened', 'level' => 'warning'], null, 'warning');
-        Monitor::record('auth', 'a@b.c', ['guard' => 'web'], null, 'login', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Exception, 'RuntimeException', ['class' => 'RuntimeException', 'message' => 'boom', 'file' => 'app/X.php', 'line' => 1]);
+        Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 250);
+        Monitor::record(RecordType::Job, 'App\\Jobs\\SendEmail', ['queue' => 'default'], 40, 'processed');
+        Monitor::record(RecordType::Command, 'app:sync-data', ['exit_code' => 0], 15, 'success');
+        Monitor::record(RecordType::ScheduledTask, 'inspire', ['command' => 'inspire'], 12, 'finished');
+        Monitor::record(RecordType::Cache, 'users:1', [], null, 'hit');
+        Monitor::record(RecordType::OutgoingRequest, 'GET https://api.example.com', ['status' => 200], 90, 'success');
+        Monitor::record(RecordType::Mail, 'Welcome', ['subject' => 'Welcome', 'to' => 'a@b.c']);
+        Monitor::record(RecordType::Notification, 'App\\Notifications\\Invoice', ['channel' => 'mail'], null, 'mail');
+        Monitor::record(RecordType::Log, 'Something happened', ['message' => 'Something happened', 'level' => 'warning'], null, 'warning');
+        Monitor::record(RecordType::Auth, 'a@b.c', ['guard' => 'web'], null, 'login', 1);
         Monitor::flush();
 
         foreach (['overview', 'requests', 'exceptions', 'queries', 'jobs', 'commands', 'schedule', 'cache', 'outgoing', 'mail', 'notifications', 'users', 'logs'] as $tab) {
@@ -1181,13 +1207,13 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
-        Monitor::record('request', 'POST /users', ['status' => 201], 60, '2xx', 1);
-        Monitor::record('request', 'PUT /users/1', ['status' => 200], 70, '2xx', 1);
-        Monitor::record('request', 'PATCH /users/1', ['status' => 200], 40, '2xx', 1);
-        Monitor::record('request', 'DELETE /users/1', ['status' => 204], 30, '2xx', 1);
-        Monitor::record('request', 'GET /orders', ['status' => 404], 20, '4xx', 1);
-        Monitor::record('request', 'POST /payments', ['status' => 500], 90, '5xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'POST /users', ['status' => 201], 60, '2xx', 1);
+        Monitor::record(RecordType::Request, 'PUT /users/1', ['status' => 200], 70, '2xx', 1);
+        Monitor::record(RecordType::Request, 'PATCH /users/1', ['status' => 200], 40, '2xx', 1);
+        Monitor::record(RecordType::Request, 'DELETE /users/1', ['status' => 204], 30, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /orders', ['status' => 404], 20, '4xx', 1);
+        Monitor::record(RecordType::Request, 'POST /payments', ['status' => 500], 90, '5xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests')
@@ -1202,7 +1228,7 @@ class MonitorTest extends TestCase
     public function test_request_detail_individual_requests_paginate_past_the_first_page(): void
     {
         for ($i = 0; $i < 60; $i++) {
-            Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+            Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
         }
         Monitor::flush();
 
@@ -1227,7 +1253,7 @@ class MonitorTest extends TestCase
         // clamp-to-now never clips the window regardless of when this test runs.
         // 2026-01-15 04:00 UTC = 2026-01-15 11:00 in Asia/Ho_Chi_Minh (UTC+7).
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-01-15 04:00:00', 'UTC'));
-        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
         Monitor::flush();
         CarbonImmutable::setTestNow();
 
@@ -1250,9 +1276,9 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         $monitor->markControllerStart();
-        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
+        Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 25);
         $monitor->markResponseReady();
-        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -1273,7 +1299,7 @@ class MonitorTest extends TestCase
         $children = $storage->timelineFor($requestId);
 
         $this->assertCount(1, $children);
-        $this->assertSame('slow_query', $children->first()->type);
+        $this->assertSame('query', $children->first()->type);
         $this->assertSame($requestId, $children->first()->request_id);
         $this->assertIsNumeric($children->first()->start_offset);
     }
@@ -1295,12 +1321,12 @@ class MonitorTest extends TestCase
         $monitor->beginRequest();
         $monitor->markControllerStart();
         $monitor->markRenderStart();
-        Monitor::record('slow_query', 'select * from posts', ['sql' => 'select * from posts'], 5);
+        Monitor::record(RecordType::Query, 'select * from posts', ['sql' => 'select * from posts'], 5);
         $monitor->markUnwinding();
-        Monitor::record('slow_query', 'insert into sessions', ['sql' => 'insert into sessions'], 3);
+        Monitor::record(RecordType::Query, 'insert into sessions', ['sql' => 'insert into sessions'], 3);
         $monitor->markResponseReady();
         $monitor->markTerminating();
-        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -1341,10 +1367,10 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         $monitor->markControllerStart();
-        Monitor::record('slow_query', 'select * from legacy', ['sql' => 'select * from legacy'], 5);
+        Monitor::record(RecordType::Query, 'select * from legacy', ['sql' => 'select * from legacy'], 5);
         $monitor->markResponseReady();
         $monitor->markTerminating();
-        Monitor::record('request', 'GET /legacy', ['method' => 'GET', 'path' => '/legacy', 'status' => 200], 60, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /legacy', ['method' => 'GET', 'path' => '/legacy', 'status' => 200], 60, '2xx', 1);
         Monitor::flush();
 
         $storage = app(Storage::class);
@@ -1364,7 +1390,7 @@ class MonitorTest extends TestCase
     public function test_request_recorder_captures_correlated_timeline_end_to_end(): void
     {
         \Illuminate\Support\Facades\Route::middleware('web')->get('/demo-users', function () {
-            Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
+            Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 25);
 
             return 'ok';
         });
@@ -1386,7 +1412,7 @@ class MonitorTest extends TestCase
         $this->assertArrayHasKey('request_headers', $payload);
         $this->assertNotEmpty($payload['phases']);
 
-        $query = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'slow_query')->first();
+        $query = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'query')->first();
 
         $this->assertSame($row->request_id, $query->request_id);
     }
@@ -1437,8 +1463,8 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         $monitor->markControllerStart();
-        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 25);
-        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 25);
+        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/'.$monitor->requestId())
@@ -1756,7 +1782,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record('request', 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users'))
@@ -1779,7 +1805,7 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         $monitor->markControllerStart();
-        Monitor::record('request', 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users').'/'.$monitor->requestId())
@@ -1847,9 +1873,9 @@ class MonitorTest extends TestCase
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $key = 'App\\Notifications\\Welcome';
-        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'mail'], 10, 'mail');
-        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'mail'], 20, 'mail');
-        Monitor::record('notification', $key, ['notification' => $key, 'channel' => 'database'], null, 'database');
+        Monitor::record(RecordType::Notification, $key, ['notification' => $key, 'channel' => 'mail'], 10, 'mail');
+        Monitor::record(RecordType::Notification, $key, ['notification' => $key, 'channel' => 'mail'], 20, 'mail');
+        Monitor::record(RecordType::Notification, $key, ['notification' => $key, 'channel' => 'database'], null, 'database');
         Monitor::flush();
 
         // The list groups all three sends into one row for the class...
@@ -1869,8 +1895,8 @@ class MonitorTest extends TestCase
         Gate::define('viewMonitor', fn ($user = null) => true);
 
         $key = 'App\\Mail\\InvoiceMail';
-        Monitor::record('mail', $key, ['subject' => 'Your invoice', 'to' => 'a@b.com', 'mailable' => $key], 5, 'direct');
-        Monitor::record('mail', $key, ['subject' => 'Your invoice', 'to' => 'c@d.com', 'mailable' => $key], 8, 'direct');
+        Monitor::record(RecordType::Mail, $key, ['subject' => 'Your invoice', 'to' => 'a@b.com', 'mailable' => $key], 5, 'direct');
+        Monitor::record(RecordType::Mail, $key, ['subject' => 'Your invoice', 'to' => 'c@d.com', 'mailable' => $key], 8, 'direct');
         Monitor::flush();
 
         $this->get('/monitor/mail')
@@ -2118,13 +2144,13 @@ class MonitorTest extends TestCase
 
         // Still inside the outer job's handle(), after the nested dispatch returned.
         $this->assertSame($outerAttemptId, $monitor->jobAttemptId());
-        Monitor::record('slow_query', 'select * from users', ['sql' => 'select * from users'], 5);
+        Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 5);
 
         event(new \Illuminate\Queue\Events\JobProcessed('sync', $outer));
 
         Monitor::flush();
 
-        $queryRow = DB::table('monitor_entries')->where('type', 'slow_query')->first();
+        $queryRow = DB::table('monitor_entries')->where('type', 'query')->first();
         $outerRow = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->get()
             ->first(fn ($row) => json_decode($row->payload, true)['job_id'] === 'outer-job-id');
 
@@ -2215,7 +2241,7 @@ class MonitorTest extends TestCase
 
         LazyLoadingFixtureModel::query()->get();
 
-        Monitor::record('request', 'GET /x', ['method' => 'GET', 'path' => '/x', 'status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /x', ['method' => 'GET', 'path' => '/x', 'status' => 200], 50, '2xx');
         Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'request')->first();
@@ -2296,7 +2322,7 @@ class MonitorTest extends TestCase
 
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record('exception', $key, [
+        Monitor::record(RecordType::Exception, $key, [
             'class' => 'App\\Services\\Boom',
             'message' => 'Kaboom',
             'file' => 'app/X.php',
@@ -2319,12 +2345,12 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record('slow_query', 'select * from big_table', [], 600);
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
         Monitor::flush();
 
         $storage = app(\LaravelMonitor\Contracts\Storage::class);
-        $storage->syncIssues('slow_query', ['select * from big_table' => now()]);
-        $uuid = $storage->issueStatuses('slow_query', ['select * from big_table'])->get('select * from big_table')->uuid;
+        $storage->syncIssues('query', ['select * from big_table' => now()]);
+        $uuid = $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->uuid;
 
         $this->get('/monitor/issues/'.$uuid)
             ->assertOk()

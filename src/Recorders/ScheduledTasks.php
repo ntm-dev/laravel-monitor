@@ -10,6 +10,7 @@ use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Event as ScheduledEvent;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\RecordType;
 
 use function gethostname;
 use function memory_get_peak_usage;
@@ -78,7 +79,7 @@ class ScheduledTasks extends Recorder
     protected function record(ScheduledEvent $task, string $status, ?float $duration = null, ?string $error = null): void
     {
         $this->monitor->record(
-            type: 'scheduled_task',
+            type: RecordType::ScheduledTask,
             key: self::name($task),
             payload: array_filter([
                 'command' => $this->fullCommand($task),

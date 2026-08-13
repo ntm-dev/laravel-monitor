@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Request;
+use LaravelMonitor\Support\RecordType;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderBag;
 use Symfony\Component\HttpFoundation\Response;
@@ -88,7 +89,7 @@ class Requests extends Recorder
         }
 
         $this->monitor->record(
-            type: 'request',
+            type: RecordType::Request,
             key: $request->method().' '.$uri,
             payload: array_filter([
                 'method' => $request->method(),

@@ -256,7 +256,7 @@ class DatabaseStorage implements Storage
     public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
     {
         $rows = $this->table()
-            ->where('type', 'slow_query')
+            ->where('type', 'query')
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
             // created_at, not id, as the primary sort — see cacheKeyStats()

@@ -14,6 +14,7 @@ use Illuminate\Cache\Events\RetrievingManyKeys;
 use Illuminate\Cache\Events\WritingKey;
 use Illuminate\Cache\Events\WritingManyKeys;
 use Illuminate\Contracts\Events\Dispatcher;
+use LaravelMonitor\Support\RecordType;
 
 class CacheInteractions extends Recorder
 {
@@ -70,7 +71,7 @@ class CacheInteractions extends Recorder
             : null;
 
         $this->monitor->record(
-            type: 'cache',
+            type: RecordType::Cache,
             key: $key,
             payload: array_filter([
                 'store' => $storeName,

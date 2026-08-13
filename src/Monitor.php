@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Location;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 class Monitor
@@ -146,7 +147,7 @@ class Monitor
      * as soon as the buffer limit is reached.
      */
     public function record(
-        string $type,
+        RecordType $type,
         ?string $key = null,
         array $payload = [],
         ?float $duration = null,
@@ -162,14 +163,14 @@ class Monitor
         // after `$next()` (e.g. session persistence) getting swept into
         // whatever phase happened to be open the longest, purely because
         // their stored start_offset fell inside that phase's interval.
-        if ($type !== 'request' && $this->request !== null) {
+        if ($type !== RecordType::Request && $this->request !== null) {
             $payload['phase'] = $this->request['stage'];
-        } elseif ($type !== 'command' && $this->command !== null) {
+        } elseif ($type !== RecordType::Command && $this->command !== null) {
             $payload['phase'] = $this->command['stage'];
         }
 
         $entry = new Entry(
-            $type,
+            $type->value,
             $key,
             $payload,
             $duration,
@@ -186,11 +187,11 @@ class Monitor
             $this->startOffsetFor($type, $duration),
         );
 
-        if ($type === 'request' && $this->request !== null) {
+        if ($type === RecordType::Request && $this->request !== null) {
             $this->pendingRequest = $entry;
         }
 
-        if ($type === 'command' && $this->command !== null) {
+        if ($type === RecordType::Command && $this->command !== null) {
             $this->pendingCommand = $entry;
         }
 
@@ -226,10 +227,10 @@ class Monitor
      * offset keeps microsecond precision instead of being floored to a
      * whole millisecond before it ever reaches storage.
      */
-    protected function startOffsetFor(string $type, ?float $duration): ?float
+    protected function startOffsetFor(RecordType $type, ?float $duration): ?float
     {
         if ($this->request !== null) {
-            if ($type === 'request') {
+            if ($type === RecordType::Request) {
                 return 0.0;
             }
 
@@ -237,7 +238,7 @@ class Monitor
         }
 
         if (($job = $this->currentJob()) !== null) {
-            if ($type === 'job') {
+            if ($type === RecordType::Job) {
                 return 0.0;
             }
 
@@ -247,7 +248,7 @@ class Monitor
         }
 
         if ($this->scheduledTask !== null) {
-            if ($type === 'scheduled_task') {
+            if ($type === RecordType::ScheduledTask) {
                 return 0.0;
             }
 
@@ -257,7 +258,7 @@ class Monitor
         }
 
         if ($this->command !== null) {
-            if ($type === 'command') {
+            if ($type === RecordType::Command) {
                 return 0.0;
             }
 
