@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\Issues;
+use LaravelMonitor\Support\RecordType;
 use Livewire\Livewire;
 use Ramsey\Uuid\Uuid;
 
@@ -19,14 +20,14 @@ class IssuesTest extends TestCase
         // (request/job 1000ms, query 500ms, outgoing_request 1000ms) — the
         // "under" entry of each pair must be excluded, proving the areas
         // aren't sharing a single threshold.
-        Monitor::record('request', 'GET /over', [], 1200, '2xx');
-        Monitor::record('request', 'GET /under', [], 800, '2xx');
-        Monitor::record('job', 'App\\Jobs\\SlowJob', [], 1500, 'processed');
-        Monitor::record('job', 'App\\Jobs\\FastJob', [], 200, 'processed');
-        Monitor::record('slow_query', 'select * from big_table', [], 600);
-        Monitor::record('slow_query', 'select * from small_table', [], 400);
-        Monitor::record('outgoing_request', 'GET https://slow.example.com', [], 3000, 'success');
-        Monitor::record('outgoing_request', 'GET https://fast.example.com', [], 100, 'success');
+        Monitor::record(RecordType::Request, 'GET /over', [], 1200, '2xx');
+        Monitor::record(RecordType::Request, 'GET /under', [], 800, '2xx');
+        Monitor::record(RecordType::Job, 'App\\Jobs\\SlowJob', [], 1500, 'processed');
+        Monitor::record(RecordType::Job, 'App\\Jobs\\FastJob', [], 200, 'processed');
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
+        Monitor::record(RecordType::Query, 'select * from small_table', [], 400);
+        Monitor::record(RecordType::OutgoingRequest, 'GET https://slow.example.com', [], 3000, 'success');
+        Monitor::record(RecordType::OutgoingRequest, 'GET https://fast.example.com', [], 100, 'success');
         Monitor::flush();
 
         $component = Livewire::test(Issues::class)->set('view', 'performance');
@@ -45,7 +46,7 @@ class IssuesTest extends TestCase
 
     public function test_resolving_an_exception_moves_it_out_of_the_open_tab(): void
     {
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
         Monitor::flush();
 
         $component = Livewire::test(Issues::class)->set('view', 'exceptions');
@@ -63,14 +64,14 @@ class IssuesTest extends TestCase
 
     public function test_ignoring_a_performance_issue_moves_it_out_of_the_open_tab(): void
     {
-        Monitor::record('slow_query', 'select * from big_table', [], 600);
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
         Monitor::flush();
 
         $component = Livewire::test(Issues::class)->set('view', 'performance');
 
         $this->assertCount(1, $component->viewData('performance'));
 
-        $component->call('ignore', 'slow_query', 'select * from big_table');
+        $component->call('ignore', 'query', 'select * from big_table');
 
         $this->assertCount(0, $component->viewData('performance'));
 
@@ -81,7 +82,7 @@ class IssuesTest extends TestCase
 
     public function test_reopening_a_resolved_exception_returns_it_to_the_open_tab(): void
     {
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
         Monitor::flush();
 
         $component = Livewire::test(Issues::class)->set('view', 'exceptions');
@@ -103,7 +104,7 @@ class IssuesTest extends TestCase
         // Recorded strictly after the resolution above — timestamp columns
         // are only second-precision, so the gap needs to survive that.
         \Illuminate\Support\Carbon::setTestNow(now()->addMinutes(6));
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom again'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom again'], null, 'unhandled');
         Monitor::flush();
 
         $open = Livewire::test(Issues::class)->set('view', 'exceptions')->viewData('exceptions');
@@ -118,12 +119,12 @@ class IssuesTest extends TestCase
     {
         $storage = app(\LaravelMonitor\Contracts\Storage::class);
 
-        Monitor::record('slow_query', 'select * from big_table', [], 600);
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
         Monitor::flush();
 
-        $storage->setIssueStatus('slow_query', 'select * from big_table', 'ignored');
+        $storage->setIssueStatus('query', 'select * from big_table', 'ignored');
 
-        Monitor::record('slow_query', 'select * from big_table', [], 700);
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 700);
         Monitor::flush();
 
         $open = Livewire::test(Issues::class)->set('view', 'performance')->viewData('performance');
@@ -167,7 +168,7 @@ class IssuesTest extends TestCase
     {
         $storage = app(\LaravelMonitor\Contracts\Storage::class);
 
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
         Monitor::flush();
 
         Livewire::test(Issues::class)->set('view', 'exceptions'); // triggers syncIssues() for the row above
@@ -212,7 +213,7 @@ class IssuesTest extends TestCase
 
     public function test_exception_rows_carry_id_uuid_and_priority(): void
     {
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
         Monitor::flush();
 
         $row = Livewire::test(Issues::class)->set('view', 'exceptions')->viewData('exceptions')->first();
@@ -224,8 +225,8 @@ class IssuesTest extends TestCase
 
     public function test_bulk_resolving_selected_exceptions_moves_them_out_of_the_open_tab(): void
     {
-        Monitor::record('exception', 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
-        Monitor::record('exception', 'App\\Exceptions\\Bang', ['class' => 'App\\Exceptions\\Bang', 'message' => 'bang'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
+        Monitor::record(RecordType::Exception, 'App\\Exceptions\\Bang', ['class' => 'App\\Exceptions\\Bang', 'message' => 'bang'], null, 'unhandled');
         Monitor::flush();
 
         $component = Livewire::test(Issues::class)->set('view', 'exceptions');

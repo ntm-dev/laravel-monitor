@@ -28,7 +28,7 @@ class Sql
     }
 
     /**
-     * How many of this request/job/command's own `slow_query` rows share a
+     * How many of this request/job/command's own `query` rows share a
      * normalized shape with at least one other — surfaced on the Queries
      * summary card as an N+1 signal. `key` is already the normalized shape
      * (see Recorders\Queries::record()), so no re-normalizing needed here.

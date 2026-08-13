@@ -6,6 +6,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\LazyLoadingViolationException;
 use LaravelMonitor\Monitor;
+use LaravelMonitor\Support\RecordType;
 use ReflectionProperty;
 
 class Models extends Recorder
@@ -45,7 +46,7 @@ class Models extends Recorder
             // Testbench, where a fresh application (and Monitor singleton)
             // boots per test but Eloquent's static callback slot persists.
             app(Monitor::class)->record(
-                type: 'lazy_loading',
+                type: RecordType::LazyLoading,
                 key: get_class($model).'::'.$relation,
                 payload: [
                     'model' => get_class($model),

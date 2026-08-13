@@ -7,6 +7,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Events\Dispatcher;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Support\RecordType;
 
 class Authentication extends Recorder
 {
@@ -24,7 +25,7 @@ class Authentication extends Recorder
         }
 
         $this->monitor->record(
-            type: 'auth',
+            type: RecordType::Auth,
             key: $this->identifier($event->user),
             payload: ['guard' => $event->guard],
             subtype: 'login',
@@ -39,7 +40,7 @@ class Authentication extends Recorder
         }
 
         $this->monitor->record(
-            type: 'auth',
+            type: RecordType::Auth,
             key: $this->identifier($event->user),
             payload: ['guard' => $event->guard],
             subtype: 'logout',
@@ -58,7 +59,7 @@ class Authentication extends Recorder
             : (string) ($event->credentials['email'] ?? $event->credentials['username'] ?? 'unknown');
 
         $this->monitor->record(
-            type: 'auth',
+            type: RecordType::Auth,
             key: $identifier,
             payload: ['guard' => $event->guard],
             subtype: 'failed',

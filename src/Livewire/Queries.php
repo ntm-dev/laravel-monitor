@@ -94,9 +94,9 @@ class Queries extends Card
             // connection filter — filtering the time-bucketed charts by a
             // JSON-payload field isn't worth the extra query complexity for
             // a secondary UI control.
-            'calls' => $storage->stats('slow_query', $since, null, null, $until)->count,
-            'callBuckets' => $storage->countsPerBucket('slow_query', $since, $buckets, null, null, $until),
-            'duration' => $storage->durationStats('slow_query', $since, $buckets, null, null, $until),
+            'calls' => $storage->stats('query', $since, null, null, $until)->count,
+            'callBuckets' => $storage->countsPerBucket('query', $since, $buckets, null, null, $until),
+            'duration' => $storage->durationStats('query', $since, $buckets, null, null, $until),
             'connections' => $connections,
             'queries' => $queries->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalQueries' => $total,

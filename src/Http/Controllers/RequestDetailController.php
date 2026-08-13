@@ -34,7 +34,7 @@ class RequestDetailController
      * Recorder type => events-summary bucket key.
      */
     protected const SUMMARY_TYPES = [
-        'slow_query' => 'queries',
+        'query' => 'queries',
         'cache' => 'cache',
         'mail' => 'mail',
         'notification' => 'notifications',
@@ -51,7 +51,7 @@ class RequestDetailController
      * doesn't either.
      */
     protected const SUMMARY_TYPES_JOB = [
-        'slow_query' => 'queries',
+        'query' => 'queries',
         'cache' => 'cache',
         'mail' => 'mail',
         'notification' => 'notifications',
@@ -173,13 +173,16 @@ class RequestDetailController
             return $summary;
         }
 
-        // `slow_query` rows only exist for queries at/above the configured
-        // threshold, so counting them undercounts (or, as often happens,
-        // shows zero for a request that ran several fast queries). The
-        // request payload carries a true total incremented on every query —
-        // fall back to the slow-query count for older rows recorded before
-        // that counter existed.
-        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
+        // `query` rows only exist for queries at/above the configured
+        // threshold on installs still running an older version of this
+        // package's Queries recorder (it persists every query today,
+        // regardless of duration — see Recorders\Queries::record()), so
+        // counting them undercounts on those installs (or, as often
+        // happens, shows zero for a request that ran several fast
+        // queries). The request payload carries a true total incremented
+        // on every query — fall back to the raw row count only for older
+        // rows recorded before that counter existed.
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'query'));
 
         if ($root !== null && isset($root->payload['query_count'])) {
             $summary['queries']['count'] = (int) $root->payload['query_count'];

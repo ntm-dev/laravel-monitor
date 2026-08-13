@@ -6,6 +6,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 class Mail extends Recorder
@@ -81,7 +82,7 @@ class Mail extends Recorder
         $groupKey = is_string($notification) ? $notification : (is_string($mailable) ? $mailable : Str::limit($subject, 250));
 
         $this->monitor->record(
-            type: 'mail',
+            type: RecordType::Mail,
             key: $groupKey,
             payload: array_filter([
                 'subject' => Str::limit($subject, 250),

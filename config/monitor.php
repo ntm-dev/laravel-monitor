@@ -204,9 +204,10 @@ return [
         // would silently drop any existing .env override.
         Recorders\Queries::class => [
             'enabled' => env('MONITOR_SLOW_QUERIES_ENABLED', true),
-            // Milliseconds. Queries at or above this threshold are tagged
-            // `slow` (surfaced in the dedicated Slow Queries digest) rather
-            // than `fast` — every query is recorded either way.
+            // Milliseconds. Every query is recorded regardless of this
+            // value — it's read live by the Query Detail page to decide
+            // which calls to highlight as slow (Livewire\QueryDetail's
+            // $slowThreshold), not used to tag anything at record time.
             'threshold' => env('MONITOR_SLOW_QUERY_THRESHOLD', 100),
         ],
 

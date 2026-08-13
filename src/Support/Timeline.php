@@ -35,7 +35,7 @@ class Timeline
      * surface a new recorder type on the timeline — no Blade changes needed.
      */
     protected const EVENT_TYPES = [
-        'slow_query' => ['type' => 'query', 'label' => 'Query'],
+        'query' => ['type' => 'query', 'label' => 'Query'],
         'cache' => ['type' => 'cache', 'label' => 'Cache'],
         'mail' => ['type' => 'mail', 'label' => 'Mail'],
         'notification' => ['type' => 'notification', 'label' => 'Notification'],
@@ -244,7 +244,7 @@ class Timeline
     protected static function labelFor(object $row, string $fallback): string
     {
         return match ($row->type) {
-            'slow_query' => 'Query',
+            'query' => 'Query',
             'cache' => ucfirst($row->subtype ?? 'cache').' · '.($row->key ?? ''),
             'mail' => $row->key ?? $fallback,
             'notification' => $row->key ?? $fallback,

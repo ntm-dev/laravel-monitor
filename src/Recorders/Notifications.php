@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Notifications\Events\NotificationSent;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 class Notifications extends Recorder
@@ -49,7 +50,7 @@ class Notifications extends Recorder
             : null;
 
         $this->monitor->record(
-            type: 'notification',
+            type: RecordType::Notification,
             key: get_class($event->notification),
             payload: array_filter([
                 'notification' => get_class($event->notification),

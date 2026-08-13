@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
+use LaravelMonitor\Support\RecordType;
 use ReflectionProperty;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
@@ -96,7 +97,7 @@ class Commands extends Recorder
         $this->monitor->markCommandTerminating();
 
         $this->monitor->record(
-            type: 'command',
+            type: RecordType::Command,
             key: $event->command,
             payload: array_filter([
                 'exit_code' => $event->exitCode,

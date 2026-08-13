@@ -6,6 +6,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\RecordType;
 use Throwable;
 
 class OutgoingRequests extends Recorder
@@ -21,7 +22,7 @@ class OutgoingRequests extends Recorder
         $status = $event->response->status();
 
         $this->monitor->record(
-            type: 'outgoing_request',
+            type: RecordType::OutgoingRequest,
             key: $this->key($event->request->method(), $event->request->url()),
             payload: [
                 'method' => $event->request->method(),
@@ -36,7 +37,7 @@ class OutgoingRequests extends Recorder
     public function recordFailure(ConnectionFailed $event): void
     {
         $this->monitor->record(
-            type: 'outgoing_request',
+            type: RecordType::OutgoingRequest,
             key: $this->key($event->request->method(), $event->request->url()),
             payload: [
                 'method' => $event->request->method(),

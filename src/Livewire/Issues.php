@@ -16,7 +16,7 @@ class Issues extends Card
     public const PERFORMANCE_AREAS = [
         'request' => ['badge' => 'Request', 'tab' => 'requests', 'threshold' => 'request'],
         'job' => ['badge' => 'Job', 'tab' => 'jobs', 'threshold' => 'job'],
-        'slow_query' => ['badge' => 'Query', 'tab' => 'queries', 'threshold' => 'query'],
+        'query' => ['badge' => 'Query', 'tab' => 'queries', 'threshold' => 'query'],
         'outgoing_request' => ['badge' => 'Outgoing', 'tab' => 'outgoing', 'threshold' => 'outgoing_request'],
         'command' => ['badge' => 'Command', 'tab' => 'commands', 'threshold' => 'command'],
     ];

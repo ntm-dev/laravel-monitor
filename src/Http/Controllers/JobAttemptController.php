@@ -42,7 +42,7 @@ class JobAttemptController
      * timeline shouldn't summarise itself.
      */
     protected const SUMMARY_TYPES = [
-        'slow_query' => 'queries',
+        'query' => 'queries',
         'cache' => 'cache',
         'mail' => 'mail',
         'notification' => 'notifications',
@@ -117,7 +117,7 @@ class JobAttemptController
             $summary[$key]['duration'] += (float) ($row->duration ?? 0);
         }
 
-        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'slow_query'));
+        $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'query'));
 
         return $summary;
     }
