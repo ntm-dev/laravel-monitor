@@ -51,19 +51,243 @@
         crossX: null,
         crossWidth: 0,
         totalDuration: {{ $totalDuration }},
-        // Which tracks currently show their own phase/event rows — starts
-        // with just the page's default track (see
-        // MergesJobTimelines::defaultTrackId()); toggling any other track on
-        // via toggleTrack() below only ever adds to/removes from this set,
-        // it never touches another track's own entry.
+        {{-- Chart pane's own min-width in px at 1x zoom (see
+             View\Components\Requests\Timeline::$minWidthPx) — appended to the
+             usual zoom*100% width below so the pane stretches wide enough to
+             keep the shortest bar on the page readable without resizing any
+             single bar out of true proportion to the rest. --}}
+        minWidthPx: {{ $minWidthPx }},
+        {{-- The visible chart pane's own width in px (the outer overflow-x-auto
+             box, not its scrolled inner content) — kept as reactive state
+             rather than read from the ref on demand so handleResize() below
+             has a value to pass on to refreshTicks(). --}}
+        viewportWidth: 0,
+        {{-- Which tracks currently show their own phase/event rows — starts
+             with just the page's default track (see
+             MergesJobTimelines::defaultTrackId()); toggling any other track on
+             via toggleTrack() below only ever adds to/removes from this set,
+             it never touches another track's own entry. --}}
         expandedTracks: { '{{ $defaultTrack }}': true },
-        // Landing here already scoped to a specific job track (see
-        // MergesJobTimelines::defaultTrackId()) — it starts expanded above,
-        // but with other tracks stacked ahead of it on the page it can
-        // still render below the fold, so jump to it immediately, same as
-        // toggleTrack() does for a manual expand. No-op when the default
-        // track is already the page's first (nothing to scroll to).
+        {{-- Landing here already scoped to a specific job track (see
+             MergesJobTimelines::defaultTrackId()) — it starts expanded above,
+             but with other tracks stacked ahead of it on the page it can
+             still render below the fold, so jump to it immediately, same as
+             toggleTrack() does for a manual expand. No-op when the default
+             track is already the page's first (nothing to scroll to).
+             Fallbacks only — measureHeaderOffsets() below overwrites both
+             before paint. pageHeaderOffset is how far down the dashboard's own
+             sticky page header (components/header.blade.php or
+             components/requests/header.blade.php, whichever one rendered)
+             actually reaches; the three pages sharing this Timeline component
+             don't all render the same header content (a job attempt's header
+             is one line shorter than a request's, and a request's URL row is
+             itself optional), so that height isn't a constant we can bake into
+             a Tailwind class the way top-[120px] used to. --}}
+        pageHeaderOffset: 120,
+        {{-- pageHeaderOffset plus this timeline's own title/zoom/ruler row —
+             where the selected-event detail panel's sticky position starts. --}}
+        timelineHeaderOffset: 169,
+        measureHeaderOffsets() {
+            const pageHeader = document.querySelector('header.sticky.top-0');
+            this.pageHeaderOffset = pageHeader ? Math.ceil(pageHeader.getBoundingClientRect().height) : 120;
+            const ownHeader = this.$refs.stickyHeader;
+            this.timelineHeaderOffset = this.pageHeaderOffset + (ownHeader ? Math.ceil(ownHeader.getBoundingClientRect().height) : 49);
+        },
+        measureViewport() {
+            this.viewportWidth = this.$refs.scrollArea?.clientWidth || 0;
+        },
+        handleResize() {
+            this.measureHeaderOffsets();
+            this.measureViewport();
+            this.refreshTicks();
+        },
+        {{-- Ruler ticks + gridlines, rendered from this cached array (not
+             recomputed inline) — populated by refreshTicks() below, called
+             once as part of init() (right when this component is created,
+             not deferred to a later interaction) so it's already correct
+             before the very first paint, then kept updated on zoom and
+             window resize, but never on scroll: scrolling alone can fire
+             many times a second while dragging/panning, and re-deriving 9
+             tick positions (plus their formatted labels) on each one is
+             wasted work for a ruler whose marks are already dense enough,
+             right after the last zoom, to stay meaningful as you pan past
+             them. Computed here, client-side, rather than precomputed in
+             PHP: the real tick set depends on the viewport's own width and
+             the minWidthPx stretch (see View\Components\Requests\Timeline),
+             neither of which the server can know, so a PHP-computed set
+             would just be dead weight recalculated on arrival anyway. --}}
+        ticks: [],
+        {{-- Bumped every time refreshTicks() below starts a fresh
+             computation — growTicksInBackground()'s own queued
+             requestAnimationFrame callbacks compare against this and bail
+             out the moment it no longer matches the token they were handed,
+             so a zoom fired while an earlier fill is still painting in the
+             background doesn't leave two generations racing to overwrite
+             `ticks`. --}}
+        ticksToken: 0,
+        {{-- Recomputes `ticks` across the page's *entire* 0-100% span (not
+             just whatever's visible right now) — so panning without zooming
+             (deliberately not recomputed on scroll — see `ticks` above)
+             still finds marks anywhere along the timeline instead of
+             running into an empty stretch the moment the initially-visible
+             window scrolls out of view. Spaced densely enough that any
+             single viewport-width-wide window, wherever it lands, still
+             contains at least 4 of them: since ticks are evenly spaced in
+             both ms and px (px position is linear in ms), a window
+             viewportWidth px wide contains
+             (viewportWidth / (totalWidthPx / count)) ticks, so solving that
+             for >= 4 gives the count below. Denser zoom levels (bigger
+             totalWidthPx relative to the fixed viewportWidth) need
+             proportionally more ticks to keep that guarantee, which is
+             exactly why this only needs to re-run on zoom (and on resize,
+             which changes viewportWidth) — see handleResize()/setZoom()
+             above, not here.
+
+             A page whose bars span several orders of magnitude of duration
+             (a 40μs query alongside a 30s gap — see the minWidthPx stretch
+             this count reacts to) can demand tens of thousands of ticks to
+             keep that guarantee everywhere, and building all of them into
+             the DOM in one go measured at several seconds of a fully frozen
+             page — so this only builds the handful nearest wherever the
+             pane is currently scrolled to synchronously (instant, since
+             that's always a small, bounded count), then hands the rest to
+             growTicksInBackground() below to paint in over several frames,
+             nearest-first, without ever blocking long enough to be felt.
+             $refs.rowsInner is the same scrolled element the bars/gridlines
+             already render inside, so its own offsetWidth is the exact
+             px-per-ms scale in effect right now, whatever mix of zoom and
+             the minWidthPx stretch (see
+             View\Components\Requests\Timeline::$minWidthPx) produced it —
+             measuring it directly here avoids re-deriving that CSS width
+             formula a second time in JS, where it could drift out of sync. --}}
+        refreshTicks() {
+            const totalWidthPx = this.$refs.rowsInner?.offsetWidth || 0;
+
+            if (totalWidthPx <= 0 || this.totalDuration <= 0) {
+                this.ticks = [];
+
+                return;
+            }
+
+            const viewportWidth = this.viewportWidth || totalWidthPx;
+            const count = Math.max(8, Math.ceil((4 * totalWidthPx) / viewportWidth));
+            const stepMs = this.totalDuration / count;
+            {{-- Kept as a float, not rounded to a whole ms: a dense enough
+                 count (a large zoom stretched far past the minWidthPx floor
+                 onto a single sub-millisecond bar — see
+                 View\Components\Requests\Timeline) can put adjacent ticks
+                 well under 1ms apart, and rounding every one to its nearest
+                 ms would collapse them onto the same value — exactly the
+                 fewer-than-4-per-viewport case this whole method exists to
+                 prevent. formatTickMs() below already renders sub-ms ticks
+                 in μs, so nothing here needs the value pre-rounded.
+                 The gap between two adjacent ticks, in ms — passed into
+                 formatTickMs() so it shows enough decimal places to tell
+                 neighbouring ticks apart. Position alone isn't a reliable
+                 guide to that: two ticks a fraction of a millisecond apart
+                 can still sit tens of seconds into the timeline (a
+                 zoomed-in region deep inside a page that also spans a
+                 multi-second gap elsewhere — see MergesJobTimelines' own
+                 docs on why one can exist), where Format::duration()'s
+                 usual 2-decimal seconds display can't distinguish them at
+                 all. --}}
+            const buildTick = (i) => {
+                const ms = stepMs * i;
+
+                return { ms, label: this.formatTickMs(ms, stepMs), pct: (ms / this.totalDuration) * 100, first: i === 0, last: i === count };
+            };
+
+            {{-- Every tick's index (0..count), ordered by distance from
+                 wherever the pane is scrolled to right now rather than
+                 chronologically — growTicksInBackground() below consumes
+                 this queue front-to-back, so what's actually on screen
+                 finishes first regardless of how far into the full count
+                 it'd otherwise fall. --}}
+            const centerIndex = ((this.scrollLeft + viewportWidth / 2) / totalWidthPx) * count;
+            const order = Array.from({ length: count + 1 }, (_, i) => i)
+                .sort((a, b) => Math.abs(a - centerIndex) - Math.abs(b - centerIndex));
+
+            const token = ++this.ticksToken;
+            const immediate = order.splice(0, Math.min(order.length, 40));
+
+            this.ticks = this.dedupeAgainst([], immediate.map(buildTick));
+
+            if (order.length > 0) {
+                this.growTicksInBackground(order, buildTick, token);
+            }
+        },
+        {{-- Paints the rest of a refreshTicks() call's tick queue into
+             `ticks` a chunk at a time, one requestAnimationFrame apart, so
+             a page that needs many thousands of them (see refreshTicks()'s
+             own docs) never does it all in one blocking pass — each frame
+             only ever pays for CHUNK_SIZE more DOM nodes, not the whole
+             remaining queue. --}}
+        growTicksInBackground(remaining, buildTick, token) {
+            const CHUNK_SIZE = 60;
+
+            requestAnimationFrame(() => {
+                {{-- A newer refreshTicks() call (another zoom, a resize)
+                     bumped ticksToken past what this chain was handed —
+                     stop rather than race that newer generation to
+                     overwrite `ticks`. --}}
+                if (token !== this.ticksToken) {
+                    return;
+                }
+
+                const chunk = this.dedupeAgainst(this.ticks, remaining.splice(0, CHUNK_SIZE).map(buildTick));
+
+                this.ticks = this.ticks.concat(chunk);
+
+                if (remaining.length > 0) {
+                    this.growTicksInBackground(remaining, buildTick, token);
+                }
+            });
+        },
+        {{-- Every `candidates` tick whose rendered label doesn't already
+             appear in `existing` — dropping a duplicate rather than
+             overwriting the existing entry, since both describe the same
+             displayed mark. Only actually filters anything out when
+             stepMs itself rounds away to nothing (totalDuration itself is
+             ~0) — with a real, positive stepMs, formatTickMs() already
+             picks enough precision that adjacent ticks render distinctly. --}}
+        dedupeAgainst(existing, candidates) {
+            const seen = new Set(existing.map((tick) => tick.label));
+
+            return candidates.filter((tick) => (seen.has(tick.label) ? false : (seen.add(tick.label), true)));
+        },
+        {{-- Mirrors Support\Format::duration()'s largest-whole-unit choice
+             (h/m/s/ms/μs), but not its fixed 2-decimal precision: a
+             ruler tick's own absolute position can be large (tens of seconds
+             into the timeline) while still needing sub-ms resolution to read
+             as distinct from its neighbour, once zoomed into a narrow slice
+             (see refreshTicks() above) — stepMs (the gap between adjacent
+             ticks, in the same ms units as `ms`) drives how many decimals get
+             shown instead of a number fixed for every zoom level. --}}
+        formatTickMs(ms, stepMs) {
+            const trim = (fixed) => fixed.replace(/\.?0+$/, '');
+            const decimalsFor = (stepInUnit) => Math.min(6, Math.max(2, Math.ceil(-Math.log10(Math.max(stepInUnit, 1e-9)))));
+
+            for (const [unitMs, suffix] of [[3600000, 'h'], [60000, 'm'], [1000, 's']]) {
+                if (ms >= unitMs) return trim((ms / unitMs).toFixed(decimalsFor(stepMs / unitMs))) + suffix;
+            }
+
+            if (ms > 0 && ms < 1) return trim((ms * 1000).toFixed(decimalsFor(stepMs * 1000))) + 'μs';
+
+            return trim(ms.toFixed(decimalsFor(stepMs))) + 'ms';
+        },
         init() {
+            this.measureHeaderOffsets();
+            this.measureViewport();
+            {{-- $nextTick, not called straight away: $refs.rowsInner's own
+                 :style (the zoom*100%/minWidthPx stretch) hasn't been
+                 applied to the DOM yet at this exact point in Alpine's own
+                 init — measuring its offsetWidth here would catch it at its
+                 default (pre-stretch, viewport-width) size, computing a
+                 tick spread for a duration range that's about to become
+                 wrong the moment the real width applies, with nothing
+                 (scroll is deliberately excluded — see refreshTicks() above)
+                 left to correct it afterwards. --}}
+            this.$nextTick(() => this.refreshTicks());
             if (!{{ $defaultTrack !== ($tracks[0]['id'] ?? null) ? 'true' : 'false' }}) return;
             this.$nextTick(() => {
                 this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
@@ -72,26 +296,26 @@
         toggleTrack(id) {
             this.expandedTracks[id] = !this.expandedTracks[id];
             if (!this.expandedTracks[id]) return;
-            // Jump straight to the track that was just expanded — with
-            // several tracks stacked on the page, the one you just opened
-            // can easily be scrolled off well below the fold.
+            {{-- Jump straight to the track that was just expanded — with
+                 several tracks stacked on the page, the one you just opened
+                 can easily be scrolled off well below the fold. --}}
             this.$nextTick(() => {
                 this.$refs.rows.querySelector(`[data-track-root='${id}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
             });
         },
         selectedId: null,
         hoveredId: null,
-        // Toggled true for 5s (see the window listener above) whenever the
-        // EventSummary 'N duplicates' badge is clicked, so every dot
-        // sharing that query's colour (see TimelineRow::$duplicateColor)
-        // pulses at once — the visual equivalent of highlighting an N+1.
+        {{-- Toggled true for 5s (see the window listener above) whenever the
+             EventSummary 'N duplicates' badge is clicked, so every dot
+             sharing that query's colour (see TimelineRow::$duplicateColor)
+             pulses at once — the visual equivalent of highlighting an N+1. --}}
         heartbeatActive: false,
         heartbeatTimer: null,
-        // Same pulse, scoped to just the clicked query's own duplicate
-        // group (see selectRow() below) rather than every group on the
-        // page — keyed by TimelineRow::$duplicateGroup, not $duplicateColor:
-        // the 10-colour palette repeats, so two unrelated groups can share
-        // a colour and would otherwise pulse together.
+        {{-- Same pulse, scoped to just the clicked query's own duplicate
+             group (see selectRow() below) rather than every group on the
+             page — keyed by TimelineRow::$duplicateGroup, not $duplicateColor:
+             the 10-colour palette repeats, so two unrelated groups can share
+             a colour and would otherwise pulse together. --}}
         heartbeatGroup: null,
         heartbeatGroupTimer: null,
         tooltip: { text: '', top: 0, left: 0 },
@@ -162,11 +386,11 @@
             this.sqlCopied = true;
             setTimeout(() => this.sqlCopied = false, 1500);
         },
-        // Fixed-position, not the row's own absolutely-positioned child: the
-        // pinned tree pane clips overflow to hold its column width steady
-        // (see the label pane's `overflow-hidden` below), which would
-        // otherwise clip this tooltip too whenever the truncated text it's
-        // showing extends past the pane's edge.
+        {{-- Fixed-position, not the row's own absolutely-positioned child: the
+             pinned tree pane clips overflow to hold its column width steady
+             (see the label pane's `overflow-hidden` below), which would
+             otherwise clip this tooltip too whenever the truncated text it's
+             showing extends past the pane's edge. --}}
         showTooltip(event, text) {
             if (!text) { return; }
             const rect = event.currentTarget.getBoundingClientRect();
@@ -188,10 +412,19 @@
         setZoom(next) {
             const el = this.$refs.scrollArea;
             const oldWidth = el.scrollWidth;
-            const ratio = oldWidth > 0 ? el.scrollLeft / oldWidth : 0;
+            const viewportWidth = el.clientWidth;
+            {{-- Anchor whatever timestamp currently sits at the *center* of the
+                 visible viewport, not its left edge — anchoring the edge keeps
+                 that one pixel in place while the point the user was actually
+                 looking at (the middle of the viewport) drifts away as the
+                 pane grows/shrinks around it. --}}
+            const centerRatio = oldWidth > 0 ? (el.scrollLeft + viewportWidth / 2) / oldWidth : 0;
             this.zoom = Math.min(this.maxZoom, Math.max(this.minZoom, next));
-            this.$nextTick(() => { el.scrollLeft = ratio * el.scrollWidth;
-                this.scrollLeft = el.scrollLeft; });
+            this.$nextTick(() => {
+                el.scrollLeft = (centerRatio * el.scrollWidth) - viewportWidth / 2;
+                this.scrollLeft = el.scrollLeft;
+                this.refreshTicks();
+            });
         },
         startDrag(event) {
             if (event.button !== 0) return;
@@ -210,9 +443,9 @@
         selectRow(id) {
             if (this.dragMoved) return;
             this.selectedId = (this.selectedId === id ? null : id);
-            // Selecting a duplicate query pulses every dot sharing its own
-            // group (see TimelineRow::$duplicateGroup), so an N+1 is
-            // obvious without hunting for the EventSummary badge.
+            {{-- Selecting a duplicate query pulses every dot sharing its own
+                 group (see TimelineRow::$duplicateGroup), so an N+1 is
+                 obvious without hunting for the EventSummary badge. --}}
             clearTimeout(this.heartbeatGroupTimer);
             const group = this.selectedId !== null ? this.data[this.selectedId]?.duplicateGroup : null;
             this.heartbeatGroup = group ?? null;
@@ -220,68 +453,70 @@
                 this.heartbeatGroupTimer = setTimeout(() => this.heartbeatGroup = null, 6000);
             }
             if (this.selectedId === null) return;
-            // The tree pane's row is always vertically in view (it's what was
-            // just clicked) but the chart pane scrolls independently on its
-            // own horizontal axis — when zoomed in, the matching bar can sit
-            // outside the current scroll window entirely.
-            // $nextTick matters here: opening the detail panel shrinks the
-            // chart pane's width by 320px (it's a flex sibling), but that
-            // hasn't been applied to the DOM yet at the point selectedId is
-            // set above — scrollIntoView run synchronously would measure the
-            // pane's old, wider bounds. Waiting a tick lets Alpine flush the
-            // panel's layout change first, so the scroll math uses the
-            // narrower, final width.
-            // inline: 'center' (not 'nearest') because 'nearest' only scrolls
-            // the minimum distance needed, which parks the bar flush against
-            // whichever edge it entered from — and the right edge of this
-            // pane is the detail panel's own left border, so a bar arriving
-            // from the right ends up sitting right on top of that seam,
-            // reading as still covered. Centering it always leaves clear
-            // space on both sides regardless of which edge it was outside.
+            {{-- The tree pane's row is always vertically in view (it's what was
+                 just clicked) but the chart pane scrolls independently on its
+                 own horizontal axis — when zoomed in, the matching bar can sit
+                 outside the current scroll window entirely.
+                 $nextTick matters here: opening the detail panel shrinks the
+                 chart pane's width by 320px (it's a flex sibling), but that
+                 hasn't been applied to the DOM yet at the point selectedId is
+                 set above — scrollIntoView run synchronously would measure the
+                 pane's old, wider bounds. Waiting a tick lets Alpine flush the
+                 panel's layout change first, so the scroll math uses the
+                 narrower, final width.
+                 inline: 'center' (not 'nearest') because 'nearest' only scrolls
+                 the minimum distance needed, which parks the bar flush against
+                 whichever edge it entered from — and the right edge of this
+                 pane is the detail panel's own left border, so a bar arriving
+                 from the right ends up sitting right on top of that seam,
+                 reading as still covered. Centering it always leaves clear
+                 space on both sides regardless of which edge it was outside. --}}
             this.$nextTick(() => {
                 const bar = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => el.dataset.rowId === this.selectedId);
                 bar?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             });
         },
-        // Fired by the EventSummary cards above the timeline (every type but
-        // 'queries', which has its own duplicates-heartbeat scroll instead)
-        // — jumps to the first row of that type in DOM order, i.e. the
-        // nearest one chronologically since rows render in timeline order.
+        {{-- Fired by the EventSummary cards above the timeline (every type but
+             'queries', which has its own duplicates-heartbeat scroll instead)
+             — jumps to the first row of that type in DOM order, i.e. the
+             nearest one chronologically since rows render in timeline order. --}}
         scrollToType(type) {
             const row = Array.from(this.$refs.rows.querySelectorAll('[data-row-id]')).find(el => this.data[el.dataset.rowId]?.type === type);
             if (!row) return;
-            // Only query/cache/mail/notification/lazy_loading/exception/http
-            // rows are ever detailable (see TimelineRow::DETAILABLE_TYPES) —
-            // that's baked server-side into this same element's
-            // 'cursor-pointer' class, so checking for it here avoids keeping
-            // a second, JS-side copy of that type list that could drift out
-            // of sync.
+            {{-- Only query/cache/mail/notification/lazy_loading/exception/http
+                 rows are ever detailable (see TimelineRow::DETAILABLE_TYPES) —
+                 that's baked server-side into this same element's
+                 'cursor-pointer' class, so checking for it here avoids keeping
+                 a second, JS-side copy of that type list that could drift out
+                 of sync. --}}
             if (row.classList.contains('cursor-pointer')) {
-                // selectRow()'s own nextTick only centers the *horizontal*
-                // (chart-pane) axis — it assumes the row is already visible
-                // vertically, true when it was just clicked directly, but
-                // not here, coming from a summary card that can be anywhere
-                // on the page. Center it vertically first, then hand off.
+                {{-- selectRow()'s own nextTick only centers the *horizontal*
+                     (chart-pane) axis — it assumes the row is already visible
+                     vertically, true when it was just clicked directly, but
+                     not here, coming from a summary card that can be anywhere
+                     on the page. Center it vertically first, then hand off. --}}
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 this.selectRow(row.dataset.rowId);
             } else {
-                // Nothing to select for queue rows (no inspector panel for
-                // them) — just center the bar in both axes directly.
+                {{-- Nothing to select for queue rows (no inspector panel for
+                     them) — just center the bar in both axes directly. --}}
                 row.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'center' });
             }
         },
-    }">
-    {{-- Sticky at top-[120px] for the same reason the detail panel below is:
-         flush against the bottom of the dashboard's own sticky page header
-         (see components/header.blade.php's `sticky top-0`, measured at
-         120px). z-20 (not the z-10 used elsewhere in this card) so it stays
-         above the rows pane's own sticky bar labels as they scroll
-         underneath it, and it needs its own opaque background — sticky
-         content doesn't get one for free — matching x-monitor::card's
-         `bg-white dark:bg-neutral-900` so scrolled-past rows don't show
-         through. --}}
-    <div
-        class="sticky top-[120px] z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
+    }" @resize.window="handleResize()">
+    {{-- Sticky, flush against the bottom of the dashboard's own sticky page
+         header (components/header.blade.php or components/requests/header.blade.php's
+         `sticky top-0`, whichever one rendered on this page — the two aren't
+         always the same height, e.g. a job attempt's header is a line
+         shorter than a request's, so the offset is measured at runtime by
+         measureHeaderOffsets() above rather than a fixed Tailwind class).
+         z-20 (not the z-10 used elsewhere in this card) so it stays above
+         the rows pane's own sticky bar labels as they scroll underneath it,
+         and it needs its own opaque background — sticky content doesn't get
+         one for free — matching x-monitor::card's `bg-white dark:bg-neutral-900`
+         so scrolled-past rows don't show through. --}}
+    <div x-ref="stickyHeader" :style="'top: ' + pageHeaderOffset + 'px'"
+        class="sticky z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
         <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.timeline') }}</h2>
             <div class="flex items-center gap-1.5">
@@ -294,20 +529,23 @@
         </div>
         <div class="relative flex-1 overflow-hidden">
             <div class="relative h-full"
-                :style="'width: ' + (zoom * 100) + '%; transform: translateX(-' + scrollLeft + 'px)'">
+                :style="'width: ' + (zoom * 100) + '%; min-width: ' + (zoom * minWidthPx) + 'px; transform: translateX(-' + scrollLeft + 'px)'">
                 {{-- First/last ticks stay edge-anchored (centering them would
                      push half the label off the pane); every other tick is
                      centered on its mark so it lines up with the crosshair,
-                     which sits exactly at the mark itself. --}}
-                @foreach ($ticks as $tick)
-                    <span
-                        class="absolute top-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500 {{ match (true) {
-                            $tick['first'] => 'pl-1',
-                            $tick['last'] => '-translate-x-full pr-1',
-                            default => '-translate-x-1/2',
-                        } }}"
-                        style="left: {{ $tick['pct'] }}%">{{ $tick['label'] }}</span>
-                @endforeach
+                     which sits exactly at the mark itself. Rendered from the
+                     `ticks` array (see refreshTicks() in x-data above), not a
+                     server-computed list — it's rebuilt for whatever time
+                     range is actually in view whenever refreshTicks() last
+                     ran (init/zoom/resize, not every scroll event — see its
+                     own docs), not the page's full 0-100% span, so zooming
+                     into a narrow slice never leaves the viewport with fewer
+                     than a handful of marks in it. --}}
+                <template x-for="(tick, index) in ticks" :key="index">
+                    <span class="absolute top-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500"
+                        :class="tick.first ? 'pl-1' : (tick.last ? '-translate-x-full pr-1' : '-translate-x-1/2')"
+                        :style="'left: ' + tick.pct + '%'" x-text="tick.label"></span>
+                </template>
 
                 {{-- Hover ms readout, tracking the same crossX the rows pane's
                      crosshair uses — this container shares the identical
@@ -366,18 +604,17 @@
         <div class="relative flex-1 overflow-x-auto overflow-y-hidden bg-neutral-50/50 dark:bg-transparent"
             x-ref="scrollArea" @scroll="scrollLeft = $event.target.scrollLeft" @mousemove.window="onDrag($event)"
             @mouseup.window="stopDrag()">
-            <div :style="'width: ' + (zoom * 100) + '%'" class="min-w-full select-none"
+            <div x-ref="rowsInner" :style="'width: ' + (zoom * 100) + '%; min-width: ' + (zoom * minWidthPx) + 'px'" class="min-w-full select-none"
                 :class="dragging ? 'cursor-grabbing' : 'cursor-grab'" @mousedown="startDrag($event)">
                 {{-- Rows + full-height gridlines/crosshair overlay --}}
                 <div class="relative" x-ref="rows" @mousemove="track($event)" @mouseleave="crossX = null">
-                    {{-- Vertical gridlines aligned to the ruler ticks --}}
+                    {{-- Vertical gridlines aligned to the ruler ticks (see
+                         refreshTicks() in x-data above). --}}
                     <div class="pointer-events-none absolute inset-0 z-0">
-                        @foreach ($ticks as $tick)
-                            @unless ($tick['first'])
-                                <div class="absolute inset-y-0 border-l border-neutral-100 dark:border-neutral-800/70"
-                                    style="left: {{ $tick['pct'] }}%"></div>
-                            @endunless
-                        @endforeach
+                        <template x-for="(tick, index) in ticks" :key="index">
+                            <div x-show="!tick.first" class="absolute inset-y-0 border-l border-neutral-100 dark:border-neutral-800/70"
+                                :style="'left: ' + tick.pct + '%'"></div>
+                        </template>
                     </div>
 
                     {{-- Hover crosshair --}}
@@ -407,18 +644,19 @@
              as long as the row list beside it is tall enough to scroll
              through, instead of scrolling away with the rows the moment you
              pass its own — much shorter — content height. `sticky` alone is
-             a no-op without an explicit offset, so `top-[169px]` sits the
-             panel flush against the bottom of the timeline's own sticky
-             title/zoom/ruler header above (`top-[120px] ... z-20` a bit up
-             from here) — 120px for the dashboard's own sticky page header
-             (back link + title row + subtitle row, all three pages sharing
-             this Timeline component use the same header structure/padding)
-             plus that header row's own rendered height (49px). Using the
-             same `top-[120px]` as that header would make the two sticky
-             elements land on the exact same viewport band, and whichever
-             paints later (this panel, being later in the DOM) would cover
-             the header instead of sitting below it. Matches the `169px`
-             already baked into `max-h-[calc(100vh-169px)]` below, so the
+             a no-op without an explicit offset, so `timelineHeaderOffset`
+             (see measureHeaderOffsets() above) sits the panel flush against
+             the bottom of the timeline's own sticky title/zoom/ruler header
+             (`pageHeaderOffset ... z-20` a bit up from here) — the dashboard's
+             own sticky page header's real rendered height plus that header
+             row's own, both measured at runtime rather than assumed, since
+             the three pages sharing this Timeline component don't all render
+             the same header content (see measureHeaderOffsets()'s own
+             comment). Using the same offset as that header would make the
+             two sticky elements land on the exact same viewport band, and
+             whichever paints later (this panel, being later in the DOM)
+             would cover the header instead of sitting below it. The same
+             timelineHeaderOffset also drives max-height below, so the
              panel's sticky position plus its own max-height exactly reaches
              the bottom of the viewport. --}}
         {{-- No x-transition here on purpose: with it, Alpine silently failed
@@ -427,8 +665,8 @@
              verified by removing just x-transition, everything else equal.
              Plain x-show still switches display instantly and correctly. --}}
         <div x-show="selectedId !== null" class="w-80 shrink-0">
-            <div
-                class="sticky top-[169px] max-h-[calc(100vh-169px)] divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
+            <div :style="'top: ' + timelineHeaderOffset + 'px; max-height: calc(100vh - ' + timelineHeaderOffset + 'px)'"
+                class="sticky divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
                         <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400"

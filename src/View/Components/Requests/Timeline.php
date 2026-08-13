@@ -6,7 +6,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\View\Component;
-use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline as TimelineSupport;
@@ -37,8 +36,11 @@ use LaravelMonitor\Support\TimelineEntry;
  */
 class Timeline extends Component
 {
-    /** Ruler segments between 0 and the total duration. */
-    public const TICK_COUNT = 8;
+    /**
+     * The shortest real (non-zero) duration bar on the page must still be
+     * at least this many px wide at 1x zoom — see $minWidthPx.
+     */
+    protected const MIN_ITEM_PX = 3;
 
     /**
      * Every row across every track, in track order: {kind: root|attempt|phase|event|divider, entry: ?TimelineEntry, track: string, rootLabel?: string, focusable?: bool, attempt?: ?int, jobStatus?: ?string, attemptsDuration?: ?int}.
@@ -47,27 +49,50 @@ class Timeline extends Component
      */
     public array $rows = [];
 
-    /**
-     * Ruler ticks: {label: "50ms", pct: float 0-100, first: bool, last: bool}.
-     *
-     * @var list<array{label: string, pct: float, first: bool, last: bool}>
-     */
-    public array $ticks = [];
-
     /** JSON entry map (id => type/label/start/duration/metadata) for Alpine, across every track. */
     public string $entriesJson;
 
-    /** The fixed scale every bar/tick on the page is positioned against — spans from the earliest row's start to the latest row's end, across every track (see the class docblock). */
-    public int $totalDuration;
+    /**
+     * The fixed scale every bar/tick on the page is positioned against —
+     * spans from the earliest row's start to the latest row's end, across
+     * every track (see the class docblock). Left unrounded (a float, not the
+     * whole-ms int this used to be) — it's handed to Alpine as-is
+     * (`totalDuration` in timeline.blade.php's x-data) for every downstream
+     * ms/pct computation there (ruler ticks, the hover crosshair's ms
+     * readout, ...), each of which does its own rounding at the point it
+     * actually renders a number, so nothing here should round first and
+     * force that later, more-informed rounding to work from an
+     * already-lossy input.
+     */
+    public float $totalDuration;
 
     /**
-     * @param  list<array{id: string, badge: string, label: string, start: float, duration: int, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: TimelineEntry[]}>, totalAttemptsDuration?: int}>  $tracks
+     * The chart pane's own minimum width in px at 1x zoom (see
+     * timeline.blade.php), chosen so the page's shortest real-duration bar
+     * is still at least self::MIN_ITEM_PX wide — every other bar/gap is
+     * measured in px against that exact same px-per-ms ratio, so the whole
+     * pane stretches as one unit and every bar keeps its true proportional
+     * share of the timeline (start time, end time, and the gaps between
+     * bars) instead of a lone short bar being widened past its real size.
+     * Left unrounded for the same reason as $totalDuration above — Alpine
+     * multiplies it by the live zoom level (`zoom * minWidthPx` in
+     * timeline.blade.php) to get the pane's actual CSS min-width, so
+     * rounding it here would just make that later multiplication work from
+     * a less accurate number for no benefit (CSS tolerates arbitrary
+     * sub-pixel precision fine). 0.0 when nothing on the page has a real
+     * (non-zero) duration to measure against, leaving the pane at its normal
+     * viewport-fit width.
+     */
+    public float $minWidthPx = 0.0;
+
+    /**
+     * @param  list<array{id: string, badge: string, label: string, start: float, duration: float, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: TimelineEntry[]}>, totalAttemptsDuration?: float}>  $tracks
      * @param  ?string  $jobBaseUrl  This page's own url (see RequestDetailController::requestUrl()) a job track's own row appends its latest attempt's outcome id onto, so clicking it navigates there instead of merely expanding in place — null on every other page this component renders on (job/command/schedule detail), which has nowhere of that kind to navigate a job track to.
      */
     public function __construct(public array $tracks, public string $defaultTrack = 'root', public ?string $jobBaseUrl = null)
     {
         $primary = collect($tracks)->firstWhere('id', $defaultTrack) ?? $tracks[0];
-        $primaryDuration = max(1, (int) $primary['duration']);
+        $primaryDuration = max(1.0, (float) $primary['duration']);
         $primaryStart = (float) $primary['start'];
 
         $multiTrack = count($tracks) > 1;
@@ -148,7 +173,16 @@ class Timeline extends Component
         $nonDividerRows = collect($this->rows)->reject(fn (array $row) => $row['kind'] === 'divider');
         $minStart = min(0.0, $nonDividerRows->min('barStart') ?? 0.0);
         $maxEnd = $nonDividerRows->max(fn (array $row) => $row['barStart'] + ($row['entry']->duration ?? 0)) ?? $primaryDuration;
-        $totalDuration = $this->totalDuration = max(1, (int) ceil($maxEnd - $minStart));
+        $totalDuration = $this->totalDuration = max(1.0, $maxEnd - $minStart);
+
+        $shortestDuration = $nonDividerRows
+            ->map(fn (array $row) => (float) ($row['entry']->duration ?? 0))
+            ->filter(fn (float $duration) => $duration > 0)
+            ->min();
+
+        $this->minWidthPx = $shortestDuration !== null
+            ? ($totalDuration / $shortestDuration) * self::MIN_ITEM_PX
+            : 0.0;
 
         if ($minStart < 0) {
             foreach ($this->rows as &$row) {
@@ -160,15 +194,42 @@ class Timeline extends Component
         }
 
         $this->entriesJson = Js::from($entriesById)->toHtml();
-        $this->ticks = $this->buildTicks($totalDuration);
+
+        // A zero-duration entry (an instantaneous marker, not a span) has no
+        // real proportional share of the timeline to render at all — it
+        // borrows the shortest real bar's own share instead of a fixed
+        // magic-number percentage, so it stays exactly as wide as
+        // self::MIN_ITEM_PX too rather than a size unrelated to everything
+        // else on the same scale. Falls back to the pre-stretch 0.15% when
+        // nothing on the page has a real duration to borrow from. Left
+        // unrounded like every other value here (see $totalDuration/
+        // $minWidthPx above) — PHP is this value's own final consumer (baked
+        // directly into the rendered `style` attribute below, nothing
+        // downstream computes with it further), but the browser accepts
+        // arbitrary float precision in a CSS percentage just as happily as a
+        // 4-decimal one, so rounding here would only reintroduce the exact
+        // proportional drift $minWidthPx exists to avoid, for no display
+        // benefit.
+        $pointWidthPct = $shortestDuration !== null
+            ? ($shortestDuration / $totalDuration) * 100
+            : 0.15;
 
         foreach ($this->rows as &$row) {
             if ($row['kind'] === 'divider') {
                 continue;
             }
 
-            $row['left'] = $totalDuration > 0 ? round(($row['barStart'] / $totalDuration) * 100, 4) : 0.0;
-            $row['width'] = $totalDuration > 0 ? max(0.15, round((($row['entry']->duration ?? 0) / $totalDuration) * 100, 4)) : 0.15;
+            $duration = (float) ($row['entry']->duration ?? 0);
+
+            $row['left'] = $totalDuration > 0 ? ($row['barStart'] / $totalDuration) * 100 : 0.0;
+            // No floor on a positive-duration bar's own share: $minWidthPx
+            // above already stretched the whole pane so the shortest one on
+            // the page renders at self::MIN_ITEM_PX, so clamping any
+            // individual bar's percentage here would only widen it past its
+            // true proportional size relative to every other bar and gap.
+            $row['width'] = $totalDuration > 0
+                ? ($duration > 0 ? ($duration / $totalDuration) * 100 : $pointWidthPct)
+                : 0.15;
         }
     }
 
@@ -413,26 +474,6 @@ class Timeline extends Component
             ->sortBy('start')
             ->map(fn (TimelineEntry $entry) => ['kind' => 'event', 'entry' => $entry])
             ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<array{label: string, pct: float, first: bool, last: bool}>
-     */
-    protected function buildTicks(int $totalDuration): array
-    {
-        $milliseconds = collect(range(0, self::TICK_COUNT))
-            ->map(fn (int $i) => (int) round($totalDuration * $i / self::TICK_COUNT))
-            ->unique()
-            ->values();
-
-        return $milliseconds
-            ->map(fn (int $ms, int $index) => [
-                'label' => Format::duration($ms),
-                'pct' => $totalDuration > 0 ? ($ms / $totalDuration) * 100 : 0.0,
-                'first' => $index === 0,
-                'last' => $index === $milliseconds->count() - 1,
-            ])
             ->all();
     }
 }

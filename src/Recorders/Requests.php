@@ -80,7 +80,11 @@ class Requests extends Recorder
 
         // LARAVEL_START before REQUEST_TIME_FLOAT — see Monitor::beginRequest() for why.
         $startTime = \defined('LARAVEL_START') ? LARAVEL_START : $request->server('REQUEST_TIME_FLOAT');
-        $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 2) : null;
+        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
+        // floats, so subtracting them is a floating-point catastrophic
+        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
+        // decimals matches microtime()'s own microsecond resolution.
+        $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 3) : null;
 
         try {
             $userId = $request->user()?->getAuthIdentifier();
