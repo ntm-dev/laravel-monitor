@@ -40,7 +40,11 @@ return new class extends Migration
             // QueryExecuted::$time) already arrive rounded upstream, so the
             // extra digits are simply 0 there.
             $table->decimal('duration', 16, 6)->unsigned()->nullable();
-            $table->unsignedBigInteger('user_id')->nullable();
+            // string, not unsignedBigInteger: getAuthIdentifier() (used by both
+            // the Requests and Authentication recorders) is typed int|string|null
+            // — a non-numeric primary key (UUID/ULID, string API identifier, ...)
+            // would silently fail to store under an integer column.
+            $table->string('user_id', 255)->nullable();
             $table->string('request_id', 36)->nullable();
             $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
             $table->timestamp('created_at');
