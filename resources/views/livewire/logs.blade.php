@@ -32,12 +32,14 @@
                         </span>
                         <span @class([
                             'shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight',
-                            'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => in_array(
-                                $level,
-                                ['emergency', 'alert', 'critical', 'error']),
-                            'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' =>
+                            'monitor-log-emergency-ping border-red-600 bg-red-600 text-white' => $level === 'emergency',
+                            'animate-pulse border-red-600 bg-red-600 text-white' => $level === 'alert',
+                            'border-red-600 bg-red-600 text-white' => $level === 'critical',
+                            'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' =>
+                                $level === 'error',
+                            'border-orange-400 dark:border-orange-300 bg-orange-50 dark:bg-orange-300 text-orange-400 dark:text-orange-300' =>
                                 $level === 'warning',
-                            'border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400' => in_array(
+                            'border-blue-600 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10  text-blue-600 dark:text-sky-400' => in_array(
                                 $level,
                                 ['notice', 'info']),
                             'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400' =>
@@ -69,4 +71,21 @@
             @endforeach
         </div>
     @endif
+
+    {{-- Same shape as Tailwind's own animate-ping (fade to 0 while scaling
+         up, 1s cubic-bezier(0, 0, 0.2, 1) infinite), but capped at scale(1.2)
+         — the default scale(2) blew the emergency badge up past its
+         neighbours in the row. --}}
+    <style>
+        @keyframes monitor-log-emergency-ping {
+            75%, 100% {
+                transform: scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        .monitor-log-emergency-ping {
+            animation: monitor-log-emergency-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+    </style>
 </div>
