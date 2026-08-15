@@ -218,6 +218,7 @@ return [
         Recorders\Logs::class => [
             'enabled' => env('MONITOR_LOGS_ENABLED', true),
             'levels' => ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info'],
+            'ignore_paths' => [],
         ],
 
         Recorders\Jobs::class => [

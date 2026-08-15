@@ -4,9 +4,14 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Log\Events\MessageLogged;
-use Illuminate\Support\Str;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Types\Str;
 use Throwable;
+
+use function in_array;
+use function is_object;
+use function is_resource;
+use function trim;
 
 class Logs extends Recorder
 {
@@ -18,7 +23,7 @@ class Logs extends Recorder
     public function record(MessageLogged $event): void
     {
         // Exceptions have their own recorder.
-        if (($event->context['exception'] ?? null) instanceof Throwable) {
+        if ($this->shouldIgnore() || ($event->context['exception'] ?? null) instanceof Throwable) {
             return;
         }
 
@@ -32,15 +37,49 @@ class Logs extends Recorder
             ->reject(fn ($value) => is_object($value) || is_resource($value))
             ->all();
 
+        $message = (string) $event->message;
+
+        // No request/user object on MessageLogged itself (it can fire from
+        // console/queue contexts too) — resolve the currently authenticated
+        // user the same way Recorders\Requests does, guarded the same way
+        // since auth() can throw when no guard/session is bound outside an
+        // HTTP request.
+        try {
+            $userId = auth()->user()?->getAuthIdentifier();
+        } catch (Throwable) {
+            $userId = null;
+        }
+
         $this->monitor->record(
             type: RecordType::Log,
-            key: Str::limit((string) $event->message, 250),
+            key: Str::tinyText($message),
             payload: [
-                'message' => Str::limit((string) $event->message, 1000),
-                'level' => $event->level,
-                'context' => Str::limit(json_encode($context) ?: '{}', 1000),
+                'message' => Str::text($message),
+                'context' => Str::mediumText(json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION) ?: '{}'),
             ],
             subtype: $event->level,
+            userId: $userId,
         );
+    }
+
+    /**
+     * MessageLogged carries no request of its own (it fires from console/
+     * queue contexts too), so this checks the container-bound request the
+     * same way Recorders\Requests excludes the dashboard's own routes from
+     * the request log — otherwise a log emitted while merely browsing the
+     * monitor dashboard itself gets recorded as if it were the app's own.
+     */
+    protected function shouldIgnore(): bool
+    {
+        if (! app()->bound('request')) {
+            return false;
+        }
+
+        $patterns = [
+            ...$this->config['ignore_paths'] ?? [],
+            trim(config('monitor.path', 'monitor'), '/').'*',
+        ];
+
+        return $this->matchesAny(app('request')->path(), $patterns);
     }
 }

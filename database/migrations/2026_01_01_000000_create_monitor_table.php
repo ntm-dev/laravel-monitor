@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('type', 32);
             $table->string('subtype', 32)->nullable();
             $table->string('key', 255)->nullable();
-            $table->text('payload')->nullable();
+            $table->longText('payload')->nullable();
             // 6 decimal places so request/phase timing measured via
             // microtime() is stored at its full native precision, not
             // floored away — see Monitor::elapsedMsPrecise() and Entry::toArray(),
@@ -40,10 +40,14 @@ return new class extends Migration
             // QueryExecuted::$time) already arrive rounded upstream, so the
             // extra digits are simply 0 there.
             $table->decimal('duration', 16, 6)->unsigned()->nullable();
-            $table->unsignedBigInteger('user_id')->nullable();
+            // string, not unsignedBigInteger: getAuthIdentifier() (used by both
+            // the Requests and Authentication recorders) is typed int|string|null
+            // — a non-numeric primary key (UUID/ULID, string API identifier, ...)
+            // would silently fail to store under an integer column.
+            $table->string('user_id', 255)->nullable();
             $table->string('request_id', 36)->nullable();
             $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
-            $table->timestamp('created_at');
+            $table->timestamp('created_at', 6);
 
             // Two indexes sharing the [type, created_at] prefix, on purpose:
             //
@@ -182,9 +186,9 @@ return new class extends Migration
             $table->string('key', 255);
             $table->string('status', 16)->default('open');
             $table->string('priority', 16)->default('none');
-            $table->timestamp('first_seen');
-            $table->timestamp('last_seen');
-            $table->timestamp('resolved_at')->nullable();
+            $table->timestamp('first_seen', 6);
+            $table->timestamp('last_seen', 6);
+            $table->timestamp('resolved_at', 6)->nullable();
             $table->timestamps();
 
             $table->unique(['type', 'key']);
