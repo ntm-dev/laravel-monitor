@@ -32,3 +32,10 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
   lookup at runtime. Applies to functions like `is_object`, `get_class`, `str_starts_with`,
   `substr`, `strlen`, `implode`, `ltrim`, `preg_match`, etc. — not to framework helpers
   (`base_path()`, `config()`, ...) or Laravel facades/classes, which already resolve normally.
+- Prefer the array spread operator over `array_merge()` when merging array literals/variables:
+  `[...$a, ...$b, 'extra']`, not `array_merge($a, $b, ['extra'])`. Avoids the IDE hint ("replace
+  with array spread operator", PHP7103) and is directly re-indexed inline. `array_merge()` still
+  the right call when a variable holding the merge arguments is dynamic/computed (e.g. an array
+  of arrays via `...$dynamic` isn't valid), or when string keys must be preserved with later
+  values overwriting earlier ones the way `array_merge()` does (spread with string keys throws
+  on duplicates in PHP < 8.1 and this repo doesn't rely on that overwrite semantics elsewhere).
