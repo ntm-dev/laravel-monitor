@@ -327,6 +327,8 @@ return [
         'server_error' => '5XX',
         'duplicate_count' => 'duplicate|duplicates',
         'vendor_frames' => 'vendor frame|vendor frames',
+        'json_items' => 'item|items',
+        'loading_more' => 'Loading more',
         'copied' => 'Copied!',
         'copy_as_markdown' => 'Copy as Markdown',
 

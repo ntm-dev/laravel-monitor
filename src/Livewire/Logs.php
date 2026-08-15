@@ -2,9 +2,32 @@
 
 namespace LaravelMonitor\Livewire;
 
+use Illuminate\Support\Str;
+use LaravelMonitor\Support\JsonTree;
+
+use function str_replace;
+
 class Logs extends Card
 {
+    protected const DEFAULT_LIMIT = 50;
+
+    protected const LOAD_MORE_STEP = 20;
+
     public string $level = '';
+
+    public int $limit = self::DEFAULT_LIMIT;
+
+    /** Bumps how many rows the next render fetches — called by the sentinel at the bottom of the list (x-intersect in logs.blade.php) instead of a wire:click "Load more" button. */
+    public function loadMore(): void
+    {
+        $this->limit += self::LOAD_MORE_STEP;
+    }
+
+    /** Resets back to the first page's worth of rows whenever the level filter changes, so switching filters doesn't carry over however far the user had scrolled under the old one. */
+    public function updatedLevel(): void
+    {
+        $this->limit = self::DEFAULT_LIMIT;
+    }
 
     protected function view(): string
     {
@@ -34,11 +57,23 @@ class Logs extends Card
                 default => null,
             };
 
+            $log->level = $log->subtype ?? 'info';
+            $contextRaw = $log->payload['context'] ?? '{}';
+            $message = $log->payload['message'] ?? '';
+            $log->contextRaw = $contextRaw;
+            $log->contextTree = JsonTree::parse($contextRaw);
+            $log->summary = $message !== ''
+                ? $message
+                : Str::limit(str_replace(["\r\n", "\n", "\r"], ' ', $contextRaw), 200);
+
             return $log;
         });
 
         return [
             'logs' => $logs,
+            // Fewer rows than asked for means storage has run out — the
+            // sentinel in logs.blade.php only renders while this is true.
+            'hasMore' => $logs->count() >= $this->limit,
         ];
     }
 }

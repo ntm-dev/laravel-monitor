@@ -327,6 +327,8 @@ return [
         'server_error' => '5XX',
         'duplicate_count' => 'bản trùng lặp',
         'vendor_frames' => 'khung vendor',
+        'json_items' => 'mục',
+        'loading_more' => 'Đang tải thêm',
         'copied' => 'Đã sao chép!',
         'copy_as_markdown' => 'Sao chép dạng Markdown',
 
