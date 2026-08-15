@@ -118,13 +118,13 @@ class Commands extends Recorder
             subtype: $event->exitCode === 0 ? 'success' : 'failed',
         );
 
-        // Console commands never hit the request lifecycle, persist now.
-        // Before endCommandRun(): flush() finalizes the pending 'command'
-        // entry (phases, full-lifecycle duration) using $this->command,
-        // which endCommandRun() would otherwise have already cleared.
-        $this->monitor->flush();
-
-        $this->monitor->endCommandRun();
+        // Deliberately *not* flushed here: MonitorServiceProvider's
+        // whenCommandLifecycleIsLongerThan(-1, ...) hook marks the trailing
+        // End phase (everything after CommandFinished — the console
+        // kernel's own Terminating callbacks, app->terminate()) and flushes
+        // from there instead, once that phase's duration is actually known.
+        // Flushing here would persist this entry before End is ever marked,
+        // making it permanently zero-length.
     }
 
     /**

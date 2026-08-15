@@ -6,6 +6,8 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\State\CommandState;
+use LaravelMonitor\State\RequestState;
 use LaravelMonitor\Support\Location;
 use LaravelMonitor\Support\RecordType;
 use Throwable;
@@ -29,18 +31,8 @@ class Monitor
      * after the fact by comparing its timestamp against stored phase
      * intervals (see `Support\Timeline::containingPhase()`, still used only
      * as a fallback for rows stored before this stage tag existed).
-     *
-     * @var array{
-     *     id: string,
-     *     start: float,
-     *     phases: array<int, array{name: string, start: float, duration: float}>,
-     *     stage: string,
-     *     stage_start: float,
-     *     queries: int,
-     *     models: int,
-     * }|null
      */
-    protected ?array $request = null;
+    protected ?RequestState $request = null;
 
     /** The buffered root `request` entry, finalised (phases, duration) on flush. */
     protected ?Entry $pendingRequest = null;
@@ -74,19 +66,8 @@ class Monitor
      * one command at a time, never concurrently with a request or a queued
      * job attempt, so at most one of $request/$job/$command is ever set.
      *
-     * @var array{
-     *     id: string,
-     *     name: string,
-     *     start: float,
-     *     phases: array<int, array{name: string, start: float, duration: float}>,
-     *     stage: string,
-     *     stage_start: float,
-     *     models: int,
-     *     pid: ?int,
-     *     scheduled_task_run_id: ?string,
-     * }|null
      */
-    protected ?array $command = null;
+    protected ?CommandState $command = null;
 
     /** The buffered root `command` entry, finalised (phases, duration) on flush — mirrors $pendingRequest. */
     protected ?Entry $pendingCommand = null;
@@ -164,9 +145,9 @@ class Monitor
         // whatever phase happened to be open the longest, purely because
         // their stored start_offset fell inside that phase's interval.
         if ($type !== RecordType::Request && $this->request !== null) {
-            $payload['phase'] = $this->request['stage'];
+            $payload['phase'] = $this->request->stage->value;
         } elseif ($type !== RecordType::Command && $this->command !== null) {
-            $payload['phase'] = $this->command['stage'];
+            $payload['phase'] = $this->command->stage->value;
         }
 
         $entry = new Entry(
@@ -199,7 +180,7 @@ class Monitor
             // right before this specific task ran, must win so everything
             // it triggers correlates onto *this* task's run, not onto
             // schedule:run itself.
-            $this->currentJob()['id'] ?? $this->request['id'] ?? $this->scheduledTask['id'] ?? $this->command['id'] ?? null,
+            $this->currentJob()['id'] ?? $this->request?->id ?? $this->scheduledTask['id'] ?? $this->command?->id ?? null,
             $this->startOffsetFor($type, $duration),
         );
 
@@ -226,9 +207,9 @@ class Monitor
         // its own entries before it can be killed, instead of losing them.
         if (
             $this->command !== null
-            && $this->command['pid'] !== null
+            && $this->command->pid !== null
             && function_exists('posix_getpid')
-            && posix_getpid() !== $this->command['pid']
+            && posix_getpid() !== $this->command->pid
         ) {
             $this->flush();
         } elseif (count($this->entries) >= (int) $this->app['config']->get('monitor.buffer', 200)) {
@@ -280,7 +261,7 @@ class Monitor
                 return 0.0;
             }
 
-            $elapsed = max(0.0, round((microtime(true) - $this->command['start']) * 1000, 3));
+            $elapsed = max(0.0, round((microtime(true) - $this->command->timestamp) * 1000, 3));
 
             return max(0.0, $elapsed - ($duration ?? 0));
         }
@@ -307,25 +288,21 @@ class Monitor
      */
     public function beginRequest(): void
     {
-        $this->request = [
-            'id' => (string) Str::uuid(),
-            'start' => $this->timestamp ?? microtime(true),
-            'phases' => [],
-            'stage' => 'middleware',
-            'stage_start' => 0,
-            'queries' => 0,
-            'models' => 0,
-        ];
+        $this->request = new RequestState(
+            timestamp: $this->timestamp ?? microtime(true),
+            id: (string) Str::uuid(),
+            stage: ExecutionStage::BeforeMiddleware,
+        );
 
         $elapsed = $this->elapsedMsPrecise();
 
-        $this->recordPhase('bootstrap', 0, $elapsed);
-        $this->request['stage_start'] = $elapsed;
+        $this->recordPhase(ExecutionStage::Bootstrap, 0, $elapsed);
+        $this->request->currentExecutionStageStartedAtMicrotime = $elapsed;
     }
 
     public function requestId(): ?string
     {
-        return $this->request['id'] ?? null;
+        return $this->request?->id;
     }
 
     /**
@@ -391,35 +368,33 @@ class Monitor
      */
     public function beginCommandRun(string $name, ?string $scheduledTaskRunId = null): void
     {
-        $this->command = [
-            'id' => (string) Str::uuid(),
-            'name' => $name,
+        $this->command = new CommandState(
             // LARAVEL_START (the artisan entry script sets this the same way
             // public/index.php does for requests) rather than "now" — so the
-            // 'bootstrap' phase below, and every child entry's start_offset,
+            // bootstrap phase below, and every child entry's start_offset,
             // account for the framework boot that already happened before
             // CommandStarting fired, the same way beginRequest() does.
-            'start' => $this->timestamp ?? microtime(true),
-            'phases' => [],
-            'stage' => 'action',
-            'stage_start' => 0.0,
-            'models' => 0,
-            // The pid this run actually started under — see record()'s fork
-            // detection, which this exists solely to support.
-            'pid' => function_exists('posix_getpid') ? posix_getpid() : null,
-            'scheduled_task_run_id' => $scheduledTaskRunId,
-        ];
+            timestamp: $this->timestamp ?? microtime(true),
+            id: (string) Str::uuid(),
+            name: $name,
+            stage: ExecutionStage::Action,
+        );
+
+        // The pid this run actually started under — see record()'s fork
+        // detection, which this exists solely to support.
+        $this->command->pid = function_exists('posix_getpid') ? posix_getpid() : null;
+        $this->command->scheduledTaskRunId = $scheduledTaskRunId;
 
         $elapsed = $this->commandElapsedMsPrecise() ?? 0.0;
 
-        $this->recordCommandPhase('bootstrap', 0, $elapsed);
-        $this->command['stage_start'] = $elapsed;
+        $this->recordCommandPhase(ExecutionStage::Bootstrap, 0, $elapsed);
+        $this->command->currentExecutionStageStartedAtMicrotime = $elapsed;
     }
 
     /**
      * Milliseconds elapsed since the running command's own process started
      * (LARAVEL_START), or null outside one. round(x, 3): microtime() and
-     * $this->command['start'] are both ~1.7-billion-magnitude Unix epoch
+     * $this->command->timestamp are both ~1.7-billion-magnitude Unix epoch
      * floats, so subtracting them is a textbook floating-point catastrophic
      * cancellation — the large integer part eats into a double's ~15-17
      * significant digits, so what should be an exact "918" can come out as
@@ -434,18 +409,18 @@ class Monitor
             return null;
         }
 
-        return max(0.0, round((microtime(true) - $this->command['start']) * 1000, 3));
+        return max(0.0, round((microtime(true) - $this->command->timestamp) * 1000, 3));
     }
 
-    /** Append a named lifecycle phase for the running command (offsets/durations in ms, microsecond precision). */
-    public function recordCommandPhase(string $name, int|float $start, int|float $duration): void
+    /** Append a lifecycle phase for the running command (offsets/durations in ms, microsecond precision). */
+    public function recordCommandPhase(ExecutionStage $stage, int|float $start, int|float $duration): void
     {
         if ($this->command === null) {
             return;
         }
 
-        $this->command['phases'][] = [
-            'name' => $name,
+        $this->command->phases[] = [
+            'name' => $stage->value,
             'start' => max(0, $start),
             'duration' => max(0, $duration),
         ];
@@ -455,32 +430,57 @@ class Monitor
      * Marks the handle()-done → terminating boundary. Called by the Commands
      * recorder on CommandFinished, before the command's own entry is
      * recorded — mirrors markTerminating(), but a command only ever has the
-     * one 'action' phase to close out first (no controller/render/unwinding
-     * steps of its own).
+     * one Action phase to close out first (no render/unwinding steps of its
+     * own).
      */
     public function markCommandTerminating(): void
     {
-        if ($this->command === null || $this->command['stage'] === 'terminating') {
+        $this->transitionCommandStage(ExecutionStage::Terminating);
+    }
+
+    /**
+     * Marks the terminating → end boundary — called from
+     * MonitorServiceProvider's whenCommandLifecycleIsLongerThan hook, the
+     * last thing the console kernel runs (after every terminating callback,
+     * including the app's own `terminating()` ones) before the process
+     * exits. Closes out whatever the Terminating phase's own duration
+     * turns out to be once that trailing work is included.
+     */
+    public function markCommandEnd(): void
+    {
+        $this->transitionCommandStage(ExecutionStage::End);
+    }
+
+    /**
+     * Move the running command to a new lifecycle stage, closing out the
+     * phase it was previously in — the command-side counterpart of
+     * transitionStage(), without the `$from` guard (nothing currently needs
+     * it: markCommandTerminating()/markCommandEnd() are each only ever
+     * called from one place, in a fixed order).
+     */
+    protected function transitionCommandStage(ExecutionStage $stage): void
+    {
+        if ($this->command === null || $this->command->stage === $stage) {
             return;
         }
 
         $now = $this->commandElapsedMsPrecise();
 
-        $this->recordCommandPhase($this->command['stage'], $this->command['stage_start'], $now - $this->command['stage_start']);
+        $this->recordCommandPhase($this->command->stage, $this->command->currentExecutionStageStartedAtMicrotime, $now - $this->command->currentExecutionStageStartedAtMicrotime);
 
-        $this->command['stage'] = 'terminating';
-        $this->command['stage_start'] = $now;
+        $this->command->stage = $stage;
+        $this->command->currentExecutionStageStartedAtMicrotime = $now;
     }
 
     public function commandRunId(): ?string
     {
-        return $this->command['id'] ?? null;
+        return $this->command?->id;
     }
 
     /** The running command's name, e.g. "app:sync-data" — used to label queries recorded outside a request/job. */
     public function commandName(): ?string
     {
-        return $this->command['name'] ?? null;
+        return $this->command?->name;
     }
 
     /** Called by the Commands recorder once the run's own `command` entry has been recorded. */
@@ -593,13 +593,13 @@ class Monitor
     public function incrementQueryCount(): void
     {
         if ($this->request !== null && $this->enabled()) {
-            $this->request['queries']++;
+            $this->request->queries++;
         }
     }
 
     public function queryCount(): int
     {
-        return $this->request['queries'] ?? 0;
+        return $this->request?->queries ?? 0;
     }
 
     /**
@@ -616,19 +616,19 @@ class Monitor
         }
 
         if ($this->request !== null) {
-            $this->request['models']++;
+            $this->request->hydratedModels++;
         } elseif ($this->jobStack !== []) {
             $this->jobStack[array_key_last($this->jobStack)]['models']++;
         } elseif ($this->scheduledTask !== null) {
             $this->scheduledTask['models']++;
         } elseif ($this->command !== null) {
-            $this->command['models']++;
+            $this->command->hydratedModels++;
         }
     }
 
     public function modelCount(): int
     {
-        return $this->request['models'] ?? $this->currentJob()['models'] ?? $this->scheduledTask['models'] ?? $this->command['models'] ?? 0;
+        return $this->request?->hydratedModels ?? $this->currentJob()['models'] ?? $this->scheduledTask['models'] ?? $this->command?->hydratedModels ?? 0;
     }
 
     /** Milliseconds elapsed since the request started, or null outside one. */
@@ -638,7 +638,7 @@ class Monitor
             return null;
         }
 
-        return max(0, (int) round((microtime(true) - $this->request['start']) * 1000));
+        return max(0, (int) round((microtime(true) - $this->request->timestamp) * 1000));
     }
 
     /**
@@ -648,7 +648,7 @@ class Monitor
      * phase boundaries (bootstrap/middleware/...) — a whole-millisecond
      * elapsedMs() would round phases shorter than 1ms (e.g. "sending") down
      * to a reported 0ms. The round(x, 3) here isn't a premature
-     * display-rounding shortcut: microtime() and $this->request['start']
+     * display-rounding shortcut: microtime() and $this->request->timestamp
      * are both ~1.7-billion-magnitude Unix epoch floats, so subtracting
      * them is a textbook floating-point catastrophic cancellation — the
      * large integer part eats into a double's ~15-17 significant digits, so
@@ -665,23 +665,23 @@ class Monitor
             return null;
         }
 
-        return max(0.0, round((microtime(true) - $this->request['start']) * 1000, 3));
+        return max(0.0, round((microtime(true) - $this->request->timestamp) * 1000, 3));
     }
 
     /**
-     * Marks the middleware → controller boundary. Called from a closure
-     * middleware attached directly onto the matched route at RouteMatched
-     * time (see Hooks\ControllerStartHook), as the route's own last
-     * middleware entry — i.e. after every other route middleware's
+     * Marks the middleware → action (controller) boundary. Called from a
+     * closure middleware attached directly onto the matched route at
+     * RouteMatched time (see Hooks\ControllerStartHook), as the route's own
+     * last middleware entry — i.e. after every other route middleware's
      * `handle()` has run, right before the controller.
      */
     public function markControllerStart(): void
     {
-        $this->transitionStage('controller', from: 'middleware');
+        $this->transitionStage(ExecutionStage::Action, from: ExecutionStage::BeforeMiddleware);
     }
 
     /**
-     * Marks the controller → render boundary. Called on
+     * Marks the action (controller) → render boundary. Called on
      * Illuminate\Routing\Events\PreparingResponse, dispatched by
      * Router::prepareResponse() while still deep inside the route's own
      * middleware pipeline (Route::run()'s Pipeline `then()` callback) —
@@ -689,7 +689,7 @@ class Monitor
      */
     public function markRenderStart(): void
     {
-        $this->transitionStage('render', from: 'controller');
+        $this->transitionStage(ExecutionStage::Render, from: ExecutionStage::Action);
     }
 
     /**
@@ -702,7 +702,7 @@ class Monitor
      */
     public function markUnwinding(): void
     {
-        $this->transitionStage('unwinding', from: 'render');
+        $this->transitionStage(ExecutionStage::AfterMiddleware, from: ExecutionStage::Render);
     }
 
     /**
@@ -716,20 +716,51 @@ class Monitor
      */
     public function markResponseReady(): void
     {
-        $this->transitionStage('sending');
+        $this->transitionStage(ExecutionStage::Sending);
     }
 
     /** Marks the start of the terminating phase (response already sent). */
     public function markTerminating(): void
     {
-        $this->transitionStage('terminating');
+        $this->transitionStage(ExecutionStage::Terminating);
     }
 
     /**
-     * Move to a new named lifecycle stage, closing out the phase the
-     * request was previously in. Replaces the old approach of recording
-     * a handful of independent timestamp markers and matching every entry's
-     * stored start_offset against them after the fact (still available as
+     * Marks the terminating → end boundary — called from
+     * MonitorServiceProvider's whenRequestLifecycleIsLongerThan hook, the
+     * very last thing the HTTP kernel runs (after every terminable
+     * middleware and the app's own `terminating()` callbacks) before
+     * control returns to the web server. Closes out whatever the
+     * Terminating phase's own duration turns out to be once that trailing
+     * work is included.
+     */
+    public function markEnd(): void
+    {
+        $this->transitionStage(ExecutionStage::End);
+    }
+
+    /**
+     * Whether a request or command run currently owns its own end-of-
+     * lifecycle flush (see MonitorServiceProvider's
+     * whenRequestLifecycleIsLongerThan/whenCommandLifecycleIsLongerThan
+     * registration, which marks End then flushes) — the generic
+     * app->terminating() safety net (jobs and scheduled tasks flush
+     * explicitly per-attempt/per-run and never reach this at all) must skip
+     * flushing here when true, since the HTTP/console kernel always runs
+     * app->terminating() *before* those lifecycle hooks: flushing here too
+     * would persist the entry before End ever gets marked, making it dead
+     * on arrival.
+     */
+    public function hasTrackedExecution(): bool
+    {
+        return $this->request !== null || $this->command !== null;
+    }
+
+    /**
+     * Move to a new lifecycle stage, closing out the phase the request was
+     * previously in. Replaces the old approach of recording a handful of
+     * independent timestamp markers and matching every entry's stored
+     * start_offset against them after the fact (still available as
      * Support\Timeline::containingPhase(), kept only as a fallback for rows
      * stored before this stage tag existed): that approach couldn't tell
      * "still rendering the view" apart from "a middleware doing its own
@@ -737,38 +768,39 @@ class Monitor
      * once measured from outside. Tagging entries with the *live* stage at
      * record() time (see `record()`) removes that ambiguity entirely.
      *
-     * @param  ?string  $from  if given, the transition is ignored unless the
-     *                         request is currently in this stage — guards
-     *                         against a framework event firing out of order,
-     *                         more than once, or not at all.
+     * @param  ?ExecutionStage  $from  if given, the transition is ignored
+     *                                 unless the request is currently in
+     *                                 this stage — guards against a
+     *                                 framework event firing out of order,
+     *                                 more than once, or not at all.
      */
-    protected function transitionStage(string $stage, ?string $from = null): void
+    protected function transitionStage(ExecutionStage $stage, ?ExecutionStage $from = null): void
     {
-        if ($this->request === null || $this->request['stage'] === $stage) {
+        if ($this->request === null || $this->request->stage === $stage) {
             return;
         }
 
-        if ($from !== null && $this->request['stage'] !== $from) {
+        if ($from !== null && $this->request->stage !== $from) {
             return;
         }
 
         $now = $this->elapsedMsPrecise();
 
-        $this->recordPhase($this->request['stage'], $this->request['stage_start'], $now - $this->request['stage_start']);
+        $this->recordPhase($this->request->stage, $this->request->currentExecutionStageStartedAtMicrotime, $now - $this->request->currentExecutionStageStartedAtMicrotime);
 
-        $this->request['stage'] = $stage;
-        $this->request['stage_start'] = $now;
+        $this->request->stage = $stage;
+        $this->request->currentExecutionStageStartedAtMicrotime = $now;
     }
 
-    /** Append a named lifecycle phase (offsets/durations in ms, microsecond precision). */
-    public function recordPhase(string $name, int|float $start, int|float $duration): void
+    /** Append a lifecycle phase (offsets/durations in ms, microsecond precision). */
+    public function recordPhase(ExecutionStage $stage, int|float $start, int|float $duration): void
     {
         if ($this->request === null) {
             return;
         }
 
-        $this->request['phases'][] = [
-            'name' => $name,
+        $this->request->phases[] = [
+            'name' => $stage->value,
             'start' => max(0, $start),
             'duration' => max(0, $duration),
         ];
@@ -793,11 +825,11 @@ class Monitor
 
         $elapsed = $this->elapsedMsPrecise();
 
-        $this->recordPhase($this->request['stage'], $this->request['stage_start'], $elapsed - $this->request['stage_start']);
+        $this->recordPhase($this->request->stage, $this->request->currentExecutionStageStartedAtMicrotime, $elapsed - $this->request->currentExecutionStageStartedAtMicrotime);
 
-        $entry->payload['phases'] = $this->request['phases'];
-        $entry->payload['query_count'] = $this->request['queries'];
-        $entry->payload['model_count'] = $this->request['models'];
+        $entry->payload['phases'] = $this->request->phases;
+        $entry->payload['query_count'] = $this->request->queries;
+        $entry->payload['model_count'] = $this->request->hydratedModels;
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
     }
 
@@ -822,15 +854,15 @@ class Monitor
 
         $elapsed = $this->commandElapsedMsPrecise();
 
-        $this->recordCommandPhase($this->command['stage'], $this->command['stage_start'], $elapsed - $this->command['stage_start']);
+        $this->recordCommandPhase($this->command->stage, $this->command->currentExecutionStageStartedAtMicrotime, $elapsed - $this->command->currentExecutionStageStartedAtMicrotime);
 
-        $entry->payload['phases'] = $this->command['phases'];
+        $entry->payload['phases'] = $this->command->phases;
         // The run's real start (LARAVEL_START), stamped the same way
         // Recorders\Requests/Jobs stamp theirs — created_at is only stored
         // at second precision and marks the run's *end*, so reconstructing
         // "started at" from created_at - duration disagrees with this by up
         // to a whole second (see Support\Format::startedAt()).
-        $entry->payload['started_at'] = $this->command['start'];
+        $entry->payload['started_at'] = $this->command->timestamp;
 
         // Only set for a command-based scheduled task's own subprocess (see
         // beginCommandRun()'s $scheduledTaskRunId param) — the same
@@ -840,8 +872,8 @@ class Monitor
         // scheduled_task entry to link to, and ScheduleRunController the
         // reverse. Purely a cross-reference — this run's own timeline stays
         // entirely its own regardless (see startOffsetFor()).
-        if ($this->command['scheduled_task_run_id'] !== null) {
-            $entry->payload['correlation_id'] = $this->command['scheduled_task_run_id'];
+        if ($this->command->scheduledTaskRunId !== null) {
+            $entry->payload['correlation_id'] = $this->command->scheduledTaskRunId;
         }
 
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);

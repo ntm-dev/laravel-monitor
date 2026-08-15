@@ -607,6 +607,7 @@ class MonitorTest extends TestCase
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         usleep(1000);
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -626,6 +627,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 1));
+        Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -640,6 +642,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -655,6 +658,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -667,6 +671,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'command')->first();
         $payload = json_decode($row->payload, true);
@@ -708,6 +713,7 @@ class MonitorTest extends TestCase
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
         $queryRow = DB::table('monitor_entries')->where('type', 'query')->first();
@@ -725,6 +731,7 @@ class MonitorTest extends TestCase
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -910,6 +917,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -931,6 +939,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -949,6 +958,7 @@ class MonitorTest extends TestCase
 
         event(new \Illuminate\Console\Events\CommandStarting('app:sync-data', $input, $output));
         event(new \Illuminate\Console\Events\CommandFinished('app:sync-data', $input, $output, 0));
+        Monitor::flush();
 
         $commandRow = DB::table('monitor_entries')->where('type', 'command')->first();
 
@@ -1335,7 +1345,7 @@ class MonitorTest extends TestCase
 
         $phaseNames = collect($root->payload['phases'] ?? [])->pluck('name')->all();
         $this->assertSame(
-            ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'terminating'],
+            ['bootstrap', 'middleware', 'action', 'render', 'unwinding', 'sending', 'terminating'],
             $phaseNames,
         );
 

@@ -299,7 +299,7 @@ class Timeline extends Component
         $byId = collect($entries)->keyBy('id');
         $byParent = collect($entries)->groupBy(fn (TimelineEntry $entry) => $entry->parentId ?? 'request');
 
-        $phases = collect(TimelineSupport::PHASES)
+        $phases = collect(TimelineSupport::phases())
             ->map(fn (string $name) => $byId->get('phase-'.$name))
             ->filter()
             ->sortBy('start')
@@ -349,7 +349,7 @@ class Timeline extends Component
             // The "Other" header only means something when there are real
             // phases for these events to be "other than" (a request's
             // bootstrap/middleware/controller/...) — a job attempt has no
-            // phases at all (see Support\Timeline::PHASES), so *every* one
+            // phases at all (see Support\Timeline::phases()), so *every* one
             // of its events ends up here, and labelling the whole list
             // "Other" is just noise.
             if ($phases->isNotEmpty()) {
@@ -382,7 +382,7 @@ class Timeline extends Component
         foreach ($entries as $entry) {
             $entriesById[$entry->id] = [
                 'type' => $entry->type,
-                'badge' => TimelineRow::badgeFor($entry->type),
+                'badge' => TimelineRow::badgeFor($entry->type, $entry->label),
                 'label' => $entry->label,
                 'start' => $entry->start,
                 'duration' => $entry->duration,
