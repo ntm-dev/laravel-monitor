@@ -65,7 +65,11 @@ class DatabaseStorage implements Storage
             ->map(function ($entry) {
                 $row = $entry->toArray();
                 $row['payload'] = json_encode($row['payload']);
-                $row['created_at'] = $row['created_at']->toDateTimeString();
+                // format('Y-m-d H:i:s.u'), not toDateTimeString(): the latter
+                // always drops the fractional seconds CarbonImmutable::now()
+                // already captured (see Entry::__construct()) — created_at(6)
+                // in the migration exists specifically to keep them.
+                $row['created_at'] = $row['created_at']->format('Y-m-d H:i:s.u');
 
                 return $row;
             })
