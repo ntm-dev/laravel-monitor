@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('type', 32);
             $table->string('subtype', 32)->nullable();
             $table->string('key', 255)->nullable();
-            $table->text('payload')->nullable();
+            $table->mediumText('payload')->nullable();
             // 6 decimal places so request/phase timing measured via
             // microtime() is stored at its full native precision, not
             // floored away — see Monitor::elapsedMsPrecise() and Entry::toArray(),
@@ -47,7 +47,7 @@ return new class extends Migration
             $table->string('user_id', 255)->nullable();
             $table->string('request_id', 36)->nullable();
             $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
-            $table->timestamp('created_at');
+            $table->timestamp('created_at', 6);
 
             // Two indexes sharing the [type, created_at] prefix, on purpose:
             //

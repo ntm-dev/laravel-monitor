@@ -14,6 +14,14 @@ class Format
     public const DATETIME = 'M j, Y, H:i:s';
 
     /**
+     * Microsecond-precision timestamp format — only meaningful for a
+     * `created_at` column stored with fractional seconds (`timestamp(6)`,
+     * see the migration); parsing an older second-precision value just
+     * prints a `.000000` suffix.
+     */
+    public const DATETIME_PRECISE = 'Y-m-d H:i:s.u';
+
+    /**
      * Minute-precision format used by the custom range picker
      * (matches <input type="datetime-local">).
      */
@@ -131,9 +139,9 @@ class Format
         return self::$durationUnits[$locale] = $units;
     }
 
-    public static function datetime(DateTimeInterface $date): string
+    public static function datetime(DateTimeInterface $date, ?string $format = null): string
     {
-        return Carbon::instance($date)->setTimezone(Preferences::timezone())->format(self::DATETIME);
+        return Carbon::instance($date)->setTimezone(Preferences::timezone())->format(blank($format) ? self::DATETIME : $format);
     }
 
     /**

@@ -47,6 +47,10 @@ return [
         'no_occurrences_in_period' => 'This exception has no occurrences :period.',
     ],
 
+    'logs' => [
+        'context' => 'Context',
+    ],
+
     'settings' => [
         'preferences' => 'Preferences',
         'preferences_hint' => 'These settings are stored in your browser and only affect how the dashboard looks for you.',

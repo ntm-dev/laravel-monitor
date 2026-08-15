@@ -47,6 +47,10 @@ return [
         'no_occurrences_in_period' => 'Ngoại lệ này không có lần xảy ra nào :period.',
     ],
 
+    'logs' => [
+        'context' => 'Ngữ cảnh',
+    ],
+
     'settings' => [
         'preferences' => 'Tuỳ chỉnh',
         'preferences_hint' => 'Các tuỳ chọn này được lưu trong trình duyệt và chỉ thay đổi giao diện bảng điều khiển cho riêng bạn.',
