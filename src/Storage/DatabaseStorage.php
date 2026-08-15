@@ -1021,8 +1021,8 @@ class DatabaseStorage implements Storage
                     'key' => $key,
                     'uuid' => Uuid::uuid7()->toString(),
                     'status' => 'open',
-                    'first_seen' => $lastSeenValue,
-                    'last_seen' => $lastSeenValue,
+                    'first_seen' => $this->preciseTimestamp($lastSeenValue),
+                    'last_seen' => $this->preciseTimestamp($lastSeenValue),
                     'resolved_at' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -1031,7 +1031,7 @@ class DatabaseStorage implements Storage
                 continue;
             }
 
-            $update = ['last_seen' => $lastSeenValue, 'updated_at' => $now];
+            $update = ['last_seen' => $this->preciseTimestamp($lastSeenValue), 'updated_at' => $now];
 
             // A resolved issue that keeps occurring reopens itself
             // automatically. An ignored one stays ignored until the user
@@ -1087,9 +1087,9 @@ class DatabaseStorage implements Storage
                 'key' => $key,
                 'uuid' => Uuid::uuid7()->toString(),
                 'status' => $status,
-                'first_seen' => $now,
-                'last_seen' => $now,
-                'resolved_at' => $status === 'resolved' ? $now : null,
+                'first_seen' => $this->preciseTimestamp($now),
+                'last_seen' => $this->preciseTimestamp($now),
+                'resolved_at' => $status === 'resolved' ? $this->preciseTimestamp($now) : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -1099,7 +1099,7 @@ class DatabaseStorage implements Storage
 
         $this->issuesTable()->where('type', $type)->where('key', $key)->update([
             'status' => $status,
-            'resolved_at' => $status === 'resolved' ? $now : null,
+            'resolved_at' => $status === 'resolved' ? $this->preciseTimestamp($now) : null,
             'updated_at' => $now,
         ]);
     }
@@ -1125,8 +1125,8 @@ class DatabaseStorage implements Storage
                 'uuid' => Uuid::uuid7()->toString(),
                 'status' => 'open',
                 'priority' => $priority,
-                'first_seen' => $now,
-                'last_seen' => $now,
+                'first_seen' => $this->preciseTimestamp($now),
+                'last_seen' => $this->preciseTimestamp($now),
                 'resolved_at' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -1159,6 +1159,22 @@ class DatabaseStorage implements Storage
             'first_seen' => CarbonImmutable::parse($row->first_seen),
             'last_seen' => CarbonImmutable::parse($row->last_seen),
         ];
+    }
+
+    /**
+     * format('Y-m-d H:i:s.u'), not toDateTimeString(): the latter always
+     * drops the fractional seconds — see store()'s own version of this
+     * comment. monitor_issues.first_seen/last_seen/resolved_at are
+     * timestamp(6) specifically so syncIssues()'s recurrence check (last_seen
+     * vs. resolved_at) compares two values at the same precision as the
+     * microsecond-precision monitor_entries.created_at last_seen is read
+     * from — otherwise a resolve landing in the same wall-clock second as
+     * the last occurrence truncates resolved_at below last_seen and the
+     * issue looks like it already recurred.
+     */
+    protected function preciseTimestamp(CarbonImmutable $value): string
+    {
+        return $value->format('Y-m-d H:i:s.u');
     }
 
     public function resolveKeyHash(string $type, string $hash): ?string

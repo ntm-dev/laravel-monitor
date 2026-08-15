@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('type', 32);
             $table->string('subtype', 32)->nullable();
             $table->string('key', 255)->nullable();
-            $table->mediumText('payload')->nullable();
+            $table->longText('payload')->nullable();
             // 6 decimal places so request/phase timing measured via
             // microtime() is stored at its full native precision, not
             // floored away — see Monitor::elapsedMsPrecise() and Entry::toArray(),
@@ -186,9 +186,9 @@ return new class extends Migration
             $table->string('key', 255);
             $table->string('status', 16)->default('open');
             $table->string('priority', 16)->default('none');
-            $table->timestamp('first_seen');
-            $table->timestamp('last_seen');
-            $table->timestamp('resolved_at')->nullable();
+            $table->timestamp('first_seen', 6);
+            $table->timestamp('last_seen', 6);
+            $table->timestamp('resolved_at', 6)->nullable();
             $table->timestamps();
 
             $table->unique(['type', 'key']);
