@@ -5,6 +5,7 @@ namespace LaravelMonitor\View\Components\Requests;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\View\Component;
+use LaravelMonitor\ExecutionStage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\TimelineEntry;
 
@@ -31,12 +32,10 @@ class TimelineRow extends Component
         'http' => 'HTTP',
         'lazy_loading' => 'N+1',
         'command' => 'COMMAND',
-        // A phase, not an event type — phase rows are badged through this
-        // same map (see badgeFor()). Only a command root ever opens an
-        // 'action' phase (see Monitor::beginCommandRun()), and on a command
-        // "Handle" names what it actually is: the command's own handle()
-        // call, bracketed by Bootstrap and Terminating.
-        'action' => 'HANDLE',
+        // No 'action' entry: that phase is shared by a request's controller
+        // phase and a command's handle() phase (see ExecutionStage::Action),
+        // so it's resolved dynamically in badgeFor() from the entry's own
+        // label instead of a static lookup here.
     ];
 
     public const ROOT_COLOR = 'bg-emerald-500/15 border border-emerald-500/40 dark:bg-emerald-400/10 dark:border-emerald-400/40';
@@ -176,7 +175,7 @@ class TimelineRow extends Component
         $this->durationLabel = $attemptsDuration !== null
             ? Format::duration($attemptsDuration)
             : ($entry->duration !== null ? Format::duration($entry->duration) : '');
-        $this->badge = self::badgeFor($entry->type);
+        $this->badge = self::badgeFor($entry->type, $entry->label);
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
         $this->duplicateCount = $entry->metadata['duplicateCount'] ?? null;
         $this->duplicateGroup = $entry->metadata['duplicateGroup'] ?? null;
@@ -267,9 +266,20 @@ class TimelineRow extends Component
      * Alpine inspector panel), so the panel header shows the same wording
      * as the tree/bar rows instead of a second, JS-side mapping drifting
      * out of sync with this one.
+     *
+     * @param  ?string  $label  the entry's own precomputed label — only
+     *                          needed to disambiguate the Action phase,
+     *                          which reads "CONTROLLER" on a request root
+     *                          and "HANDLE" on a command root (see
+     *                          Support\Timeline::phaseEntries()); every
+     *                          other type's badge is static.
      */
-    public static function badgeFor(string $type): string
+    public static function badgeFor(string $type, ?string $label = null): string
     {
+        if ($type === ExecutionStage::Action->value && $label !== null) {
+            return strtoupper($label);
+        }
+
         return self::BADGES[$type] ?? strtoupper($type);
     }
 

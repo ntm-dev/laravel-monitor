@@ -4,6 +4,7 @@ namespace LaravelMonitor\Support;
 
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use LaravelMonitor\ExecutionStage;
 
 /**
  * Builds the ordered list of TimelineEntry rows shown on the Request Detail
@@ -14,20 +15,31 @@ use Illuminate\Support\Collection;
  */
 class Timeline
 {
-    public const PHASES = ['bootstrap', 'middleware', 'controller', 'render', 'unwinding', 'sending', 'action', 'terminating'];
+    /**
+     * Every displayable phase name, in ExecutionStage's own declared case
+     * order — a command root only ever has bootstrap/action/terminating/end
+     * entries, but this order still places Action correctly between the
+     * middleware phases for a request root. Derived from the enum itself
+     * (a plain array constant can't call ExecutionStage::cases() — class
+     * constant expressions can't include method calls) so a case
+     * added/renamed there can't silently drift out of sync here.
+     *
+     * @return list<string>
+     */
+    public static function phases(): array
+    {
+        return array_map(fn (ExecutionStage $stage) => $stage->value, ExecutionStage::cases());
+    }
 
     /**
      * Phase name => display label, for the few phases whose name doesn't
-     * read well through a plain ucfirst() (see phaseEntries()).
+     * read well through a plain ucfirst() (see phaseEntries()). Action isn't
+     * here — it's shared by a request's controller phase and a command's
+     * handle() phase, so its label is picked in phaseEntries() based on the
+     * root's own type instead of being static.
      */
     protected const PHASE_LABELS = [
         'unwinding' => 'Middleware',
-        // Phase rows render their *label*, not their badge (see
-        // components/requests/timeline-row.blade.php), so renaming this
-        // phase in the UI takes both this entry and TimelineRow::BADGES —
-        // one drives the tree/bar text, the other the Alpine inspector's
-        // entry map, and they have to agree.
-        'action' => 'Handle',
     ];
 
     /**
@@ -85,7 +97,7 @@ class Timeline
             metadata: array_filter(['status' => $root->payload['status'] ?? null], fn ($value) => $value !== null),
         );
 
-        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null);
+        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null, $root->type);
 
         $events = self::assignLanes(
             $visibleChildren
@@ -164,31 +176,40 @@ class Timeline
      * @param  array<int, array{name: string, start: float, duration: float}>  $phases
      * @param  string|null  $routeAction  the request root's "Controller@method" (see
      *                                    Recorders\Requests::routeAction()) — surfaced on the
-     *                                    controller phase row, since "Controller" alone names
-     *                                    nothing.
+     *                                    Action phase row, since "Controller"/"Handle" alone
+     *                                    names nothing. Only ever non-null for a request root —
+     *                                    a command's payload has no 'route_action' key.
+     * @param  string  $rootType  the root's own RecordType value ('request'/'command'/...) —
+     *                            picks the Action phase's label, since it's shared by a
+     *                            request's controller phase and a command's handle() phase.
      * @return TimelineEntry[]
      */
-    protected static function phaseEntries(array $phases, ?string $routeAction = null): array
+    protected static function phaseEntries(array $phases, ?string $routeAction, string $rootType): array
     {
         $byName = collect($phases)->keyBy('name');
 
         $entries = [];
 
-        foreach (self::PHASES as $name) {
+        foreach (self::phases() as $name) {
             $phase = $byName->get($name);
 
             if ($phase === null) {
                 continue;
             }
 
+            $label = match (true) {
+                $name === ExecutionStage::Action->value => $rootType === 'command' ? 'Handle' : 'Controller',
+                default => self::PHASE_LABELS[$name] ?? ucfirst($name),
+            };
+
             $entries[] = new TimelineEntry(
                 id: 'phase-'.$name,
                 type: $name,
-                label: self::PHASE_LABELS[$name] ?? ucfirst($name),
+                label: $label,
                 start: max(0.0, (float) $phase['start']),
                 duration: max(0.0, (float) $phase['duration']),
                 parentId: 'request',
-                metadata: $name === 'controller' && $routeAction !== null ? ['controller' => $routeAction] : [],
+                metadata: $name === ExecutionStage::Action->value && $routeAction !== null ? ['controller' => $routeAction] : [],
             );
         }
 

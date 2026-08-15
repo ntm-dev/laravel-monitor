@@ -248,19 +248,21 @@ class Settings
         // there for why. Written to a temp file and renamed into place so a
         // concurrent require() during the write never sees a half-written
         // file; rename() is atomic on the same filesystem.
-        //
-        // Deliberately not calling opcache_invalidate() here: it forces an
-        // immediate revalidation across every PHP-FPM worker sharing this
-        // opcache, not just this one — a save on this one settings file
-        // would briefly contend with every other worker's unrelated
-        // requests. Left to PHP's normal opcache.validate_timestamps
-        // behaviour instead, so a save becomes visible within one
-        // opcache.revalidate_freq window (2s by default) rather than
-        // instantly — an acceptable trade for not touching shared state
-        // other requests depend on.
         $tmp = $path.'.'.uniqid('', true).'.tmp';
         file_put_contents($tmp, '<?php'.PHP_EOL.PHP_EOL.'return '.var_export($values, true).';'.PHP_EOL, LOCK_EX);
         rename($tmp, $path);
+
+        // The settings form redirects straight back to this same page, so
+        // the very next require() of this file is almost always inside
+        // opcache.revalidate_freq (2s default) of this write. Without an
+        // explicit invalidation that reload can still serve the pre-save
+        // bytecode, making the save look like it silently reverted until a
+        // second save happens to land outside that window. Force just this
+        // one path to recompile now instead of waiting on the timestamp
+        // check.
+        if (function_exists('opcache_invalidate')) {
+            opcache_invalidate($path, true);
+        }
 
         static::$cache = $values;
     }

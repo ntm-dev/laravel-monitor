@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Hooks\CommandLifecycleEndHook;
 use LaravelMonitor\Hooks\ControllerStartHook;
+use LaravelMonitor\Hooks\RequestLifecycleEndHook;
 use LaravelMonitor\Livewire as Cards;
 use LaravelMonitor\Models\MonitorUser;
 use Livewire\Livewire;
@@ -30,8 +32,28 @@ class MonitorServiceProvider extends ServiceProvider
                 $this->registerRecorders();
                 if (!$this->app->runningInConsole()) {
                     $this->registerRequestHooks();
+                } else {
+                    $this->registerConsoleHooks();
                 }
-                $this->app->terminating($this->app->make(Monitor::class)->flush(...));
+
+                // Jobs/scheduled tasks flush explicitly per-attempt/per-run
+                // (see Recorders\Jobs, Recorders\ScheduledTasks) and never
+                // reach End at all, so this remains their only flush
+                // trigger — but a tracked request/command run gets flushed
+                // by its own whenRequestLifecycleIsLongerThan/
+                // whenCommandLifecycleIsLongerThan hook instead (registered
+                // above), which marks End first; flushing here too would
+                // run *before* that hook can, persisting the entry before
+                // End is ever marked.
+                $this->app->terminating(function () {
+                    $monitor = $this->app->make(Monitor::class);
+
+                    if ($monitor->hasTrackedExecution()) {
+                        return;
+                    }
+
+                    $monitor->flush();
+                });
             }
         } catch (\Throwable $th) {
             report($th);
@@ -42,6 +64,8 @@ class MonitorServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Monitor::class);
         $this->app->singleton(ControllerStartHook::class);
+        $this->app->singleton(RequestLifecycleEndHook::class);
+        $this->app->singleton(CommandLifecycleEndHook::class);
         $this->app->singleton(StorageManager::class);
         $this->app->bind(Storage::class, fn ($app) => $app[StorageManager::class]->driver());
     }
@@ -160,10 +184,59 @@ class MonitorServiceProvider extends ServiceProvider
         if (class_exists(\Illuminate\Foundation\Events\Terminating::class)) {
             $events->listen(\Illuminate\Foundation\Events\Terminating::class, $monitor->markTerminating(...));
         }
+
+        // whenRequestLifecycleIsLongerThan(-1, ...) fires last of all — after
+        // every terminable middleware and the app's own terminating()
+        // callbacks — so marking End here (rather than on the Terminating
+        // event above) actually captures that trailing work instead of
+        // measuring a zero-length phase. -1 as the threshold means "always",
+        // not "only when slow": duration is never negative. Deferred behind
+        // callAfterResolving() since the kernel isn't bound yet this early
+        // in the boot cycle, and guarded by both an instanceof and a
+        // method_exists check — this method only exists on the concrete
+        // Illuminate\Foundation\Http\Kernel (not every app swaps in a
+        // custom one), and only on a late-enough Laravel 10.x point release
+        // (this package's own floor), not necessarily every 10.x install.
+        $this->callAfterResolving(\Illuminate\Contracts\Http\Kernel::class, function ($kernel) {
+            if (
+                ! $kernel instanceof \Illuminate\Foundation\Http\Kernel
+                || ! method_exists($kernel, 'whenRequestLifecycleIsLongerThan')
+            ) {
+                return;
+            }
+
+            $kernel->whenRequestLifecycleIsLongerThan(-1, $this->app->make(RequestLifecycleEndHook::class));
+        });
+
         $this->registerLivewireComponents();
         $this->registerAuthorization();
         $this->registerAuth();
         $this->registerOAuth();
+    }
+
+    /**
+     * Console-side counterpart of registerRequestHooks()'s End-marking
+     * hook — see that method's own docs for why whenCommandLifecycleIsLongerThan(-1, ...)
+     * is what makes End meaningful instead of a permanently zero-length
+     * phase. Every other command-lifecycle stage (Bootstrap, Action,
+     * Terminating) is already marked directly by Recorders\Commands itself
+     * (beginCommandRun()/markCommandTerminating()), driven off
+     * CommandStarting/CommandFinished rather than a service-provider-level
+     * hook — this is the one boundary that can only be reached from outside
+     * Monitor's own request/command lifecycle.
+     */
+    protected function registerConsoleHooks(): void
+    {
+        $this->callAfterResolving(\Illuminate\Contracts\Console\Kernel::class, function ($kernel) {
+            if (
+                ! $kernel instanceof \Illuminate\Foundation\Console\Kernel
+                || ! method_exists($kernel, 'whenCommandLifecycleIsLongerThan')
+            ) {
+                return;
+            }
+
+            $kernel->whenCommandLifecycleIsLongerThan(-1, $this->app->make(CommandLifecycleEndHook::class));
+        });
     }
 
     protected function registerLivewireComponents(): void
