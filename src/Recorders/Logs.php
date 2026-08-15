@@ -8,6 +8,11 @@ use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Types\Str;
 use Throwable;
 
+use function in_array;
+use function is_object;
+use function is_resource;
+use function trim;
+
 class Logs extends Recorder
 {
     public function register(Dispatcher $events): void
@@ -18,7 +23,7 @@ class Logs extends Recorder
     public function record(MessageLogged $event): void
     {
         // Exceptions have their own recorder.
-        if (($event->context['exception'] ?? null) instanceof Throwable) {
+        if ($this->shouldIgnore() || ($event->context['exception'] ?? null) instanceof Throwable) {
             return;
         }
 
@@ -55,5 +60,26 @@ class Logs extends Recorder
             subtype: $event->level,
             userId: $userId,
         );
+    }
+
+    /**
+     * MessageLogged carries no request of its own (it fires from console/
+     * queue contexts too), so this checks the container-bound request the
+     * same way Recorders\Requests excludes the dashboard's own routes from
+     * the request log — otherwise a log emitted while merely browsing the
+     * monitor dashboard itself gets recorded as if it were the app's own.
+     */
+    protected function shouldIgnore(): bool
+    {
+        if (! app()->bound('request')) {
+            return false;
+        }
+
+        $patterns = [
+            ...$this->config['ignore_paths'] ?? [],
+            trim(config('monitor.path', 'monitor'), '/').'*',
+        ];
+
+        return $this->matchesAny(app('request')->path(), $patterns);
     }
 }

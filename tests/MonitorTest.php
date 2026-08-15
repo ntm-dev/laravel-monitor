@@ -2653,6 +2653,40 @@ class MonitorTest extends TestCase
         ]);
     }
 
+    public function test_a_log_emitted_while_browsing_the_monitor_dashboard_is_not_recorded(): void
+    {
+        // Same self-exclusion as test_login_with_wrong_password_does_not_record_monitors_own_auth_entry:
+        // Recorders\Logs has no request of its own on MessageLogged, so it
+        // checks the container-bound request the same way Recorders\Requests
+        // excludes the dashboard's own routes.
+        Monitor::flush();
+
+        $this->app->instance('request', \Illuminate\Http\Request::create('/monitor/logs'));
+
+        \Illuminate\Support\Facades\Log::warning('should not be recorded — emitted from the dashboard itself');
+        Monitor::flush();
+
+        $this->assertDatabaseMissing('monitor_entries', [
+            'type' => 'log',
+            'key' => 'should not be recorded — emitted from the dashboard itself',
+        ]);
+    }
+
+    public function test_a_log_emitted_during_a_normal_app_request_is_still_recorded(): void
+    {
+        Monitor::flush();
+
+        $this->app->instance('request', \Illuminate\Http\Request::create('/some/app/route'));
+
+        \Illuminate\Support\Facades\Log::warning('should be recorded — emitted from the monitored app');
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'log',
+            'key' => 'should be recorded — emitted from the monitored app',
+        ]);
+    }
+
     public function test_logout_clears_the_monitor_guard_session(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
