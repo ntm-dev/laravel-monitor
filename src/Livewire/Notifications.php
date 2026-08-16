@@ -24,9 +24,29 @@ class Notifications extends Card
 
     public const CUSTOM_CHANNEL_COLOR = 'bg-rose-500';
 
+    public const SORTABLE = ['key', 'count', 'avg_duration', 'p95_duration', 'last_seen'];
+
     public int $limit = 25;
 
     public string $search = '';
+
+    public string $sortBy = 'last_seen';
+
+    public string $sortDirection = 'desc';
+
+    public function sort(string $column): void
+    {
+        if (! in_array($column, self::SORTABLE, true)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'desc';
+        }
+    }
 
     protected function view(): string
     {
@@ -83,7 +103,8 @@ class Notifications extends Card
             $groups = $groups->filter(fn ($group) => str_contains(strtolower($group->key), $needle))->values();
         }
 
-        $groups = $groups->sortByDesc('count')->values()->take($this->limit);
+        $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'last_seen';
+        $groups = $groups->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values()->take($this->limit);
 
         return [
             'total' => $bySubtype->sum('count'),

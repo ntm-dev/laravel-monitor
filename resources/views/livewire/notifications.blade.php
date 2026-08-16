@@ -3,6 +3,14 @@
     use LaravelMonitor\Support\Icons;
 
     $fmt = fn ($ms) => Format::duration($ms);
+
+    $columns = [
+        'key' => ['label' => __('monitor::messages.common.notification'), 'align' => 'left'],
+        'count' => ['label' => __('monitor::messages.common.count'), 'align' => 'right'],
+        'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
+        'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
+        'last_seen' => ['label' => __('monitor::messages.common.last_sent'), 'align' => 'right'],
+    ];
 @endphp
 <div wire:poll.{{ $refresh }}s>
     <x-monitor::section :icon="Icons::NOTIFICATIONS" :title="__('monitor::messages.nav.notifications')">
@@ -48,11 +56,20 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.notification') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.count') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.avg') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.p95') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.last_sent') }}</th>
+                            @foreach ($columns as $field => $column)
+                                <th class="cursor-pointer select-none pb-2 font-normal {{ $column['align'] === 'right' ? 'text-right' : 'text-left' }}"
+                                    wire:click="sort('{{ $field }}')">
+                                    <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row' : '' }}">
+                                        {{ $column['label'] }}
+                                        <div class=" -right-3 flex flex-col gap-[2px]">
+                                            <div class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection === 'asc' ? 'border-b-blue-500' : '' }} dark:border-b-white">
+                                            </div>
+                                            <div class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection !== 'asc' ? 'border-b-blue-500' : '' }} rotate-180">
+                                            </div>
+                                        </div>
+                                    </span>
+                                </th>
+                            @endforeach
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>

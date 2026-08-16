@@ -7,10 +7,10 @@ namespace LaravelMonitor\Livewire;
  * selected period) — analogous to JobDetail/QueryDetail. $key is the
  * notification's FQCN, unlike NotificationDetail where $key is one send's
  * own database id. Its "recent sends" list is where a specific occurrence
- * gets picked: each row links to the request/job attempt timeline that
- * triggered it — both sides of a mail-channel notification show up together
- * there — falling back to NotificationDetail's own standalone page only when
- * no such correlation exists.
+ * gets picked: each row links to the request/job/command/scheduled task
+ * timeline that triggered it — both sides of a mail-channel notification
+ * show up together there — falling back to NotificationDetail's own
+ * standalone page only when no such correlation exists.
  */
 class NotificationClassDetail extends Card
 {
@@ -46,14 +46,18 @@ class NotificationClassDetail extends Card
 
         $entries = $storage->recent('notification', $since, 50, null, $key, $until);
 
-        $rootTypes = $storage->rootTypesFor(
-            $entries->pluck('request_id')->filter()->unique()->values()->all()
-        );
+        $requestIds = $entries->pluck('request_id')->filter()->unique()->values()->all();
+        $rootTypes = $storage->rootTypesFor($requestIds);
+        $rootLabels = $storage->rootLabelsFor($requestIds);
 
-        $entries = $entries->map(function ($entry) use ($rootTypes) {
-            $entry->timeline_url = match ($rootTypes->get($entry->request_id)) {
+        $entries = $entries->map(function ($entry) use ($rootTypes, $rootLabels) {
+            $entry->sourceType = $rootTypes->get($entry->request_id);
+            $entry->sourceLabel = $entry->sourceType !== null ? $rootLabels->get($entry->request_id) : null;
+            $entry->sourceUrl = match ($entry->sourceType) {
                 'request' => route('monitor.requests.show', $entry->request_id),
                 'job' => route('monitor.jobs.attempts.show', $entry->request_id),
+                'command' => route('monitor.commands.runs.show', $entry->request_id),
+                'scheduled_task' => route('monitor.schedule.runs.show', $entry->request_id),
                 default => null,
             };
 
