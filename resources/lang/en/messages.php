@@ -392,6 +392,7 @@ return [
         'showing_range' => 'Showing :from–:to of :total',
         'attempt_count' => 'Attempt count',
         'open_request' => 'Open timeline',
+        'open_mail' => 'Open mail',
         'user_count' => 'user|users',
         'route_count' => 'route|routes',
         'key_count' => 'Key|Keys',

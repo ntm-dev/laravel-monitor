@@ -392,6 +392,7 @@ return [
         'showing_range' => 'Hiển thị :from–:to trong tổng :total',
         'attempt_count' => 'Số lần thử',
         'open_request' => 'Mở dòng thời gian',
+        'open_mail' => 'Mở mail',
         'user_count' => 'người dùng|người dùng',
         'route_count' => 'route|route',
         'key_count' => 'Key|Key',
