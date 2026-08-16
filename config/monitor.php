@@ -209,6 +209,7 @@ return [
             // which calls to highlight as slow (Livewire\QueryDetail's
             // $slowThreshold), not used to tag anything at record time.
             'threshold' => env('MONITOR_SLOW_QUERY_THRESHOLD', 100),
+            'ignore_paths' => [],
         ],
 
         Recorders\Exceptions::class => [
