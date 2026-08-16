@@ -170,9 +170,17 @@ class Format
         return Carbon::instance($entry->created_at)->subMilliseconds((int) round((float) ($entry->duration ?? 0)));
     }
 
+    /**
+     * The suffix shown next to every timestamp on the dashboard: the bare
+     * "UTC" label for the default zone, otherwise a numeric offset like
+     * "+07:00" rather than the raw identifier (e.g. "Asia/Ho_Chi_Minh"),
+     * which is wide, mixed-case, and pushes neighbouring table columns out.
+     */
     public static function timezone(): string
     {
-        return strtoupper(Preferences::timezone());
+        $tz = Preferences::timezone();
+
+        return $tz === 'UTC' ? 'UTC' : Carbon::now($tz)->format('P');
     }
 
     public static function priorityLabel(string $priority): string

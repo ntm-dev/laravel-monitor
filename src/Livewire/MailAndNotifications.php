@@ -4,9 +4,48 @@ namespace LaravelMonitor\Livewire;
 
 class MailAndNotifications extends Card
 {
-    public int $limit = 25;
+    public const SORTABLE = ['key', 'count', 'avg_duration', 'p95_duration', 'last_seen'];
+
+    public const PER_PAGE = 25;
 
     public string $search = '';
+
+    public string $sortBy = 'last_seen';
+
+    public string $sortDirection = 'desc';
+
+    public int $page = 1;
+
+    public function updatedSearch(): void
+    {
+        $this->page = 1;
+    }
+
+    public function sort(string $column): void
+    {
+        if (! in_array($column, self::SORTABLE, true)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'desc';
+        }
+
+        $this->page = 1;
+    }
+
+    public function previousPage(): void
+    {
+        $this->page = max(1, $this->page - 1);
+    }
+
+    public function nextPage(): void
+    {
+        $this->page++;
+    }
 
     protected function view(): string
     {
@@ -34,7 +73,12 @@ class MailAndNotifications extends Card
             $groups = $groups->filter(fn ($group) => str_contains(strtolower($group->key), $needle))->values();
         }
 
-        $groups = $groups->sortByDesc('count')->values()->take($this->limit);
+        $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'last_seen';
+        $groups = $groups->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values();
+
+        $total = $groups->count();
+        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = min(max(1, $this->page), $lastPage);
 
         return [
             // $direct + $viaNotification, not the list's total: mail
@@ -47,7 +91,11 @@ class MailAndNotifications extends Card
             'directBuckets' => $storage->countsPerBucket('mail', $since, $buckets, 'direct', null, $until),
             'viaNotificationBuckets' => $storage->countsPerBucket('mail', $since, $buckets, 'notification', null, $until),
             'duration' => $storage->durationStats('mail', $since, $buckets, null, null, $until),
-            'groups' => $groups,
+            'groups' => $groups->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
+            'totalGroups' => $total,
+            'page' => $page,
+            'lastPage' => $lastPage,
+            'perPage' => self::PER_PAGE,
         ];
     }
 }
