@@ -11,6 +11,8 @@
         'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
         'last_seen' => ['label' => __('monitor::messages.common.last_sent'), 'align' => 'right'],
     ];
+
+    $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
     <x-monitor::section :icon="Icons::NOTIFICATIONS" :title="__('monitor::messages.nav.notifications')">
@@ -46,7 +48,7 @@
 
         {{-- Grouped by notification class --}}
         <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
-            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($groups->count()) }} {{ trans_choice('monitor::messages.common.notification_count', $groups->count()) }}</h3>
+            <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalGroups) }} {{ trans_choice('monitor::messages.common.notification_count', $totalGroups) }}</h3>
         </div>
 
         @if ($groups->isEmpty())
@@ -91,6 +93,19 @@
                         @endforeach
                     </tbody>
                 </table>
+
+                @if ($lastPage > 1)
+                    <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalGroups), 'total' => number_format($totalGroups)]) }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" wire:click="previousPage" @disabled($page <= 1)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
+                            <span>{{ $page }} / {{ $lastPage }}</span>
+                            <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
+                        </div>
+                    </div>
+                @endif
             </x-monitor::card>
         @endif
     </x-monitor::section>

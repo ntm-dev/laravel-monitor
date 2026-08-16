@@ -4,6 +4,7 @@
 
     $fmt = fn ($ms) => Format::duration($ms);
     $tz = Format::timezone();
+    $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
     <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-2"
@@ -31,7 +32,7 @@
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
             <x-monitor::icon :path="Icons::NOTIFICATIONS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
-            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($entries->count()) }} {{ trans_choice('monitor::messages.common.send_count', $entries->count()) }}</h2>
+            <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.send_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
             @if ($entries->isEmpty())
@@ -72,6 +73,19 @@
                         @endforeach
                     </tbody>
                 </table>
+
+                @if ($lastPage > 1)
+                    <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalEntries), 'total' => number_format($totalEntries)]) }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" wire:click="previousPage" @disabled($page <= 1)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
+                            <span>{{ $page }} / {{ $lastPage }}</span>
+                            <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
+                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
+                        </div>
+                    </div>
+                @endif
             @endif
         </x-monitor::card>
     </div>

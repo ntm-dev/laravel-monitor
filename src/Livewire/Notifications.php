@@ -26,13 +26,20 @@ class Notifications extends Card
 
     public const SORTABLE = ['key', 'count', 'avg_duration', 'p95_duration', 'last_seen'];
 
-    public int $limit = 25;
+    public const PER_PAGE = 25;
 
     public string $search = '';
 
     public string $sortBy = 'last_seen';
 
     public string $sortDirection = 'desc';
+
+    public int $page = 1;
+
+    public function updatedSearch(): void
+    {
+        $this->page = 1;
+    }
 
     public function sort(string $column): void
     {
@@ -46,6 +53,18 @@ class Notifications extends Card
             $this->sortBy = $column;
             $this->sortDirection = 'desc';
         }
+
+        $this->page = 1;
+    }
+
+    public function previousPage(): void
+    {
+        $this->page = max(1, $this->page - 1);
+    }
+
+    public function nextPage(): void
+    {
+        $this->page++;
     }
 
     protected function view(): string
@@ -104,14 +123,22 @@ class Notifications extends Card
         }
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'last_seen';
-        $groups = $groups->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values()->take($this->limit);
+        $groups = $groups->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values();
+
+        $total = $groups->count();
+        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = min(max(1, $this->page), $lastPage);
 
         return [
             'total' => $bySubtype->sum('count'),
             'channels' => $channels->sortByDesc('count')->values(),
             'channelSeries' => $channelSeries,
             'duration' => $storage->durationStats('notification', $since, $buckets, null, null, $until),
-            'groups' => $groups,
+            'groups' => $groups->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
+            'totalGroups' => $total,
+            'page' => $page,
+            'lastPage' => $lastPage,
+            'perPage' => self::PER_PAGE,
         ];
     }
 }

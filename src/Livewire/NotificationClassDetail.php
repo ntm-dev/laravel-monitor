@@ -14,13 +14,27 @@ namespace LaravelMonitor\Livewire;
  */
 class NotificationClassDetail extends Card
 {
+    public const PER_PAGE = 50;
+
     public string $key = '';
+
+    public int $page = 1;
 
     public function mount(?string $period = null, ?string $from = null, ?string $to = null, ?string $key = null): void
     {
         parent::mount($period, $from, $to);
 
         $this->key = $key ?? (string) request('key', '');
+    }
+
+    public function previousPage(): void
+    {
+        $this->page = max(1, $this->page - 1);
+    }
+
+    public function nextPage(): void
+    {
+        $this->page++;
     }
 
     protected function view(): string
@@ -44,7 +58,12 @@ class NotificationClassDetail extends Card
             'count' => $stat->count,
         ])->sortByDesc('count')->values();
 
-        $entries = $storage->recent('notification', $since, 50, null, $key, $until);
+        $stats = $storage->stats('notification', $since, null, $key, $until);
+        $totalEntries = $stats->count;
+        $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
+        $page = min(max(1, $this->page), $lastPage);
+
+        $entries = $storage->recent('notification', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE);
 
         $requestIds = $entries->pluck('request_id')->filter()->unique()->values()->all();
         $rootTypes = $storage->rootTypesFor($requestIds);
@@ -70,6 +89,10 @@ class NotificationClassDetail extends Card
             'volumeBuckets' => $storage->countsPerBucket('notification', $since, $buckets, null, $key, $until),
             'duration' => $storage->durationStats('notification', $since, $buckets, $key, null, $until),
             'entries' => $entries,
+            'totalEntries' => $totalEntries,
+            'page' => $page,
+            'lastPage' => $lastPage,
+            'perPage' => self::PER_PAGE,
         ];
     }
 }
