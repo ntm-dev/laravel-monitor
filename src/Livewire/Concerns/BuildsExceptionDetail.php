@@ -50,7 +50,7 @@ trait BuildsExceptionDetail
      * dashboard can link back to it — every event is tagged with the
      * request/job/command it occurred in. One batched
      * rootTypesFor()/rootLabelsFor() pair instead of a lookup per row (same
-     * approach as NotificationClassDetail's timeline_url).
+     * approach as NotificationClassDetail's sourceUrl).
      *
      * @param  array<int|string, string>  $names  user_id => display name
      */
