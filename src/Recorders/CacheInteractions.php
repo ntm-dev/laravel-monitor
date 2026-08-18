@@ -15,6 +15,7 @@ use Illuminate\Cache\Events\WritingKey;
 use Illuminate\Cache\Events\WritingManyKeys;
 use Illuminate\Contracts\Events\Dispatcher;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\Str;
 
 class CacheInteractions extends Recorder
 {
@@ -59,7 +60,7 @@ class CacheInteractions extends Recorder
 
     protected function record(string $key, string $interaction, ?string $storeName = null, ?int $ttl = null): void
     {
-        if ($this->matchesAny($key, $this->config['ignore_keys'] ?? [])) {
+        if (Str::matchesAny($key, $this->config['ignore_keys'] ?? [])) {
             return;
         }
 

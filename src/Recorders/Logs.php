@@ -11,7 +11,6 @@ use Throwable;
 use function in_array;
 use function is_object;
 use function is_resource;
-use function trim;
 
 class Logs extends Recorder
 {
@@ -64,22 +63,12 @@ class Logs extends Recorder
 
     /**
      * MessageLogged carries no request of its own (it fires from console/
-     * queue contexts too), so this checks the container-bound request the
-     * same way Recorders\Requests excludes the dashboard's own routes from
-     * the request log — otherwise a log emitted while merely browsing the
-     * monitor dashboard itself gets recorded as if it were the app's own.
+     * queue contexts too) — otherwise a log emitted while merely browsing
+     * the monitor dashboard itself gets recorded as if it were the app's
+     * own.
      */
     protected function shouldIgnore(): bool
     {
-        if (! app()->bound('request')) {
-            return false;
-        }
-
-        $patterns = [
-            ...$this->config['ignore_paths'] ?? [],
-            trim(config('monitor.path', 'monitor'), '/').'*',
-        ];
-
-        return $this->matchesAny(app('request')->path(), $patterns);
+        return $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);
     }
 }

@@ -66,7 +66,7 @@ class Requests extends Recorder
         $request = $event->request;
         $path = $request->path();
 
-        if ($this->shouldIgnore($path)) {
+        if ($this->shouldIgnore()) {
             return;
         }
 
@@ -239,14 +239,9 @@ class Requests extends Recorder
         return $result;
     }
 
-    protected function shouldIgnore(string $path): bool
+    protected function shouldIgnore(): bool
     {
-        $patterns = array_merge(
-            $this->config['ignore_paths'] ?? [],
-            [trim(config('monitor.path', 'monitor'), '/').'*'],
-        );
-
-        return $this->matchesAny($path, $patterns);
+        return $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);
     }
 
     protected function statusGroup(int $status): string
