@@ -18,7 +18,7 @@
     $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::REQUESTS" :title="__('monitor::messages.nav.requests')">
+    <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 <select wire:model.live="userId" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">

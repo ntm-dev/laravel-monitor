@@ -1,6 +1,8 @@
 {{-- Sticky page header: detail breadcrumb or page title, period switcher with
      custom range picker, and the mobile tab strip. All data is prepared by
-     Http\Controllers\DashboardController. --}}
+     Http\Controllers\DashboardController. Optional slots: $leading renders
+     before the page title, $periodsExtra renders in the period switcher's
+     spot (alongside or instead of it). --}}
 @props(['tab', 'tabs', 'groups', 'title', 'detail', 'key', 'range', 'period', 'periods', 'hasCustomRange', 'from', 'to', 'timezone', 'rangeMax', 'currentRouteName', 'currentRouteParams'])
 <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
     <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
@@ -22,7 +24,12 @@
                 @endif
             </div>
         @else
-            <h1 class="truncate text-2xl font-bold tracking-tight">{{ $title }}</h1>
+            <div class="flex min-w-0 items-center gap-2.5">
+                @isset($leading)
+                    {{ $leading }}
+                @endisset
+                <h1 class="truncate text-2xl font-bold tracking-tight">{{ $title }}</h1>
+            </div>
         @endif
 
         @if (! in_array($tab, ['settings', 'team'], true))
