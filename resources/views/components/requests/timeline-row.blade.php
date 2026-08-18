@@ -22,8 +22,8 @@
 @php
     $depth = match ($kind) { 'phase', 'attempt' => 1, 'event' => 2, default => 0 };
     $highlightClass = $detailable
-        ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
-        : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
+        ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'shadow-neu-inset dark:shadow-neu-dark-inset' : '')"
+        : "hoveredId === '{$entry->id}' ? 'shadow-neu-inset dark:shadow-neu-dark-inset' : ''";
     // Full text for the tree pane's hover tooltip — only the root row and
     // events actually have a truncated label worth expanding; empty skips
     // showTooltip() below (see timeline.blade.php).
@@ -57,7 +57,7 @@
 @endphp
 @if ($part === 'label')
     <div x-show="{{ $visible }}"
-         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable)])
+         @class(['relative flex h-9 min-w-0 items-center rounded-lg pr-3', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable)])
          :class="{{ $highlightClass }}"
          @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
          @mouseleave="hoveredId = null; hideTooltip()"
@@ -101,7 +101,7 @@
     {{-- data-duplicate-group marks the first-in-DOM-order match for the
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
-    <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
+    <div x-show="{{ $visible }}" class="relative flex h-9 items-center rounded-lg" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
         <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
@@ -133,7 +133,7 @@
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                 </div>
             @elseif ($kind === 'phase')
-                <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800"></span>
+                <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded bg-neutral-300 dark:bg-neutral-800"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
                     @if ($durationLabel !== '')
@@ -147,7 +147,7 @@
                 <span class="absolute left-0 top-1/2 h-6 w-full -translate-y-1/2 rounded {{ $barColor }}"
                       @if ($detailable) :class="selectedId === '{{ $entry->id }}' ? 'ring-1 ring-blue-500' : ''" @endif>
                     @if ($tooltipDetail !== '')
-                        <div class="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1.5 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 opacity-0 shadow-lg transition-opacity duration-100"
+                        <div class="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-1.5 max-w-md whitespace-pre-wrap break-words rounded-xl bg-neutral-200 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-800 opacity-0 shadow-neu-lg transition-opacity duration-100 dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-lg"
                              :class="hoveredId === '{{ $entry->id }}' ? 'visible opacity-100' : ''">
                             {{ $tooltipDetail }}
                         </div>

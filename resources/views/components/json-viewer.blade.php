@@ -5,9 +5,9 @@
      Support\JsonTree; this component only walks and displays it. --}}
 @props(['raw', 'tree'])
 @if ($tree === null)
-    <pre class="max-h-64 overflow-auto rounded-md bg-white p-2 font-mono text-[11px] leading-relaxed text-neutral-700 dark:bg-neutral-950 dark:text-neutral-200"><code>{{ $raw }}</code></pre>
+    <pre class="max-h-64 overflow-auto rounded-xl bg-neutral-200 p-2 font-mono text-[11px] leading-relaxed text-neutral-700 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-200 dark:shadow-neu-dark-inset"><code>{{ $raw }}</code></pre>
 @else
-    <div class="max-h-64 overflow-auto rounded-md bg-white p-2 font-mono text-[11px] leading-relaxed dark:bg-neutral-950">
+    <div class="max-h-64 overflow-auto rounded-xl bg-neutral-200 p-2 font-mono text-[11px] leading-relaxed shadow-neu-inset dark:bg-neutral-800 dark:shadow-neu-dark-inset">
         <x-monitor::json-node :node="$tree" :root="true" />
     </div>
 @endif

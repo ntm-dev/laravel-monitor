@@ -41,7 +41,7 @@
                     <div class="mt-5 space-y-2">
                         @foreach ($slowRoutes as $route)
                             <a href="{{ route('monitor.requests.routes.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($route->key)] + $range) }}"
-                               class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-800/50 p-3 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:shadow-sm">
+                               class="flex items-center justify-between gap-3 rounded-xl bg-neutral-200 dark:bg-neutral-800 p-3 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark">
                                 <span class="min-w-0">
                                     <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>
                                     <span class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \Illuminate\Support\Str::after($route->key, ' ') }}</span>

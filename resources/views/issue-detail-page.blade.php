@@ -7,7 +7,7 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="'issues'" :range="[]" :refresh="$refresh" :app-initial="$appInitial" :open-issue-count="$openIssueCount"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
+            <header class="sticky top-0 z-10 bg-neutral-200/80 backdrop-blur dark:bg-neutral-800/80">
                 <div class="mx-auto flex w-full max-w-[1600px] items-center gap-3 px-4 py-5 md:px-8">
                     <a href="{{ route('monitor.dashboard', ['tab' => 'issues']) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">← {{ __('monitor::messages.nav.issues') }}</a>
                     <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">#{{ $issue->id }}</span>
@@ -29,20 +29,14 @@
                                     @foreach ($summary as [$label, $value])
                                         <div class="flex max-w-full items-baseline gap-2 h-6 text-sm font-mono">
                                             <div class="uppercase text-neutral-500 dark:text-neutral-400 shrink-0">{{ $label }}</div>
-                                            <div class="min-w-6 grow h-3 border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                                            <div class="min-w-6 grow h-3 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                                             <div class="truncate text-neutral-900 dark:text-white">{{ $value }}</div>
                                         </div>
                                     @endforeach
                                 </dl>
                             </x-monitor::card>
 
-                            {{-- dark:bg-white/5, not /2: this app loads Tailwind via the
-                                 cdn.tailwindcss.com script, whose JIT only generates
-                                 color-opacity modifiers on the default scale
-                                 (0/5/10/20/25/...); `/2` silently compiled to nothing,
-                                 leaving this card stuck on its light-mode `bg-white`
-                                 regardless of theme. --}}
-                            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
+                            <div class="flex flex-col rounded-2xl bg-neutral-200 shadow-neu dark:bg-neutral-800 dark:shadow-neu-dark overflow-hidden">
                                 <div class="flex flex-col gap-3 p-4 md:p-5"
                                      x-data="{ copied: false, copy() {
                                          navigator.clipboard.writeText(@js($markdown)).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1600); });
@@ -50,7 +44,7 @@
                                     <div class="flex justify-between gap-2 max-md:flex-col md:items-center">
                                         <x-monitor::status-badge :handled="$handled"/>
                                         <button type="button" @click="copy()"
-                                                class="group flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/50 px-1.5 text-xs leading-none text-neutral-600 dark:text-neutral-300 hover:border-blue-500 hover:bg-white dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-100 active:translate-y-px active:bg-neutral-100 dark:active:bg-neutral-800">
+                                                class="group flex h-6 shrink-0 items-center gap-1.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 px-1.5 text-xs leading-none text-neutral-600 dark:text-neutral-300 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark hover:text-neutral-900 dark:hover:text-neutral-100 active:shadow-neu-inset dark:active:shadow-neu-dark-inset active:scale-[0.98]">
                                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500 group-hover:text-blue-600 dark:group-hover:text-blue-400"/>
                                             <span x-text="copied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy_as_markdown'))"></span>
                                         </button>
@@ -69,23 +63,23 @@
 
                             <div>
                                 <div class="flex items-center gap-2 px-1 pb-3">
-                                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOCK" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
+                                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOCK" class="h-4 w-4 text-blue-600 dark:text-purple-400"/>
                                     <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($occurrences->count()) }} {{ trans_choice('monitor::messages.issue.occurrence_count', $occurrences->count()) }}</h3>
                                 </div>
                                 <x-monitor::card class="p-4">
                                     <div class="overflow-x-auto">
                                         <table class="w-full min-w-[640px] text-sm">
                                             <thead>
-                                                <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                                <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                                     <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
                                                     <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
                                                     <th class="pb-2 font-normal">{{ __('monitor::messages.common.message') }}</th>
                                                     <th class="pb-2 font-normal">{{ __('monitor::messages.common.user') }}</th>
                                                 </tr>
                                             </thead>
-                                            <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                                            <tbody class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                                                 @foreach ($occurrences as $occurrence)
-                                                    <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                                    <tr class="rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset">
                                                         <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $occurrence->date }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                                         <td class="max-w-[14rem] py-2 pr-3">
                                                             <x-monitor::exception-source-badge :type="$occurrence->sourceType" :label="$occurrence->sourceLabel" :url="$occurrence->sourceUrl"/>
@@ -102,7 +96,7 @@
                         @endif
                     @else
                         <x-monitor::card class="p-6">
-                            <span class="rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $badge }}</span>
+                            <span class="rounded bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $badge }}</span>
                             <p class="mt-3 break-all font-mono text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ $label }}</p>
                             <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
                                 <div>
@@ -114,7 +108,7 @@
                                     <dd class="mt-1 font-mono text-amber-600 dark:text-amber-400">{{ \LaravelMonitor\Support\Format::duration($maxDuration) }}</dd>
                                 </div>
                             </dl>
-                            <a href="{{ $targetUrl }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">{{ __('monitor::messages.issue.view_details') }} →</a>
+                            <a href="{{ $targetUrl }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-purple-400 hover:underline">{{ __('monitor::messages.issue.view_details') }} →</a>
                         </x-monitor::card>
                     @endif
                 </div>

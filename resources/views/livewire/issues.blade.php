@@ -4,7 +4,7 @@
 
     $fmt = fn ($ms) => Format::duration($ms);
     $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('monitor'.$i), 16, 36)))->implode(' ');
-    $actionButton = 'shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
+    $actionButton = 'shrink-0 rounded-lg bg-neutral-200 dark:bg-neutral-800 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark hover:text-neutral-900 dark:hover:text-neutral-100';
     $priorityColor = fn (string $priority) => match ($priority) {
         'urgent' => 'text-rose-500',
         'high' => 'text-orange-500',
@@ -23,13 +23,13 @@
 @endphp
 <div wire:poll.{{ $refresh }}s>
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+        <div class="flex h-9 items-center gap-0.5 rounded-xl bg-neutral-200 dark:bg-neutral-800 p-0.5 shadow-neu-inset dark:shadow-neu-dark-inset">
             @foreach (['exceptions' => [__('monitor::messages.nav.exceptions'), $exceptionCount], 'performance' => [__('monitor::messages.issue.performance'), $performanceCount]] as $issueTab => [$issueLabel, $issueCount])
                 <button type="button" wire:click="$set('view', '{{ $issueTab }}')"
                         @class([
-                            'flex h-full items-center gap-2 rounded-md border px-3 text-sm',
-                            'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $view === $issueTab,
-                            'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $view !== $issueTab,
+                            'flex h-full items-center gap-2 rounded-lg px-3 text-sm',
+                            'bg-neutral-200 shadow-neu-sm dark:bg-neutral-800 dark:shadow-neu-dark-sm text-neutral-900 dark:text-neutral-100' => $view === $issueTab,
+                            'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $view !== $issueTab,
                         ])>
                     {{ $issueLabel }}
                     <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">{{ $issueCount }}</span>
@@ -41,15 +41,15 @@
             <div class="relative">
                 <x-monitor::icon :path="Icons::SEARCH" class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
                 <input type="search" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search') }}"
-                       class="h-9 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-3 text-sm text-neutral-700 dark:text-neutral-200 shadow-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none">
+                       class="h-9 w-52 rounded-xl bg-neutral-200 dark:bg-neutral-800 pl-8 pr-3 text-sm text-neutral-700 dark:text-neutral-200 shadow-neu-inset dark:shadow-neu-dark-inset placeholder:text-neutral-400 dark:placeholder:text-neutral-500">
             </div>
-            <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 text-sm shadow-sm">
+            <div class="flex h-9 items-center gap-0.5 rounded-xl bg-neutral-200 dark:bg-neutral-800 p-0.5 text-sm shadow-neu-inset dark:shadow-neu-dark-inset">
                 @foreach (['open' => __('monitor::messages.issue.status_open'), 'resolved' => __('monitor::messages.issue.status_resolved'), 'ignored' => __('monitor::messages.issue.status_ignored')] as $statusKey => $statusLabel)
                     <button type="button" wire:click="$set('status', '{{ $statusKey }}')"
                             @class([
-                                'flex h-full items-center rounded-md border px-3',
-                                'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $status === $statusKey,
-                                'border-transparent text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $statusKey,
+                                'flex h-full items-center rounded-lg px-3',
+                                'bg-neutral-200 shadow-neu-sm dark:bg-neutral-800 dark:shadow-neu-dark-sm text-neutral-900 dark:text-neutral-100' => $status === $statusKey,
+                                'text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $statusKey,
                             ])>{{ $statusLabel }}</button>
                 @endforeach
             </div>
@@ -57,7 +57,7 @@
     </div>
 
     @if ($selectedCount > 0)
-        <div class="mt-3 flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm">
+        <div class="mt-3 flex items-center gap-3 rounded-xl bg-neutral-200 dark:bg-neutral-800 px-3 py-2 text-sm shadow-neu-inset dark:shadow-neu-dark-inset">
             <span class="font-medium text-blue-700 dark:text-blue-300">{{ __('monitor::messages.issue.selected', ['count' => $selectedCount]) }}</span>
             <button type="button" wire:click="resolveSelected" class="{{ $actionButton }}">{{ __('monitor::messages.issue.resolve') }}</button>
             <button type="button" wire:click="ignoreSelected" class="{{ $actionButton }}">{{ __('monitor::messages.issue.ignore') }}</button>
@@ -71,7 +71,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[820px] text-sm">
                         <thead>
-                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                            <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="w-8 pb-2">
                                     <input type="checkbox" @checked($allSelectedOnPage)
                                            wire:click="{{ $allSelectedOnPage ? 'deselectAll' : 'selectAll' }}({{ $allSelectedOnPage ? '' : Js::from($pagePairs) }})">
@@ -86,9 +86,9 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             @foreach ($exceptions as $exception)
-                                <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                <tr class="group rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset">
                                     <td class="py-2.5 pr-2">
                                         <input type="checkbox" @checked(isset($selected['exception'][$exception->key]))
                                                wire:click="toggleSelected('exception', '{{ $exception->key }}')">
@@ -125,7 +125,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[820px] text-sm">
                         <thead>
-                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                            <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="w-8 pb-2">
                                     <input type="checkbox" @checked($allSelectedOnPage)
                                            wire:click="{{ $allSelectedOnPage ? 'deselectAll' : 'selectAll' }}({{ $allSelectedOnPage ? '' : Js::from($pagePairs) }})">
@@ -139,9 +139,9 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             @foreach ($performance as $item)
-                                <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                <tr class="group rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset">
                                     <td class="py-2.5 pr-2">
                                         <input type="checkbox" @checked(isset($selected[$item->issue_type][$item->key]))
                                                wire:click="toggleSelected('{{ $item->issue_type }}', '{{ $item->key }}')">
@@ -151,7 +151,7 @@
                                         <x-monitor::icon :path="Icons::PRIORITY" :stroke="2" class="h-4 w-4 {{ $priorityColor($item->priority) }}"/>
                                     </td>
                                     <td class="max-w-[26rem] cursor-pointer py-2.5 pr-3" onclick="window.location='{{ route('monitor.issues.show', $item->uuid) }}'">
-                                        <span class="mr-2 shrink-0 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $item->badge }}</span>
+                                        <span class="mr-2 shrink-0 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-200/80 dark:bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $item->badge }}</span>
                                         <span class="font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $item->label }}</span>
                                     </td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs font-medium text-neutral-700 dark:text-neutral-200">{{ number_format($item->count) }}</td>

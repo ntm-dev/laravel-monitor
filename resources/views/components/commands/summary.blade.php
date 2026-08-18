@@ -37,7 +37,7 @@
         @foreach ($general as $key => $value)
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 @if ($key === 'command')
                     <dd class="min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" title="{{ $value }}">{{ $value }}</dd>
                 @else
@@ -50,10 +50,10 @@
         @if ($scheduledTask !== null)
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.command.scheduled_task') }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 <dd class="min-w-0 shrink font-mono text-xs">
                     <a href="{{ route('monitor.schedule.runs.show', $scheduledTask->request_id) }}"
-                       class="truncate text-blue-600 hover:underline dark:text-blue-400">{{ $scheduledTask->key }}</a>
+                       class="truncate text-blue-600 hover:underline dark:text-purple-400">{{ $scheduledTask->key }}</a>
                 </dd>
             </div>
         @endif

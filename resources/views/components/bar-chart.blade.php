@@ -17,7 +17,7 @@
 <div class="relative {{ $height }}">
     <div class="pointer-events-none absolute inset-0 flex flex-col justify-between">
         @for ($chartI = 0; $chartI < 5; $chartI++)
-            <div class="border-t border-neutral-100 dark:border-neutral-800"></div>
+            <div class="border-t border-neutral-300/60 dark:border-neutral-600/60"></div>
         @endfor
     </div>
     <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300 dark:bg-neutral-600"
@@ -26,7 +26,7 @@
     <div class="relative flex h-full items-end gap-px" @mouseleave="clearHoverIndex()">
         @for ($chartI = 0; $chartI < $chartBuckets; $chartI++)
             <div class="relative flex h-full flex-1 flex-col items-center justify-end"
-                 :class="{ 'bg-neutral-100/60 dark:bg-neutral-800/60': hoverIndex === {{ $chartI }} }"
+                 :class="{ 'bg-neutral-200/60 dark:bg-neutral-800/60': hoverIndex === {{ $chartI }} }"
                  @mouseenter="setHoverIndex({{ $chartI }})">
                 @foreach (array_reverse($series) as $chartSerie)
                     @php($chartValue = $chartSerie['data'][$chartI] ?? 0)
@@ -38,17 +38,17 @@
                 @if (($chartTotals[$chartI] ?? 0) === 0)
                     <div class="h-[2px] {{ $barWidth }} bg-neutral-200/70 dark:bg-neutral-700/70"></div>
                 @endif
-                <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
+                <div class="pointer-events-none absolute bottom-full {{ $chartI < $chartBuckets / 2 ? 'left-0' : 'right-0' }} z-20 mb-2 w-56 rounded-2xl bg-neutral-200 p-3 shadow-neu-lg dark:bg-neutral-800 dark:shadow-neu-dark-lg"
                      x-show="hoverIndex === {{ $chartI }}" x-cloak>
-                    <p class="font-mono text-[11px] text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($since->copy()->addSeconds($chartI * $chartSeconds)) }} <span class="text-neutral-500">{{ $chartTz }}</span></p>
-                    <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
+                    <p class="font-mono text-[11px] text-neutral-600 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($since->copy()->addSeconds($chartI * $chartSeconds)) }} <span class="text-neutral-400 dark:text-neutral-500">{{ $chartTz }}</span></p>
+                    <div class="mt-2 space-y-1.5 border-t border-neutral-300/60 pt-2 dark:border-neutral-600/60">
                         @foreach ($series as $chartSerie)
-                            <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                            <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <span class="inline-block h-2.5 w-1 rounded-full {{ $chartSerie['dot'] }}"></span>{{ $chartSerie['label'] }}
-                                <span class="ml-auto text-neutral-100">{{ number_format($chartSerie['data'][$chartI] ?? 0) }}</span>
+                                <span class="ml-auto text-neutral-800 dark:text-neutral-100">{{ number_format($chartSerie['data'][$chartI] ?? 0) }}</span>
                             </p>
                         @endforeach
-                        <p class="flex items-center gap-1.5 border-t border-neutral-700/60 pt-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">{{ __('monitor::messages.common.total') }}<span class="ml-auto text-neutral-100">{{ number_format($chartTotals[$chartI] ?? 0) }}</span></p>
+                        <p class="flex items-center gap-1.5 border-t border-neutral-300/60 pt-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:border-neutral-600/60 dark:text-neutral-400">{{ __('monitor::messages.common.total') }}<span class="ml-auto text-neutral-800 dark:text-neutral-100">{{ number_format($chartTotals[$chartI] ?? 0) }}</span></p>
                     </div>
                 </div>
             </div>

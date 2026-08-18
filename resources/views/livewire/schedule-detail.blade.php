@@ -31,7 +31,7 @@
     {{-- Individual runs --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
-            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SCHEDULE" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
+            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SCHEDULE" class="h-4 w-4 text-blue-600 dark:text-purple-400"/>
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.run_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
@@ -40,31 +40,31 @@
             @else
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                        <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($entries as $entry)
                             @php($runUrl = ($entry->request_id ?? null) ? route('monitor.schedule.runs.show', $entry->request_id) : null)
-                            <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                            <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset"
                                 @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                 <td class="py-2 pr-3">
                                     <span @class([
-                                        'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                                        'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'finished',
-                                        'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400' => $entry->subtype === 'skipped',
-                                        'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
+                                        'rounded px-1.5 py-0.5 font-mono text-[10px] uppercase bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset',
+                                        'text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'finished',
+                                        'text-neutral-500 dark:text-neutral-400' => $entry->subtype === 'skipped',
+                                        'text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
                                     ])>{{ __("monitor::messages.common.{$entry->subtype}") }}</span>
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
                                 <td class="py-2 pl-2 text-right">
                                     @if ($runUrl)
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg text-neutral-300 dark:text-neutral-600 group-hover:bg-neutral-200 dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-neu-sm dark:group-hover:shadow-neu-dark-sm">
                                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     @endif
@@ -75,14 +75,14 @@
                 </table>
 
                 @if ($lastPage > 1)
-                    <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                    <div class="mt-3 flex items-center justify-between shadow-[0_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_-1px_0_rgba(255,255,255,0.06)] pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                         <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalEntries), 'total' => number_format($totalEntries)]) }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
+                                    class="rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2.5 py-1 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset disabled:opacity-40 disabled:shadow-none disabled:hover:shadow-none">{{ __('monitor::messages.common.prev') }}</button>
                             <span>{{ $page }} / {{ $lastPage }}</span>
                             <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
+                                    class="rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2.5 py-1 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset disabled:opacity-40 disabled:shadow-none disabled:hover:shadow-none">{{ __('monitor::messages.common.next') }}</button>
                         </div>
                     </div>
                 @endif

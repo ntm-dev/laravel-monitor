@@ -44,7 +44,7 @@
         @foreach ($general as $key => $value)
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 @if ($key === 'status_code' && is_numeric($value))
                     <dd class="shrink-0">
                         <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ \LaravelMonitor\Support\Format::statusBadgeClass((int) $value) }}">{{ $value }}</span>
@@ -60,7 +60,7 @@
         @foreach ($user as $key => $value)
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $userLabels[$key] }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
             </div>
         @endforeach

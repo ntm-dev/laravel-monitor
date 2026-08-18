@@ -13,9 +13,9 @@
     $command = $root->payload['command'] ?? $key;
     $status = $root->subtype ?? 'finished';
     $badgeClass = match ($status) {
-        'failed' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
-        'skipped' => 'bg-neutral-200/70 text-neutral-600 dark:bg-neutral-500/10 dark:text-neutral-400',
-        default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+        'failed' => 'bg-neutral-200 text-rose-600 shadow-neu-inset dark:bg-neutral-800 dark:text-rose-400 dark:shadow-neu-dark-inset',
+        'skipped' => 'bg-neutral-200 text-neutral-600 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-400 dark:shadow-neu-dark-inset',
+        default => 'bg-neutral-200 text-emerald-600 shadow-neu-inset dark:bg-neutral-800 dark:text-emerald-400 dark:shadow-neu-dark-inset',
     };
 
     // Same cadence phrase as the badge on the schedule-show page's own
@@ -77,7 +77,7 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
+            <header class="sticky top-0 z-10 bg-neutral-200/80 backdrop-blur dark:bg-neutral-800/80">
                 <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
                     {{-- start breadcrumb scheduled task run --}}
                     <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -115,7 +115,7 @@
                         @foreach ($general as $field => $value)
                             <div class="flex items-baseline justify-between gap-3">
                                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$field] }}</dt>
-                                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                                 @if ($field === 'status')
                                     <dd class="shrink-0">
                                         <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ $badgeClass }}">{{ $value }}</span>
@@ -130,10 +130,10 @@
                         @if ($commandRun !== null)
                             <div class="flex items-baseline justify-between gap-3">
                                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.schedule.command_run') }}</dt>
-                                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                                 <dd class="min-w-0 shrink font-mono text-xs">
                                     <a href="{{ route('monitor.commands.runs.show', $commandRun->request_id) }}"
-                                       class="truncate text-blue-600 hover:underline dark:text-blue-400">{{ $commandRun->payload['command'] ?? $commandRun->key }}</a>
+                                       class="truncate text-blue-600 hover:underline dark:text-purple-400">{{ $commandRun->payload['command'] ?? $commandRun->key }}</a>
                                 </dd>
                             </div>
                         @endif

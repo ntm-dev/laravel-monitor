@@ -42,6 +42,23 @@
                         sans: ['InterVariable', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
                         mono: ['"CommitMono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
                     },
+                    // Neumorphism (soft UI) shadow tokens. Surfaces share the
+                    // page's own background colour — depth comes only from
+                    // this dual light/dark shadow pair, never a border.
+                    // "-inset" variants read as pressed/selected (nav's
+                    // active item, a toggled switch, an input's data well);
+                    // the plain variants read as raised (cards, buttons,
+                    // idle nav items).
+                    boxShadow: {
+                        'neu': '-6px -6px 12px rgba(255,255,255,0.9), 6px 6px 12px rgba(0,0,0,0.15)',
+                        'neu-sm': '-3px -3px 6px rgba(255,255,255,0.9), 3px 3px 6px rgba(0,0,0,0.12)',
+                        'neu-lg': '-10px -10px 20px rgba(255,255,255,0.9), 10px 10px 24px rgba(0,0,0,0.18)',
+                        'neu-inset': 'inset -3px -3px 6px rgba(255,255,255,0.8), inset 3px 3px 6px rgba(0,0,0,0.15)',
+                        'neu-dark': '-6px -6px 12px rgba(255,255,255,0.06), 6px 6px 12px rgba(0,0,0,0.7)',
+                        'neu-dark-sm': '-3px -3px 6px rgba(255,255,255,0.05), 3px 3px 6px rgba(0,0,0,0.65)',
+                        'neu-dark-lg': '-10px -10px 20px rgba(255,255,255,0.07), 10px 10px 24px rgba(0,0,0,0.75)',
+                        'neu-dark-inset': 'inset -3px -3px 6px rgba(255,255,255,0.04), inset 3px 3px 6px rgba(0,0,0,0.65)',
+                    },
                 },
             },
         };
@@ -87,9 +104,39 @@
             background-color: rgb(64 64 64);
         }
     </style>
+    <style>
+        /* Neumorphic surfaces drop the border-based focus ring, so every
+           interactive element gets this real ring back via :focus-visible —
+           without it, keyboard-only navigation would have no visible focus
+           indicator at all (see components/layout.blade.php boxShadow tokens
+           above for why borders are gone). */
+        a, button, input, select, textarea, [tabindex] {
+            outline: none;
+        }
+        a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+            outline: 2px solid rgb(59 130 246);
+            outline-offset: 2px;
+        }
+        /* Dark mode's primary accent is purple (see boxShadow tokens above
+           for the rest of the neumorphic system) — the focus ring follows
+           it so it doesn't read as a leftover blue. */
+        .dark a:focus-visible, .dark button:focus-visible, .dark input:focus-visible, .dark select:focus-visible, .dark textarea:focus-visible, .dark [tabindex]:focus-visible {
+            outline-color: rgb(168 85 247);
+        }
+        /* List rows sit inside a `divide-y` container (Tailwind renders that
+           as border-top on every row but the first), so a hovered row's own
+           box-shadow gets visually cut by that line — both the one on its
+           own top edge and the one belonging to the row right after it.
+           `divide-y`'s selector (.divide-y > :not([hidden]) ~ :not([hidden]))
+           out-specifies a plain hover utility class, hence !important here
+           rather than a Tailwind class. */
+        tr:hover, tr:hover + tr {
+            border-top-color: transparent !important;
+        }
+    </style>
     @livewireStyles
 </head>
-<body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
+<body class="min-h-screen bg-neutral-200 font-sans text-neutral-800 antialiased dark:bg-neutral-800 dark:text-neutral-100">
     {{ $slot }}
 
     @livewireScripts
