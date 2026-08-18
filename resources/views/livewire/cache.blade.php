@@ -15,7 +15,7 @@
     $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::CACHE" :title="__('monitor::messages.nav.cache')">
+    <x-monitor::section>
         <x-slot:actions>
             <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
                     class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">

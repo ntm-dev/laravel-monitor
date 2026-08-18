@@ -15,7 +15,7 @@
     $from = ($page - 1) * $perPage;
 @endphp
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="Icons::NOTIFICATIONS" :title="__('monitor::messages.nav.notifications')">
+    <x-monitor::section>
         <x-slot:actions>
             <div class="relative">
                 <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>

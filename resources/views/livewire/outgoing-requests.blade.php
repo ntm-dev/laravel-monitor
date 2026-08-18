@@ -1,6 +1,6 @@
 @php($fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms))
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::OUTGOING" :title="__('monitor::messages.nav.outgoing')">
+    <x-monitor::section>
         @if ($requests->isEmpty())
             <x-monitor::empty-state :label="__('monitor::messages.nav.outgoing')" :message="__('monitor::messages.common.no_outgoing_requests')" :period-phrase="$periodPhrase"/>
         @else

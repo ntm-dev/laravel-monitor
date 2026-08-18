@@ -1,8 +1,10 @@
 <div wire:poll.{{ $refresh }}s>
-    <x-monitor::section :icon="\LaravelMonitor\Support\Icons::USER" :title="__('monitor::messages.nav.users')">
-        <x-slot:actions>
-            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'users'] + $range)" external>{{ __('monitor::messages.nav.users') }}</x-monitor::link-button>
-        </x-slot:actions>
+    <x-monitor::section :icon="$embedded ? \LaravelMonitor\Support\Icons::USER : null" :title="$embedded ? __('monitor::messages.nav.users') : null">
+        @if ($embedded)
+            <x-slot:actions>
+                <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'users'] + $range)" external>{{ __('monitor::messages.nav.users') }}</x-monitor::link-button>
+            </x-slot:actions>
+        @endif
 
         <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
             {{-- Users impacted by exceptions --}}

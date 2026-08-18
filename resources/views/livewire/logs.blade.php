@@ -65,8 +65,10 @@
                             title="{{ $log->summary }}">{{ $log->summary }}
                         </span>
                     </button>
-                    <div x-show="expanded" x-cloak class="flex flex-col divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-white/5 dark:border-white/5 pl-4 pr-2.5">
-                        <x-monitor::json-viewer :raw="$log->contextRaw" :tree="$log->contextTree" />
+                    <div x-show="expanded" x-cloak class="flex flex-col divide-y divide-neutral-200  dark:divide-white/5 pl-4 pr-2.5">
+                        <div class="border-t border-neutral-200 dark:border-white/5">
+                            <x-monitor::json-viewer :raw="$log->contextRaw" :tree="$log->contextTree" />
+                        </div>
                     </div>
                 </div>
                 {{-- end log entry row --}}

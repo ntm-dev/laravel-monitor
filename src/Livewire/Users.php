@@ -8,6 +8,14 @@ class Users extends Card
 {
     use ResolvesUserNames;
 
+    /**
+     * True when rendered as one of several summary cards on the Overview
+     * tab; false when this is the entire body of the standalone Users tab
+     * (whose header already shows the icon/title, so the section shouldn't
+     * repeat them).
+     */
+    public bool $embedded = false;
+
     protected function view(): string
     {
         return 'monitor::livewire.users';

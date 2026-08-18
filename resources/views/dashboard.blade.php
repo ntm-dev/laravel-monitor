@@ -9,14 +9,18 @@
             <x-monitor::header :tab="$tab" :tabs="$tabs" :groups="$groups" :title="$title" :detail="$detail" :key="$key" :range="$range"
                                :period="$period" :periods="$periods" :has-custom-range="$hasCustomRange" :from="$from" :to="$to"
                                :timezone="$timezone" :range-max="$rangeMax"
-                               :current-route-name="$currentRouteName" :current-route-params="$currentRouteParams"/>
+                               :current-route-name="$currentRouteName" :current-route-params="$currentRouteParams">
+                <x-slot:leading>
+                    <x-monitor::icon :path="$tabs[$tab]['icon']" class="h-5 w-5 text-neutral-400 dark:text-neutral-500"/>
+                </x-slot:leading>
+            </x-monitor::header>
 
             <main class="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-10 md:px-8">
                 @if ($tab === 'overview')
                     <div class="space-y-4">
                         @livewire('monitor.overview', $rangeProps)
                         @livewire('monitor.application', $rangeProps)
-                        @livewire('monitor.users', $rangeProps)
+                        @livewire('monitor.users', $rangeProps + ['embedded' => true])
                     </div>
                 @elseif ($tab === 'settings')
                     @include('monitor::settings')
