@@ -36,7 +36,7 @@
                         <button type="button" wire:click="setStatus('{{ $value }}')"
                                 @class([
                                     'flex h-full items-center rounded-md px-2.5 text-xs font-medium',
-                                    'bg-neutral-900 text-white' => $status === $value,
+                                    'bg-neutral-900 text-white dark:bg-neutral-500' => $status === $value,
                                     'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $value,
                                 ])>{{ $label }}</button>
                     @endforeach
@@ -61,15 +61,26 @@
                                     <th @class([
                                             'pb-2 font-normal',
                                             'text-right' => $column['align'] === 'right',
-                                            'cursor-pointer select-none' => $column['sortable'] ?? true,
+                                            'cursor-pointer select-none' => $column['sortable'] ?? false,
                                         ])
-                                        @if ($column['sortable'] ?? true) wire:click="sort('{{ $field }}')" @endif>
-                                        <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row-reverse' : '' }}">
-                                            {{ $column['label'] }}
-                                            @if (($column['sortable'] ?? true) && $sortBy === $field)
-                                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3 {{ $sortDirection === 'asc' ? 'rotate-180' : '' }}"/>
-                                            @endif
-                                        </span>
+                                        @if ($column['sortable'] ?? false) wire:click="sort('{{ $field }}')" @endif>
+                                        @if ($column['sortable'] ?? false)
+                                            <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row' : '' }}">
+                                                {{ $column['label'] }}
+                                                <div class="-right-3 flex flex-col gap-[2px]">
+                                                    <div class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px]
+                                                        border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden
+                                                        {{ $sortBy === $field && $sortDirection === 'asc' ? 'border-b-blue-500' : '' }}"
+                                                    >
+                                                    </div>
+                                                    <div class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px]
+                                                        border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden
+                                                        {{ $sortBy === $field && $sortDirection !== 'asc' ? 'border-b-blue-500' : '' }} rotate-180"
+                                                    >
+                                                    </div>
+                                                </div>
+                                            </span>
+                                        @endif
                                     </th>
                                 @endforeach
                                 <th class="w-8 pb-2"></th>
