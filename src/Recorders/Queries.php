@@ -112,54 +112,11 @@ class Queries extends Recorder
      * Whether the current request is browsing the Monitor dashboard itself
      * — every query that fires while rendering/polling a dashboard page
      * (session lookups, cache reads, ...) would otherwise be attributed to
-     * "app" activity, same reasoning as Recorders\Logs::shouldIgnore(). No
-     * request bound at all (console/queue context) never matches.
+     * "app" activity, same reasoning as Recorders\Logs::shouldIgnore().
      */
     protected function shouldIgnore(): bool
     {
-        return $this->shouldIgnoreCache ??= $this->resolveShouldIgnore();
-    }
-
-    protected function resolveShouldIgnore(): bool
-    {
-        if (! app()->bound('request')) {
-            return false;
-        }
-
-        $request = app('request');
-
-        $patterns = [
-            ...$this->config['ignore_paths'] ?? [],
-            trim(config('monitor.path', 'monitor'), '/').'*',
-        ];
-
-        if ($this->matchesAny($request->path(), $patterns)) {
-            return true;
-        }
-
-        // wire:poll/component-interaction requests never hit the dashboard's
-        // own URL — they POST to Livewire's own update endpoint instead,
-        // whose path is unrelated (and can be a random hash per deploy, e.g.
-        // "livewire-bc31bc9b/update"), so the path check above never matches
-        // them. Each request payload carries the *original* page URL the
-        // component was rendered on in its snapshot instead (memo.path —
-        // Livewire's own PersistentMiddleware stashes it there to replay
-        // that page's middleware); check that so polling a Monitor
-        // dashboard tab keeps being excluded the same way loading it does.
-        if (! $request->hasHeader('X-Livewire')) {
-            return false;
-        }
-
-        foreach ((array) $request->input('components', []) as $component) {
-            $snapshot = json_decode((string) ($component['snapshot'] ?? ''), true);
-            $path = $snapshot['memo']['path'] ?? null;
-
-            if (is_string($path) && $this->matchesAny(ltrim($path, '/'), $patterns)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->shouldIgnoreCache ??= $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);
     }
 
     /**

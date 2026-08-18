@@ -10,7 +10,13 @@ use LaravelMonitor\State\CommandState;
 use LaravelMonitor\State\RequestState;
 use LaravelMonitor\Support\Location;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\Str as SupportStr;
 use Throwable;
+
+use function is_string;
+use function json_decode;
+use function ltrim;
+use function trim;
 
 class Monitor
 {
@@ -272,6 +278,48 @@ class Monitor
     public function enabled(): bool
     {
         return $this->recording && (bool) $this->app['config']->get('monitor.enabled', true);
+    }
+
+    /**
+     * Whether the current request is Monitor's own dashboard — checked
+     * directly by path, or via memo.path for a Livewire wire:poll/
+     * component-interaction request (those POST to Livewire's own update
+     * endpoint instead, carrying the originating page's URL in the
+     * snapshot rather than the request path). $ignorePaths lets a recorder
+     * fold in its own extra exclusions (e.g. Requests also excludes other
+     * dev-tool dashboards like Telescope/Pulse/Horizon).
+     */
+    public function isSelfRequest(array $ignorePaths = []): bool
+    {
+        if (! $this->app->bound('request')) {
+            return false;
+        }
+
+        $request = $this->app['request'];
+
+        $patterns = [
+            ...$ignorePaths,
+            trim((string) $this->app['config']->get('monitor.path', 'monitor'), '/').'*',
+        ];
+
+        if (SupportStr::matchesAny($request->path(), $patterns)) {
+            return true;
+        }
+
+        if (! $request->hasHeader('X-Livewire')) {
+            return false;
+        }
+
+        foreach ((array) $request->input('components', []) as $component) {
+            $snapshot = json_decode((string) ($component['snapshot'] ?? ''), true);
+            $path = $snapshot['memo']['path'] ?? null;
+
+            if (is_string($path) && SupportStr::matchesAny(ltrim($path, '/'), $patterns)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
