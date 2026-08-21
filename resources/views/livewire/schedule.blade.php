@@ -90,7 +90,7 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($tasks as $task)
                             {{-- Cells below carry their own `title` (full command,
                                  full expression) — a plain title on the <tr> alone
@@ -121,19 +121,14 @@
                             </tr>
                         @endforeach
                     </tbody>
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <x-monitor::table-skeleton :columns="10" :rows="count($tasks)"/>
+                    </tbody>
                 </table>
 
                 @if ($lastPage > 1)
-                    <div class="mt-3 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalTasks), 'total' => number_format($totalTasks)]) }}</span>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.prev') }}</button>
-                            <span>{{ $page }} / {{ $lastPage }}</span>
-                            <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">{{ __('monitor::messages.common.next') }}</button>
-                        </div>
-                    </div>
+                    <x-monitor::pagination :page="$page" :last-page="$lastPage"
+                        :label="__('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalTasks), 'total' => number_format($totalTasks)])"/>
                 @endif
             </x-monitor::card>
         @endif
