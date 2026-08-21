@@ -66,7 +66,7 @@
                             @endforeach
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($keys as $row)
                             <tr class="{{ $row->failures > 0 ? 'bg-rose-50/60 dark:bg-rose-500/10 rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset' : 'rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset' }}">
                                 <td class="max-w-[24rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $row->key }}">{{ $row->key }}</td>
@@ -80,19 +80,14 @@
                             </tr>
                         @endforeach
                     </tbody>
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
+                        <x-monitor::table-skeleton :columns="8" :rows="count($keys)"/>
+                    </tbody>
                 </table>
 
                 @if ($lastPage > 1)
-                    <div class="mt-3 flex items-center justify-between shadow-[0_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_-1px_0_rgba(255,255,255,0.06)] pt-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                        <span>{{ __('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalKeys), 'total' => number_format($totalKeys)]) }}</span>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" wire:click="previousPage" @disabled($page <= 1)
-                                    class="rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2.5 py-1 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset disabled:opacity-40 disabled:shadow-none disabled:hover:shadow-none">{{ __('monitor::messages.common.prev') }}</button>
-                            <span>{{ $page }} / {{ $lastPage }}</span>
-                            <button type="button" wire:click="nextPage" @disabled($page >= $lastPage)
-                                    class="rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2.5 py-1 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset disabled:opacity-40 disabled:shadow-none disabled:hover:shadow-none">{{ __('monitor::messages.common.next') }}</button>
-                        </div>
-                    </div>
+                    <x-monitor::pagination :page="$page" :last-page="$lastPage"
+                        :label="__('monitor::messages.common.showing_range', ['from' => $from + 1, 'to' => min($from + $perPage, $totalKeys), 'total' => number_format($totalKeys)])"/>
                 @endif
             </x-monitor::card>
         @endif
