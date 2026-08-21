@@ -513,10 +513,10 @@
          z-20 (not the z-10 used elsewhere in this card) so it stays above
          the rows pane's own sticky bar labels as they scroll underneath it,
          and it needs its own opaque background — sticky content doesn't get
-         one for free — matching x-monitor::card's `bg-white dark:bg-neutral-900`
+         one for free — matching x-monitor::card's `bg-neutral-200 dark:bg-neutral-800`
          so scrolled-past rows don't show through. --}}
     <div x-ref="stickyHeader" :style="'top: ' + pageHeaderOffset + 'px'"
-        class="sticky z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
+        class="sticky z-20 flex items-stretch divide-x divide-neutral-300/60 bg-neutral-200 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:divide-neutral-600/60 dark:bg-neutral-800 dark:shadow-[0_1px_0_rgba(255,255,255,0.06)]">
         <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.timeline') }}</h2>
             <div class="flex items-center gap-1.5">
@@ -573,7 +573,7 @@
         <div x-show="selectedId !== null" x-cloak class="w-80 shrink-0"></div>
     </div>
 
-    <div class="flex items-stretch divide-x divide-neutral-200 dark:divide-neutral-800">
+    <div class="flex items-stretch divide-x divide-neutral-300/60 dark:divide-neutral-600/60">
         {{-- Pinned tree pane: a plain flex sibling, entirely outside the
              chart's overflow-x-auto container, so it simply never scrolls
              horizontally — no sticky/z-index tricks required. --}}
@@ -612,7 +612,7 @@
                          refreshTicks() in x-data above). --}}
                     <div class="pointer-events-none absolute inset-0 z-0">
                         <template x-for="(tick, index) in ticks" :key="index">
-                            <div x-show="!tick.first" class="absolute inset-y-0 border-l border-neutral-100 dark:border-neutral-800/70"
+                            <div x-show="!tick.first" class="absolute inset-y-0 border-l border-neutral-300/60 dark:border-neutral-600/60"
                                 :style="'left: ' + tick.pct + '%'"></div>
                         </template>
                     </div>
@@ -666,7 +666,7 @@
              Plain x-show still switches display instantly and correctly. --}}
         <div x-show="selectedId !== null" class="w-80 shrink-0">
             <div :style="'top: ' + timelineHeaderOffset + 'px; max-height: calc(100vh - ' + timelineHeaderOffset + 'px)'"
-                class="sticky divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
+                class="sticky divide-y divide-neutral-300/60 overflow-y-auto dark:divide-neutral-600/60">
                 <div class="flex items-start justify-between gap-2 p-4">
                     <div class="min-w-0">
                         <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400"
@@ -677,31 +677,31 @@
                     <div class="flex shrink-0 items-center gap-1">
                         <template x-if="selected()?.type === 'query'">
                             <a :href="selected()?.queryUrl" title="{{ __('monitor::messages.common.view_query') }}"
-                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
+                                class="flex h-6 w-6 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-emerald-700 hover:shadow-neu-sm dark:hover:bg-neutral-900 dark:hover:text-emerald-200 dark:hover:shadow-neu-dark-sm">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'notification'">
                             <a :href="selected()?.notificationUrl" title="{{ __('monitor::messages.common.view_notification') }}"
-                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
+                                class="flex h-6 w-6 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-emerald-700 hover:shadow-neu-sm dark:hover:bg-neutral-900 dark:hover:text-emerald-200 dark:hover:shadow-neu-dark-sm">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'mail'">
                             <a :href="selected()?.mailUrl" title="{{ __('monitor::messages.common.view_mail') }}"
-                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
+                                class="flex h-6 w-6 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-emerald-700 hover:shadow-neu-sm dark:hover:bg-neutral-900 dark:hover:text-emerald-200 dark:hover:shadow-neu-dark-sm">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'exception'">
                             <a :href="selected()?.exceptionUrl" title="{{ __('monitor::messages.common.view_exception') }}"
-                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
+                                class="flex h-6 w-6 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-emerald-700 hover:shadow-neu-sm dark:hover:bg-neutral-900 dark:hover:text-emerald-200 dark:hover:shadow-neu-dark-sm">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
                         <template x-if="selected()?.type === 'http'">
                             <a :href="selected()?.outgoingUrl" title="{{ __('monitor::messages.common.view_outgoing_request') }}"
-                                class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
+                                class="flex h-6 w-6 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-200 hover:text-emerald-700 hover:shadow-neu-sm dark:hover:bg-neutral-900 dark:hover:text-emerald-200 dark:hover:shadow-neu-dark-sm">
                                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                             </a>
                         </template>
@@ -736,7 +736,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'query'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                             <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                             <dd class="font-mono text-neutral-800 dark:text-neutral-200"
@@ -765,7 +765,7 @@
                                         :class="({
                                             write: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
                                             read: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-                                            direct: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+                                            direct: 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
                                         })[selected()?.metadata?.connection_type]"
                                         x-text="selected()?.metadata?.connection_type"></span>
                                 </template>
@@ -785,7 +785,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'cache'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.key') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -819,7 +819,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'notification'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.notification') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
@@ -850,7 +850,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'mail'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.subject') }}</dt>
                             <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
@@ -923,7 +923,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'lazy_loading'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.model') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
@@ -948,7 +948,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'http'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.method') }}</dt>
                             <dd class="font-mono uppercase text-neutral-800 dark:text-neutral-200"
@@ -977,7 +977,7 @@
                 </template>
 
                 <template x-if="selected()?.type === 'queue'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.job') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
@@ -1051,7 +1051,7 @@
                     </div>
                 </template>
                 <template x-if="selected()?.type === 'exception'">
-                    <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <dl class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                             <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.class') }}</dt>
                             {{-- direction:rtl + text-align:left truncates the *front* of the
@@ -1087,7 +1087,7 @@
          absolutely-positioned child of each row like the chart pane's own
          bar tooltips are. --}}
     <div x-show="tooltip.text !== ''" x-cloak
-        class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 shadow-lg"
+        class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-xl bg-neutral-200 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-800 shadow-neu-lg dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-lg"
         :style="'top: ' + tooltip.top + 'px; left: ' + tooltip.left + 'px'" x-text="tooltip.text"></div>
 
     {{-- Duplicate-SQL dot "heartbeat": two staggered rings expanding from

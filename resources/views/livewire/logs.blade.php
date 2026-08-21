@@ -1,7 +1,7 @@
 <div wire:poll.{{ $refresh }}s>
 
     <select wire:model.live="level"
-        class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+        class="h-8 rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-neu-inset dark:shadow-neu-dark-inset">
         <option value="">{{ __('monitor::messages.common.all_levels') }}</option>
         @foreach (['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info'] as $option)
             <option value="{{ $option }}">{{ ucfirst($option) }}</option>
@@ -11,11 +11,11 @@
     @if ($logs->isEmpty())
         <x-monitor::empty-state :label="__('monitor::messages.nav.logs')" :message="__('monitor::messages.common.no_log_entries')" :period-phrase="$periodPhrase" />
     @else
-        <div class="divide-y divide-neutral-100 dark:divide-neutral-800 mt-1 grid gap-y-1 grid-cols-1">
+        <div class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60 mt-1 grid gap-y-1 grid-cols-1">
             @foreach ($logs as $log)
                 @php($level = $log->level)
                 {{-- start log entry row --}}
-                <div wire:key="log-{{ $log->id }}" x-data="{ expanded: false }" class="rounded-lg rounded-md border border border-neutral-100 dark:border-white/5 bg-white dark:bg-white/5 shadow-xs text-xs">
+                <div wire:key="log-{{ $log->id }}" x-data="{ expanded: false }" class="rounded-2xl bg-neutral-200 dark:bg-neutral-800 shadow-neu-sm dark:shadow-neu-dark-sm text-xs">
                     {{-- Grid (not flex) so the timestamp/level/source/summary
                          columns line up across every row regardless of each
                          cell's own content width — a variable-length level
@@ -25,11 +25,11 @@
                          so it keeps its own track instead of being skipped
                          by grid auto-placement. --}}
                     <button type="button" @click="expanded = ! expanded"
-                        class="grid h-11 w-full cursor-pointer grid-cols-[1.5rem_12rem_5rem_10rem_1fr] items-center gap-3 rounded-lg pl-4 pr-2.5 text-left hover:bg-white/50 dark:hover:bg-white/5">
+                        class="grid h-11 w-full cursor-pointer grid-cols-[1.5rem_12rem_5rem_10rem_1fr] items-center gap-3 rounded-2xl pl-4 pr-2.5 text-left hover:shadow-neu dark:hover:shadow-neu-dark">
                         <span
-                            class="flex h-6 w-6 items-center justify-center rounded-md dark:border dark:border-white/10"
-                            :class="expanded ? 'text-blue-500 dark:text-emerald-500 dark:bg-white/5' :
-                                'text-neutral-500 dark:bg-white/5'">
+                            class="flex h-6 w-6 items-center justify-center rounded-lg bg-neutral-200 dark:bg-neutral-800"
+                            :class="expanded ? 'text-blue-500 shadow-neu-inset dark:shadow-neu-dark-inset' :
+                                'text-neutral-500 shadow-neu-sm dark:shadow-neu-dark-sm'">
                             <x-monitor::chevrons-updown x-show="expanded" direction="down-up" />
                             <x-monitor::chevrons-updown x-show="! expanded" x-cloak direction="up-down" />
                         </span>
@@ -37,19 +37,19 @@
                             {{ \LaravelMonitor\Support\Format::datetime($log->created_at, \LaravelMonitor\Support\Format::DATETIME_PRECISE) }}
                         </span>
                         <span @class([
-                            'w-fit rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight',
-                            'monitor-log-emergency-ping border-red-600 bg-red-600 text-white' =>
+                            'w-fit rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight',
+                            'monitor-log-emergency-ping bg-red-600 text-white shadow-neu-sm' =>
                                 $level === 'emergency',
-                            'animate-pulse border-red-600 bg-red-600 text-white' => $level === 'alert',
-                            'border-red-600 bg-red-600 text-white' => $level === 'critical',
-                            'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' =>
+                            'animate-pulse bg-red-600 text-white shadow-neu-sm' => $level === 'alert',
+                            'bg-red-600 text-white shadow-neu-sm' => $level === 'critical',
+                            'bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset text-rose-600 dark:text-rose-400' =>
                                 $level === 'error',
-                            'border-orange-400 dark:border-orange-300 bg-orange-50 dark:bg-orange-300/10 text-orange-400 dark:text-orange-300' =>
+                            'bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset text-orange-500 dark:text-orange-300' =>
                                 $level === 'warning',
-                            'border-blue-600 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/10  text-blue-600 dark:text-sky-400' => in_array(
+                            'bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset text-blue-600 dark:text-sky-400' => in_array(
                                 $level,
                                 ['notice', 'info']),
-                            'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400' =>
+                            'bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset text-neutral-500 dark:text-neutral-400' =>
                                 $level === 'debug',
                         ])>{{ $level }}</span>
                         <span class="min-w-0 truncate" @click.stop>
@@ -65,8 +65,8 @@
                             title="{{ $log->summary }}">{{ $log->summary }}
                         </span>
                     </button>
-                    <div x-show="expanded" x-cloak class="flex flex-col divide-y divide-neutral-200  dark:divide-white/5 pl-4 pr-2.5">
-                        <div class="border-t border-neutral-200 dark:border-white/5">
+                    <div x-show="expanded" x-cloak class="flex flex-col divide-y divide-neutral-300/60 dark:divide-neutral-600/60 pl-4 pr-2.5">
+                        <div class="border-t border-neutral-300/60 dark:border-neutral-600/60">
                             <x-monitor::json-viewer :raw="$log->contextRaw" :tree="$log->contextTree" />
                         </div>
                     </div>

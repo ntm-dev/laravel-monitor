@@ -36,30 +36,30 @@
             <dl class="flex flex-col gap-3">
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.total_time') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($totalTime) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.avg_time') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->avg) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.p95') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $fmt($duration->p95) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.calls') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ number_format($calls) }}</dd>
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="flex flex-wrap justify-end gap-1">
                         @forelse ($connections as $conn)
-                            <span class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-neutral-200 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 shadow-neu-inset dark:text-neutral-300 dark:shadow-neu-dark-inset">
                                 {{ $conn['name'] }}
                                 @if ($conn['type'])
                                     <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$conn['type']] }}">{{ $conn['type'] }}</span>
@@ -72,13 +72,13 @@
                 </div>
                 <div class="flex max-w-full items-baseline gap-2">
                     <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.first_seen') }}</dt>
-                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
+                    <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                     <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $firstSeen ? Format::datetime($firstSeen).' '.$tz : '—' }}</dd>
                 </div>
             </dl>
         </div>
 
-        <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 md:w-1/2"
+        <div class="rounded-2xl bg-neutral-200 shadow-neu dark:bg-neutral-800 dark:shadow-neu-dark md:w-1/2"
              x-data="{
                  sql: @js($sql),
                  sqlCopied: false,
@@ -114,7 +114,7 @@
     {{-- Individual calls --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
-            <x-monitor::icon :path="Icons::QUERIES" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
+            <x-monitor::icon :path="Icons::QUERIES" class="h-4 w-4 text-blue-600 dark:text-purple-400"/>
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.call_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
@@ -124,7 +124,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[760px] text-sm">
                         <thead>
-                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                            <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.connection') }}</th>
@@ -133,7 +133,7 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             @foreach ($entries as $entry)
                                 {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
                                      sourceType/sourceLabel/sourceUrl (set in QueryDetail::data()) resolve it to the
@@ -142,14 +142,14 @@
                                 @php($location = $entry->payload['location'] ?? null)
                                 @php($connection = $entry->payload['connection'] ?? null)
                                 @php($connectionType = $entry->payload['connection_type'] ?? null)
-                                <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                <tr class="rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset">
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                     <td class="{{ $entry->sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($entry->sourceUrl) onclick="window.location='{{ $entry->sourceUrl }}'" @endif>
                                         @if ($entry->sourceType)
                                             <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$entry->sourceUrl"/>
                                         @else
                                             <span class="flex items-center gap-1.5">
-                                                <span class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.exception.source_command') }}</span>
+                                                <span class="shrink-0 rounded-md bg-neutral-200 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-neutral-500 shadow-neu-inset dark:text-neutral-400 dark:shadow-neu-dark-inset">{{ __('monitor::messages.exception.source_command') }}</span>
                                                 <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" title="{{ $commandName }}">{{ $commandName ?? '—' }}</span>
                                             </span>
                                         @endif
@@ -186,7 +186,7 @@
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
                         </tbody>
                     </table>

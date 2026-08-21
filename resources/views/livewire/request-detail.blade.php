@@ -20,7 +20,7 @@
     {{-- Individual requests --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
-            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REQUESTS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
+            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REQUESTS" class="h-4 w-4 text-blue-600 dark:text-purple-400"/>
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.request_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
@@ -29,7 +29,7 @@
             @else
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                        <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.method') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.details') }}</th>
@@ -37,14 +37,14 @@
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($entries as $entry)
                             @php($status = (int) ($entry->payload['status'] ?? 0))
                             @php($detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'requestId' => $entry->request_id]) : null)
-                            <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
+                            <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset" @else class="rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs">
                                     @if ($detailUrl)
-                                        <a href="{{ $detailUrl }}" class="text-blue-600 hover:underline dark:text-blue-400" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</a>
+                                        <a href="{{ $detailUrl }}" class="text-blue-600 hover:underline dark:text-purple-400" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</a>
                                     @else
                                         <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</span>
                                     @endif
@@ -57,7 +57,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <x-monitor::table-skeleton :columns="5" :rows="count($entries)"/>
                     </tbody>
                 </table>

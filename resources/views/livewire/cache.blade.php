@@ -18,7 +18,7 @@
     <x-monitor::section>
         <x-slot:actions>
             <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
-                    class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                    class="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset">
                 <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
             </button>
         </x-slot:actions>
@@ -45,7 +45,7 @@
             <x-monitor::card class="p-4">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                        <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             @foreach ($columns as $field => $column)
                                 <th class="cursor-pointer select-none pb-2 font-normal {{ $column['align'] === 'right' ? 'text-right' : 'text-left' }}"
                                     wire:click="sort('{{ $field }}')">
@@ -66,9 +66,9 @@
                             @endforeach
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($keys as $row)
-                            <tr class="{{ $row->failures > 0 ? 'bg-rose-50/60 dark:bg-rose-500/10 hover:bg-rose-50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">
+                            <tr class="{{ $row->failures > 0 ? 'bg-rose-50/60 dark:bg-rose-500/10 rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset' : 'rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset' }}">
                                 <td class="max-w-[24rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $row->key }}">{{ $row->key }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $row->hit_ratio !== null && $row->hit_ratio < 50 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $row->hit_ratio !== null ? $row->hit_ratio.'%' : '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->deletes) }}</td>
@@ -80,7 +80,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <x-monitor::table-skeleton :columns="8" :rows="count($keys)"/>
                     </tbody>
                 </table>

@@ -14,8 +14,8 @@
     $invocation = $root->payload['command'] ?? $command;
     $status = $root->subtype ?? 'success';
     $badgeClass = match ($status) {
-        'failed' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
-        default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+        'failed' => 'bg-neutral-200 text-rose-600 shadow-neu-inset dark:bg-neutral-800 dark:text-rose-400 dark:shadow-neu-dark-inset',
+        default => 'bg-neutral-200 text-emerald-600 shadow-neu-inset dark:bg-neutral-800 dark:text-emerald-400 dark:shadow-neu-dark-inset',
     };
 @endphp
 <x-monitor::layout :title="$invocation">
@@ -23,7 +23,7 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
+            <header class="sticky top-0 z-10 bg-neutral-200/80 backdrop-blur dark:bg-neutral-800/80">
                 <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
                     {{-- start breadcrumb command run --}}
                     <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">

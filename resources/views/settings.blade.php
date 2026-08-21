@@ -8,11 +8,11 @@
     $rowClass = 'flex items-center justify-between gap-4 py-2.5';
     $labelClass = 'text-sm text-neutral-700 dark:text-neutral-300';
     $fieldClass =
-        'w-44 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        'w-44 rounded-xl bg-neutral-200 px-2 py-1.5 text-xs text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset';
     $numClass =
-        'w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-right font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        'w-24 rounded-xl bg-neutral-200 px-2 py-1.5 text-right font-mono text-xs text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset';
     $periodInput =
-        'rounded-md border border-neutral-200 bg-white px-2 py-1.5 font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        'rounded-xl bg-neutral-200 px-2 py-1.5 font-mono text-xs text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset';
     $periodItems = collect($system['periods'])
         ->map(fn($hours, $label) => ['label' => (string) $label, 'hours' => $hours])
         ->values();
@@ -26,14 +26,13 @@
     @endif
 
     @if ($errors->any())
-        <div
-            class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">
+        <x-monitor::alert color="rose" class="items-start text-xs">
             <ul class="list-inside list-disc space-y-0.5">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-        </div>
+        </x-monitor::alert>
     @endif
 
     <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']) }" class="space-y-4">
@@ -57,7 +56,7 @@
                         <label
                             class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.theme') }}</label>
                         <div
-                            class="grid grid-cols-3 gap-0.5 rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 dark:border-neutral-700 dark:bg-neutral-800">
+                            class="grid grid-cols-3 gap-0.5 rounded-xl bg-neutral-200 p-0.5 shadow-neu-inset dark:bg-neutral-800 dark:shadow-neu-dark-inset">
                             @foreach ([
         'light' => [__('monitor::messages.settings.theme_light'), \LaravelMonitor\Support\Icons::SUN],
         'dark' => [__('monitor::messages.settings.theme_dark'), \LaravelMonitor\Support\Icons::MOON],
@@ -65,10 +64,10 @@
     ] as $value => [$themeLabel, $themeIcon])
                                 <label
                                     @click="theme = '{{ $value }}'; window.monitorApplyTheme && window.monitorApplyTheme('{{ $value }}')"
-                                    class="flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium"
+                                    class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium"
                                     :class="theme === '{{ $value }}'
                                         ?
-                                        'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' :
+                                        'bg-neutral-200 text-neutral-900 shadow-neu-sm dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-sm' :
                                         'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'">
                                     <input type="radio" name="theme" value="{{ $value }}" class="sr-only"
                                         @checked($prefs['theme'] === $value)>
@@ -83,7 +82,7 @@
                         <label for="monitor-locale"
                             class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.language') }}</label>
                         <select id="monitor-locale" name="locale"
-                            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                            class="w-full rounded-xl bg-neutral-200 px-3 py-2 text-sm text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset">
                             @foreach ($localeOptions as $code => $name)
                                 <option value="{{ $code }}" @selected($prefs['locale'] === $code)>{{ $name }}
                                 </option>
@@ -97,24 +96,24 @@
                             <label
                                 class="block {{ $labelClass }}">{{ __('monitor::messages.settings.timezone') }}</label>
                             <button type="button" @click="useBrowser()"
-                                class="text-xs text-blue-600 hover:underline dark:text-blue-400">{{ __('monitor::messages.settings.use_browser_timezone') }}</button>
+                                class="text-xs text-blue-600 hover:underline dark:text-purple-400">{{ __('monitor::messages.settings.use_browser_timezone') }}</button>
                         </div>
                         <button type="button" @click="toggle()"
-                            class="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100">
+                            class="flex w-full items-center justify-between gap-2 rounded-xl bg-neutral-200 px-3 py-2 text-left text-sm text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset">
                             <span class="truncate" x-text="label(selected)"></span>
                             <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500"
                                 x-text="timeIn(selected)"></span>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false"
-                            class="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-800">
+                            class="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl bg-neutral-200 shadow-neu-lg dark:bg-neutral-800 dark:shadow-neu-dark-lg">
                             <input x-ref="q" x-model="query" type="text"
                                 placeholder="{{ __('monitor::messages.settings.tz_search') }}"
-                                class="w-full border-b border-neutral-100 bg-transparent px-3 py-2 text-sm text-neutral-900 focus:outline-none dark:border-neutral-700 dark:text-neutral-100">
+                                class="w-full bg-transparent px-3 py-2 text-sm text-neutral-800 shadow-[0_1px_0_rgba(0,0,0,0.08)] dark:text-neutral-100 dark:shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                             <ul class="max-h-60 overflow-auto py-1">
                                 <template x-for="opt in filtered()" :key="opt.value">
                                     <li @click="choose(opt.value)"
-                                        class="flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                                        :class="opt.value === selected ? 'bg-neutral-100 dark:bg-neutral-700' : ''">
+                                        class="flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-xs rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset"
+                                        :class="opt.value === selected ? 'shadow-neu-inset dark:shadow-neu-dark-inset' : ''">
                                         <span class="truncate text-neutral-700 dark:text-neutral-200">
                                             <span x-text="opt.name"></span>
                                             <span class="text-neutral-400 dark:text-neutral-500"
@@ -147,7 +146,7 @@
             <x-monitor::card class="p-4">
                 <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
-                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                <div class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
 
                     <div class="{{ $rowClass }}">
                         <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.recording') }}</span>
@@ -165,7 +164,7 @@
                         <div class="grid gap-x-8 sm:grid-cols-2">
                             @foreach ($system['recorders'] as $recorder)
                                 <div
-                                    class="flex items-center justify-between gap-4 border-b border-neutral-100 py-2.5 dark:border-neutral-800">
+                                    class="flex items-center justify-between gap-4 border-b border-neutral-300/60 py-2.5 dark:border-neutral-600/60">
                                     <span class="flex min-w-0 items-center gap-2 font-mono text-xs text-neutral-700 dark:text-neutral-300">
                                         <x-monitor::icon :path="$recorder['icon']" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
                                         <span class="truncate">{{ $recorder['name'] }}</span>
@@ -238,14 +237,14 @@
                                         class="w-24 {{ $periodInput }} text-right">
                                     <button type="button" @click="items.splice(index, 1)"
                                         title="{{ __('monitor::messages.settings.remove') }}"
-                                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-400 hover:border-rose-300 hover:text-rose-600 dark:border-neutral-700 dark:hover:border-rose-500/40 dark:hover:text-rose-400">
+                                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-neutral-400 shadow-neu-sm hover:text-rose-600 hover:shadow-neu dark:shadow-neu-dark-sm dark:hover:text-rose-400 dark:hover:shadow-neu-dark">
                                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOSE" :stroke="2" class="h-3.5 w-3.5" />
                                     </button>
                                 </div>
                             </template>
                         </div>
                         <button type="button" @click="items.push({ label: '', hours: '' })"
-                            class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+                            class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-purple-400">
                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::PLUS" :stroke="2"
                                 class="h-3.5 w-3.5" />{{ __('monitor::messages.settings.add_period') }}
                         </button>
@@ -271,7 +270,7 @@
             <x-monitor::card class="p-4">
                 <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
-                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                <div class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
 
                     <div class="{{ $rowClass }}">
                         <label for="s-req"
@@ -322,9 +321,9 @@
 
         <div class="flex items-center justify-end gap-2">
             <button type="submit" formnovalidate formaction="{{ route('monitor.settings.reset') }}"
-                class="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">{{ __('monitor::messages.settings.reset') }}</button>
+                class="rounded-xl bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 shadow-neu-sm hover:shadow-neu active:shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-300 dark:shadow-neu-dark-sm dark:hover:shadow-neu-dark dark:active:shadow-neu-dark-inset">{{ __('monitor::messages.settings.reset') }}</button>
             <button type="submit"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
+                class="rounded-xl bg-blue-600 dark:bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-neu-sm hover:bg-blue-500 dark:hover:bg-purple-500 active:scale-[0.98]">{{ __('monitor::messages.settings.save_system') }}</button>
         </div>
     </form>
 </div>

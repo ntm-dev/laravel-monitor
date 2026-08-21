@@ -2,14 +2,14 @@
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
-                <select wire:model.live="userId" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                <select wire:model.live="userId" class="h-8 rounded-xl bg-neutral-200 dark:bg-neutral-800 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-neu-inset dark:shadow-neu-dark-inset">
                     <option value="">{{ __('monitor::messages.common.all_users') }}</option>
                     @foreach ($users as $user)
                         <option value="{{ $user->id }}">{{ $user->name }}</option>
                     @endforeach
                 </select>
                 <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
-                        class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                        class="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 shadow-neu-sm dark:shadow-neu-dark-sm hover:shadow-neu dark:hover:shadow-neu-dark active:shadow-neu-inset dark:active:shadow-neu-dark-inset">
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
                 </button>
             </div>
@@ -31,12 +31,12 @@
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalGroups) }} {{ trans_choice('monitor::messages.common.exception_count', $totalGroups) }}</h3>
             <div class="flex items-center gap-2">
-                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+                <div class="flex h-8 items-center gap-0.5 rounded-xl bg-neutral-200 dark:bg-neutral-800 p-0.5 shadow-neu-inset dark:shadow-neu-dark-inset">
                     @foreach ($filters as $value => $label)
                         <button type="button" wire:click="setStatus('{{ $value }}')"
                                 @class([
-                                    'flex h-full items-center rounded-md px-2.5 text-xs font-medium',
-                                    'bg-neutral-900 text-white dark:bg-neutral-500' => $status === $value,
+                                    'flex h-full items-center rounded-lg px-2.5 text-xs font-medium',
+                                    'bg-neutral-900 text-white shadow-neu-sm dark:bg-neutral-500 dark:shadow-neu-dark-sm' => $status === $value,
                                     'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $value,
                                 ])>{{ $label }}</button>
                     @endforeach
@@ -44,7 +44,7 @@
                 <div class="relative">
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_exceptions') }}"
-                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                           class="h-8 w-56 rounded-xl bg-neutral-200 dark:bg-neutral-800 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-neu-inset dark:shadow-neu-dark-inset">
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[720px] text-sm">
                         <thead>
-                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                            <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 @foreach ($columns as $field => $column)
                                     <th @class([
                                             'pb-2 font-normal',
@@ -86,9 +86,9 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             @foreach ($groups as $group)
-                                <tr class="group cursor-pointer {{ $group->unhandled > 0 ? 'hover:bg-rose-50/50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}"
+                                <tr class="group cursor-pointer rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset"
                                     onclick="window.location='{{ route('monitor.exceptions.show', ['hash' => $group->key] + $range) }}'">
                                     <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $group->last_seen_full }}">
                                         {{ $group->last_seen_human }}
@@ -107,14 +107,14 @@
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs font-medium text-neutral-700 dark:text-neutral-200">{{ number_format($group->count) }}</td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $group->users > 0 ? number_format($group->users) : '—' }}</td>
                                     <td class="py-2.5 pl-2 text-right">
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg text-neutral-300 dark:text-neutral-600 group-hover:bg-neutral-200 dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-neu-sm dark:group-hover:shadow-neu-dark-sm">
                                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             <x-monitor::table-skeleton :columns="6" :rows="count($groups)"/>
                         </tbody>
                     </table>

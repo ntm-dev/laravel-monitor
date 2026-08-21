@@ -38,7 +38,7 @@ class NotificationHeading
 
         return new Heading(
             badge: $channel,
-            badgeClass: 'bg-neutral-200/70 text-neutral-600',
+            badgeClass: 'bg-neutral-200 text-neutral-600 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-400 dark:shadow-neu-dark-inset',
             heading: $class,
             titleAttr: $class,
             pageTitle: class_basename($class),

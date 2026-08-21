@@ -8,8 +8,8 @@
     $payload = $root->payload ?? [];
     $status = $root->subtype ?? 'processed';
     $badgeClass = match ($status) {
-        'failed' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
-        default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+        'failed' => 'bg-neutral-200 text-rose-600 shadow-neu-inset dark:bg-neutral-800 dark:text-rose-400 dark:shadow-neu-dark-inset',
+        default => 'bg-neutral-200 text-emerald-600 shadow-neu-inset dark:bg-neutral-800 dark:text-emerald-400 dark:shadow-neu-dark-inset',
     };
 
     $general = array_filter([
@@ -38,7 +38,7 @@
         @foreach ($general as $key => $value)
             <div class="flex items-baseline justify-between gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 @if ($key === 'status')
                     <dd class="shrink-0">
                         <span class="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase {{ $badgeClass }}">{{ $value }}</span>

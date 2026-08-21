@@ -12,7 +12,7 @@
                 <x-monitor::card class="flex flex-col p-4">
                     <x-monitor::badge>{{ __('monitor::messages.nav.exceptions') }}</x-monitor::badge>
                     <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $impactedUsers->count() }} {{ trans_choice('monitor::messages.common.user_count', $impactedUsers->count()) }} {{ __('monitor::messages.common.impacted_by_exceptions') }} {{ $periodPhrase }}.</p>
-                    <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <div class="mt-4 divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($impactedUsers as $user)
                             <div class="flex items-center gap-2.5 py-2 text-xs">
                                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-500/10 text-[10px] font-semibold text-rose-600 dark:text-rose-400">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
@@ -31,10 +31,10 @@
                 <x-monitor::card class="flex flex-col p-4">
                     <x-monitor::badge>{{ __('monitor::messages.nav.requests') }}</x-monitor::badge>
                     <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.most_active_users') }} {{ $periodPhrase }}.</p>
-                    <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <div class="mt-4 divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($topUsers as $user)
                             <div class="flex items-center gap-2.5 py-2 text-xs">
-                                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-[10px] font-semibold text-neutral-600 dark:text-neutral-300">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
+                                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-800 text-[10px] font-semibold text-neutral-600 dark:text-neutral-300">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
                                 <span class="truncate text-neutral-700 dark:text-neutral-200">{{ $user->name }}</span>
                                 <span class="ml-auto shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ number_format($user->count) }} req</span>
                             </div>
@@ -56,14 +56,14 @@
                     @if ($authEvents->isEmpty())
                         <p class="py-3 text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_logins_in_period') }}</p>
                     @else
-                        <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <div class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                             @foreach ($authEvents as $event)
                                 <div class="flex items-center gap-2 py-2 text-xs">
                                     <span @class([
-                                        'shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                                        'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $event->subtype === 'login',
-                                        'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400' => $event->subtype === 'logout',
-                                        'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $event->subtype === 'failed',
+                                        'shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase bg-neutral-200 dark:bg-neutral-800 shadow-neu-inset dark:shadow-neu-dark-inset',
+                                        'text-emerald-600 dark:text-emerald-400' => $event->subtype === 'login',
+                                        'text-neutral-500 dark:text-neutral-400' => $event->subtype === 'logout',
+                                        'text-rose-600 dark:text-rose-400' => $event->subtype === 'failed',
                                     ])>{{ $event->subtype }}</span>
                                     <span class="truncate text-neutral-700 dark:text-neutral-200">{{ $event->key }}</span>
                                     <span class="ml-auto shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ $event->created_at->diffForHumans(short: true) }}</span>

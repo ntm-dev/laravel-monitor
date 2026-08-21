@@ -4,7 +4,7 @@
      before the page title, $periodsExtra renders in the period switcher's
      spot (alongside or instead of it). --}}
 @props(['tab', 'tabs', 'groups', 'title', 'detail', 'key', 'range', 'period', 'periods', 'hasCustomRange', 'from', 'to', 'timezone', 'rangeMax', 'currentRouteName', 'currentRouteParams'])
-<header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
+<header class="sticky top-0 z-10 bg-neutral-200/80 backdrop-blur dark:bg-neutral-800/80">
     <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
         @if ($detail !== null)
             <div class="min-w-0">
@@ -33,16 +33,16 @@
         @endif
 
         @if (! in_array($tab, ['settings', 'team'], true))
-        <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-xl bg-neutral-200 p-0.5 shadow-neu-inset dark:bg-neutral-800 dark:shadow-neu-dark-inset">
             @foreach ($periods as $value)
                 <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"
                    @class([
-                       'flex h-full min-w-8 items-center justify-center rounded-md border px-2.5 font-mono text-xs',
-                       'border-blue-500 bg-blue-600 text-white' => ! $hasCustomRange && $period === $value,
-                       'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $hasCustomRange || $period !== $value,
+                       'flex h-full min-w-8 items-center justify-center rounded-lg px-2.5 font-mono text-xs',
+                       'bg-blue-600 dark:bg-purple-600 text-white shadow-neu-sm' => ! $hasCustomRange && $period === $value,
+                       'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $hasCustomRange || $period !== $value,
                    ])>{{ strtoupper($value) }}</a>
             @endforeach
-            <span class="mx-0.5 h-4 w-px bg-neutral-200 dark:bg-neutral-700"></span>
+            <span class="mx-0.5 h-4 w-px bg-neutral-300 dark:bg-neutral-700"></span>
             <div x-data="{
                     open: false,
                     mode: 'utc',
@@ -60,9 +60,9 @@
                  }" class="relative h-full">
                 <button type="button" @click="open = ! open"
                         @class([
-                            'flex h-full items-center gap-1 rounded-md border px-2',
-                            'border-blue-500 bg-blue-600 text-white' => $hasCustomRange,
-                            'border-transparent text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100' => ! $hasCustomRange,
+                            'flex h-full items-center gap-1 rounded-lg px-2',
+                            'bg-blue-600 dark:bg-purple-600 text-white shadow-neu-sm' => $hasCustomRange,
+                            'text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100' => ! $hasCustomRange,
                         ])>
                     @if ($hasCustomRange)
                         <span class="font-mono text-xs">{{ $from }} → {{ $to }}</span>
@@ -71,20 +71,20 @@
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3"/>
                 </button>
                 <div x-show="open" x-cloak @click.outside="open = false"
-                     class="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20">
-                    <div class="grid grid-cols-2 gap-0.5 rounded-md bg-neutral-800 p-0.5 font-mono text-xs">
-                        <button type="button" @click="mode = 'utc'" class="rounded px-2 py-1.5" :class="mode === 'utc' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">{{ $timezone }}</button>
-                        <button type="button" @click="mode = 'local'" class="rounded px-2 py-1.5" :class="mode === 'local' ? 'bg-neutral-700 text-white' : 'text-neutral-400'">{{ __('monitor::messages.header.timezone_local') }}</button>
+                     class="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl bg-neutral-200 p-3 shadow-neu-lg dark:bg-neutral-800 dark:shadow-neu-dark-lg">
+                    <div class="grid grid-cols-2 gap-0.5 rounded-xl bg-neutral-200 p-0.5 font-mono text-xs shadow-neu-inset dark:bg-neutral-800 dark:shadow-neu-dark-inset">
+                        <button type="button" @click="mode = 'utc'" class="rounded-lg px-2 py-1.5" :class="mode === 'utc' ? 'bg-neutral-200 text-neutral-900 shadow-neu-sm dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-sm' : 'text-neutral-500 dark:text-neutral-400'">{{ $timezone }}</button>
+                        <button type="button" @click="mode = 'local'" class="rounded-lg px-2 py-1.5" :class="mode === 'local' ? 'bg-neutral-200 text-neutral-900 shadow-neu-sm dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-sm' : 'text-neutral-500 dark:text-neutral-400'">{{ __('monitor::messages.header.timezone_local') }}</button>
                     </div>
-                    <label class="mt-3 block text-xs text-neutral-400">{{ __('monitor::messages.header.starting_date') }}</label>
+                    <label class="mt-3 block text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.header.starting_date') }}</label>
                     <input type="datetime-local" x-model="from" max="{{ $rangeMax }}"
-                           class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
-                    <label class="mt-3 block text-xs text-neutral-400">{{ __('monitor::messages.header.ending_date') }}</label>
+                           class="mt-1 w-full rounded-lg bg-neutral-200 px-2 py-1.5 font-mono text-xs text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-200 dark:shadow-neu-dark-inset">
+                    <label class="mt-3 block text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.header.ending_date') }}</label>
                     <input type="datetime-local" x-model="to" max="{{ $rangeMax }}"
-                           class="mt-1 w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 font-mono text-xs text-neutral-200 focus:outline-none">
-                    <p x-show="error" x-text="error" class="mt-2 text-xs text-rose-400"></p>
+                           class="mt-1 w-full rounded-lg bg-neutral-200 px-2 py-1.5 font-mono text-xs text-neutral-800 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-200 dark:shadow-neu-dark-inset">
+                    <p x-show="error" x-text="error" class="mt-2 text-xs text-rose-500 dark:text-rose-400"></p>
                     <button type="button" @click="apply()"
-                            class="mt-3 w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.header.apply') }}</button>
+                            class="mt-3 w-full rounded-lg bg-blue-600 dark:bg-purple-600 py-2 text-sm font-medium text-white shadow-neu-sm hover:bg-blue-500 dark:hover:bg-purple-500 active:scale-[0.98]">{{ __('monitor::messages.header.apply') }}</button>
                 </div>
             </div>
         </div>
@@ -97,9 +97,9 @@
             @foreach ($items as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                    @class([
-                       'shrink-0 rounded-md border px-2.5 py-1.5',
-                       'border-neutral-200 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
-                       'border-transparent text-neutral-500 dark:text-neutral-400' => $tab !== $tabKey,
+                       'shrink-0 rounded-lg px-2.5 py-1.5 transition-shadow',
+                       'bg-neutral-200 text-neutral-900 shadow-neu-inset dark:bg-neutral-800 dark:text-neutral-100 dark:shadow-neu-dark-inset' => $tab === $tabKey,
+                       'text-neutral-500 hover:text-neutral-900 hover:shadow-neu-sm dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:shadow-neu-dark-sm' => $tab !== $tabKey,
                    ])>{{ $item['label'] }}</a>
             @endforeach
         @endforeach

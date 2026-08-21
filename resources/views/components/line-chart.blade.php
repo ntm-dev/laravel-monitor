@@ -14,7 +14,7 @@
 <div wire:key="line-chart-{{ md5(json_encode($hoverY)) }}" class="relative {{ $height }}" x-data="{ lineHoverY: {{ \Illuminate\Support\Js::from($hoverY) }} }">
     <div class="pointer-events-none absolute inset-0 flex flex-col justify-between">
         @for ($i = 0; $i < 5; $i++)
-            <div class="border-t border-neutral-100 dark:border-neutral-800"></div>
+            <div class="border-t border-neutral-300/60 dark:border-neutral-600/60"></div>
         @endfor
     </div>
     <svg class="absolute inset-0 h-full w-full" viewBox="0 0 {{ $buckets }} 100" preserveAspectRatio="none">
@@ -52,19 +52,19 @@
     <div class="absolute inset-0 flex" @mouseleave="clearHoverIndex()">
         @foreach ($tooltips as $i => $tooltip)
             <div class="relative h-full flex-1"
-                 @if ($tooltip['hasData']) :class="{ 'bg-neutral-100/60 dark:bg-neutral-800/60': hoverIndex === {{ $i }} }" @endif
+                 @if ($tooltip['hasData']) :class="{ 'bg-neutral-200/60 dark:bg-neutral-800/60': hoverIndex === {{ $i }} }" @endif
                  @mouseenter="setHoverIndex({{ $i }})">
-                <div class="pointer-events-none absolute bottom-full {{ $tooltip['anchor'] }} z-20 mb-2 w-56 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20"
+                <div class="pointer-events-none absolute bottom-full {{ $tooltip['anchor'] }} z-20 mb-2 w-56 rounded-2xl bg-neutral-200 p-3 shadow-neu-lg dark:bg-neutral-800 dark:shadow-neu-dark-lg"
                      x-show="hoverIndex === {{ $i }}" x-cloak>
-                    <p class="font-mono text-[11px] text-neutral-200">{{ $tooltip['time'] }} <span class="text-neutral-500">{{ $timezone }}</span></p>
-                    <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
-                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                    <p class="font-mono text-[11px] text-neutral-600 dark:text-neutral-200">{{ $tooltip['time'] }} <span class="text-neutral-400 dark:text-neutral-500">{{ $timezone }}</span></p>
+                    <div class="mt-2 space-y-1.5 border-t border-neutral-300/60 pt-2 dark:border-neutral-600/60">
+                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             <span class="inline-block h-2.5 w-1 rounded-full bg-neutral-600"></span>{{ __('monitor::messages.common.avg') }}
-                            <span class="ml-auto text-neutral-100">{{ $tooltip['avg'] }}</span>
+                            <span class="ml-auto text-neutral-800 dark:text-neutral-100">{{ $tooltip['avg'] }}</span>
                         </p>
-                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             <span class="inline-block h-2.5 w-1 rounded-full bg-amber-500"></span>{{ __('monitor::messages.common.p95') }}
-                            <span class="ml-auto text-neutral-100">{{ $tooltip['p95'] }}</span>
+                            <span class="ml-auto text-neutral-800 dark:text-neutral-100">{{ $tooltip['p95'] }}</span>
                         </p>
                     </div>
                 </div>

@@ -34,7 +34,7 @@
     {{-- Individual runs --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">
-            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COMMANDS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
+            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COMMANDS" class="h-4 w-4 text-blue-600 dark:text-purple-400"/>
             <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.run_count', $totalEntries) }}</h2>
         </div>
         <x-monitor::card class="p-4">
@@ -43,7 +43,7 @@
             @else
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                        <tr class="shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_rgba(255,255,255,0.06)] text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                             <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.command') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
@@ -52,10 +52,10 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         @foreach ($entries as $entry)
                             @php($runUrl = ($entry->request_id ?? null) ? route('monitor.commands.runs.show', $entry->request_id) : null)
-                            <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                            <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} rounded-lg hover:shadow-neu-inset dark:hover:shadow-neu-dark-inset"
                                 @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
                                 {{-- The run's start, not its created_at: entries are stamped when
                                      they finish, so showing created_at here put this row a second
@@ -78,7 +78,7 @@
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
                                 <td class="py-2 pl-2 text-right">
                                     @if ($runUrl)
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg text-neutral-300 dark:text-neutral-600 group-hover:bg-neutral-200 dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-neu-sm dark:group-hover:shadow-neu-dark-sm">
                                             <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     @endif
@@ -86,7 +86,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-300/60 dark:divide-neutral-600/60">
                         <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
                     </tbody>
                 </table>

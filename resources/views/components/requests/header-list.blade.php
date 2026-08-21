@@ -8,7 +8,7 @@
         @foreach ($headers as $name => $value)
             <div class="flex items-baseline gap-3">
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400" title="{{ $name }}">{{ $name }}</dt>
-                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
+                <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-400 dark:border-neutral-700"></div>
                 <dd class="max-w-[60%] break-words text-right font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
             </div>
         @endforeach
