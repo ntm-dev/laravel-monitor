@@ -9,9 +9,23 @@ use Illuminate\Support\Carbon;
 class Format
 {
     /**
-     * Timestamp format used across charts and detail tables.
+     * Timestamp format used across charts and detail tables, for a locale
+     * with no entry in DATETIME_LOCALES below.
      */
     public const DATETIME = 'M j, Y, H:i:s';
+
+    /**
+     * Locale => timestamp format override. Date order/punctuation is a
+     * locale convention, not just word translation — Vietnamese reads
+     * day-first ("21/08/2026"), not the US month-first layout DATETIME
+     * above uses — so translatedFormat() alone (which only swaps the
+     * month/day *names* a format string references) isn't enough.
+     *
+     * @var array<string, string>
+     */
+    public const DATETIME_LOCALES = [
+        'vi' => 'd-m-Y H:i:s',
+    ];
 
     /**
      * Microsecond-precision timestamp format — only meaningful for a
@@ -141,7 +155,16 @@ class Format
 
     public static function datetime(DateTimeInterface $date, ?string $format = null): string
     {
-        return Carbon::instance($date)->setTimezone(Preferences::timezone())->format(blank($format) ? self::DATETIME : $format);
+        $locale = app()->getLocale();
+
+        // translatedFormat(), not format(): Carbon's own locale is never
+        // synced to the app's (see durationUnits() for why), so plain
+        // format() renders 'M'/'D'/'l'/'F' month/day names in English
+        // regardless of the active locale unless set explicitly here.
+        return Carbon::instance($date)
+            ->setTimezone(Preferences::timezone())
+            ->locale($locale)
+            ->translatedFormat(blank($format) ? (self::DATETIME_LOCALES[$locale] ?? self::DATETIME) : $format);
     }
 
     /**

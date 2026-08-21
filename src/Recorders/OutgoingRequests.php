@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use LaravelMonitor\Support\RecordType;
 use Throwable;
 
+use function parse_url;
+
 class OutgoingRequests extends Recorder
 {
     public function register(Dispatcher $events): void
@@ -23,14 +25,14 @@ class OutgoingRequests extends Recorder
 
         $this->monitor->record(
             type: RecordType::OutgoingRequest,
-            key: $this->key($event->request->method(), $event->request->url()),
+            key: $this->key($event->request->url()),
             payload: [
                 'method' => $event->request->method(),
                 'url' => Str::limit($event->request->url(), 500),
                 'status' => $status,
             ],
             duration: $this->duration($event),
-            subtype: $status >= 400 ? 'error' : 'success',
+            subtype: $this->statusGroup($status),
         );
     }
 
@@ -38,19 +40,38 @@ class OutgoingRequests extends Recorder
     {
         $this->monitor->record(
             type: RecordType::OutgoingRequest,
-            key: $this->key($event->request->method(), $event->request->url()),
+            key: $this->key($event->request->url()),
             payload: [
                 'method' => $event->request->method(),
                 'url' => Str::limit($event->request->url(), 500),
                 'status' => null,
             ],
-            subtype: 'failed',
+            // No HTTP status to group by — bucketed with the server-error
+            // column (rather than a bucket of its own) since a connection
+            // failure is, from the caller's perspective, that domain being
+            // unreachable. payload['status'] stays null so the per-request
+            // page still renders it as "Failed", not a fake 5xx.
+            subtype: '5xx',
         );
     }
 
-    protected function key(string $method, string $url): string
+    /**
+     * Grouping key for the outgoing-requests list/detail pages: the
+     * destination host, not the full method+path — see Livewire\OutgoingRequests.
+     */
+    protected function key(string $url): string
     {
-        return $method.' '.Str::before($url, '?');
+        return parse_url($url, PHP_URL_HOST) ?? $url;
+    }
+
+    protected function statusGroup(int $status): string
+    {
+        return match (true) {
+            $status >= 500 => '5xx',
+            $status >= 400 => '4xx',
+            $status >= 300 => '3xx',
+            default => '2xx',
+        };
     }
 
     protected function duration(ResponseReceived $event): ?float

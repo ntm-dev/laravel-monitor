@@ -408,6 +408,7 @@ return [
         'request_count' => 'Request|Request',
         'task_count' => 'Tác vụ|Tác vụ',
         'routes_count' => 'Route|Route',
+        'domain_count' => 'Domain|Domain',
         'exceptions_reported_phrase' => 'ngoại lệ được ghi nhận',
         'application' => 'Ứng dụng',
         'info' => 'Thông tin',
