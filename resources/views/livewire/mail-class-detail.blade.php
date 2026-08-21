@@ -58,8 +58,15 @@
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $entry->payload['mailer'] ?? '—' }}</td>
                                     <td class="max-w-[16rem] truncate py-2 pr-3 text-xs text-neutral-700 dark:text-neutral-200" title="{{ $entry->payload['subject'] ?? '' }}">{{ $entry->payload['subject'] ?? '(no subject)' }}</td>
                                     <td class="py-2 pr-3">
-                                        {{-- Icon + total recipients, with a dark dotted-line breakdown tooltip on hover — mirrors Nightwatch's own Mail list Recipients column. --}}
-                                        <div class="group/recipients relative inline-flex cursor-default items-center gap-3">
+                                        {{-- Icon + total recipients, with a dark dotted-line breakdown tooltip on hover — mirrors Nightwatch's own Mail list Recipients column.
+                                             Positioned via Alpine as position:fixed (coordinates from getBoundingClientRect on hover) rather than CSS group-hover +
+                                             position:absolute: the ancestor .overflow-x-auto wrapper (needed for horizontal scroll on narrow screens) forces
+                                             overflow-y:auto too, which clipped an absolutely-positioned tooltip popping upward for rows near the top of the table.
+                                             No ancestor here has a transform/filter, so position:fixed escapes that clip without needing x-teleport. --}}
+                                        <div class="inline-flex cursor-default items-center gap-3"
+                                             x-data="{ open: false, style: '' }"
+                                             @mouseenter="const r = $el.getBoundingClientRect(); style = `left:${r.left}px; top:${r.top - 6}px;`; open = true"
+                                             @mouseleave="open = false">
                                             <span class="inline-flex items-center gap-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                                                 <x-monitor::icon :path="Icons::USER" :stroke="1.8" class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500"/>
                                                 {{ number_format(($entry->payload['to_count'] ?? 0) + ($entry->payload['cc_count'] ?? 0) + ($entry->payload['bcc_count'] ?? 0)) }}
@@ -68,7 +75,8 @@
                                                 <x-monitor::icon :path="Icons::PAPER_CLIP" :stroke="1.8" class="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500"/>
                                                 {{ number_format($entry->payload['attachments'] ?? 0) }}
                                             </span>
-                                            <div class="pointer-events-none invisible absolute bottom-full left-0 z-10 mb-1.5 w-36 rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 opacity-0 shadow-lg transition-opacity group-hover/recipients:visible group-hover/recipients:opacity-100">
+                                            <div x-show="open" x-cloak x-transition.opacity.duration.100ms :style="style"
+                                                 class="pointer-events-none fixed z-50 w-36 -translate-y-full rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 shadow-lg">
                                                 <dl class="flex flex-col gap-0.5">
                                                     @foreach ([
                                                         'to' => $entry->payload['to_count'] ?? 0,
