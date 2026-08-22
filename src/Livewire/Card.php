@@ -233,4 +233,18 @@ abstract class Card extends Component
     {
         return app(Storage::class);
     }
+
+    /**
+     * Pop a toast in the shared corner stack (see components/toast-container
+     * .blade.php, mounted once in layout.blade.php) — available to every
+     * card so a mutation (resolve an issue, save a setting, ...) can
+     * confirm itself the same way everywhere, instead of each page growing
+     * its own one-off inline banner.
+     *
+     * @param  'primary'|'secondary'|'success'|'danger'|'warning'|'info'  $level
+     */
+    protected function notify(string $level, string $message): void
+    {
+        $this->dispatch('toast', level: $level, message: $message);
+    }
 }

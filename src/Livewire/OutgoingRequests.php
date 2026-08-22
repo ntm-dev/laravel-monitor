@@ -8,7 +8,7 @@ class OutgoingRequests extends Card
 {
     use CombinesSubtypeStats;
 
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration'];
 

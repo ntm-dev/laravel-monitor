@@ -6,7 +6,7 @@ use Illuminate\Support\Collection;
 
 class JobDetail extends Card
 {
-    public const PER_PAGE = 50;
+    public const PER_PAGE = 25;
 
     public string $key = '';
 

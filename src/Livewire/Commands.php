@@ -4,7 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 class Commands extends Card
 {
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'success', 'failed', 'total', 'avg_duration', 'p95_duration'];
 

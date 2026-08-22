@@ -1246,13 +1246,18 @@ class MonitorTest extends TestCase
 
         $this->assertSame(60, $component->viewData('totalEntries'));
         $this->assertSame(1, $component->viewData('page'));
-        $this->assertSame(2, $component->viewData('lastPage'));
+        $this->assertSame(3, $component->viewData('lastPage'));
         $this->assertCount(RequestDetail::PER_PAGE, $component->viewData('entries'));
 
         $component->call('nextPage');
 
         $this->assertSame(2, $component->viewData('page'));
-        $this->assertCount(10, $component->viewData('entries'));
+        $this->assertCount(RequestDetail::PER_PAGE, $component->viewData('entries'));
+
+        $component->call('nextPage');
+
+        $this->assertSame(3, $component->viewData('page'));
+        $this->assertCount(60 - 2 * RequestDetail::PER_PAGE, $component->viewData('entries'));
     }
 
     public function test_custom_range_from_the_picker_is_interpreted_in_the_viewers_timezone(): void
@@ -2375,7 +2380,7 @@ class MonitorTest extends TestCase
         $this->get('/monitor/issues/'.(string) \Illuminate\Support\Str::uuid())->assertNotFound();
     }
 
-    public function test_updating_issue_status_persists_and_redirects_back(): void
+    public function test_updating_issue_status_persists(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
@@ -2383,13 +2388,13 @@ class MonitorTest extends TestCase
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
-        $this->post('/monitor/issues/'.$uuid.'/status', ['status' => 'resolved'])
-            ->assertRedirect('/monitor/issues/'.$uuid);
+        Livewire::test(\LaravelMonitor\Livewire\IssueManagePanel::class, ['uuid' => $uuid])
+            ->call('setStatus', 'resolved');
 
         $this->assertSame('resolved', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->status);
     }
 
-    public function test_updating_issue_priority_persists_and_redirects_back(): void
+    public function test_updating_issue_priority_persists(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
@@ -2397,13 +2402,13 @@ class MonitorTest extends TestCase
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
-        $this->post('/monitor/issues/'.$uuid.'/priority', ['priority' => 'urgent'])
-            ->assertRedirect('/monitor/issues/'.$uuid);
+        Livewire::test(\LaravelMonitor\Livewire\IssueManagePanel::class, ['uuid' => $uuid])
+            ->call('setPriority', 'urgent');
 
         $this->assertSame('urgent', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->priority);
     }
 
-    public function test_updating_issue_status_rejects_an_invalid_value(): void
+    public function test_updating_issue_status_ignores_an_invalid_value(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
@@ -2411,8 +2416,10 @@ class MonitorTest extends TestCase
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
-        $this->post('/monitor/issues/'.$uuid.'/status', ['status' => 'not-a-status'])
-            ->assertSessionHasErrors('status');
+        Livewire::test(\LaravelMonitor\Livewire\IssueManagePanel::class, ['uuid' => $uuid])
+            ->call('setStatus', 'not-a-status');
+
+        $this->assertSame('open', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->status);
     }
 
     public function test_monitor_users_table_exists_with_expected_columns(): void

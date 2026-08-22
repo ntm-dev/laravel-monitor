@@ -9,7 +9,7 @@ class Exceptions extends Card
 {
     use ResolvesUserNames;
 
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['last_seen', 'count', 'users'];
 

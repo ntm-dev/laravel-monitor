@@ -41,7 +41,12 @@ class Format
      */
     public const RANGE = 'Y-m-d\TH:i';
 
-    /** Manual issue-priority levels, value => human label. */
+    /**
+     * Manual issue-priority levels, value => fallback English label. Only
+     * the keys are canonical (validated against in IssueController and
+     * DatabaseStorage::setIssuePriority()) — displayed text always goes
+     * through priorityLabel()/priorityOptions() instead, so it's translated.
+     */
     public const PRIORITIES = [
         'none' => 'No priority',
         'low' => 'Low',
@@ -208,7 +213,22 @@ class Format
 
     public static function priorityLabel(string $priority): string
     {
-        return self::PRIORITIES[$priority] ?? self::PRIORITIES['none'];
+        $key = array_key_exists($priority, self::PRIORITIES) ? $priority : 'none';
+
+        return __('monitor::messages.issue.priority_'.$key);
+    }
+
+    /**
+     * Every priority level as value => translated label, for the priority
+     * <select> on the Issue detail page.
+     *
+     * @return array<string, string>
+     */
+    public static function priorityOptions(): array
+    {
+        return collect(array_keys(self::PRIORITIES))
+            ->mapWithKeys(fn ($key) => [$key => self::priorityLabel($key)])
+            ->all();
     }
 
     /**

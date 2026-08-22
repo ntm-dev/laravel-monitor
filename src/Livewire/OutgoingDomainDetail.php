@@ -16,7 +16,7 @@ class OutgoingDomainDetail extends Card
 {
     use CombinesSubtypeStats;
 
-    public const PER_PAGE = 50;
+    public const PER_PAGE = 25;
 
     public string $key = '';
 

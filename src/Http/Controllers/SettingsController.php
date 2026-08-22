@@ -83,7 +83,7 @@ class SettingsController
 
         // Redirect to the (possibly new) path so the dashboard never lands on a
         // stale URL after the prefix changes on the next boot.
-        return $this->backTo($path, 'monitor.settings_saved')->withCookie($cookie);
+        return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'))->withCookie($cookie);
     }
 
     public function reset(Request $request): RedirectResponse
@@ -93,7 +93,7 @@ class SettingsController
         Settings::reset();
 
         // Path reverts to the config default — redirect there, not the override.
-        return $this->backTo(Settings::defaultPath(), 'monitor.settings_reset');
+        return $this->backTo(Settings::defaultPath(), 'warning', __('monitor::messages.settings.settings_reset'));
     }
 
     /**
@@ -139,11 +139,13 @@ class SettingsController
     }
 
     /**
-     * Redirect to the settings tab at the given dashboard path. Built by hand
-     * (not via the route name) because the prefix may change on the next boot.
+     * Redirect to the settings tab at the given dashboard path (built by
+     * hand, not via the route name, because the prefix may change on the
+     * next boot), flashing a toast the shared toast-container picks up on
+     * the page it lands on (see components/toast-container.blade.php).
      */
-    protected function backTo(string $path, string $flag): RedirectResponse
+    protected function backTo(string $path, string $level, string $message): RedirectResponse
     {
-        return redirect('/'.trim($path, '/').'/settings')->with($flag, true);
+        return redirect('/'.trim($path, '/').'/settings')->with('monitor.toast', ['level' => $level, 'message' => $message]);
     }
 }

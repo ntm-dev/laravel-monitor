@@ -79,7 +79,6 @@ class DashboardController
             'tabs' => $tabs,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'openIssueCount' => app(Storage::class)->openIssueCount(),
             'detail' => $detail,
             'title' => $tabs[$tab]['label'],
             'pageTitle' => $detail?->pageTitle ?? $tabs[$tab]['label'],

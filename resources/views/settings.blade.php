@@ -19,12 +19,6 @@
 @endphp
 <div class="mx-auto max-w-5xl space-y-4">
 
-    @if (session('monitor.settings_saved'))
-        <x-monitor::settings-flash>{{ __('monitor::messages.settings.settings_saved') }}</x-monitor::settings-flash>
-    @elseif (session('monitor.settings_reset'))
-        <x-monitor::settings-flash>{{ __('monitor::messages.settings.settings_reset') }}</x-monitor::settings-flash>
-    @endif
-
     @if ($errors->any())
         <div
             class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">

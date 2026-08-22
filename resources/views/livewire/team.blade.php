@@ -377,7 +377,7 @@
                 {{ number_format($members->count()) }} {{ $members->count() === 1 ? $t('member') : $t('members') }}
             </h3>
             <div class="flex flex-wrap items-center gap-2">
-                <input type="search" wire:model.live.debounce.300ms="memberSearch" placeholder="{{ $t('search_members') }}"
+                <input type="text" wire:model.live.debounce.300ms="memberSearch" placeholder="{{ $t('search_members') }}"
                        class="min-w-0 flex-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
                 <select wire:model.live="memberRoleFilter"
                         class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">

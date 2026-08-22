@@ -38,11 +38,12 @@ interface Storage
 
     /**
      * Group entries by key. Each item exposes:
-     * key, count, avg_duration, max_duration, last_seen.
+     * key, count, avg_duration, max_duration, last_seen, users (distinct
+     * user_id count).
      *
      * $orderBy is one of: count, avg_duration, max_duration, last_seen.
-     * Sampled at high volume — see durationStats() — `count` is exact only
-     * up to DatabaseStorage::MAX_SAMPLE_ROWS matching rows.
+     * Sampled at high volume — see durationStats() — `count`/`users` are
+     * exact only up to DatabaseStorage::MAX_SAMPLE_ROWS matching rows.
      */
     public function aggregateByKey(
         string $type,
@@ -354,6 +355,18 @@ interface Storage
      * records synced by syncIssues(), not a windowed event count.
      */
     public function openIssueCount(): int;
+
+    /**
+     * Delete every "open" issue whose (type, key) no longer matches any row
+     * in monitor_entries — called by PruneCommand right after it purges
+     * old entries, so an issue never sits "open" forever once the raw data
+     * proving it recurred is gone. Checked by actual existence rather than
+     * comparing last_seen against the prune cutoff: a key can predate that
+     * cutoff's data even while last_seen itself still looks recent, e.g.
+     * after an earlier prune ran with a shorter --hours value. Returns the
+     * number of issues deleted.
+     */
+    public function expireStaleIssues(): int;
 
     /**
      * Set an issue's priority (one of Format::PRIORITIES' keys) — silently

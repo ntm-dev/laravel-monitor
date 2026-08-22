@@ -1,6 +1,6 @@
 {{-- Desktop sidebar: app identity, grouped tab links and footer entries.
      All data is prepared by Http\Controllers\DashboardController. --}}
-@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'openIssueCount' => 0])
+@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial'])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
 @endphp
@@ -30,8 +30,8 @@
                        ])>
                         <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300' }}"/>
                         <span class="flex-1 truncate">{{ $item['label'] }}</span>
-                        @if ($tabKey === 'issues' && $openIssueCount > 0)
-                            <span class="shrink-0 rounded-full border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] leading-none text-rose-600 dark:text-rose-400">{{ $openIssueCount > 99 ? '99+' : $openIssueCount }}</span>
+                        @if ($tabKey === 'issues')
+                            @livewire('monitor.open-issue-badge', key('nav-open-issue-badge'))
                         @endif
                     </a>
                 @endforeach
