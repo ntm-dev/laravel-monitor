@@ -1246,13 +1246,18 @@ class MonitorTest extends TestCase
 
         $this->assertSame(60, $component->viewData('totalEntries'));
         $this->assertSame(1, $component->viewData('page'));
-        $this->assertSame(2, $component->viewData('lastPage'));
+        $this->assertSame(3, $component->viewData('lastPage'));
         $this->assertCount(RequestDetail::PER_PAGE, $component->viewData('entries'));
 
         $component->call('nextPage');
 
         $this->assertSame(2, $component->viewData('page'));
-        $this->assertCount(10, $component->viewData('entries'));
+        $this->assertCount(RequestDetail::PER_PAGE, $component->viewData('entries'));
+
+        $component->call('nextPage');
+
+        $this->assertSame(3, $component->viewData('page'));
+        $this->assertCount(60 - 2 * RequestDetail::PER_PAGE, $component->viewData('entries'));
     }
 
     public function test_custom_range_from_the_picker_is_interpreted_in_the_viewers_timezone(): void

@@ -181,11 +181,19 @@ class Issues extends Card
      * $view property changes (the Exceptions/Performance toggle), since a
      * selection made while looking at one sub-tab shouldn't silently apply
      * to rows the viewer can no longer see.
+     *
+     * Also resets the sort back to each tab's own natural order — newest
+     * issue first for Exceptions, worst offender first for Performance —
+     * since both tabs share the same $sortBy/$sortDirection pair, and
+     * 'id' (the other tab's default) has no relationship to a performance
+     * row's severity.
      */
     public function updatedView(): void
     {
         $this->selected = [];
         $this->page = 1;
+        $this->sortBy = $this->view === 'performance' ? 'max_duration' : 'id';
+        $this->sortDirection = 'desc';
     }
 
     /**
