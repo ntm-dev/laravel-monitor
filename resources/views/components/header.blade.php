@@ -32,7 +32,7 @@
             </div>
         @endif
 
-        @if (! in_array($tab, ['settings', 'team'], true))
+        @if (! in_array($tab, ['settings', 'team', 'issues'], true))
         <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
                 <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"

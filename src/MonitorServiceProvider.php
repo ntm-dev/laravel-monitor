@@ -260,6 +260,8 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.users', Cards\Users::class);
         Livewire::component('monitor.application', Cards\Application::class);
         Livewire::component('monitor.issues', Cards\Issues::class);
+        Livewire::component('monitor.issue-manage-panel', Cards\IssueManagePanel::class);
+        Livewire::component('monitor.open-issue-badge', Cards\OpenIssueBadge::class);
         Livewire::component('monitor.notifications', Cards\Notifications::class);
         Livewire::component('monitor.request-detail', Cards\RequestDetail::class);
         Livewire::component('monitor.job-detail', Cards\JobDetail::class);

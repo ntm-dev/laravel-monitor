@@ -130,8 +130,6 @@ Route::domain(config('monitor.domain'))
                     ->name("monitor.{$groupTab}.sends.show");
             }
 
-            Route::post('/issues/{uuid}/status', [IssueController::class, 'updateStatus'])->name('monitor.issues.status');
-            Route::post('/issues/{uuid}/priority', [IssueController::class, 'updatePriority'])->name('monitor.issues.priority');
             Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');
             Route::post('/settings/reset', [SettingsController::class, 'reset'])->name('monitor.settings.reset');
             Route::post('/webauthn/register/options', [WebauthnController::class, 'registerOptions'])->name('monitor.webauthn.register.options');

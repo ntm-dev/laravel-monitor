@@ -4,7 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 class CacheStats extends Card
 {
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'hit_ratio', 'hits', 'misses', 'writes', 'deletes', 'failures', 'total'];
 

@@ -9,7 +9,7 @@ use LaravelMonitor\Support\Percentile;
 
 class Schedule extends Card
 {
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = [
         'key', 'next_run_at', 'finished', 'skipped',

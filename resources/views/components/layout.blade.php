@@ -92,6 +92,8 @@
 <body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
     {{ $slot }}
 
+    <x-monitor::toast-container/>
+
     @livewireScripts
 
     {{-- Progressive syntax highlighting for stack-trace snippets (highlight.js),

@@ -4,7 +4,7 @@
      See Http\Controllers\IssueController. --}}
 <x-monitor::layout :title="'Issue #'.$issue->id">
     <div class="flex min-h-screen">
-        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="'issues'" :range="[]" :refresh="$refresh" :app-initial="$appInitial" :open-issue-count="$openIssueCount"/>
+        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="'issues'" :range="[]" :refresh="$refresh" :app-initial="$appInitial"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
@@ -119,8 +119,8 @@
                     @endif
                 </div>
 
-                <aside class="lg:sticky lg:top-20 lg:self-start">
-                    <x-monitor::issues.manage-panel :issue="$issue" :statuses="$statuses" :priorities="$priorities"/>
+                <aside class="lg:sticky lg:top-14 lg:self-start">
+                    @livewire('monitor.issue-manage-panel', ['uuid' => $issue->uuid])
                 </aside>
             </main>
         </div>

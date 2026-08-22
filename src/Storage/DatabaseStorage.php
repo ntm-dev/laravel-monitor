@@ -390,7 +390,7 @@ class DatabaseStorage implements Storage
         // sort within a tied second — see sampleDurationsAcrossBuckets()
         // for why `id` is added as a deterministic tiebreaker.
         $sample = $this->query($type, $since, $subtype, null, $until)
-            ->select(['key', 'duration', 'created_at'])
+            ->select(['key', 'duration', 'created_at', 'user_id'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows());
@@ -398,7 +398,7 @@ class DatabaseStorage implements Storage
         return $this->table()
             ->fromSub($sample, 't')
             ->select('key')
-            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, max(created_at) as last_seen')
+            ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, max(created_at) as last_seen, count(distinct user_id) as users')
             ->groupBy('key')
             ->orderByDesc($orderColumn)
             ->limit($limit)
@@ -409,6 +409,7 @@ class DatabaseStorage implements Storage
                 $row->avg_duration = $row->avg_duration !== null ? round((float) $row->avg_duration, 2) : null;
                 $row->max_duration = $row->max_duration !== null ? (float) $row->max_duration : null;
                 $row->last_seen = $row->last_seen !== null ? CarbonImmutable::parse($row->last_seen) : null;
+                $row->users = (int) $row->users;
 
                 return $row;
             });
@@ -1107,6 +1108,20 @@ class DatabaseStorage implements Storage
     public function openIssueCount(): int
     {
         return $this->issuesTable()->where('status', 'open')->count();
+    }
+
+    public function expireStaleIssues(): int
+    {
+        $orphaned = $this->issuesTable()
+            ->where('status', 'open')
+            ->get(['id', 'type', 'key'])
+            ->filter(fn ($issue) => ! $this->table()->where('type', $issue->type)->where('key', $issue->key)->exists());
+
+        if ($orphaned->isEmpty()) {
+            return 0;
+        }
+
+        return $this->issuesTable()->whereIn('id', $orphaned->pluck('id'))->delete();
     }
 
     public function setIssuePriority(string $type, string $key, string $priority): void

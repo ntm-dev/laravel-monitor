@@ -10,3 +10,4 @@ testbench.yaml
 .claude/.headroom_wrap_marker.json
 .claude/deploy-verify.local.json
 CLAUDE.local.md
+.vscode

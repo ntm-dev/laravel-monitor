@@ -4,8 +4,6 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Livewire\Concerns\BuildsExceptionDetail;
@@ -17,11 +15,11 @@ use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 
 /**
- * Renders the standalone Issue Detail page (route: monitor.issues.show) and
- * handles its Status/Priority mutations via plain POST + redirect back —
- * same convention as SettingsController — rather than a Livewire component,
- * since edits here are infrequent and don't need live reactivity. Owns its
- * own route, same family as RequestDetailController/JobAttemptController.
+ * Renders the standalone Issue Detail page (route: monitor.issues.show).
+ * Status/Priority mutations live in the embedded Livewire\IssueManagePanel
+ * instead of a controller action, so changing either doesn't reload the
+ * exception/performance data already on the page. Owns its own route, same
+ * family as RequestDetailController/JobAttemptController.
  */
 class IssueController
 {
@@ -46,11 +44,8 @@ class IssueController
             'issue' => $issue,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
-            'openIssueCount' => $this->storage->openIssueCount(),
             'refresh' => (int) config('monitor.refresh', 10),
             'appInitial' => strtoupper(mb_substr(config('app.name', 'L'), 0, 1)),
-            'statuses' => Issues::STATUSES,
-            'priorities' => Format::PRIORITIES,
         ];
 
         $data = $issue->type === 'exception'
@@ -58,36 +53,6 @@ class IssueController
             : $this->performanceData($issue->type, $issue->key);
 
         return view('monitor::issue-detail-page', $shared + $data);
-    }
-
-    public function updateStatus(Request $request, string $uuid): RedirectResponse
-    {
-        $issue = $this->storage->findIssueByUuid($uuid);
-
-        abort_unless($issue !== null, 404);
-
-        $status = $request->validate([
-            'status' => ['required', 'string', 'in:'.implode(',', Issues::STATUSES)],
-        ])['status'];
-
-        $this->storage->setIssueStatus($issue->type, $issue->key, $status);
-
-        return redirect()->route('monitor.issues.show', $uuid);
-    }
-
-    public function updatePriority(Request $request, string $uuid): RedirectResponse
-    {
-        $issue = $this->storage->findIssueByUuid($uuid);
-
-        abort_unless($issue !== null, 404);
-
-        $priority = $request->validate([
-            'priority' => ['required', 'string', 'in:'.implode(',', array_keys(Format::PRIORITIES))],
-        ])['priority'];
-
-        $this->storage->setIssuePriority($issue->type, $issue->key, $priority);
-
-        return redirect()->route('monitor.issues.show', $uuid);
     }
 
     protected function exceptionData(string $key): array

@@ -4,7 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 class Jobs extends Card
 {
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'queued', 'processed', 'released', 'failed', 'avg_duration'];
 

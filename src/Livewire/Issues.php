@@ -3,11 +3,15 @@
 namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Livewire\Concerns\SyncsOpenIssues;
+use LaravelMonitor\Support\Format;
+use Livewire\Attributes\Url;
 
 class Issues extends Card
 {
+    use SyncsOpenIssues;
+
     /**
      * Areas checked against their own configured threshold for the
      * Performance tab, in the order rows fall back to when max durations tie.
@@ -23,27 +27,104 @@ class Issues extends Card
 
     public const STATUSES = ['open', 'resolved', 'ignored'];
 
+    /** Ordinal rank for sort('priority') — higher sorts first in 'desc'. */
+    protected const PRIORITY_RANK = ['none' => 0, 'low' => 1, 'medium' => 2, 'high' => 3, 'urgent' => 4];
+
+    /**
+     * Columns sort() accepts — 'first_seen' only exists on exception rows
+     * and 'max_duration' only on performance rows, but sorting the other
+     * collection by a key it doesn't have is a harmless no-op (every row
+     * ties), so both tables share one $sortBy/$sortDirection pair instead
+     * of needing one each.
+     */
+    protected const SORTABLE = ['priority', 'id', 'label', 'count', 'users', 'first_seen', 'last_seen', 'max_duration'];
+
+    public const PER_PAGE = 25;
+
     public string $view = 'exceptions';
 
     public string $status = 'open';
 
+    public string $sortBy = 'id';
+
+    public string $sortDirection = 'desc';
+
+    /**
+     * Kept in the URL (not just server-side state) so that navigating to an
+     * issue's detail page and back restores the same filtered list the
+     * search box's own text still shows — without this, a fresh mount on
+     * the way back resets $search to '' server-side while the <input>'s
+     * value survives regardless, purely via the browser's own form-field
+     * history restoration, leaving the two visibly out of sync.
+     */
+    #[Url]
     public string $search = '';
 
     public array $selected = [];
 
+    public int $page = 1;
+
     public function resolve(string $type, string $key): void
     {
         $this->setStatus($type, $key, 'resolved');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_resolved', 1));
     }
 
     public function ignore(string $type, string $key): void
     {
         $this->setStatus($type, $key, 'ignored');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_ignored', 1));
     }
 
     public function reopen(string $type, string $key): void
     {
         $this->setStatus($type, $key, 'open');
+    }
+
+    /**
+     * Set an issue's priority straight from the list's own dropdown —
+     * mirrors resolve()/ignore()/reopen()'s inline pattern instead of
+     * requiring a trip to the Issue detail page for this one field.
+     */
+    public function setPriority(string $type, string $key, string $priority): void
+    {
+        if (! array_key_exists($type, self::PERFORMANCE_AREAS) && $type !== 'exception') {
+            return;
+        }
+
+        $this->storage()->setIssuePriority($type, $key, $priority);
+        $this->notify('success', __('monitor::messages.issue.toast_priority_updated', ['level' => Format::priorityLabel($priority)]));
+    }
+
+    public function sort(string $column): void
+    {
+        if (! in_array($column, self::SORTABLE, true)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'desc';
+        }
+
+        $this->page = 1;
+    }
+
+    public function previousPage(): void
+    {
+        $this->page = max(1, $this->page - 1);
+    }
+
+    public function nextPage(): void
+    {
+        $this->page++;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->page = 1;
     }
 
     /**
@@ -83,12 +164,16 @@ class Issues extends Card
 
     public function resolveSelected(): void
     {
+        $count = $this->selectedCount();
         $this->applyStatusToSelected('resolved');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_resolved', $count, ['count' => $count]));
     }
 
     public function ignoreSelected(): void
     {
+        $count = $this->selectedCount();
         $this->applyStatusToSelected('ignored');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_ignored', $count, ['count' => $count]));
     }
 
     /**
@@ -100,6 +185,19 @@ class Issues extends Card
     public function updatedView(): void
     {
         $this->selected = [];
+        $this->page = 1;
+    }
+
+    /**
+     * Same reasoning as updatedView() — a selection made under one status
+     * filter (e.g. Open) shouldn't silently carry over (and keep the
+     * "N selected" banner showing) once the viewer switches to Resolved/
+     * Ignored, where none of those rows are even visible anymore.
+     */
+    public function updatedStatus(): void
+    {
+        $this->selected = [];
+        $this->page = 1;
     }
 
     protected function applyStatusToSelected(string $status): void
@@ -133,7 +231,23 @@ class Issues extends Card
         $until = $this->until();
         $storage = $this->storage();
 
-        $exceptions = $storage->aggregateByKey('exception', $since, null, 50, 'last_seen', $until);
+        $openIssueCountBefore = $storage->openIssueCount();
+
+        [$exceptions, $performance] = $this->syncOpenIssues($storage, $since, $until);
+
+        $openIssueCount = $storage->openIssueCount();
+
+        // syncOpenIssues() above can open a brand-new issue or reopen a
+        // recurring one on its own, with no explicit resolve/ignore/reopen
+        // call to carry the same nudge setStatus() would send — and
+        // resolve()/ignore()/etc. land here too, one render() later. Only
+        // dispatching when the count actually moved (rather than on every
+        // render) keeps the sidebar's OpenIssueBadge in sync without also
+        // firing a second request on every search keystroke, sort, or page
+        // change that doesn't touch it.
+        if ($openIssueCount !== $openIssueCountBefore) {
+            $this->dispatch('issues-changed');
+        }
 
         $latest = $storage->recent('exception', $since, 100, null, null, $until)
             ->groupBy('key')
@@ -141,18 +255,12 @@ class Issues extends Card
 
         $exceptions = $exceptions->map(function ($group) use ($latest) {
             $group->latest = $latest->get($group->key)?->payload ?? [];
+            $group->label = $group->latest['class'] ?? $group->key;
 
             return $group;
         });
 
-        $storage->syncIssues('exception', $exceptions->pluck('last_seen', 'key')->filter()->all());
         $exceptions = $this->attachIssueStatus($storage, 'exception', $exceptions);
-
-        $performance = $this->performanceIssues($since, $until);
-
-        foreach ($performance->groupBy('type') as $type => $items) {
-            $storage->syncIssues($type, $items->pluck('last_seen', 'key')->filter()->all());
-        }
 
         $performance = $performance->groupBy('type')
             ->flatMap(fn ($items, $type) => $this->attachIssueStatus($storage, $type, $items))
@@ -168,6 +276,7 @@ class Issues extends Card
 
             $exceptions = $exceptions
                 ->filter(fn ($group) => stripos($group->key, $needle) !== false
+                    || stripos($group->latest['class'] ?? '', $needle) !== false
                     || stripos($group->latest['message'] ?? '', $needle) !== false)
                 ->values();
             $performance = $performance
@@ -175,13 +284,46 @@ class Issues extends Card
                 ->values();
         }
 
+        if (in_array($this->sortBy, self::SORTABLE, true)) {
+            $key = $this->sortBy === 'priority'
+                ? fn ($row) => self::PRIORITY_RANK[$row->priority] ?? 0
+                : $this->sortBy;
+            $descending = $this->sortDirection === 'desc';
+
+            $exceptions = $exceptions->sortBy($key, SORT_REGULAR, $descending)->values();
+            $performance = $performance->sortBy($key, SORT_REGULAR, $descending)->values();
+        }
+
+        $exceptionCount = $exceptions->count();
+        $performanceCount = $performance->count();
+
+        // Paginating the currently active tab only — the other one's count
+        // above already reflects its own full filtered total for the tab
+        // button's badge, so slicing it too would serve no purpose.
+        $total = $this->view === 'exceptions' ? $exceptionCount : $performanceCount;
+        $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = min(max(1, $this->page), $lastPage);
+        $from = ($page - 1) * self::PER_PAGE;
+
+        if ($this->view === 'exceptions') {
+            $exceptions = $exceptions->slice($from, self::PER_PAGE)->values();
+        } else {
+            $performance = $performance->slice($from, self::PER_PAGE)->values();
+        }
+
         return [
             'exceptions' => $exceptions,
-            'exceptionCount' => $exceptions->count(),
+            'exceptionCount' => $exceptionCount,
             'performance' => $performance,
-            'performanceCount' => $performance->count(),
+            'performanceCount' => $performanceCount,
+            'openIssueCount' => $openIssueCount,
             'selected' => $this->selected,
             'status' => $status,
+            'total' => $total,
+            'page' => $page,
+            'lastPage' => $lastPage,
+            'perPage' => self::PER_PAGE,
+            'from' => $from,
         ];
     }
 
@@ -206,41 +348,5 @@ class Issues extends Card
 
             return $item;
         });
-    }
-
-    /**
-     * Requests, jobs, slow queries and outgoing requests whose max duration
-     * breached their own configured threshold, merged into one severity-
-     * ordered feed (worst max duration first), surfacing every "over
-     * threshold" area as a single Issues list rather than a separate page
-     * per area.
-     *
-     * @return Collection<int, object{type: string, badge: string, label: string, key: string, count: int, max_duration: float}>
-     */
-    protected function performanceIssues(\DateTimeInterface $since, ?\DateTimeInterface $until): Collection
-    {
-        $items = collect();
-
-        foreach (self::PERFORMANCE_AREAS as $type => $area) {
-            $threshold = (int) config("monitor.thresholds.{$area['threshold']}", 1000);
-
-            $this->storage()
-                ->aggregateByKey($type, $since, null, 50, 'max_duration', $until)
-                ->filter(fn ($row) => ($row->max_duration ?? 0) >= $threshold)
-                ->each(function ($row) use ($items, $type, $area) {
-                    $items->push((object) [
-                        'type' => $type,
-                        'badge' => $area['badge'],
-                        'tab' => $area['tab'],
-                        'label' => $type === 'job' ? class_basename($row->key) : Str::limit($row->key, 100),
-                        'key' => $row->key,
-                        'count' => $row->count,
-                        'max_duration' => $row->max_duration,
-                        'last_seen' => $row->last_seen,
-                    ]);
-                });
-        }
-
-        return $items->sortByDesc('max_duration')->values();
     }
 }

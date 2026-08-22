@@ -4,7 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 class Queries extends Card
 {
-    public const PER_PAGE = 15;
+    public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'connection', 'calls', 'total', 'avg', 'p95'];
 
