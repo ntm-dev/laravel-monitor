@@ -5,10 +5,11 @@ namespace LaravelMonitor\Http\Headings;
 use LaravelMonitor\Contracts\Storage;
 
 /**
- * Heading for an outgoing (HTTP client) request detail page. Unlike
- * Mail/NotificationHeading there's no aggregate ("class") mode — $key is
- * always the entry's own database id, since outgoing requests only have a
- * per-occurrence detail page (see Livewire\OutgoingDetail).
+ * Heading for an outgoing (HTTP client) request detail page. $key means one
+ * of two things, disambiguated by dashboard.blade.php the same way it routes
+ * the page itself: a numeric database id (one specific call — OutgoingDetail,
+ * method+url as heading) or the destination host (aggregate across all calls
+ * to it — OutgoingDomainDetail, same convention as MailHeading/JobHeading).
  */
 class OutgoingHeading
 {
@@ -19,7 +20,11 @@ class OutgoingHeading
     public function __invoke(string $key): Heading
     {
         if (! ctype_digit($key)) {
-            return new Heading(pageTitle: 'Outgoing Request');
+            return new Heading(
+                heading: $key,
+                titleAttr: $key,
+                pageTitle: $key,
+            );
         }
 
         $entry = $this->storage->findById((int) $key, 'outgoing_request');

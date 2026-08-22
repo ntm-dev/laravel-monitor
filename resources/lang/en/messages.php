@@ -408,6 +408,7 @@ return [
         'request_count' => 'Request|Requests',
         'task_count' => 'Task|Tasks',
         'routes_count' => 'Route|Routes',
+        'domain_count' => 'Domain|Domains',
         'exceptions_reported_phrase' => 'exceptions reported',
         'application' => 'Application',
         'info' => 'Info',

@@ -49,9 +49,11 @@
                     {{-- $key is the mailable/notification class (aggregate across all its sends) --}}
                     @livewire('monitor.mail-class-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'outgoing' && filled($key) && ctype_digit($key))
-                    {{-- Outgoing requests only have a per-occurrence detail page — no
-                         aggregate ("class") mode, unlike notifications/mail above. --}}
+                    {{-- $key is one call's own database id (per-occurrence) --}}
                     @livewire('monitor.outgoing-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'outgoing' && filled($key))
+                    {{-- $key is the destination host (aggregate across all calls to it) --}}
+                    @livewire('monitor.outgoing-domain-detail', $rangeProps + ['key' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif
