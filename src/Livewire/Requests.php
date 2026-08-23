@@ -4,6 +4,7 @@ namespace LaravelMonitor\Livewire;
 
 use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+use LaravelMonitor\Support\HttpStatusGroup;
 
 class Requests extends Card
 {
@@ -73,8 +74,8 @@ class Requests extends Card
         $buckets = $this->chartBuckets();
         $userId = $this->userId !== '' ? (int) $this->userId : null;
 
-        $ok2xx = $storage->countsPerBucket('request', $since, $buckets, '2xx', null, $until, $userId);
-        $ok3xx = $storage->countsPerBucket('request', $since, $buckets, '3xx', null, $until, $userId);
+        $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until, $userId);
+        $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until, $userId);
 
         $routes = $storage->routeStats('request', $since, $until, $userId);
 
@@ -99,12 +100,12 @@ class Requests extends Card
 
         return [
             'requests' => $this->combineStats($bySubtype),
-            'okRequests' => ($bySubtype->get('2xx')?->count ?? 0) + ($bySubtype->get('3xx')?->count ?? 0),
-            'clientErrors' => $bySubtype->get('4xx')?->count ?? 0,
-            'serverErrors' => $bySubtype->get('5xx')?->count ?? 0,
+            'okRequests' => ($bySubtype->get(HttpStatusGroup::Successful->value)?->count ?? 0) + ($bySubtype->get(HttpStatusGroup::Redirection->value)?->count ?? 0),
+            'clientErrors' => $bySubtype->get(HttpStatusGroup::ClientError->value)?->count ?? 0,
+            'serverErrors' => $bySubtype->get(HttpStatusGroup::ServerError->value)?->count ?? 0,
             'okBuckets' => array_map(fn ($a, $b) => $a + $b, $ok2xx, $ok3xx),
-            'clientErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, '4xx', null, $until, $userId),
-            'serverErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, '5xx', null, $until, $userId),
+            'clientErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::ClientError->value, null, $until, $userId),
+            'serverErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::ServerError->value, null, $until, $userId),
             'duration' => $storage->durationStats('request', $since, $buckets, null, null, $until, $userId),
             'routes' => $routes->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalRoutes' => $total,

@@ -39,3 +39,13 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
   of arrays via `...$dynamic` isn't valid), or when string keys must be preserved with later
   values overwriting earlier ones the way `array_merge()` does (spread with string keys throws
   on duplicates in PHP < 8.1 and this repo doesn't rely on that overwrite semantics elsewhere).
+- Avoid hard-coded string/int literals for a fixed, known set of values (a status/grouping code,
+  a mode flag, a lookup key repeated across files) — prefer a backed `enum` (or a class `const`
+  for a single value) as the one source of truth, referenced via `::CaseName->value` everywhere
+  the literal would otherwise appear. See `LaravelMonitor\Support\HttpStatusGroup` (backs the
+  `monitor_entries.subtype` values '2xx'/'3xx'/'4xx'/'5xx'/'net_err', shared by
+  `Recorders\Requests`, `Recorders\OutgoingRequests`, and every read-side query that groups by
+  subtype) and `LaravelMonitor\Support\RecordType` for the existing pattern. Catches typos at
+  the type level and keeps every call site in sync when a value changes — a literal `'net_err'`
+  repeated across a recorder and several Livewire/Storage call sites is exactly the kind of
+  duplication this avoids.

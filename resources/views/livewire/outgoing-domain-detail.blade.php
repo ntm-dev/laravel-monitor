@@ -14,8 +14,8 @@
              clearHoverIndex() { this.hoverIndex = null },
          }">
         <x-monitor::requests-chart-card
-            :count="$stats->count" :ok="$okRequests" :client="$clientErrors" :server="$serverErrors"
-            :ok-buckets="$okBuckets" :client-buckets="$clientErrorBuckets" :server-buckets="$serverErrorBuckets"
+            :count="$stats->count" :ok="$okRequests" :client="$clientErrors" :server="$serverErrors" :failed="$networkErrors"
+            :ok-buckets="$okBuckets" :client-buckets="$clientErrorBuckets" :server-buckets="$serverErrorBuckets" :failed-buckets="$networkErrorBuckets"
             :since="$since" :until="$until" height="h-[167px]"/>
         <x-monitor::duration-chart-card :duration="$duration" :since="$since" :until="$until" :threshold="$threshold" height="h-[167px]"/>
     </div>

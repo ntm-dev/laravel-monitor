@@ -11,6 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\KeyHash;
 use Ramsey\Uuid\Uuid;
 
@@ -842,14 +843,15 @@ class DatabaseStorage implements Storage
 
         foreach ($rows as $row) {
             $group = &$groups[$row->key];
-            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'durations' => []];
+            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => []];
 
             $group['count']++;
 
             match ($row->subtype) {
-                '1xx', '2xx', '3xx' => $group['success']++,
-                '4xx' => $group['client_errors']++,
-                '5xx' => $group['server_errors']++,
+                HttpStatusGroup::Informational->value, HttpStatusGroup::Successful->value, HttpStatusGroup::Redirection->value => $group['success']++,
+                HttpStatusGroup::ClientError->value => $group['client_errors']++,
+                HttpStatusGroup::ServerError->value => $group['server_errors']++,
+                HttpStatusGroup::NetworkError->value => $group['network_errors']++,
                 default => null,
             };
 
@@ -870,6 +872,7 @@ class DatabaseStorage implements Storage
                 'success' => $group['success'],
                 'client_errors' => $group['client_errors'],
                 'server_errors' => $group['server_errors'],
+                'network_errors' => $group['network_errors'],
                 'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                 'p95_duration' => $this->percentile($durations, 0.95),
             ];
