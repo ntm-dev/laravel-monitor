@@ -38,17 +38,6 @@ class Logs extends Recorder
 
         $message = (string) $event->message;
 
-        // No request/user object on MessageLogged itself (it can fire from
-        // console/queue contexts too) — resolve the currently authenticated
-        // user the same way Recorders\Requests does, guarded the same way
-        // since auth() can throw when no guard/session is bound outside an
-        // HTTP request.
-        try {
-            $userId = auth()->user()?->getAuthIdentifier();
-        } catch (Throwable) {
-            $userId = null;
-        }
-
         $this->monitor->record(
             type: RecordType::Log,
             key: Str::tinyText($message),
@@ -57,7 +46,7 @@ class Logs extends Recorder
                 'context' => Str::mediumText(json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION) ?: '{}'),
             ],
             subtype: $event->level,
-            userId: $userId,
+            userId: $this->monitor->currentUserId(),
         );
     }
 

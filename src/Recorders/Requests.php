@@ -87,12 +87,6 @@ class Requests extends Recorder
         // decimals matches microtime()'s own microsecond resolution.
         $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 3) : null;
 
-        try {
-            $userId = $request->user()?->getAuthIdentifier();
-        } catch (Throwable) {
-            $userId = null;
-        }
-
         $this->monitor->record(
             type: RecordType::Request,
             key: $request->method().' '.$uri,
@@ -120,7 +114,7 @@ class Requests extends Recorder
             ], fn ($value) => $value !== null),
             duration: $duration,
             subtype: HttpStatusGroup::forStatus($status)->value,
-            userId: $userId,
+            userId: $this->monitor->currentUserId(),
         );
     }
 

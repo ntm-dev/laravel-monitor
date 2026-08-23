@@ -130,6 +130,21 @@ class Monitor
     }
 
     /**
+     * The currently authenticated application user's id, or null when
+     * there isn't one — guarded because auth() can throw when no
+     * guard/session is bound outside an HTTP request (console, queue
+     * workers).
+     */
+    public function currentUserId(): int|string|null
+    {
+        try {
+            return auth()->user()?->getAuthIdentifier();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Buffer a new entry. It is persisted on flush (end of request/job) or
      * as soon as the buffer limit is reached.
      */
