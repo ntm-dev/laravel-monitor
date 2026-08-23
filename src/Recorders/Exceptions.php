@@ -34,7 +34,7 @@ class Exceptions extends Recorder
     {
         $hook = function (ExceptionHandler $handler): void {
             if ($handler instanceof Handler) {
-                $handler->reportable(fn (Throwable $exception) => $this->record($exception));
+                $handler->reportable($this->record(...));
             }
         };
 
@@ -44,10 +44,10 @@ class Exceptions extends Recorder
         // after that first resolution too (e.g. a previous exception already
         // forced it during this same process), so also fire immediately if
         // it's already sitting in the container.
-        app()->afterResolving(ExceptionHandler::class, $hook);
+        $this->monitor->app->afterResolving(ExceptionHandler::class, $hook);
 
-        if (app()->resolved(ExceptionHandler::class)) {
-            $hook(app(ExceptionHandler::class));
+        if ($this->monitor->app->resolved(ExceptionHandler::class)) {
+            $hook($this->monitor->app->make(ExceptionHandler::class));
         }
     }
 

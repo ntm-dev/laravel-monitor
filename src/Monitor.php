@@ -110,7 +110,7 @@ class Monitor
     protected const SCHEDULED_TASK_CONTEXT_KEY = 'monitor_scheduled_task_id';
 
     public function __construct(
-        protected Application $app,
+        public Application $app,
         public Location $location,
     ) {
     }
