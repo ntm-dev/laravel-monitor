@@ -9,6 +9,7 @@
         'success' => ['label' => __('monitor::messages.common.ok_status'), 'align' => 'right'],
         'client_errors' => ['label' => __('monitor::messages.common.client_error'), 'align' => 'right'],
         'server_errors' => ['label' => __('monitor::messages.common.server_error'), 'align' => 'right'],
+        'network_errors' => ['label' => __('monitor::messages.common.failed'), 'align' => 'right'],
         'count' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
         'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
@@ -26,8 +27,8 @@
                  clearHoverIndex() { this.hoverIndex = null },
              }">
             <x-monitor::requests-chart-card
-                :count="$requests->count" :ok="$okRequests" :client="$clientErrors" :server="$serverErrors"
-                :ok-buckets="$okBuckets" :client-buckets="$clientErrorBuckets" :server-buckets="$serverErrorBuckets"
+                :count="$requests->count" :ok="$okRequests" :client="$clientErrors" :server="$serverErrors" :failed="$networkErrors"
+                :ok-buckets="$okBuckets" :client-buckets="$clientErrorBuckets" :server-buckets="$serverErrorBuckets" :failed-buckets="$networkErrorBuckets"
                 :since="$since" :until="$until" height="h-[167px]"/>
             <x-monitor::duration-chart-card :duration="$duration" :since="$since" :until="$until" :threshold="$threshold" height="h-[167px]"/>
         </div>
@@ -78,6 +79,7 @@
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($domain->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $domain->client_errors > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($domain->client_errors) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $domain->server_errors > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($domain->server_errors) }}</td>
+                                <td class="py-2 text-right font-mono text-xs {{ $domain->network_errors > 0 ? 'text-violet-600 dark:text-violet-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($domain->network_errors) }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($domain->count) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($domain->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($domain->avg_duration) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($domain->p95_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($domain->p95_duration) }}</td>
@@ -90,7 +92,7 @@
                         @endforeach
                     </tbody>
                     <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="8" :rows="count($domains)"/>
+                        <x-monitor::table-skeleton :columns="9" :rows="count($domains)"/>
                     </tbody>
                 </table>
 

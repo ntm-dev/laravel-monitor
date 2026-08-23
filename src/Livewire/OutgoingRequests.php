@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Livewire;
 
 use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
+use LaravelMonitor\Support\HttpStatusGroup;
 
 class OutgoingRequests extends Card
 {
@@ -10,7 +11,7 @@ class OutgoingRequests extends Card
 
     public const PER_PAGE = 15;
 
-    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration'];
+    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'network_errors', 'avg_duration', 'p95_duration'];
 
     public string $sortBy = 'count';
 
@@ -56,8 +57,9 @@ class OutgoingRequests extends Card
         $storage = $this->storage();
         $buckets = $this->chartBuckets();
 
-        $ok2xx = $storage->countsPerBucket('outgoing_request', $since, $buckets, '2xx', null, $until);
-        $ok3xx = $storage->countsPerBucket('outgoing_request', $since, $buckets, '3xx', null, $until);
+        $ok2xx = $storage->countsPerBucket('outgoing_request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until);
+        $ok3xx = $storage->countsPerBucket('outgoing_request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until);
+        $networkErrorBuckets = $storage->countsPerBucket('outgoing_request', $since, $buckets, HttpStatusGroup::NetworkError->value, null, $until);
 
         $domains = $storage->routeStats('outgoing_request', $since, $until);
 
@@ -73,12 +75,14 @@ class OutgoingRequests extends Card
 
         return [
             'requests' => $this->combineStats($bySubtype),
-            'okRequests' => ($bySubtype->get('2xx')?->count ?? 0) + ($bySubtype->get('3xx')?->count ?? 0),
-            'clientErrors' => $bySubtype->get('4xx')?->count ?? 0,
-            'serverErrors' => $bySubtype->get('5xx')?->count ?? 0,
+            'okRequests' => ($bySubtype->get(HttpStatusGroup::Successful->value)?->count ?? 0) + ($bySubtype->get(HttpStatusGroup::Redirection->value)?->count ?? 0),
+            'clientErrors' => $bySubtype->get(HttpStatusGroup::ClientError->value)?->count ?? 0,
+            'serverErrors' => $bySubtype->get(HttpStatusGroup::ServerError->value)?->count ?? 0,
+            'networkErrors' => $bySubtype->get(HttpStatusGroup::NetworkError->value)?->count ?? 0,
             'okBuckets' => array_map(fn ($a, $b) => $a + $b, $ok2xx, $ok3xx),
-            'clientErrorBuckets' => $storage->countsPerBucket('outgoing_request', $since, $buckets, '4xx', null, $until),
-            'serverErrorBuckets' => $storage->countsPerBucket('outgoing_request', $since, $buckets, '5xx', null, $until),
+            'clientErrorBuckets' => $storage->countsPerBucket('outgoing_request', $since, $buckets, HttpStatusGroup::ClientError->value, null, $until),
+            'serverErrorBuckets' => $storage->countsPerBucket('outgoing_request', $since, $buckets, HttpStatusGroup::ServerError->value, null, $until),
+            'networkErrorBuckets' => $networkErrorBuckets,
             'duration' => $storage->durationStats('outgoing_request', $since, $buckets, null, null, $until),
             'domains' => $domains->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalDomains' => $total,

@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Request;
+use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\RecordType;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderBag;
@@ -118,7 +119,7 @@ class Requests extends Recorder
                 'started_at' => $startTime ?: null,
             ], fn ($value) => $value !== null),
             duration: $duration,
-            subtype: $this->statusGroup($status),
+            subtype: HttpStatusGroup::forStatus($status)->value,
             userId: $userId,
         );
     }
@@ -242,15 +243,5 @@ class Requests extends Recorder
     protected function shouldIgnore(): bool
     {
         return $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);
-    }
-
-    protected function statusGroup(int $status): string
-    {
-        return match (true) {
-            $status >= 500 => '5xx',
-            $status >= 400 => '4xx',
-            $status >= 300 => '3xx',
-            default => '2xx',
-        };
     }
 }
