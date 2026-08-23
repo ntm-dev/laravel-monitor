@@ -1052,6 +1052,20 @@ class DatabaseStorage implements Storage
     }
 
     /**
+     * @param  string[]  $currentKeys
+     */
+    public function deleteMissingIssues(string $type, array $currentKeys): int
+    {
+        $query = $this->issuesTable()->where('type', $type)->where('status', 'open');
+
+        if ($currentKeys !== []) {
+            $query->whereNotIn('key', $currentKeys);
+        }
+
+        return $query->delete();
+    }
+
+    /**
      * @param  string[]  $keys
      */
     public function issueStatuses(string $type, array $keys): Collection

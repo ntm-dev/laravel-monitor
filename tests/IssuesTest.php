@@ -80,6 +80,55 @@ class IssuesTest extends TestCase
         $this->assertSame('ignored', $ignored->first()->status);
     }
 
+    public function test_a_performance_issue_is_deleted_once_it_falls_back_under_its_threshold(): void
+    {
+        // Opens while the threshold is low enough for this query to breach
+        // it — mirrors an issue that was genuinely "open" at some point.
+        config(['monitor.thresholds.query' => 500]);
+
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
+        Monitor::flush();
+
+        Livewire::test(Issues::class)->set('view', 'performance');
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $this->assertSame('open', $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->status);
+
+        // Threshold raised past the query's own max_duration — it no
+        // longer belongs on the page, and shouldn't keep counting toward
+        // openIssueCount() either.
+        config(['monitor.thresholds.query' => 1000]);
+
+        Livewire::test(Issues::class)->set('view', 'performance');
+
+        $this->assertNull($storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table'));
+        $this->assertSame(0, $storage->openIssueCount());
+    }
+
+    public function test_prune_command_also_deletes_a_stale_performance_issue_below_its_current_threshold(): void
+    {
+        // Same scenario as the Livewire-driven test above, but reached via
+        // `monitor:prune` directly — this issue must not depend on someone
+        // happening to have the dashboard open to get cleaned up.
+        config(['monitor.thresholds.query' => 500]);
+
+        Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
+        Monitor::flush();
+
+        Livewire::test(Issues::class)->set('view', 'performance');
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $this->assertSame('open', $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->status);
+
+        config(['monitor.thresholds.query' => 1000]);
+
+        // A huge --hours keeps purge() from touching the entry itself —
+        // isolates this test to the reconciliation pass alone.
+        $this->artisan('monitor:prune', ['--hours' => 999999])->assertSuccessful();
+
+        $this->assertNull($storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table'));
+    }
+
     public function test_reopening_a_resolved_exception_returns_it_to_the_open_tab(): void
     {
         Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
@@ -209,6 +258,42 @@ class IssuesTest extends TestCase
 
         $this->assertNotNull($status->uuid);
         $this->assertSame(36, strlen($status->uuid));
+    }
+
+    public function test_delete_missing_issues_deletes_only_the_absent_open_keys(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->syncIssues('query', ['keep' => now(), 'drop' => now()]);
+
+        $deleted = $storage->deleteMissingIssues('query', ['keep']);
+
+        $this->assertSame(1, $deleted);
+        $statuses = $storage->issueStatuses('query', ['keep', 'drop']);
+        $this->assertSame('open', $statuses->get('keep')->status);
+        $this->assertNull($statuses->get('drop'));
+    }
+
+    public function test_delete_missing_issues_with_no_current_keys_deletes_every_open_issue_of_that_type(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->syncIssues('query', ['a' => now(), 'b' => now()]);
+
+        $storage->deleteMissingIssues('query', []);
+
+        $statuses = $storage->issueStatuses('query', ['a', 'b']);
+        $this->assertNull($statuses->get('a'));
+        $this->assertNull($statuses->get('b'));
+    }
+
+    public function test_delete_missing_issues_leaves_ignored_issues_alone(): void
+    {
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->syncIssues('query', ['a' => now()]);
+        $storage->setIssueStatus('query', 'a', 'ignored');
+
+        $storage->deleteMissingIssues('query', []);
+
+        $this->assertSame('ignored', $storage->issueStatuses('query', ['a'])->get('a')->status);
     }
 
     public function test_exception_rows_carry_id_uuid_and_priority(): void

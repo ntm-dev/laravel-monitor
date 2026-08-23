@@ -332,6 +332,22 @@ interface Storage
     public function syncIssues(string $type, array $lastSeenByKey): void;
 
     /**
+     * Delete every currently-"open" issue of $type whose key is absent
+     * from $currentKeys — syncIssues()'s complement: syncIssues() only
+     * ever opens/bumps/reopens, so without this an issue stays "open"
+     * forever once nothing keeps recording it (a performance key that's
+     * dropped back under its threshold, or all its underlying entries have
+     * been pruned) even though openIssueCount() keeps counting it and it
+     * never shows up on the page again. An "ignored"/"resolved" issue is
+     * left alone — only a stuck-"open" one with nothing behind it anymore
+     * gets removed. An empty $currentKeys deletes every open issue of
+     * $type. Returns the number of issues deleted.
+     *
+     * @param  string[]  $currentKeys
+     */
+    public function deleteMissingIssues(string $type, array $currentKeys): int;
+
+    /**
      * Status + priority + first_seen for each of the given keys of a type,
      * keyed by key — batches what would otherwise be one lookup per row on
      * the Issues page. A key with no matching row (not yet synced) is
