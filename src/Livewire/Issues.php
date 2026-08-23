@@ -257,13 +257,18 @@ class Issues extends Card
             $this->dispatch('issues-changed');
         }
 
-        $latest = $storage->recent('exception', $since, 100, null, null, $until)
-            ->groupBy('key')
-            ->map(fn ($entries) => $entries->first());
+        // exceptionGroups() (not recent()'s fixed-size "most recent entries"
+        // window) so that an old-but-still-open group whose own latest entry
+        // has aged out of a small global sample still resolves its class
+        // name instead of falling back to the raw fingerprint key — see
+        // Exceptions::data(), which already relies on this for the same
+        // reason.
+        $latest = $storage->exceptionGroups($since, $until)->keyBy('key');
 
         $exceptions = $exceptions->map(function ($group) use ($latest) {
-            $group->latest = $latest->get($group->key)?->payload ?? [];
-            $group->label = $group->latest['class'] ?? $group->key;
+            $found = $latest->get($group->key);
+            $group->latest = ['class' => $found->class ?? $group->key, 'message' => $found->message ?? null];
+            $group->label = $group->latest['class'];
 
             return $group;
         });

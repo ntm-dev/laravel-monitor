@@ -62,6 +62,31 @@ class IssuesTest extends TestCase
         $this->assertSame('resolved', $resolved->first()->status);
     }
 
+    public function test_open_tab_shows_the_exception_class_not_the_raw_key_once_its_entry_ages_out_of_the_recent_sample(): void
+    {
+        // Fingerprint-style key, deliberately different from the class name
+        // it belongs to — a real Exceptions recorder key is a hash, not the
+        // class itself, so this is the only way the test can tell "resolved
+        // from payload" apart from "fell back to the raw key".
+        Monitor::record(RecordType::Exception, 'old-fingerprint-hash', ['class' => 'App\\Exceptions\\OldBug', 'message' => 'old boom'], null, 'unhandled');
+
+        // Enough newer occurrences, under other keys, to push the row above
+        // out of the fixed-size "most recent entries" window the Issues
+        // list used to resolve each group's label from.
+        for ($i = 0; $i < 105; $i++) {
+            Monitor::record(RecordType::Exception, "noise-{$i}", ['class' => 'App\\Exceptions\\Noise', 'message' => 'noise'], null, 'unhandled');
+        }
+
+        Monitor::flush();
+
+        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
+
+        $oldBug = $component->viewData('exceptions')->firstWhere('key', 'old-fingerprint-hash');
+
+        $this->assertNotNull($oldBug);
+        $this->assertSame('App\\Exceptions\\OldBug', $oldBug->label);
+    }
+
     public function test_ignoring_a_performance_issue_moves_it_out_of_the_open_tab(): void
     {
         Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
