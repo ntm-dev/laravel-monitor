@@ -8,6 +8,8 @@ use LaravelMonitor\Livewire\Concerns\SyncsOpenIssues;
 use LaravelMonitor\Support\Format;
 use Livewire\Attributes\Url;
 
+use function count;
+
 class Issues extends Card
 {
     use SyncsOpenIssues;
@@ -60,8 +62,6 @@ class Issues extends Card
     #[Url]
     public string $search = '';
 
-    public array $selected = [];
-
     public int $page = 1;
 
     public function resolve(string $type, string $key): void
@@ -92,8 +92,17 @@ class Issues extends Card
             return;
         }
 
+        $current = $this->storage()->issueStatuses($type, [$key])->get($key);
+
+        if ($current !== null && $current->priority === $priority) {
+            return;
+        }
+
         $this->storage()->setIssuePriority($type, $key, $priority);
-        $this->notify('success', __('monitor::messages.issue.toast_priority_updated', ['level' => Format::priorityLabel($priority)]));
+
+        $id = $current->id ?? $this->storage()->issueStatuses($type, [$key])->get($key)->id;
+
+        $this->notify('success', __('monitor::messages.issue.toast_priority_updated_list', ['id' => $id, 'level' => Format::priorityLabel($priority)]));
     }
 
     public function sort(string $column): void
@@ -128,95 +137,54 @@ class Issues extends Card
     }
 
     /**
+     * $pairs is entirely client-owned (Alpine, see issues.blade.php) — which
+     * rows are checked never touches the server until a bulk action fires,
+     * so a plain checkbox click no longer costs a Livewire round-trip.
+     *
      * @param  array<int, array{0: string, 1: string}>  $pairs
      */
-    public function selectAll(array $pairs): void
+    public function resolveSelected(array $pairs): void
     {
-        foreach ($pairs as [$type, $key]) {
-            $this->selected[$type][$key] = true;
-        }
-    }
-
-    public function deselectAll(): void
-    {
-        $this->selected = [];
-    }
-
-    public function toggleSelected(string $type, string $key): void
-    {
-        if (isset($this->selected[$type][$key])) {
-            unset($this->selected[$type][$key]);
-
-            if ($this->selected[$type] === []) {
-                unset($this->selected[$type]);
-            }
-
-            return;
-        }
-
-        $this->selected[$type][$key] = true;
-    }
-
-    public function selectedCount(): int
-    {
-        return array_sum(array_map('count', $this->selected));
-    }
-
-    public function resolveSelected(): void
-    {
-        $count = $this->selectedCount();
-        $this->applyStatusToSelected('resolved');
-        $this->notify('success', trans_choice('monitor::messages.issue.toast_resolved', $count, ['count' => $count]));
-    }
-
-    public function ignoreSelected(): void
-    {
-        $count = $this->selectedCount();
-        $this->applyStatusToSelected('ignored');
-        $this->notify('success', trans_choice('monitor::messages.issue.toast_ignored', $count, ['count' => $count]));
+        $this->applyStatusToSelected($pairs, 'resolved');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_resolved', count($pairs), ['count' => count($pairs)]));
     }
 
     /**
-     * Livewire lifecycle hook — fires automatically whenever the public
-     * $view property changes (the Exceptions/Performance toggle), since a
-     * selection made while looking at one sub-tab shouldn't silently apply
-     * to rows the viewer can no longer see.
-     *
-     * Also resets the sort back to each tab's own natural order — newest
-     * issue first for Exceptions, worst offender first for Performance —
-     * since both tabs share the same $sortBy/$sortDirection pair, and
-     * 'id' (the other tab's default) has no relationship to a performance
-     * row's severity.
+     * @param  array<int, array{0: string, 1: string}>  $pairs
+     */
+    public function ignoreSelected(array $pairs): void
+    {
+        $this->applyStatusToSelected($pairs, 'ignored');
+        $this->notify('success', trans_choice('monitor::messages.issue.toast_ignored', count($pairs), ['count' => count($pairs)]));
+    }
+
+    /**
+     * Resets the sort back to each tab's own natural order — newest issue
+     * first for Exceptions, worst offender first for Performance — since
+     * both tabs share the same $sortBy/$sortDirection pair, and 'id' (the
+     * other tab's default) has no relationship to a performance row's
+     * severity.
      */
     public function updatedView(): void
     {
-        $this->selected = [];
         $this->page = 1;
         $this->sortBy = $this->view === 'performance' ? 'max_duration' : 'id';
         $this->sortDirection = 'desc';
     }
 
-    /**
-     * Same reasoning as updatedView() — a selection made under one status
-     * filter (e.g. Open) shouldn't silently carry over (and keep the
-     * "N selected" banner showing) once the viewer switches to Resolved/
-     * Ignored, where none of those rows are even visible anymore.
-     */
     public function updatedStatus(): void
     {
-        $this->selected = [];
         $this->page = 1;
     }
 
-    protected function applyStatusToSelected(string $status): void
+    /**
+     * @param  array<int, array{0: string, 1: string}>  $pairs
+     */
+    protected function applyStatusToSelected(array $pairs, string $status): void
     {
-        foreach ($this->selected as $type => $keys) {
-            foreach (array_keys($keys) as $key) {
-                $this->setStatus($type, $key, $status);
-            }
+        foreach ($pairs as [$type, $key]) {
+            $this->setStatus($type, $key, $status);
         }
-
-        $this->selected = [];
     }
 
     protected function setStatus(string $type, string $key, string $status): void
@@ -330,7 +298,6 @@ class Issues extends Card
             'performance' => $performance,
             'performanceCount' => $performanceCount,
             'openIssueCount' => $openIssueCount,
-            'selected' => $this->selected,
             'status' => $status,
             'total' => $total,
             'page' => $page,

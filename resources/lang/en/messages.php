@@ -472,6 +472,7 @@ return [
         'priority_urgent' => 'Urgent',
         'sort_by_priority' => 'Sort by priority',
         'toast_priority_updated' => 'Priority updated to :level.',
+        'toast_priority_updated_list' => 'Priority of issue #:id updated to :level.',
         'toast_resolved' => ':count issue resolved.|:count issues resolved.',
         'toast_ignored' => ':count issue ignored.|:count issues ignored.',
         'toast_reopened' => 'Issue reopened.',
