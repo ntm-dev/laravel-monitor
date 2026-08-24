@@ -45,6 +45,11 @@ return [
         'source_scheduled_task' => 'Tác vụ định kỳ',
         'back_to_exceptions' => '← Quay lại ngoại lệ',
         'no_occurrences_in_period' => 'Ngoại lệ này không có lần xảy ra nào :period.',
+        'first_reported_in' => 'Ghi nhận lần đầu ở',
+        'php_version' => 'Phiên bản PHP',
+        'laravel_version' => 'Phiên bản Laravel',
+        'impacted_users' => 'Người dùng bị ảnh hưởng',
+        'servers' => 'Máy chủ',
     ],
 
     'logs' => [

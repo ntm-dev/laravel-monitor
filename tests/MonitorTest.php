@@ -1044,6 +1044,52 @@ class MonitorTest extends TestCase
         $this->assertFalse($topFrame['vendor']);
     }
 
+    public function test_exception_recorder_labels_each_frame_with_its_own_enclosing_function(): void
+    {
+        // getTrace()[N] names the function that was *called* from that
+        // entry's file/line, not the function whose body that file/line
+        // sits inside — that name belongs to entry N+1, one level further
+        // from the throw site. Only the synthetic throw-site frame (index
+        // 0, covered by the test above) had this correction; every deeper
+        // frame kept showing the callee it invoked instead of the function
+        // actually executing at its own location. Two levels of nesting
+        // (outer calls inner, inner throws) is the minimum call chain that
+        // can catch a label copied from the wrong level.
+        $inner = new class
+        {
+            public function boom(): never
+            {
+                throw new RuntimeException('kaboom');
+            }
+        };
+
+        $outer = new class($inner)
+        {
+            public function __construct(private object $inner)
+            {
+            }
+
+            public function run(): void
+            {
+                $this->inner->boom();
+            }
+        };
+
+        try {
+            $outer->run();
+        } catch (RuntimeException $exception) {
+        }
+
+        app(ExceptionHandler::class)->report($exception);
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'exception')->first();
+        $payload = json_decode($row->payload, true);
+
+        $this->assertSame('boom', $payload['frames'][0]['function'] !== null ? Str::afterLast($payload['frames'][0]['function'], '->') : null);
+        $this->assertSame('run', Str::afterLast($payload['frames'][1]['function'], '->'));
+    }
+
     public function test_exception_recorder_marks_deliberately_reported_exceptions_as_handled(): void
     {
         $exception = new RuntimeException('Retrying webhook');
@@ -1057,6 +1103,21 @@ class MonitorTest extends TestCase
             'type' => 'exception',
             'subtype' => 'handled',
         ]);
+    }
+
+    public function test_exception_recorder_captures_the_authenticated_application_user(): void
+    {
+        // The app's own default guard, not the dashboard's `monitor` guard
+        // TestCase::setUp() logs in — same distinction Recorders\Requests
+        // and Recorders\Logs already draw via $request->user()/auth()->user().
+        $this->actingAs(new \Illuminate\Auth\GenericUser(['id' => 42]));
+
+        app(ExceptionHandler::class)->report(new RuntimeException('Charge declined'));
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'exception')->first();
+
+        $this->assertSame('42', $row->user_id);
     }
 
     public function test_fingerprint_groups_by_normalized_message(): void

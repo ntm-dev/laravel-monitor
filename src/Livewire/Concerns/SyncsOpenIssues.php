@@ -35,6 +35,18 @@ trait SyncsOpenIssues
     }
 
     /**
+     * Populated by performanceIssues(): types whose raw aggregate hit
+     * groupLimit() this round, so some keys beyond the cap aren't
+     * represented in its result. syncOpenIssues() must skip
+     * deleteMissingIssues() for a type in this state — otherwise a key
+     * that's still genuinely breaching its threshold, but sits past the
+     * cap, would look "absent" and get wrongly deleted.
+     *
+     * @var list<string>
+     */
+    protected array $truncatedPerformanceTypes = [];
+
+    /**
      * Issues is a persistent open/resolved/ignored tracker, not a
      * time-windowed report — it has no period switcher (see header.blade.php)
      * so it always looks back far enough to surface every still-open issue,
@@ -62,10 +74,24 @@ trait SyncsOpenIssues
         $exceptions = $storage->aggregateByKey('exception', $since, null, $this->groupLimit(), 'last_seen', $until);
         $storage->syncIssues('exception', $exceptions->pluck('last_seen', 'key')->filter()->all());
 
-        $performance = $this->performanceIssues($storage, $since, $until);
+        if ($exceptions->count() < $this->groupLimit()) {
+            $storage->deleteMissingIssues('exception', $exceptions->pluck('key')->all());
+        }
 
-        foreach ($performance->groupBy('type') as $type => $items) {
+        $performance = $this->performanceIssues($storage, $since, $until);
+        $grouped = $performance->groupBy('type');
+
+        // Every configured area, not just ones with a row in $performance
+        // this round — a type with zero keys currently above its threshold
+        // never appears in groupBy('type') at all, and skipping it here
+        // would leave its previously-open issues stuck open forever.
+        foreach (Issues::PERFORMANCE_AREAS as $type => $area) {
+            $items = $grouped->get($type, collect());
             $storage->syncIssues($type, $items->pluck('last_seen', 'key')->filter()->all());
+
+            if (! in_array($type, $this->truncatedPerformanceTypes, true)) {
+                $storage->deleteMissingIssues($type, $items->pluck('key')->all());
+            }
         }
 
         return [$exceptions, $performance];
@@ -83,12 +109,18 @@ trait SyncsOpenIssues
     protected function performanceIssues(Storage $storage, DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
         $items = collect();
+        $this->truncatedPerformanceTypes = [];
 
         foreach (Issues::PERFORMANCE_AREAS as $type => $area) {
             $threshold = (int) config("monitor.thresholds.{$area['threshold']}", 1000);
 
-            $storage
-                ->aggregateByKey($type, $since, null, $this->groupLimit(), 'max_duration', $until)
+            $raw = $storage->aggregateByKey($type, $since, null, $this->groupLimit(), 'max_duration', $until);
+
+            if ($raw->count() >= $this->groupLimit()) {
+                $this->truncatedPerformanceTypes[] = $type;
+            }
+
+            $raw
                 ->filter(fn ($row) => ($row->max_duration ?? 0) >= $threshold)
                 ->each(function ($row) use ($items, $type, $area) {
                     $items->push((object) [

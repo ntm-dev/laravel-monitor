@@ -33,14 +33,14 @@ trait BuildsExceptionDetail
         string $tz,
     ): array {
         return [
-            ['Last Seen', $lastSeen ? \LaravelMonitor\Support\Format::datetime($lastSeen).' '.$tz : '—'],
-            ['First Seen', $firstSeen ? \LaravelMonitor\Support\Format::datetime($firstSeen).' '.$tz : '—'],
-            ['First Reported In', $laravelVersion ? 'Laravel '.$laravelVersion : '—'],
-            ['PHP Version', $phpVersion ?? '—'],
-            ['Laravel Version', $laravelVersion ?? '—'],
-            ['Impacted Users', number_format($impactedUsers)],
-            ['Occurrences', number_format($occurrencesCount)],
-            ['Servers', $servers->isNotEmpty() ? $servers->implode(', ') : '—'],
+            [__('monitor::messages.common.last_seen'), $lastSeen ? \LaravelMonitor\Support\Format::datetime($lastSeen).' '.$tz : '—'],
+            [__('monitor::messages.common.first_seen'), $firstSeen ? \LaravelMonitor\Support\Format::datetime($firstSeen).' '.$tz : '—'],
+            [__('monitor::messages.exception.first_reported_in'), $laravelVersion ? __('monitor::messages.common.laravel').' '.$laravelVersion : '—'],
+            [__('monitor::messages.exception.php_version'), $phpVersion ?? '—'],
+            [__('monitor::messages.exception.laravel_version'), $laravelVersion ?? '—'],
+            [__('monitor::messages.exception.impacted_users'), number_format($impactedUsers)],
+            [__('monitor::messages.common.occurrences'), number_format($occurrencesCount)],
+            [__('monitor::messages.exception.servers'), $servers->isNotEmpty() ? $servers->implode(', ') : '—'],
         ];
     }
 
@@ -66,7 +66,7 @@ trait BuildsExceptionDetail
             return (object) [
                 'date' => \LaravelMonitor\Support\Format::datetime($row->created_at),
                 'message' => $row->payload['message'] ?? null,
-                'user' => $row->user_id !== null ? ($names[$row->user_id] ?? "User #{$row->user_id}") : 'Guest',
+                'user' => $row->user_id ?? __('monitor::messages.common.guest'),
                 'sourceType' => $sourceType,
                 'sourceLabel' => $sourceType !== null ? $rootLabels->get($row->request_id) : null,
                 'sourceUrl' => match ($sourceType) {

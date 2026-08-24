@@ -79,6 +79,7 @@ class Exceptions extends Recorder
                 ),
             ],
             subtype: $handled ? 'handled' : 'unhandled',
+            userId: $this->monitor->currentUserId(),
         );
     }
 
@@ -119,9 +120,7 @@ class Exceptions extends Recorder
         // site has to be prepended separately from $exception->getFile()/
         // getLine(), same as Laravel's own Foundation\Exceptions\Renderer\
         // Exception::frames() does via Symfony's FlattenException::setTrace().
-        // That synthetic frame starts with no class/function of its own;
-        // backfill it from the original trace[0], since that's the function
-        // that was actually executing when the exception was thrown.
+        // That synthetic frame starts with no class/function of its own.
         array_unshift($trace, [
             'file' => $exception->getFile(),
             'line' => $exception->getLine(),
@@ -130,14 +129,26 @@ class Exceptions extends Recorder
             'type' => null,
         ]);
 
-        if (count($trace) > 1 && empty($trace[0]['class'] ?? null) && empty($trace[0]['function'] ?? null)) {
-            $trace[0]['class'] = $trace[1]['class'] ?? null;
-            $trace[0]['type'] = $trace[1]['type'] ?? null;
-            $trace[0]['function'] = $trace[1]['function'] ?? null;
-            $trace[0]['args'] = $trace[1]['args'] ?? [];
+        // Every entry in getTrace() names the function that was *called*
+        // from that entry's own file/line — not the function whose body
+        // that file/line sits inside. That name belongs to the *next*
+        // entry, one level further from the throw site (verified against
+        // PHP's actual getTrace() output, not just its docs). Shifting
+        // class/type/function/args one level up the array re-labels each
+        // frame with the function actually executing at its own location:
+        // trace[0] (synthetic) borrows from the original trace[0], trace[1]
+        // (that original trace[0]) borrows from the original trace[1], and
+        // so on — Laravel's own renderer applies this correction only to
+        // the synthetic frame, which is why it shows the same mislabeling
+        // one level down for every frame after the first.
+        for ($i = 0, $last = count($trace) - 1; $i < $last; $i++) {
+            $trace[$i]['class'] = $trace[$i + 1]['class'] ?? null;
+            $trace[$i]['type'] = $trace[$i + 1]['type'] ?? null;
+            $trace[$i]['function'] = $trace[$i + 1]['function'] ?? null;
+            $trace[$i]['args'] = $trace[$i + 1]['args'] ?? [];
         }
 
-        $frames = array_map(fn ($frame) => $frame + ['file' => '[internal]', 'line' => 0], array_slice($trace, 0, 30));
+        $frames = array_map(fn ($frame) => $frame + ['file' => '[internal]', 'line' => 0], $trace);
 
         return array_map(function ($frame) {
             $file = $this->relativePath($frame['file'] ?? '[internal]');

@@ -45,6 +45,11 @@ return [
         'source_scheduled_task' => 'Scheduled Task',
         'back_to_exceptions' => '← Back to exceptions',
         'no_occurrences_in_period' => 'This exception has no occurrences :period.',
+        'first_reported_in' => 'First Reported In',
+        'php_version' => 'PHP Version',
+        'laravel_version' => 'Laravel Version',
+        'impacted_users' => 'Impacted Users',
+        'servers' => 'Servers',
     ],
 
     'logs' => [
