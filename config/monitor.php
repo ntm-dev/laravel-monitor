@@ -30,6 +30,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Session Cookie
+    |--------------------------------------------------------------------------
+    |
+    | Name of the cookie the dashboard's own session runs under — deliberately
+    | distinct from the host app's `session.cookie`, so logging out of the
+    | host app (which typically invalidates its entire session) can't take
+    | the monitor guard's login down with it.
+    |
+    */
+
+    'session' => [
+        'cookie' => env('MONITOR_SESSION_COOKIE', 'monitor_session'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Dashboard Periods & Refresh
     |--------------------------------------------------------------------------
     |
