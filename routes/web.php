@@ -18,10 +18,10 @@ use LaravelMonitor\Http\Controllers\ScheduleRunController;
 use LaravelMonitor\Http\Controllers\SettingsController;
 use LaravelMonitor\Http\Middleware\Authorize;
 use LaravelMonitor\Http\Middleware\EnsureMonitorAuthenticated;
-use LaravelMonitor\Http\Middleware\SetMonitorSessionCookie;
+use LaravelMonitor\Http\Middleware\IsolateMonitorCookies;
 
 Route::domain(config('monitor.domain'))
-    ->middleware(array_merge([SetMonitorSessionCookie::class], config('monitor.middleware', ['web']), [Authorize::class]))
+    ->middleware(array_merge([IsolateMonitorCookies::class], config('monitor.middleware', ['web']), [Authorize::class]))
     ->prefix(config('monitor.path', 'monitor'))
     ->group(function () {
         Route::get('/setup', [SetupController::class, 'show'])->name('monitor.setup');

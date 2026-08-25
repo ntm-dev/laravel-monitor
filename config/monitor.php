@@ -30,18 +30,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Session Cookie
+    | Session & CSRF Cookies
     |--------------------------------------------------------------------------
     |
-    | Name of the cookie the dashboard's own session runs under — deliberately
-    | distinct from the host app's `session.cookie`, so logging out of the
-    | host app (which typically invalidates its entire session) can't take
-    | the monitor guard's login down with it.
+    | Names of the cookies the dashboard's own session/CSRF token run under —
+    | deliberately distinct from the host app's `session.cookie` and its
+    | (framework-hardcoded) `XSRF-TOKEN` cookie. Without this, logging out of
+    | the host app (which typically invalidates its entire session) can take
+    | the monitor guard's login down with it, and the two apps' CSRF tokens
+    | overwrite each other's XSRF-TOKEN cookie, producing 419s.
     |
     */
 
     'session' => [
         'cookie' => env('MONITOR_SESSION_COOKIE', 'monitor_session'),
+        'xsrf_cookie' => env('MONITOR_XSRF_COOKIE', 'monitor_xsrf_token'),
     ],
 
     /*
