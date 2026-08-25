@@ -5,9 +5,12 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Events\Dispatcher;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\RecordType;
+
+use function get_class;
 
 class Authentication extends Recorder
 {
@@ -26,10 +29,10 @@ class Authentication extends Recorder
 
         $this->monitor->record(
             type: RecordType::Auth,
-            key: $this->identifier($event->user),
+            key: $this->identifier($event->guard, $event->user),
             payload: ['guard' => $event->guard],
             subtype: 'login',
-            userId: $event->user?->getAuthIdentifier(),
+            userId: $this->userId($event->guard, $event->user),
         );
     }
 
@@ -41,10 +44,10 @@ class Authentication extends Recorder
 
         $this->monitor->record(
             type: RecordType::Auth,
-            key: $this->identifier($event->user),
+            key: $this->identifier($event->guard, $event->user),
             payload: ['guard' => $event->guard],
             subtype: 'logout',
-            userId: $event->user?->getAuthIdentifier(),
+            userId: $this->userId($event->guard, $event->user),
         );
     }
 
@@ -55,15 +58,15 @@ class Authentication extends Recorder
         }
 
         $identifier = $event->user
-            ? $this->identifier($event->user)
-            : (string) ($event->credentials['email'] ?? $event->credentials['username'] ?? 'unknown');
+            ? $this->identifier($event->guard, $event->user)
+            : "{$event->guard}:".(string) ($event->credentials['email'] ?? $event->credentials['username'] ?? 'unknown');
 
         $this->monitor->record(
             type: RecordType::Auth,
             key: $identifier,
             payload: ['guard' => $event->guard],
             subtype: 'failed',
-            userId: $event->user?->getAuthIdentifier(),
+            userId: $this->userId($event->guard, $event->user),
         );
     }
 
@@ -79,12 +82,30 @@ class Authentication extends Recorder
         return $guard === MonitorUser::guardName();
     }
 
-    protected function identifier($user): string
+    /**
+     * Prefixed with the guard name — two different guards can independently
+     * assign the same id to two entirely different users (separate
+     * providers/tables), and even share a user model class. Without the
+     * guard qualifier those would record under an identical key, showing up
+     * on the dashboard as if a single user logged in/out across both.
+     */
+    protected function identifier(string $guard, ?Authenticatable $user): string
     {
         if ($user === null) {
-            return 'unknown';
+            return "{$guard}:unknown";
         }
 
-        return (string) ($user->email ?? $user->name ?? get_class($user).'#'.$user->getAuthIdentifier());
+        return "{$guard}:".get_class($user).'#'.$user->getAuthIdentifier();
+    }
+
+    /**
+     * Same guard-qualification as identifier() (see its docblock), applied
+     * to the entry's user_id column instead of its key — every "by user"
+     * query/filter across the dashboard reads that column, so it needs the
+     * same disambiguation.
+     */
+    protected function userId(string $guard, ?Authenticatable $user): ?string
+    {
+        return $user === null ? null : "{$guard}:{$user->getAuthIdentifier()}";
     }
 }

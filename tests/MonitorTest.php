@@ -1107,17 +1107,21 @@ class MonitorTest extends TestCase
 
     public function test_exception_recorder_captures_the_authenticated_application_user(): void
     {
-        // The app's own default guard, not the dashboard's `monitor` guard
+        // The app's own 'web' guard, not the dashboard's `monitor` guard
         // TestCase::setUp() logs in — same distinction Recorders\Requests
         // and Recorders\Logs already draw via $request->user()/auth()->user().
-        $this->actingAs(new \Illuminate\Auth\GenericUser(['id' => 42]));
+        // An explicit guard name matters here: setUp()'s own actingAs() call
+        // already shifted the *default* guard to 'monitor' (Laravel's
+        // actingAs(..., $guard) sets it as a side effect), so omitting the
+        // guard here would silently authenticate on 'monitor' instead.
+        $this->actingAs(new \Illuminate\Auth\GenericUser(['id' => 42]), 'web');
 
         app(ExceptionHandler::class)->report(new RuntimeException('Charge declined'));
         Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'exception')->first();
 
-        $this->assertSame('42', $row->user_id);
+        $this->assertSame('web:42', $row->user_id);
     }
 
     public function test_fingerprint_groups_by_normalized_message(): void
@@ -1199,6 +1203,35 @@ class MonitorTest extends TestCase
             ->assertOk()
             ->assertSee('GET /users')
             ->assertSee(route('monitor.requests.show', $requestId), false);
+    }
+
+    public function test_exception_detail_shows_the_resolved_user_name_for_a_guard_qualified_occurrence(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        config(['auth.guards.web' => ['driver' => 'session', 'provider' => 'monitor_users']]);
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Impacted User',
+            'email' => 'impacted-user@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record(RecordType::Exception, $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', "web:{$user->id}");
+        Monitor::flush();
+
+        $occurrences = Livewire::test(\LaravelMonitor\Livewire\ExceptionDetail::class, ['key' => $key])
+            ->viewData('occurrences');
+
+        $this->assertSame('Impacted User', $occurrences->first()->user);
     }
 
     public function test_exception_detail_page_links_to_the_command_run_it_happened_during(): void
@@ -2719,6 +2752,87 @@ class MonitorTest extends TestCase
             'type' => 'auth',
             'subtype' => 'failed',
         ]);
+    }
+
+    public function test_logins_on_two_different_guards_sharing_the_same_user_id_are_recorded_as_distinct_users(): void
+    {
+        // Two guards can independently hand out the same id to two entirely
+        // different users (separate providers/tables), and even share a
+        // user model class — Recorders\Authentication's key must still tell
+        // them apart instead of recording both under an identical key.
+        Monitor::flush();
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Shared Id',
+            'email' => 'shared-id@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        event(new \Illuminate\Auth\Events\Login('web', $user, false));
+        event(new \Illuminate\Auth\Events\Login('admin', $user, false));
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'auth',
+            'subtype' => 'login',
+            'key' => 'web:'.\LaravelMonitor\Models\MonitorUser::class.'#'.$user->id,
+            'user_id' => "web:{$user->id}",
+        ]);
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'auth',
+            'subtype' => 'login',
+            'key' => 'admin:'.\LaravelMonitor\Models\MonitorUser::class.'#'.$user->id,
+            'user_id' => "admin:{$user->id}",
+        ]);
+    }
+
+    public function test_current_user_id_checks_a_non_default_guard_when_the_default_guard_has_no_user(): void
+    {
+        config(['auth.guards.operator' => ['driver' => 'session', 'provider' => 'monitor_users']]);
+
+        $operator = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Operator',
+            'email' => 'operator@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        \Illuminate\Support\Facades\Auth::guard('operator')->setUser($operator);
+
+        $this->assertSame("operator:{$operator->id}", $this->app->make(\LaravelMonitor\Monitor::class)->currentUserId());
+    }
+
+    public function test_current_user_id_prefers_the_default_guard_when_multiple_guards_have_a_user(): void
+    {
+        config(['auth.guards.operator' => ['driver' => 'session', 'provider' => 'monitor_users']]);
+        config(['auth.defaults.guard' => 'web']);
+
+        $webUser = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Web User',
+            'email' => 'web-user@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+        $operatorUser = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Operator User',
+            'email' => 'operator-user@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        \Illuminate\Support\Facades\Auth::guard('web')->setUser($webUser);
+        \Illuminate\Support\Facades\Auth::guard('operator')->setUser($operatorUser);
+
+        $this->assertSame("web:{$webUser->id}", $this->app->make(\LaravelMonitor\Monitor::class)->currentUserId());
+    }
+
+    public function test_current_user_id_never_returns_the_monitor_dashboards_own_guard(): void
+    {
+        // TestCase::setUp() already logs in a MonitorUser on the dashboard's
+        // own 'monitor' guard — currentUserId() must never treat that as
+        // the monitored application's own current user.
+        $this->assertNull($this->app->make(\LaravelMonitor\Monitor::class)->currentUserId());
     }
 
     public function test_a_log_emitted_while_browsing_the_monitor_dashboard_is_not_recorded(): void

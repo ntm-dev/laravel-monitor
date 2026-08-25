@@ -3,9 +3,11 @@
 namespace LaravelMonitor;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\State\CommandState;
 use LaravelMonitor\State\RequestState;
 use LaravelMonitor\Support\Location;
@@ -130,18 +132,43 @@ class Monitor
     }
 
     /**
-     * The currently authenticated application user's id, or null when
-     * there isn't one — guarded because auth() can throw when no
-     * guard/session is bound outside an HTTP request (console, queue
-     * workers).
+     * The currently authenticated application user's id, prefixed with
+     * whichever guard it came from ("{guard}:{id}") — two different guards
+     * can independently hand out the same id to two entirely different
+     * users, so a bare id would conflate them wherever entries get grouped
+     * or filtered by user. Checks the default guard first, then every
+     * other configured guard, skipping the dashboard's own guard (its own
+     * logins aren't activity of the application being monitored). Returns
+     * null when none of them has a user.
      */
     public function currentUserId(): int|string|null
     {
-        try {
-            return auth()->user()?->getAuthIdentifier();
-        } catch (Throwable) {
-            return null;
+        foreach ($this->authGuardsToCheck() as $guard) {
+            try {
+                $user = Auth::guard($guard)->user();
+            } catch (Throwable) {
+                continue;
+            }
+
+            if ($user !== null) {
+                return "{$guard}:{$user->getAuthIdentifier()}";
+            }
         }
+
+        return null;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function authGuardsToCheck(): array
+    {
+        $ordered = array_unique(array_filter([
+            config('auth.defaults.guard'),
+            ...array_keys(config('auth.guards', [])),
+        ]));
+
+        return array_values(array_diff($ordered, [MonitorUser::guardName()]));
     }
 
     /**

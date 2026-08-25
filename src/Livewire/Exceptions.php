@@ -96,7 +96,7 @@ class Exceptions extends Card
         $until = $this->until();
         $storage = $this->storage();
         $buckets = $this->chartBuckets();
-        $userId = $this->userId !== '' ? (int) $this->userId : null;
+        $userId = $this->userId !== '' ? $this->userId : null;
 
         $groups = $storage->exceptionGroups($since, $until, $userId);
 
@@ -145,7 +145,7 @@ class Exceptions extends Card
             'from' => ($page - 1) * self::PER_PAGE,
             'users' => $topUsers->map(fn ($user) => (object) [
                 'id' => $user->user_id,
-                'name' => $names[$user->user_id] ?? "User #{$user->user_id}",
+                'name' => $names[$user->user_id],
             ]),
         ];
     }
