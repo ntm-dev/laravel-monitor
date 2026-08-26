@@ -1,6 +1,5 @@
-{{-- Syntax-highlighted, collapsible JSON viewer for Log Context — same idea
-     as Nightwatch's log-detail JSON panel: colour per token type, and every
-     object/array is independently expandable. Falls back to a plain dump
+{{-- Syntax-highlighted, collapsible JSON viewer for Log Context — colour per
+     token type, and every object/array is independently expandable. Falls back to a plain dump
      when $tree is null (payload wasn't valid JSON). $tree is prepared by
      Support\JsonTree; this component only walks and displays it. --}}
 @props(['raw', 'tree'])

@@ -58,7 +58,7 @@
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $entry->payload['mailer'] ?? '—' }}</td>
                                     <td class="max-w-[16rem] truncate py-2 pr-3 text-xs text-neutral-700 dark:text-neutral-200" title="{{ $entry->payload['subject'] ?? '' }}">{{ $entry->payload['subject'] ?? '(no subject)' }}</td>
                                     <td class="py-2 pr-3">
-                                        {{-- Icon + total recipients, with a dark dotted-line breakdown tooltip on hover — mirrors Nightwatch's own Mail list Recipients column.
+                                        {{-- Icon + total recipients, with a dark dotted-line breakdown tooltip on hover.
                                              Positioned via Alpine as position:fixed (coordinates from getBoundingClientRect on hover) rather than CSS group-hover +
                                              position:absolute: the ancestor .overflow-x-auto wrapper (needed for horizontal scroll on narrow screens) forces
                                              overflow-y:auto too, which clipped an absolutely-positioned tooltip popping upward for rows near the top of the table.
