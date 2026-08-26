@@ -6,11 +6,16 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Regression coverage for the dashboard sharing the host app's session
- * cookie (see SetMonitorSessionCookie): with the same cookie name, a host
- * app logout that invalidates its own session — a common Laravel logout
- * pattern — would silently log the monitor guard out too, since both lived
- * in the very same session.
+ * Regression coverage for the dashboard sharing the host app's session and
+ * CSRF cookies (see IsolateMonitorCookies):
+ * - Same session cookie name: a host app logout that invalidates its own
+ *   session — a common Laravel logout pattern — would silently log the
+ *   monitor guard out too, since both lived in the very same session.
+ * - Same XSRF-TOKEN cookie name (hardcoded by the framework, not derived
+ *   from session.cookie): once the two apps' sessions were split apart,
+ *   each still tried to write its own CSRF token under that one shared
+ *   cookie name, so whichever app responded last clobbered the other's
+ *   token — producing 419s on the app that didn't.
  */
 class SessionCookieIsolationTest extends TestCase
 {
@@ -51,5 +56,19 @@ class SessionCookieIsolationTest extends TestCase
 
         $response->assertCookie(config('monitor.session.cookie'));
         $response->assertCookieMissing('laravel_session');
+    }
+
+    public function test_the_dashboard_does_not_reuse_the_host_apps_xsrf_token_cookie_name(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // Same container-lifetime artifact as the session-cookie test above.
+        $this->app->forgetInstance('session');
+        $this->app->forgetInstance('session.store');
+
+        $response = $this->get('/monitor');
+
+        $response->assertCookie(config('monitor.session.xsrf_cookie'));
+        $response->assertCookieMissing('XSRF-TOKEN');
     }
 }
