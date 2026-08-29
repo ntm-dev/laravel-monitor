@@ -4,10 +4,9 @@ namespace LaravelMonitor\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use LaravelMonitor\Support\LivewireSnapshot;
 use Symfony\Component\HttpFoundation\Cookie;
 
-use function is_array;
-use function is_string;
 use function str_starts_with;
 
 /**
@@ -141,22 +140,8 @@ class IsolateMonitorCookies
      */
     private function payloadTargetsMonitorComponent(Request $request): bool
     {
-        $components = $request->input('components');
-
-        if (! is_array($components)) {
-            return false;
-        }
-
-        foreach ($components as $component) {
-            $snapshot = is_array($component) ? ($component['snapshot'] ?? null) : null;
-
-            if (! is_string($snapshot)) {
-                continue;
-            }
-
-            $name = json_decode($snapshot, true)['memo']['name'] ?? null;
-
-            if (is_string($name) && str_starts_with($name, 'monitor.')) {
+        foreach (LivewireSnapshot::names($request) as $name) {
+            if (str_starts_with($name, 'monitor.')) {
                 return true;
             }
         }
