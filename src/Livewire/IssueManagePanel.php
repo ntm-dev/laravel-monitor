@@ -30,7 +30,7 @@ class IssueManagePanel extends Card
 
         $issue = $this->issue();
 
-        if ($issue === null) {
+        if ($issue === null || $issue->status === $status) {
             return;
         }
 
@@ -57,7 +57,7 @@ class IssueManagePanel extends Card
 
         $issue = $this->issue();
 
-        if ($issue === null) {
+        if ($issue === null || $issue->priority === $priority) {
             return;
         }
 
