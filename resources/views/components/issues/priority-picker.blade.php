@@ -1,7 +1,6 @@
 {{-- Priority bars as a click-to-change dropdown, right in the Issues list —
-     mirrors Laravel Nightwatch's own issue list (click the bars, pick a
-     level, it saves immediately) rather than requiring a trip to the Issue
-     detail page just to change this one field.
+     click the bars, pick a level, it saves immediately, rather than
+     requiring a trip to the Issue detail page just to change this one field.
 
      The menu is x-teleport'd to <body> and positioned with `fixed` coords
      read from the trigger button's own getBoundingClientRect() — kept OUT
