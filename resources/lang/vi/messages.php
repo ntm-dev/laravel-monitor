@@ -472,6 +472,7 @@ return [
         'priority_urgent' => 'Khẩn cấp',
         'sort_by_priority' => 'Sắp xếp theo độ ưu tiên',
         'toast_priority_updated' => 'Đã cập nhật độ ưu tiên: :level.',
+        'toast_priority_updated_list' => 'Đã cập nhật độ ưu tiên sự cố #:id: :level.',
         'toast_resolved' => 'Đã xử lý :count sự cố.',
         'toast_ignored' => 'Đã bỏ qua :count sự cố.',
         'toast_reopened' => 'Đã mở lại sự cố.',

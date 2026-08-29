@@ -2488,6 +2488,22 @@ class MonitorTest extends TestCase
         $this->assertSame('resolved', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->status);
     }
 
+    public function test_setting_issue_status_to_its_current_value_is_a_noop(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        Livewire::test(\LaravelMonitor\Livewire\IssueManagePanel::class, ['uuid' => $uuid])
+            ->call('setStatus', 'open')
+            ->assertNotDispatched('toast')
+            ->assertNotDispatched('issues-changed');
+
+        $this->assertSame('open', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->status);
+    }
+
     public function test_updating_issue_priority_persists(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
@@ -2500,6 +2516,69 @@ class MonitorTest extends TestCase
             ->call('setPriority', 'urgent');
 
         $this->assertSame('urgent', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->priority);
+    }
+
+    public function test_setting_issue_priority_to_its_current_value_is_a_noop(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
+        $storage->setIssuePriority('exception', 'App\\Exceptions\\Boom', 'high');
+        $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
+
+        Livewire::test(\LaravelMonitor\Livewire\IssueManagePanel::class, ['uuid' => $uuid])
+            ->call('setPriority', 'high')
+            ->assertNotDispatched('toast');
+
+        $this->assertSame('high', $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->priority);
+    }
+
+    public function test_issues_list_setting_priority_notifies_with_the_issue_id(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        app(\Illuminate\Contracts\Debug\ExceptionHandler::class)->report(new \RuntimeException('Boom'));
+        Monitor::flush();
+
+        $key = DB::table('monitor_entries')->where('type', 'exception')->value('key');
+
+        // Mounting first (rather than reading the id straight away) lets
+        // syncOpenIssues() create the monitor_issues row for this exception —
+        // it only exists once an Issues render has run, not from reporting
+        // the exception alone.
+        $test = Livewire::test(\LaravelMonitor\Livewire\Issues::class);
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $id = $storage->issueStatuses('exception', [$key])->get($key)->id;
+
+        $test->call('setPriority', 'exception', $key, 'high')
+            ->assertDispatched('toast', message: __('monitor::messages.issue.toast_priority_updated_list', ['id' => $id, 'level' => \LaravelMonitor\Support\Format::priorityLabel('high')]));
+
+        $this->assertSame('high', $storage->issueStatuses('exception', [$key])->get($key)->priority);
+    }
+
+    public function test_issues_list_setting_priority_to_its_current_value_is_a_noop(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        // A real recorded exception, not a manually-inserted issue row —
+        // syncOpenIssues() (run on every Issues mount) deletes any issue row
+        // whose key isn't among the currently-aggregated exception groups,
+        // which would wipe a fabricated key before setPriority() ever saw it.
+        app(\Illuminate\Contracts\Debug\ExceptionHandler::class)->report(new \RuntimeException('Boom'));
+        Monitor::flush();
+
+        $key = DB::table('monitor_entries')->where('type', 'exception')->value('key');
+
+        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage->setIssuePriority('exception', $key, 'high');
+
+        Livewire::test(\LaravelMonitor\Livewire\Issues::class)
+            ->call('setPriority', 'exception', $key, 'high')
+            ->assertNotDispatched('toast');
+
+        $this->assertSame('high', $storage->issueStatuses('exception', [$key])->get($key)->priority);
     }
 
     public function test_updating_issue_status_ignores_an_invalid_value(): void

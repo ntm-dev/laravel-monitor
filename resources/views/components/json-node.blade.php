@@ -1,8 +1,7 @@
 {{-- One line (or nested block) of the Log Context JSON viewer. A scalar
      renders as a single colour-coded line; an object/array renders its own
      brace line with a small solid +/- toggle button right after the opening
-     brace (ported from Nightwatch's log-context JSON viewer), recursing into
-     x-monitor::json-node for each child — each nested node gets its own
+     brace, recursing into x-monitor::json-node for each child — each nested node gets its own
      Alpine x-data, so containers collapse independently rather than sharing
      one controller (mirrors the app's existing nested-accordion pattern, see
      stack-trace.blade.php's vendor-frame groups). $node/$last are prepared
