@@ -72,7 +72,7 @@ class Requests extends Card
         $until = $this->until();
         $storage = $this->storage();
         $buckets = $this->chartBuckets();
-        $userId = $this->userId !== '' ? (int) $this->userId : null;
+        $userId = $this->userId !== '' ? $this->userId : null;
 
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until, $userId);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until, $userId);
@@ -114,7 +114,7 @@ class Requests extends Card
             'perPage' => self::PER_PAGE,
             'users' => $topUsers->map(fn ($user) => (object) [
                 'id' => $user->user_id,
-                'name' => $names[$user->user_id] ?? "User #{$user->user_id}",
+                'name' => $names[$user->user_id],
             ]),
             'threshold' => (int) config('monitor.thresholds.request', 1000),
         ];

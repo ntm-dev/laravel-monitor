@@ -422,7 +422,7 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): object {
         if ($key === null && $userId === null && $this->aggregatesCover($type, $since, $until)) {
             return $this->statsFromAggregates($type, $subtype, $since, $until);
@@ -445,7 +445,7 @@ class DatabaseStorage implements Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
         ?string $key = null,
     ): Collection {
         if ($key === null && $userId === null && $this->aggregatesCover($type, $since, $until)) {
@@ -611,7 +611,7 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): array {
         [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
 
@@ -679,7 +679,7 @@ class DatabaseStorage implements Storage
         ?string $key = null,
         ?string $subtype = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): object {
         [$start, $bucketSize] = $this->bucketGrid($since, $buckets, $until);
 
@@ -730,7 +730,7 @@ class DatabaseStorage implements Storage
         string $type,
         ?string $subtype,
         ?string $key,
-        ?int $userId,
+        int|string|null $userId,
         ?DateTimeInterface $until,
         CarbonImmutable $start,
         float $bucketSize,
@@ -819,7 +819,7 @@ class DatabaseStorage implements Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
             // created_at, not id, as the primary sort — see cacheKeyStats()
@@ -885,7 +885,7 @@ class DatabaseStorage implements Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
         ?string $subtype = null,
     ): Collection {
         $rows = $this->query($type, $since, $subtype, null, $until, $userId)
@@ -962,7 +962,7 @@ class DatabaseStorage implements Storage
     public function exceptionGroups(
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): Collection {
         return $this->query('exception', $since, null, null, $until, $userId)
             ->orderByDesc('created_at')
@@ -1285,7 +1285,7 @@ class DatabaseStorage implements Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): Builder {
         return $this->table()
             ->where('type', $type)

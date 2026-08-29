@@ -35,7 +35,7 @@ class Users extends Card
         );
 
         $withNames = fn ($rows) => $rows->map(function ($row) use ($names) {
-            $row->name = $names[$row->user_id] ?? "User #{$row->user_id}";
+            $row->name = $names[$row->user_id];
 
             return $row;
         });

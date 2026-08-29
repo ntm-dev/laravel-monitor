@@ -64,7 +64,7 @@ interface Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): object;
 
     /**
@@ -80,7 +80,7 @@ interface Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
         ?string $key = null,
     ): Collection;
 
@@ -101,7 +101,7 @@ interface Storage
         ?string $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): array;
 
     /**
@@ -119,7 +119,7 @@ interface Storage
         ?string $key = null,
         ?string $subtype = null,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): object;
 
     /**
@@ -145,7 +145,7 @@ interface Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): Collection;
 
     /**
@@ -167,7 +167,7 @@ interface Storage
         string $type,
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
         ?string $subtype = null,
     ): Collection;
 
@@ -196,7 +196,7 @@ interface Storage
     public function exceptionGroups(
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
-        ?int $userId = null,
+        int|string|null $userId = null,
     ): Collection;
 
     /**
