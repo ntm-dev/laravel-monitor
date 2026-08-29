@@ -212,6 +212,7 @@ class MonitorServiceProvider extends ServiceProvider
         $this->registerAuthorization();
         $this->registerAuth();
         $this->registerOAuth();
+        $this->registerLivewireUpdateCookieIsolation();
     }
 
     /**
@@ -332,6 +333,31 @@ class MonitorServiceProvider extends ServiceProvider
                 $this->app['config']->set("services.{$provider}", $this->app['config']->get("monitor.auth.oauth.{$provider}", []));
             }
         }
+    }
+
+    /**
+     * Livewire serves every component's AJAX update through one single,
+     * globally-shared route (see Livewire\Mechanisms\HandleRequests) that
+     * lives outside the monitor route group registered in routes/web.php —
+     * so IsolateMonitorCookies never got a chance to run for it, leaving
+     * those requests to validate CSRF against whichever session the host
+     * app's own (unisolated) session cookie resolved to. Prepending it to
+     * the 'web' group here is what lets it also see that request; its own
+     * isMonitorRequest() check keeps this a no-op for the host app's other
+     * routes and its own Livewire components.
+     */
+    protected function registerLivewireUpdateCookieIsolation(): void
+    {
+        $this->callAfterResolving(\Illuminate\Contracts\Http\Kernel::class, static function ($kernel) {
+            if (
+                ! $kernel instanceof \Illuminate\Foundation\Http\Kernel
+                || ! isset($kernel->getMiddlewareGroups()['web'])
+            ) {
+                return;
+            }
+
+            $kernel->prependMiddlewareToGroup('web', \LaravelMonitor\Http\Middleware\IsolateMonitorCookies::class);
+        });
     }
 
     protected function registerAppleOAuthDriver(): void

@@ -8,13 +8,13 @@ use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
 use LaravelMonitor\State\CommandState;
 use LaravelMonitor\State\RequestState;
+use LaravelMonitor\Support\LivewireSnapshot;
 use LaravelMonitor\Support\Location;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Str as SupportStr;
 use Throwable;
 
 use function is_string;
-use function json_decode;
 use function ltrim;
 use function trim;
 
@@ -325,11 +325,8 @@ class Monitor
             return false;
         }
 
-        foreach ((array) $request->input('components', []) as $component) {
-            $snapshot = json_decode((string) ($component['snapshot'] ?? ''), true);
-            $path = $snapshot['memo']['path'] ?? null;
-
-            if (is_string($path) && SupportStr::matchesAny(ltrim($path, '/'), $patterns)) {
+        foreach (LivewireSnapshot::paths($request) as $path) {
+            if (SupportStr::matchesAny(ltrim($path, '/'), $patterns)) {
                 return true;
             }
         }
