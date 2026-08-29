@@ -5,11 +5,6 @@
     $fmt = fn ($ms) => Format::duration($ms);
     $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('monitor'.$i), 16, 36)))->implode(' ');
     $actionButton = 'shrink-0 whitespace-nowrap rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
-    $selectedCount = array_sum(array_map('count', $selected));
-    $rows = $view === 'exceptions' ? $exceptions : $performance;
-    $allSelectedOnPage = $rows->isNotEmpty() && $rows->every(
-        fn ($row) => isset($selected[$view === 'exceptions' ? 'exception' : $row->issue_type][$row->key])
-    );
     $pagePairs = $view === 'exceptions'
         ? $exceptions->map(fn ($e) => ['exception', $e->key])->values()
         : $performance->map(fn ($item) => [$item->issue_type, $item->key])->values();
@@ -20,11 +15,31 @@
     // silently overridden by that unrelated property in the view.
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+{{-- Row selection lives entirely in Alpine (`selected`, keyed the same way
+     the old server-side $selected array was: selected[type][key] = true) —
+     checking a box is pure client state and shouldn't cost a Livewire
+     round-trip; only resolveSelected()/ignoreSelected() below ever send it
+     to the server, as the pairs list a bulk action applies to. --}}
+<div wire:poll.{{ $refresh }}s
+     x-data="{
+        selected: {},
+        toggle(type, key) {
+            const bucket = this.selected[type] ??= {};
+            if (bucket[key]) { delete bucket[key]; if (Object.keys(bucket).length === 0) delete this.selected[type]; }
+            else { bucket[key] = true; }
+        },
+        isSelected(type, key) { return !!this.selected[type]?.[key]; },
+        selectAll(pairs) { pairs.forEach(([type, key]) => { (this.selected[type] ??= {})[key] = true; }); },
+        allSelectedOnPage(pairs) { return pairs.length > 0 && pairs.every(([type, key]) => this.isSelected(type, key)); },
+        clear() { this.selected = {}; },
+        pairs() { return Object.entries(this.selected).flatMap(([type, keys]) => Object.keys(keys).map((key) => [type, key])); },
+        count() { return this.pairs().length; },
+        selectedText: {{ Js::from(__('monitor::messages.issue.selected')) }},
+     }">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
             @foreach (['exceptions' => [__('monitor::messages.nav.exceptions'), $exceptionCount], 'performance' => [__('monitor::messages.issue.performance'), $performanceCount]] as $issueTab => [$issueLabel, $issueCount])
-                <button type="button" wire:click="$set('view', '{{ $issueTab }}')"
+                <button type="button" wire:click="$set('view', '{{ $issueTab }}')" @click="clear()"
                         @class([
                             'flex h-full items-center gap-2 rounded-md border px-3 text-sm',
                             'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $view === $issueTab,
@@ -44,7 +59,7 @@
             </div>
             <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 text-sm shadow-sm">
                 @foreach (['open' => __('monitor::messages.issue.status_open'), 'resolved' => __('monitor::messages.issue.status_resolved'), 'ignored' => __('monitor::messages.issue.status_ignored')] as $statusKey => $statusLabel)
-                    <button type="button" wire:click="$set('status', '{{ $statusKey }}')"
+                    <button type="button" wire:click="$set('status', '{{ $statusKey }}')" @click="clear()"
                             @class([
                                 'flex h-full items-center gap-2 rounded-md border px-3',
                                 'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $status === $statusKey,
@@ -60,14 +75,12 @@
         </div>
     </div>
 
-    @if ($selectedCount > 0)
-        <div class="mt-3 flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm">
-            <span class="font-medium text-blue-700 dark:text-blue-300">{{ __('monitor::messages.issue.selected', ['count' => $selectedCount]) }}</span>
-            <button type="button" wire:click="resolveSelected" class="{{ $actionButton }}">{{ __('monitor::messages.issue.resolve') }}</button>
-            <button type="button" wire:click="ignoreSelected" class="{{ $actionButton }}">{{ __('monitor::messages.issue.ignore') }}</button>
-            <button type="button" wire:click="deselectAll" class="ml-auto text-xs text-blue-700 dark:text-blue-300 hover:underline">{{ __('monitor::messages.issue.clear') }}</button>
-        </div>
-    @endif
+    <div x-show="count() > 0" x-cloak class="mt-3 flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 text-sm">
+        <span class="font-medium text-blue-700 dark:text-blue-300" x-text="selectedText.replace(':count', count())"></span>
+        <button type="button" wire:click="$wire.resolveSelected(pairs()).then(() => clear())" class="{{ $actionButton }}">{{ __('monitor::messages.issue.resolve') }}</button>
+        <button type="button" wire:click="$wire.ignoreSelected(pairs()).then(() => clear())" class="{{ $actionButton }}">{{ __('monitor::messages.issue.ignore') }}</button>
+        <button type="button" @click="clear()" class="ml-auto text-xs text-blue-700 dark:text-blue-300 hover:underline">{{ __('monitor::messages.issue.clear') }}</button>
+    </div>
 
     <div class="mt-4">
         @if ($view === 'exceptions' && $exceptions->isNotEmpty())
@@ -77,9 +90,9 @@
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="w-8 pb-2">
-                                    <input type="checkbox" @checked($allSelectedOnPage)
-                                           wire:key="select-all-exceptions-{{ $allSelectedOnPage ? 'checked' : 'unchecked' }}"
-                                           wire:click="{{ $allSelectedOnPage ? 'deselectAll' : 'selectAll' }}({{ $allSelectedOnPage ? '' : Js::from($pagePairs) }})">
+                                    <input type="checkbox" x-data="{ pagePairs: {{ Js::from($pagePairs) }} }"
+                                           :checked="allSelectedOnPage(pagePairs)"
+                                           @click="allSelectedOnPage(pagePairs) ? clear() : selectAll(pagePairs)">
                                 </th>
                                 <th class="w-12 cursor-pointer select-none pb-2 font-normal" wire:click="sort('id')">
                                     <span class="inline-flex items-center gap-1">
@@ -130,9 +143,8 @@
                             @foreach ($exceptions as $exception)
                                 <tr wire:key="issue-exception-{{ $exception->key }}" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                     <td class="py-2.5 pr-2">
-                                        <input type="checkbox" @checked(isset($selected['exception'][$exception->key]))
-                                               wire:key="select-exception-{{ $exception->key }}-{{ isset($selected['exception'][$exception->key]) ? 'checked' : 'unchecked' }}"
-                                               wire:click="toggleSelected('exception', {{ Js::from($exception->key) }})">
+                                        <input type="checkbox" :checked="isSelected('exception', {{ Js::from($exception->key) }})"
+                                               @click="toggle('exception', {{ Js::from($exception->key) }})">
                                     </td>
                                     <td class="py-2.5 pr-2 font-mono text-xs text-neutral-400 dark:text-neutral-500">#{{ $exception->id }}</td>
                                     <td class="py-2.5 pr-4">
@@ -176,9 +188,9 @@
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="w-8 pb-2">
-                                    <input type="checkbox" @checked($allSelectedOnPage)
-                                           wire:key="select-all-performance-{{ $allSelectedOnPage ? 'checked' : 'unchecked' }}"
-                                           wire:click="{{ $allSelectedOnPage ? 'deselectAll' : 'selectAll' }}({{ $allSelectedOnPage ? '' : Js::from($pagePairs) }})">
+                                    <input type="checkbox" x-data="{ pagePairs: {{ Js::from($pagePairs) }} }"
+                                           :checked="allSelectedOnPage(pagePairs)"
+                                           @click="allSelectedOnPage(pagePairs) ? clear() : selectAll(pagePairs)">
                                 </th>
                                 <th class="w-12 cursor-pointer select-none pb-2 font-normal" wire:click="sort('id')">
                                     <span class="inline-flex items-center gap-1">
@@ -223,9 +235,8 @@
                             @foreach ($performance as $item)
                                 <tr wire:key="issue-{{ $item->issue_type }}-{{ $item->key }}" class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                     <td class="py-2.5 pr-2">
-                                        <input type="checkbox" @checked(isset($selected[$item->issue_type][$item->key]))
-                                               wire:key="select-{{ $item->issue_type }}-{{ $item->key }}-{{ isset($selected[$item->issue_type][$item->key]) ? 'checked' : 'unchecked' }}"
-                                               wire:click="toggleSelected({{ Js::from($item->issue_type) }}, {{ Js::from($item->key) }})">
+                                        <input type="checkbox" :checked="isSelected({{ Js::from($item->issue_type) }}, {{ Js::from($item->key) }})"
+                                               @click="toggle({{ Js::from($item->issue_type) }}, {{ Js::from($item->key) }})">
                                     </td>
                                     <td class="py-2.5 pr-2 font-mono text-xs text-neutral-400 dark:text-neutral-500">#{{ $item->id }}</td>
                                     <td class="py-2.5 pr-4">

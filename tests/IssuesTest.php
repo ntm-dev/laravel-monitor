@@ -333,6 +333,12 @@ class IssuesTest extends TestCase
         $this->assertSame('none', $row->priority);
     }
 
+    /**
+     * Which rows are checked lives entirely client-side in Alpine now (see
+     * issues.blade.php) — resolveSelected()/ignoreSelected() only ever
+     * receive the pairs list a bulk action applies to, straight from the
+     * client, rather than reading a server-tracked $selected property.
+     */
     public function test_bulk_resolving_selected_exceptions_moves_them_out_of_the_open_tab(): void
     {
         Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
@@ -342,38 +348,11 @@ class IssuesTest extends TestCase
         $component = Livewire::test(Issues::class)->set('view', 'exceptions');
         $this->assertCount(2, $component->viewData('exceptions'));
 
-        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
-        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Bang');
-        $this->assertSame(2, $component->instance()->selectedCount());
-
-        $component->call('resolveSelected');
+        $component->call('resolveSelected', [['exception', 'App\\Exceptions\\Boom'], ['exception', 'App\\Exceptions\\Bang']]);
 
         $this->assertCount(0, $component->viewData('exceptions'));
-        $this->assertSame(0, $component->instance()->selectedCount());
 
         $resolved = $component->set('status', 'resolved')->viewData('exceptions');
         $this->assertCount(2, $resolved);
-    }
-
-    public function test_toggling_the_same_row_twice_deselects_it(): void
-    {
-        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
-
-        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
-        $this->assertSame(1, $component->instance()->selectedCount());
-
-        $component->call('toggleSelected', 'exception', 'App\\Exceptions\\Boom');
-        $this->assertSame(0, $component->instance()->selectedCount());
-    }
-
-    public function test_select_all_selects_every_given_pair_and_switching_view_clears_selection(): void
-    {
-        $component = Livewire::test(Issues::class)->set('view', 'exceptions');
-
-        $component->call('selectAll', [['exception', 'App\\Exceptions\\Boom'], ['exception', 'App\\Exceptions\\Bang']]);
-        $this->assertSame(2, $component->instance()->selectedCount());
-
-        $component->set('view', 'performance');
-        $this->assertSame(0, $component->instance()->selectedCount());
     }
 }

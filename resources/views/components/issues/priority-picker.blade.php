@@ -42,7 +42,7 @@
              class="fixed z-30 w-40 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
             @foreach ($levels as $level)
                 <button type="button" @click="open = false"
-                        wire:click="setPriority({{ Js::from($type) }}, {{ Js::from($issueKey) }}, {{ Js::from($level) }})"
+                        @if ($priority !== $level) wire:click="setPriority({{ Js::from($type) }}, {{ Js::from($issueKey) }}, {{ Js::from($level) }})" @endif
                         class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 {{ $priority === $level ? 'text-neutral-900 dark:text-neutral-100' : 'text-neutral-500 dark:text-neutral-400' }}">
                     <x-monitor::priority-bars :priority="$level"/>
                     <span class="flex-1">{{ \LaravelMonitor\Support\Format::priorityLabel($level) }}</span>

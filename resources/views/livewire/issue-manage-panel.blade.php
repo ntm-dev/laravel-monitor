@@ -11,10 +11,12 @@
             <label class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.status') }}</label>
             <div class="mt-2 flex gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 p-0.5">
                 @foreach ($statuses as $status)
-                    <button type="button" wire:click="setStatus('{{ $status }}')"
+                    <button type="button"
+                            @if ($issue->status !== $status) wire:click="setStatus('{{ $status }}')" @endif
+                            @disabled($issue->status === $status)
                             @class([
                                 'flex-1 rounded-md px-2 py-1 text-xs capitalize',
-                                'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-sm' => $issue->status === $status,
+                                'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-sm cursor-default' => $issue->status === $status,
                                 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $issue->status !== $status,
                             ])>{{ $status }}</button>
                 @endforeach
