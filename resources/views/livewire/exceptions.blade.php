@@ -31,13 +31,13 @@
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalGroups) }} {{ trans_choice('monitor::messages.common.exception_count', $totalGroups) }}</h3>
             <div class="flex items-center gap-2">
-                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800">
                     @foreach ($filters as $value => $label)
                         <button type="button" wire:click="setStatus('{{ $value }}')"
                                 @class([
-                                    'flex h-full items-center rounded-md px-2.5 text-xs font-medium',
-                                    'bg-neutral-900 text-white dark:bg-neutral-500' => $status === $value,
-                                    'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $value,
+                                    'flex h-full items-center rounded-md px-2.5 text-xs font-medium transition-colors',
+                                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $status === $value,
+                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $status !== $value,
                                 ])>{{ $label }}</button>
                     @endforeach
                 </div>

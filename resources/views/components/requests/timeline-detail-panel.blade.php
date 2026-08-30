@@ -86,7 +86,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration + 'ms'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duplicates') }}</dt>
@@ -157,7 +157,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration + 'ms'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -188,7 +188,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration + 'ms'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -244,7 +244,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration + 'ms'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
                 <template x-if="mailClass()">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
@@ -315,7 +315,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -381,7 +381,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="selected()?.duration !== null ? selected()?.duration + 'ms' : '—'"></dd>
+                        x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>

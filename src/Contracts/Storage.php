@@ -25,15 +25,20 @@ interface Storage
     /**
      * Latest entries of a type, newest first. Each item exposes:
      * key, subtype, payload (array), duration, user_id, created_at (Carbon).
+     * $subtype accepts an array to match any of several subtypes at once
+     * (e.g. every "ok" status group for a status filter tab). $minDuration
+     * keeps only entries whose own duration is at or above it (a duration
+     * filter tab).
      */
     public function recent(
         string $type,
         DateTimeInterface $since,
         int $limit = 50,
-        ?string $subtype = null,
+        string|array|null $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
         int $offset = 0,
+        ?float $minDuration = null,
     ): Collection;
 
     /**
@@ -56,15 +61,18 @@ interface Storage
 
     /**
      * Totals for a type: object with count, avg_duration, max_duration,
-     * min_duration, total_duration.
+     * min_duration, total_duration. $subtype accepts an array the same way
+     * recent() does. $minDuration restricts to entries at or above it (a
+     * duration filter tab's own badge count).
      */
     public function stats(
         string $type,
         DateTimeInterface $since,
-        ?string $subtype = null,
+        string|array|null $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
+        ?float $minDuration = null,
     ): object;
 
     /**
@@ -136,7 +144,11 @@ interface Storage
 
     /**
      * Per-route breakdown for a type: one item per key exposing
-     * key, count, success, client_errors, server_errors, avg_duration, p95_duration.
+     * key, methods, count, success, client_errors, server_errors, avg_duration, p95_duration.
+     * For type 'request', every entry whose key ends in " Recorders\Requests::UNMATCHED_ROUTE"
+     * (no matched Laravel route) is merged into a single row keyed by the bare
+     * Requests::UNMATCHED_ROUTE sentinel, with `methods` listing the distinct
+     * HTTP methods behind it (null for every ordinary route).
      * Sampled at high volume — see durationStats() — so `count` and the
      * error breakdowns are exact only up to DatabaseStorage::MAX_SAMPLE_ROWS
      * matching rows; use stats()/aggregateByKey() for exact totals.

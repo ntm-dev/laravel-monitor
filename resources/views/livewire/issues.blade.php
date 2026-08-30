@@ -37,13 +37,13 @@
         selectedText: {{ Js::from(__('monitor::messages.issue.selected')) }},
      }">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 shadow-sm">
+        <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800">
             @foreach (['exceptions' => [__('monitor::messages.nav.exceptions'), $exceptionCount], 'performance' => [__('monitor::messages.issue.performance'), $performanceCount]] as $issueTab => [$issueLabel, $issueCount])
                 <button type="button" wire:click="$set('view', '{{ $issueTab }}')" @click="clear()"
                         @class([
-                            'flex h-full items-center gap-2 rounded-md border px-3 text-sm',
-                            'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $view === $issueTab,
-                            'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100' => $view !== $issueTab,
+                            'flex h-full items-center gap-2 rounded-md px-3 text-sm transition-colors',
+                            'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $view === $issueTab,
+                            'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $view !== $issueTab,
                         ])>
                     {{ $issueLabel }}
                     <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">{{ $issueCount }}</span>
@@ -57,13 +57,13 @@
                 <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search') }}"
                        class="h-9 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-3 text-sm text-neutral-700 dark:text-neutral-200 shadow-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none">
             </div>
-            <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5 text-sm shadow-sm">
+            <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-sm dark:border-neutral-700/50 dark:bg-neutral-800">
                 @foreach (['open' => __('monitor::messages.issue.status_open'), 'resolved' => __('monitor::messages.issue.status_resolved'), 'ignored' => __('monitor::messages.issue.status_ignored')] as $statusKey => $statusLabel)
                     <button type="button" wire:click="$set('status', '{{ $statusKey }}')" @click="clear()"
                             @class([
-                                'flex h-full items-center gap-2 rounded-md border px-3',
-                                'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-neutral-100' => $status === $statusKey,
-                                'border-transparent text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100' => $status !== $statusKey,
+                                'flex h-full items-center gap-2 rounded-md px-3 transition-colors',
+                                'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $status === $statusKey,
+                                'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $status !== $statusKey,
                             ])>
                         {{ $statusLabel }}
                         @if ($statusKey === 'open' && $openIssueCount > 0)

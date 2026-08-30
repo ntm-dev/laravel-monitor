@@ -338,6 +338,7 @@ return [
         'copy_as_markdown' => 'Sao chép dạng Markdown',
 
         'refresh' => 'Làm mới',
+        'clear' => 'Xoá',
         'search' => 'Tìm kiếm',
         'search_commands' => 'Tìm command…',
         'search_exceptions' => 'Tìm ngoại lệ…',
@@ -350,6 +351,7 @@ return [
         'all_users' => 'Tất cả người dùng',
         'all_connections' => 'Tất cả connection',
         'all_levels' => 'Tất cả cấp độ',
+        'view_all' => 'Xem tất cả',
         'no_exceptions_reported' => 'Không có ngoại lệ nào được ghi nhận',
         'routes' => 'Route',
         'no_routes_exceeded_thresholds' => 'Không có route nào vượt ngưỡng',
@@ -388,6 +390,7 @@ return [
         'max' => 'Tối đa',
         'max_abbr' => 'MAX',
         'endpoint' => 'Endpoint',
+        'unmatched_route' => 'Route không khớp',
         'errors' => 'Lỗi',
         'location' => 'Vị trí',
         'details' => 'Chi tiết',

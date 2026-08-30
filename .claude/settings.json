@@ -3,5 +3,18 @@
     "mattpocock-skills@mattpocock": true,
     "php-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r \".tool_input.file_path // empty\"); case \"$f\" in *.blade.php) ;; *.php) echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"additionalContext\\\":\\\"This edits a PHP file - you MUST follow the php-conventions skill: curly braces on every control structure; PHP8 constructor property promotion; explicit param/return type hints; prefer PHPDoc over inline comments; string interpolation over dot-concatenation; arrow functions for single-expression closures (static when \\$this is unused); import global functions via use function; prefer array spread over array_merge for array literals; backed enum or class const instead of repeated literals.\\\"}}\" ;; esac 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -26,11 +26,10 @@
 
         return Math.max(this.minZoom, (2 * this.minWidthPx) / this.viewportWidth);
     },
-    {{-- Matches maxZoom()'s midpoint by construction — the zoom level on
-         first load, and what a resize re-clamps down to if it now exceeds
-         the recomputed maxZoom(). --}}
+    {{-- The zoom level on first load: always 1x (minZoom), regardless of
+         where maxZoom() ends up — not its midpoint. --}}
     defaultZoom() {
-        return Math.max(this.minZoom, this.maxZoom() / 2);
+        return this.minZoom;
     },
     scrollLeft: 0,
     crossX: null,
@@ -206,6 +205,23 @@
         if (ms > 0 && ms < 1) return trim((ms * 1000).toFixed(decimalsFor(stepMs * 1000))) + 'μs';
 
         return trim(ms.toFixed(decimalsFor(stepMs))) + 'ms';
+    },
+    {{-- The detail panel's own duration readout — same largest-whole-unit
+         ladder and fixed 2-decimal precision as Support\Format::duration(),
+         so a sub-1ms event reads "760μs" here too instead of the raw
+         "0.76ms" the panel used to concatenate directly. --}}
+    formatDuration(ms) {
+        if (ms === null || ms === undefined) return '—';
+
+        const trim = (fixed) => fixed.replace(/\.?0+$/, '');
+
+        for (const [unitMs, suffix] of [[3600000, 'h'], [60000, 'm'], [1000, 's'], [1, 'ms']]) {
+            if (ms >= unitMs) return trim((ms / unitMs).toFixed(2)) + suffix;
+        }
+
+        if (ms > 0) return trim((ms * 1000).toFixed(2)) + 'μs';
+
+        return trim(ms.toFixed(2)) + 'ms';
     },
     init() {
         this.measureHeaderOffsets();
