@@ -57,13 +57,14 @@
 @endphp
 @if ($part === 'label')
     <div x-show="{{ $visible }}"
-         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable)])
+         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || $scrollable || ($kind === 'root' && $focusable)])
          :class="{{ $highlightClass }}"
          @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
          @mouseleave="hoveredId = null; hideTooltip()"
          @if ($detailable) @click="selectRow('{{ $entry->id }}')"
          @elseif ($navigateClick) @click="{{ $navigateClick }}"
-         @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
+         @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}"
+         @elseif ($scrollable) @click="scrollToBar('{{ $entry->id }}')" @endif>
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
@@ -102,13 +103,14 @@
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
-        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || $scrollable || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
              @if ($detailable) @click="selectRow('{{ $entry->id }}')"
              @elseif ($navigateClick) @click="{{ $navigateClick }}"
-             @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}" @endif>
+             @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}"
+             @elseif ($scrollable) @click="scrollToBar('{{ $entry->id }}')" @endif>
             @if ($kind === 'root')
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">

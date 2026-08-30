@@ -22,6 +22,12 @@ class TimelineRow extends Component
 
     protected const EXCEPTION_COLOR = 'border border-rose-500 bg-rose-500 dark:border-rose-400 dark:bg-rose-400';
 
+    /** Dot colour for an outgoing HTTP call with a 4xx response — same filled style as {@see EXCEPTION_COLOR}, amber instead of rose. */
+    protected const HTTP_WARNING_COLOR = 'border border-amber-500 bg-amber-500 dark:border-amber-400 dark:bg-amber-400';
+
+    /** Dot colour for an outgoing HTTP call with a 2xx/3xx response — same filled style as {@see EXCEPTION_COLOR}, emerald instead of rose. */
+    protected const HTTP_SUCCESS_COLOR = 'border border-emerald-500 bg-emerald-500 dark:border-emerald-400 dark:bg-emerald-400';
+
     /** Inline badge text per event type; unknown types are uppercased. */
     protected const BADGES = [
         'query' => 'QUERY',
@@ -107,7 +113,7 @@ class TimelineRow extends Component
     /** Same as {@see $detail}, prefixed with the duplicate count — only ever shown in a hover tooltip, never inline. */
     public string $tooltipDetail;
 
-    /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}. */
+    /** Dot colour used only in the pinned tree column: see {@see DEFAULT_COLOR}/{@see EXCEPTION_COLOR}/{@see HTTP_WARNING_COLOR}/{@see HTTP_SUCCESS_COLOR} — an HTTP event with any recorded response status fills the dot instead of leaving it hollow, even a 2xx/3xx one (unlike {@see $badgeTextColor}/{@see $barColor}, which only react to 4xx/5xx). */
     public string $color;
 
     /** Tailwind colour name (e.g. "emerald") if this entry belongs to a duplicate-SQL group, else null. Two unrelated groups can share this — see {@see $duplicateGroup} for the value that actually identifies one group uniquely. */
@@ -119,17 +125,20 @@ class TimelineRow extends Component
     /** This duplicate-SQL group's own key (normalized SQL shape), null when this entry isn't a duplicate — what selectRow() in timeline.blade.php actually matches on to pulse just this group's dots, since {@see $duplicateColor} alone can be shared by a different group. */
     public ?string $duplicateGroup;
 
-    /** Badge text colour per event type, matching {@see $color}; neutral by default. */
+    /** Badge text colour per event type, matching {@see $color}; neutral by default. An HTTP event with a 4xx/5xx response overrides this by status severity, same buckets as {@see $barColor} — a 2xx/3xx one doesn't (see {@see $color}'s own docs on why). */
     public string $badgeTextColor;
 
-    /** Whether this event's duration is at/above the slow-event threshold — the only case the bar gets coloured. */
+    /** Whether this event's duration is at/above the slow-event threshold — the only case the bar gets coloured (besides {@see $barColor}'s own HTTP-status override). */
     public bool $slow;
 
-    /** Bar background/border classes: neutral by default, warning colour when {@see $slow}. */
+    /** Bar background/border classes: neutral by default, warning colour when {@see $slow}. An HTTP event's own 4xx/5xx response status takes priority over the duration-based warning when known, {@see TimelineRow::severity()} — since the status code is a more specific signal than "it was just slow"; a 2xx/3xx response doesn't tint the bar (see {@see $color}'s own docs). */
     public string $barColor;
 
     /** Whether clicking this row opens the inspector panel. */
     public bool $detailable;
+
+    /** Whether clicking this row scrolls its bar to the center of the chart pane without opening the inspector — a phase header has no per-event detail to show, but is still worth jumping to directly. */
+    public bool $scrollable;
 
     /** Bar background for a 'root' or 'attempt' row — neutral unless that row itself carries a status (an HTTP root's status code, or an attempt row's job outcome). */
     public string $rootColor;
@@ -179,12 +188,33 @@ class TimelineRow extends Component
         $this->duplicateColor = $entry->metadata['duplicateColor'] ?? null;
         $this->duplicateCount = $entry->metadata['duplicateCount'] ?? null;
         $this->duplicateGroup = $entry->metadata['duplicateGroup'] ?? null;
+        // An outgoing HTTP call's own response status, same severity() bucket
+        // the request root uses (error/warning/ok, coloured rose/amber/
+        // emerald below) — null only when the call has no recorded status
+        // at all (e.g. the connection itself failed), left neutral rather
+        // than treated as an error: a genuine response, even a bad one, is
+        // a more specific, more actionable signal than "no response".
+        $httpSeverity = $kind === 'event' && $entry->type === 'http' && isset($entry->metadata['status'])
+            ? self::severity((int) $entry->metadata['status'])
+            : null;
         $this->color = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_COLOR,
+            $httpSeverity === 'error' => self::EXCEPTION_COLOR,
+            $httpSeverity === 'warning' => self::HTTP_WARNING_COLOR,
+            $httpSeverity === 'ok' => self::HTTP_SUCCESS_COLOR,
             $this->duplicateColor !== null => "border border-{$this->duplicateColor}-500 bg-{$this->duplicateColor}-500 dark:border-{$this->duplicateColor}-400 dark:bg-{$this->duplicateColor}-400",
             default => self::DEFAULT_COLOR,
         };
-        $this->badgeTextColor = self::BADGE_TEXT_COLORS[$entry->type] ?? 'text-neutral-700 dark:text-neutral-200';
+        // 'ok' deliberately isn't its own branch here (unlike $color above):
+        // a 2xx/3xx response only tints the dot, not the badge text — an
+        // all-emerald row read as loudly as an all-rose one, when success is
+        // the common case that shouldn't compete for attention with actual
+        // problems (4xx/5xx).
+        $this->badgeTextColor = match ($httpSeverity) {
+            'error' => 'text-rose-600 dark:text-rose-400',
+            'warning' => 'text-amber-600 dark:text-amber-400',
+            default => self::BADGE_TEXT_COLORS[$entry->type] ?? 'text-neutral-700 dark:text-neutral-200',
+        };
         // Per-type "slow" signal against the same monitor.thresholds.* values
         // the Settings page edits (see Support\Settings) — comparing every
         // event's duration against the query recorder's own threshold
@@ -203,12 +233,17 @@ class TimelineRow extends Component
             'http' => $entry->duration >= (float) config('monitor.thresholds.outgoing_request', 1000),
             default => false,
         };
+        // Same restraint as $badgeTextColor above: 'ok' doesn't tint the bar
+        // either, only the dot — see that comment.
         $this->barColor = match (true) {
             $entry->type === 'exception' => self::EXCEPTION_BAR,
+            $httpSeverity === 'error' => self::EXCEPTION_BAR,
+            $httpSeverity === 'warning' => self::SLOW_BAR,
             $this->slow => self::SLOW_BAR,
             default => self::NEUTRAL_BAR,
         };
         $this->detailable = $kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true);
+        $this->scrollable = $kind === 'phase';
         $this->detail = $this->resolveDetail();
         $this->detailShort = Str::limit($this->detail, 90);
         $this->tooltipDetail = $this->duplicateCount !== null

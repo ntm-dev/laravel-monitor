@@ -5,6 +5,14 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
 
 # PHP Conventions
 
+- Follow the PSR coding standards as the baseline: **PSR-1** (`StudlyCaps` class names,
+  `camelCase` method names, one class per file, no side effects at include-time) and **PSR-12**
+  (4-space indentation, `<?php` on its own line with no closing `?>` tag, opening brace for a
+  class/method on its own line, one statement per line, one `use` import per line). **PSR-4**
+  governs autoloading — `LaravelMonitor\` maps to `src/` (see `composer.json`'s
+  `autoload.psr-4`), so a class's namespace must mirror its path under `src/` exactly. Every
+  other rule below refines PSR-12 for this codebase's own taste (callable priority, `use
+  function` imports, comment style, ...); none of them override it.
 - Always use curly braces for control structures, even one-liner bodies.
 - Use PHP 8 constructor property promotion when a class has a constructor:
   `public function __construct(public Storage $storage) {}`.
@@ -18,12 +26,23 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
   `'monitor::messages.'.$key`. Use braces around the expression
   (`"{$task->key}"`), not the bare `"$var"` form. Concatenation is still the right call for
   joining two whole expressions (`$prefix.$suffix`) or building a string across lines.
-- Prefer arrow functions (`fn () => ...`) over `function () { return ...; }` for single-expression
-  closures — they read shorter and capture the outer scope automatically. Use a full closure only
-  when the body genuinely needs multiple statements or a by-reference `use`.
-- Mark a closure `static` when its body never touches `$this`: `static fn ($row) => $row->key`.
-  Stops PHP binding the enclosing object into the closure, so it can't accidentally keep that
-  object alive or expose its internals.
+- Callable priority, highest first:
+  1. **First-class callable syntax** (`foo(...)`, `$this->method(...)`, `self::method(...)`,
+     `SomeClass::method(...)`) when a closure would do nothing but forward its arguments to an
+     existing function/method unchanged — e.g. `->map($this->hydrate(...))`, not
+     `->map(fn ($row) => $this->hydrate($row))`. Shorter, and PHP resolves/type-checks the
+     target at the call site instead of inside an opaque closure body.
+  2. Otherwise, an **arrow function** (`fn () => ...`) for anything that still fits one
+     expression — extra args, a transformation, a property access — over
+     `function () { return ...; }`. They read shorter and capture the outer scope automatically.
+  3. A full closure only when the body genuinely needs multiple statements or a by-reference
+     `use`.
+- Mark an arrow function or closure `static` when its body never touches `$this`:
+  `static fn ($row) => $row->key`. Stops PHP binding the enclosing object into the closure, so it
+  can't accidentally keep that object alive or expose its internals. (First-class callable syntax
+  has no `static` form of its own — `self::method(...)`/a plain function reference is already
+  static-safe with nothing to mark; `$this->method(...)` binds `$this` because the call genuinely
+  needs it.)
 - Import global (non-framework) PHP functions used inside a namespaced class with
   `use function ...;` at the top of the file — e.g. `use function is_object;`,
   `use function str_starts_with;` — instead of calling them unqualified. Avoids the IDE hint

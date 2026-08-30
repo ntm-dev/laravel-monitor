@@ -10,10 +10,14 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Recorders\Requests;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\KeyHash;
+use LaravelMonitor\Support\RecordType;
 use Ramsey\Uuid\Uuid;
+
+use function is_array;
 
 class DatabaseStorage implements Storage
 {
@@ -93,18 +97,19 @@ class DatabaseStorage implements Storage
         string $type,
         DateTimeInterface $since,
         int $limit = 50,
-        ?string $subtype = null,
+        string|array|null $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
         int $offset = 0,
+        ?float $minDuration = null,
     ): Collection {
-        return $this->query($type, $since, $subtype, $key, $until)
+        return $this->query($type, $since, $subtype, $key, $until, minDuration: $minDuration)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->offset($offset)
             ->limit($limit)
             ->get()
-            ->map(fn ($row) => $this->hydrate($row));
+            ->map($this->hydrate(...));
     }
 
     public function findByRequestId(string $requestId, string $rootType = 'request'): ?object
@@ -151,7 +156,7 @@ class DatabaseStorage implements Storage
             ->orderBy('start_offset')
             ->orderBy('id')
             ->get()
-            ->map(fn ($row) => $this->hydrate($row));
+            ->map($this->hydrate(...));
     }
 
     public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
@@ -194,7 +199,7 @@ class DatabaseStorage implements Storage
             ->orderBy('created_at')
             ->orderBy('id')
             ->get()
-            ->map(fn ($row) => $this->hydrate($row));
+            ->map($this->hydrate(...));
 
         return $outcomes
             ->groupBy(fn (object $row) => $row->payload['job_id'] ?? '')
@@ -419,16 +424,21 @@ class DatabaseStorage implements Storage
     public function stats(
         string $type,
         DateTimeInterface $since,
-        ?string $subtype = null,
+        string|array|null $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
+        ?float $minDuration = null,
     ): object {
-        if ($key === null && $userId === null && $this->aggregatesCover($type, $since, $until)) {
+        // The aggregates table only carries type+subtype totals (see
+        // countsPerBucketFromAggregates()'s own docs) — no per-row duration
+        // to compare against a bar, and no array-of-subtypes breakdown — so
+        // either one always falls back to the raw scan below.
+        if ($minDuration === null && ! is_array($subtype) && $key === null && $userId === null && $this->aggregatesCover($type, $since, $until)) {
             return $this->statsFromAggregates($type, $subtype, $since, $until);
         }
 
-        $row = $this->query($type, $since, $subtype, $key, $until, $userId)
+        $row = $this->query($type, $since, $subtype, $key, $until, $userId, $minDuration)
             ->selectRaw('count(*) as aggregate_count, avg(duration) as avg_duration, max(duration) as max_duration, min(duration) as min_duration, sum(duration) as total_duration')
             ->first();
 
@@ -842,8 +852,22 @@ class DatabaseStorage implements Storage
         $groups = [];
 
         foreach ($rows as $row) {
-            $group = &$groups[$row->key];
-            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => []];
+            // Every method that hit no Laravel route (404s, arbitrary probed
+            // paths) is still stored under its own "{METHOD} Unmatched
+            // Route" key (see Requests::record()) — collapse them into one
+            // group here, or they'd fragment the route list into one row
+            // per method instead of the single record the list should show.
+            $unmatched = $type === RecordType::Request->value
+                && $row->key !== null
+                && Str::endsWith($row->key, ' '.Requests::UNMATCHED_ROUTE);
+            $groupKey = $unmatched ? Requests::UNMATCHED_ROUTE : $row->key;
+
+            $group = &$groups[$groupKey];
+            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => [], 'methods' => []];
+
+            if ($unmatched) {
+                $group['methods'][Str::before($row->key, ' ')] = true;
+            }
 
             $group['count']++;
 
@@ -865,9 +889,15 @@ class DatabaseStorage implements Storage
 
         foreach ($groups as $key => $group) {
             $durations = $group['durations'];
+            $methods = array_keys($group['methods']);
+            sort($methods);
 
             $result[] = (object) [
                 'key' => $key,
+                // Distinct methods behind the merged Unmatched Route row
+                // (capped by the sample above), null for every ordinary
+                // route — see Livewire\Requests::presentRoute().
+                'methods' => $key === Requests::UNMATCHED_ROUTE ? $methods : null,
                 'count' => $group['count'],
                 'success' => $group['success'],
                 'client_errors' => $group['client_errors'],
@@ -964,30 +994,61 @@ class DatabaseStorage implements Storage
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
     ): Collection {
-        return $this->query('exception', $since, null, null, $until, $userId)
+        // Two narrow passes, not one wide one — see latestPayloadByKey() for
+        // the same split applied elsewhere: `payload` is by far the widest
+        // column (an exception's full class/message/file/line/trace), so
+        // fetching it for every sampled row here instead of once per group
+        // can exhaust PHP's memory limit well before the row cap is even
+        // reached — measured: ~3.6k sampled rows averaging ~36KB of payload
+        // each (~132MB) blew a 128MB limit on their own, well under the
+        // 50k-row cap.
+        $groups = $this->query('exception', $since, null, null, $until, $userId)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
-            ->get(['key', 'subtype', 'user_id', 'payload', 'created_at'])
-            ->groupBy('key')
-            ->map(function (Collection $rows, string $key) {
-                // Rows arrive newest-first, so the first payload is the latest.
-                $latest = json_decode($rows->first()->payload ?? '[]', true) ?: [];
+            ->get(['id', 'key', 'subtype', 'user_id', 'created_at'])
+            ->groupBy('key');
 
-                return (object) [
-                    'key' => $key,
-                    'class' => $latest['class'] ?? $key,
-                    'message' => $latest['message'] ?? null,
-                    'file' => $latest['file'] ?? null,
-                    'line' => $latest['line'] ?? null,
-                    'count' => $rows->count(),
-                    'handled' => $rows->where('subtype', 'handled')->count(),
-                    'unhandled' => $rows->where('subtype', 'unhandled')->count(),
-                    'users' => $rows->pluck('user_id')->filter(fn ($id) => $id !== null)->unique()->count(),
-                    'last_seen' => CarbonImmutable::parse($rows->max('created_at')),
-                    'first_seen' => CarbonImmutable::parse($rows->min('created_at')),
-                ];
-            })
+        if ($groups->isEmpty()) {
+            return collect();
+        }
+
+        // One payload per group — the latest occurrence (rows arrive
+        // newest-first, so each group's first row is it) — not one per
+        // sampled row.
+        $latestIds = $groups->map(fn (Collection $rows) => $rows->first()->id);
+
+        $payloads = $this->table()
+            ->whereIn('id', $latestIds->values()->all())
+            ->get(['id', 'payload'])
+            ->keyBy('id')
+            ->map(static function ($row) {
+                $payload = json_decode($row->payload ?? '[]', true) ?: [];
+
+                // Drop everything but what's actually read below — 'trace'
+                // alone (Recorders\Exceptions' own captured stack) is
+                // usually most of the payload's size, and every group here
+                // would otherwise hold one in memory at once.
+                return array_intersect_key($payload, ['class' => true, 'message' => true, 'file' => true, 'line' => true]);
+            });
+
+        return $groups->map(function (Collection $rows, string $key) use ($latestIds, $payloads) {
+            $latest = $payloads->get($latestIds->get($key), []);
+
+            return (object) [
+                'key' => $key,
+                'class' => $latest['class'] ?? $key,
+                'message' => $latest['message'] ?? null,
+                'file' => $latest['file'] ?? null,
+                'line' => $latest['line'] ?? null,
+                'count' => $rows->count(),
+                'handled' => $rows->where('subtype', 'handled')->count(),
+                'unhandled' => $rows->where('subtype', 'unhandled')->count(),
+                'users' => $rows->pluck('user_id')->filter(fn ($id) => $id !== null)->unique()->count(),
+                'last_seen' => CarbonImmutable::parse($rows->max('created_at')),
+                'first_seen' => CarbonImmutable::parse($rows->min('created_at')),
+            ];
+        })
             ->values();
     }
 
@@ -1211,6 +1272,14 @@ class DatabaseStorage implements Storage
 
     public function resolveKeyHash(string $type, string $hash): ?string
     {
+        // The merged Unmatched Route row (see routeStats()) links to a hash
+        // of the bare Requests::UNMATCHED_ROUTE sentinel, which never exists
+        // as a literal stored key — resolve it directly instead of scanning
+        // for a match that will never be found.
+        if ($type === RecordType::Request->value && KeyHash::for(Requests::UNMATCHED_ROUTE) === $hash) {
+            return Requests::UNMATCHED_ROUTE;
+        }
+
         return $this->table()
             ->where('type', $type)
             ->select('key')
@@ -1282,18 +1351,38 @@ class DatabaseStorage implements Storage
     protected function query(
         string $type,
         DateTimeInterface $since,
-        ?string $subtype = null,
+        string|array|null $subtype = null,
         ?string $key = null,
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
+        ?float $minDuration = null,
     ): Builder {
         return $this->table()
             ->where('type', $type)
-            ->when($subtype !== null, fn (Builder $query) => $query->where('subtype', $subtype))
-            ->when($key !== null, fn (Builder $query) => $query->where('key', $key))
+            ->when($subtype !== null, fn (Builder $query) => is_array($subtype)
+                ? $query->whereIn('subtype', $subtype)
+                : $query->where('subtype', $subtype))
+            ->when($key !== null, fn (Builder $query) => $this->whereKey($query, $type, $key))
             ->when($until !== null, fn (Builder $query) => $query->where('created_at', '<=', $until))
             ->when($userId !== null, fn (Builder $query) => $query->where('user_id', $userId))
+            ->when($minDuration !== null, fn (Builder $query) => $query->where('duration', '>=', $minDuration))
             ->where('created_at', '>=', $since);
+    }
+
+    /**
+     * Every request that matched no Laravel route is still stored under its
+     * own "{METHOD} Unmatched Route" key (see Requests::record()), but
+     * routeStats() collapses all of them into one Requests::UNMATCHED_ROUTE
+     * row on the route list — so a lookup for that bare sentinel has to
+     * expand back into every method variant instead of an exact match.
+     */
+    protected function whereKey(Builder $query, string $type, string $key): Builder
+    {
+        if ($type === RecordType::Request->value && $key === Requests::UNMATCHED_ROUTE) {
+            return $query->where('key', 'like', '% '.Requests::UNMATCHED_ROUTE);
+        }
+
+        return $query->where('key', $key);
     }
 
     protected function table(): Builder

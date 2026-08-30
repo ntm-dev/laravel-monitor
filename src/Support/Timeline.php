@@ -271,6 +271,12 @@ class Timeline
             'notification' => $row->key ?? $fallback,
             'job' => $row->key ?? $fallback,
             'exception' => $row->payload['class'] ?? $row->key ?? $fallback,
+            // $row->key is deliberately just the destination host (see
+            // Recorders\OutgoingRequests::key()), grouped on for the
+            // Outgoing Requests list — the timeline shows the full URL
+            // instead, since here each bar is one specific call, not a
+            // host-level aggregate.
+            'outgoing_request' => $row->payload['url'] ?? $row->key ?? $fallback,
             'lazy_loading' => class_basename($row->payload['model'] ?? $row->key ?? $fallback).'::'.($row->payload['relation'] ?? ''),
             default => $row->key ?? $fallback,
         };

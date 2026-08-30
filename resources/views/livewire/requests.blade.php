@@ -1,9 +1,9 @@
 @php
+    use LaravelMonitor\Support\Format;
     use LaravelMonitor\Support\Icons;
     use LaravelMonitor\Support\KeyHash;
-    use Illuminate\Support\Str;
 
-    $fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms);
+    $fmt = fn ($ms) => Format::duration($ms);
 
     $columns = [
         'key' => ['label' => __('monitor::messages.common.route'), 'align' => 'left'],
@@ -49,12 +49,43 @@
         </div>
 
         {{-- Route table --}}
-        <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalRoutes) }} {{ trans_choice('monitor::messages.common.routes_count', $totalRoutes) }}</h3>
-            <div class="relative">
-                <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_routes') }}"
-                       class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_routes') }}"
+                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 {{ $search !== '' ? 'pr-7' : 'pr-2' }} text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                    @if ($search !== '')
+                        <button type="button" wire:click="clearSearch" title="{{ __('monitor::messages.common.clear') }}"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400">
+                            <x-monitor::icon :path="Icons::CLOSE" :stroke="2" class="h-3.5 w-3.5"/>
+                        </button>
+                    @endif
+                </div>
+                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
+                    @foreach ([
+                        'all' => __('monitor::messages.common.view_all'),
+                        'avg' => '≥ '.__('monitor::messages.common.avg'),
+                        'p95' => '≥ '.__('monitor::messages.common.p95'),
+                        'threshold' => '≥ '.__('monitor::messages.common.threshold'),
+                    ] as $filterKey => $filterLabel)
+                        <button type="button" wire:click="setDurationFilter('{{ $filterKey }}')"
+                                wire:loading.attr="disabled" wire:target="setDurationFilter('{{ $filterKey }}')"
+                                @class([
+                                    'flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 transition-colors',
+                                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $durationFilter === $filterKey,
+                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $durationFilter !== $filterKey,
+                                ])>
+                            {{ $filterLabel }}
+                            <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[10px] text-neutral-600 dark:text-neutral-300">{{ $durationFilterCounts[$filterKey] }}</span>
+                            <svg wire:loading wire:target="setDurationFilter('{{ $filterKey }}')" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
+                            </svg>
+                        </button>
+                    @endforeach
+                </div>
             </div>
         </div>
 
@@ -87,21 +118,12 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage,setDurationFilter,search" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($routes as $route)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => KeyHash::for($route->key)] + $range) }}'">
-                                @php
-                                    $method = Str::before($route->key, ' ');
-                                    $methodClass = match ($method) {
-                                        'POST' => 'text-emerald-600',
-                                        'PUT', 'PATCH' => 'text-blue-500',
-                                        'DELETE' => 'text-rose-600',
-                                        default => 'text-neutral-500 dark:text-neutral-400',
-                                    };
-                                @endphp
-                                <td class="py-2 pr-2 font-mono text-xs uppercase tracking-tight {{ $methodClass }}">{{ $method }}</td>
-                                <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $route->key }}">{{ Str::after($route->key, ' ') }}</td>
+                                <td class="py-2 pr-2 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($route->method) }}">{{ $route->method }}</td>
+                                <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $route->key }}">{{ $route->path }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $route->client_errors > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">
                                     <span class="inline-flex items-center justify-end gap-1">
@@ -130,7 +152,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage,setDurationFilter,search" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="9" :rows="count($routes)"/>
                     </tbody>
                 </table>

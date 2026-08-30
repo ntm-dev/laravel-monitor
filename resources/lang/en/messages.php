@@ -338,6 +338,7 @@ return [
         'copy_as_markdown' => 'Copy as Markdown',
 
         'refresh' => 'Refresh',
+        'clear' => 'Clear',
         'search' => 'Search',
         'search_commands' => 'Search commands…',
         'search_exceptions' => 'Search exceptions…',
@@ -350,6 +351,7 @@ return [
         'all_users' => 'All users',
         'all_connections' => 'All connections',
         'all_levels' => 'All levels',
+        'view_all' => 'View all',
         'no_exceptions_reported' => 'No exceptions reported',
         'routes' => 'Routes',
         'no_routes_exceeded_thresholds' => 'No routes exceeded thresholds',
@@ -388,6 +390,7 @@ return [
         'max' => 'Max',
         'max_abbr' => 'MAX',
         'endpoint' => 'Endpoint',
+        'unmatched_route' => 'Unmatched Route',
         'errors' => 'Errors',
         'location' => 'Location',
         'details' => 'Details',

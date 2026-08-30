@@ -61,6 +61,18 @@ class Format
      * running under a Laravel version that doesn't report it, or when it's
      * ambiguous across a sampled group; see Recorders\Queries).
      */
+    /**
+     * Text color for an HTTP method badge, keyed by the verb — shared by the
+     * route list (Livewire\Requests) and a single route's request list
+     * (Livewire\RequestDetail) so a method reads the same color in both.
+     */
+    public const HTTP_METHOD_CLASSES = [
+        'POST' => 'text-emerald-600',
+        'PUT' => 'text-blue-500',
+        'PATCH' => 'text-blue-500',
+        'DELETE' => 'text-rose-600',
+    ];
+
     public const CONNECTION_TYPE_BADGES = [
         'write' => 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
         'read' => 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -105,6 +117,22 @@ class Format
         }
 
         return rtrim(rtrim(number_format($milliseconds, 2), '0'), '.').'ms';
+    }
+
+    /**
+     * Text color class for an HTTP method badge (see HTTP_METHOD_CLASSES).
+     * Also covers the merged Unmatched Route row's method column
+     * (Livewire\Requests::presentRoute()): "ANY" above its method cap, or
+     * several methods joined with "/" below it, both get a distinct color
+     * since they don't represent a single verb.
+     */
+    public static function httpMethodClass(?string $method): string
+    {
+        if ($method === 'ANY' || ($method !== null && str_contains($method, '/'))) {
+            return 'text-violet-600 dark:text-violet-400';
+        }
+
+        return self::HTTP_METHOD_CLASSES[$method] ?? 'text-neutral-500 dark:text-neutral-400';
     }
 
     /**
