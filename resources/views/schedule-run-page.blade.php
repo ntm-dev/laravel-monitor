@@ -74,7 +74,7 @@
 @endphp
 <x-monitor::layout :title="$command">
     <div class="flex min-h-screen">
-        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
+        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
             <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
@@ -91,7 +91,7 @@
                              keyed by the short grouping key (see
                              Recorders\ScheduledTasks::name()). --}}
                         <a href="{{ route('monitor.schedule.show', ['hash' => KeyHash::for($key)] + $range) }}"
-                           title="{{ $key }}"
+                           data-tooltip="{{ $key }}"
                            class="min-w-0 truncate font-mono hover:text-neutral-900 dark:hover:text-neutral-100">
                             {{ $key }}
                         </a>
@@ -99,7 +99,7 @@
                     {{-- end breadcrumb scheduled task run --}}
 
                     <div class="mt-1 flex flex-wrap items-center gap-2.5">
-                        <h1 class="min-w-0 truncate font-mono text-2xl font-bold tracking-tight" title="{{ $command }}">{{ $command }}</h1>
+                        <h1 class="min-w-0 truncate font-mono text-2xl font-bold tracking-tight" data-tooltip="{{ $command }}">{{ $command }}</h1>
                         @if ($schedule !== null)
                             <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight bg-neutral-200/70 text-neutral-600">{{ $schedule }}</span>
                         @endif

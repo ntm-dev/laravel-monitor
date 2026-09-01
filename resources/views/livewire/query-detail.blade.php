@@ -99,7 +99,7 @@
             <div class="max-h-64 overflow-auto p-4">
                 <div class="mb-1.5 flex items-center justify-between">
                     <span class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.sql') }}</span>
-                    <button type="button" @click="copySql()" title="{{ __('monitor::messages.common.copy') }}"
+                    <button type="button" @click="copySql()" data-tooltip="{{ __('monitor::messages.common.copy') }}"
                             class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                         <x-monitor::icon :path="Icons::COPY" class="h-3.5 w-3.5" x-show="! sqlCopied"/>
                         <x-monitor::icon :path="Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="sqlCopied" x-cloak
@@ -150,7 +150,7 @@
                                         @else
                                             <span class="flex items-center gap-1.5">
                                                 <span class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.exception.source_command') }}</span>
-                                                <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" title="{{ $commandName }}">{{ $commandName ?? '—' }}</span>
+                                                <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ $commandName }}">{{ $commandName ?? '—' }}</span>
                                             </span>
                                         @endif
                                     </td>
@@ -164,7 +164,7 @@
                                     </td>
                                     <td class="group max-w-[18rem] py-2 pr-3" x-data="{ copied: false }">
                                         <span class="flex items-center gap-1.5">
-                                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $location }}">{{ $location ?? '—' }}</span>
+                                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $location }}">{{ $location ?? '—' }}</span>
                                             @if ($location)
                                                 <button type="button" @click.stop="navigator.clipboard.writeText(@js($location)); copied = true; setTimeout(() => copied = false, 1200)"
                                                         class="shrink-0 text-neutral-400 opacity-0 hover:text-neutral-700 group-hover:opacity-100 dark:text-neutral-500 dark:hover:text-neutral-200">
@@ -178,7 +178,7 @@
                                     <td class="py-2 text-right font-mono text-xs {{ $entry->duration >= $slowThreshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
                                     <td class="py-2 pl-2 text-right">
                                         @if ($entry->sourceUrl)
-                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" title="{{ __('monitor::messages.common.open_request') }}">
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" data-tooltip="{{ __('monitor::messages.common.open_request') }}">
                                                 <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                             </span>
                                         @endif

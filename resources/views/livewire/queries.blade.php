@@ -25,7 +25,7 @@
                         <option value="{{ $conn }}">{{ $conn }}</option>
                     @endforeach
                 </select>
-                <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
+                <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
                         class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                     <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
                 </button>
@@ -94,7 +94,7 @@
                                 <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                     onclick="window.location='{{ route('monitor.queries.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($query->key)] + $range) }}'">
                                     <td class="max-w-[32rem] py-2 pr-3">
-                                        <code data-line-code data-lang="sql" class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $query->key }}">{{ $query->key }}</code>
+                                        <code data-line-code data-lang="sql" class="block truncate font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $query->key }}">{{ $query->key }}</code>
                                     </td>
                                     <td class="py-2 pr-3">
                                         <span class="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-500 dark:text-neutral-400">

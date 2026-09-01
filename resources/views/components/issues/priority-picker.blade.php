@@ -32,7 +32,7 @@
             this.left = rect.left;
         },
      }" class="inline-block">
-    <button type="button" x-ref="trigger" @click="reposition(); open = ! open" title="{{ \LaravelMonitor\Support\Format::priorityLabel($priority) }}">
+    <button type="button" x-ref="trigger" @click="reposition(); open = ! open" data-tooltip="{{ \LaravelMonitor\Support\Format::priorityLabel($priority) }}">
         <x-monitor::priority-bars :priority="$priority"/>
     </button>
     <template x-teleport="body">

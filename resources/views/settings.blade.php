@@ -231,7 +231,7 @@
                                         placeholder="{{ __('monitor::messages.settings.period_hours') }}"
                                         class="w-24 {{ $periodInput }} text-right">
                                     <button type="button" @click="items.splice(index, 1)"
-                                        title="{{ __('monitor::messages.settings.remove') }}"
+                                        data-tooltip="{{ __('monitor::messages.settings.remove') }}"
                                         class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-200 text-neutral-400 hover:border-rose-300 hover:text-rose-600 dark:border-neutral-700 dark:hover:border-rose-500/40 dark:hover:text-rose-400">
                                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CLOSE" :stroke="2" class="h-3.5 w-3.5" />
                                     </button>

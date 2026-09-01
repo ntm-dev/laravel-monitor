@@ -39,7 +39,7 @@
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
                 <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
                 @if ($key === 'command')
-                    <dd class="min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" title="{{ $value }}">{{ $value }}</dd>
+                    <dd class="min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $value }}">{{ $value }}</dd>
                 @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
                 @endif

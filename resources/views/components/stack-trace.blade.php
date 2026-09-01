@@ -72,7 +72,7 @@
                                  label reading as clearly distinct from the
                                  muted file path underneath it, not the same
                                  grey repeated twice. --}}
-                            <span class="truncate font-mono text-xs text-neutral-900 dark:text-neutral-100" data-line-code title="{{ $displayLabel }}">{{ $displayLabel }}</span>
+                            <span class="truncate font-mono text-xs text-neutral-900 dark:text-neutral-100" data-line-code data-tooltip="{{ $displayLabel }}">{{ $displayLabel }}</span>
                             {{-- ltr (not the app-frame header's rtl truncation trick below):
                                  this file:line sits on its own full-width row here, not
                                  sharing one with the label, so there's no front text to
@@ -81,7 +81,7 @@
                                  vendor-frame (file-with-line defaults to ltr; only the
                                  frame header overrides it). rtl here left it flush right
                                  instead, reading as detached from the label above it. --}}
-                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $frame['file'] }}:{{ $frame['line'] }}">{{ $frame['file'] }}:{{ $frame['line'] }}</span>
+                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $frame['file'] }}:{{ $frame['line'] }}">{{ $frame['file'] }}:{{ $frame['line'] }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -97,8 +97,8 @@
                             <div class="size-2 rounded-full" :class="expanded ? 'bg-rose-500 dark:bg-neutral-400' : 'bg-rose-200 dark:bg-neutral-700'"></div>
                         </div>
                         <div class="flex min-w-0 flex-1 items-center justify-between gap-6">
-                            <span class="truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" data-line-code title="{{ $displayLabel }}">{{ $displayLabel }}</span>
-                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" dir="rtl" title="{{ $frame['file'] }}:{{ $frame['line'] }}">{{ $frame['file'] }}:{{ $frame['line'] }}</span>
+                            <span class="truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" data-line-code data-tooltip="{{ $displayLabel }}">{{ $displayLabel }}</span>
+                            <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" dir="rtl" data-tooltip="{{ $frame['file'] }}:{{ $frame['line'] }}">{{ $frame['file'] }}:{{ $frame['line'] }}</span>
                         </div>
                         @if ($frame['has_code'])
                             <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md dark:border dark:border-white/10"

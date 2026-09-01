@@ -156,7 +156,7 @@ class Preferences
     }
 
     /** Format a UTC offset in seconds as "UTC+7" / "UTC+5:30" / "UTC-3". */
-    protected static function formatOffset(int $seconds): string
+    public static function formatOffset(int $seconds): string
     {
         $sign = $seconds < 0 ? '-' : '+';
         $abs = abs($seconds);

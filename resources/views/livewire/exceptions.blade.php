@@ -8,7 +8,7 @@
                         <option value="{{ $user->id }}">{{ $user->name }}</option>
                     @endforeach
                 </select>
-                <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
+                <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
                         class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
                 </button>
@@ -90,16 +90,16 @@
                             @foreach ($groups as $group)
                                 <tr class="group cursor-pointer {{ $group->unhandled > 0 ? 'hover:bg-rose-50/50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}"
                                     onclick="window.location='{{ route('monitor.exceptions.show', ['hash' => $group->key] + $range) }}'">
-                                    <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $group->last_seen_full }}">
+                                    <td class="whitespace-nowrap py-2.5 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $group->last_seen_full }}">
                                         {{ $group->last_seen_human }}
                                     </td>
                                     <td class="py-2.5 pr-3">
                                         <x-monitor::status-badge :handled="$group->handled"/>
                                     </td>
                                     <td class="max-w-[26rem] py-2.5 pr-3">
-                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-800 dark:text-neutral-200' }}" title="{{ $group->class }}">{{ $group->class }}</p>
+                                        <p class="truncate font-mono text-xs font-medium {{ $group->unhandled > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-800 dark:text-neutral-200' }}" data-tooltip="{{ $group->class }}">{{ $group->class }}</p>
                                         @if (filled($group->message))
-                                            <p class="mt-0.5 truncate text-xs text-neutral-400 dark:text-neutral-500" title="{{ $group->message }}">{{ $group->message }}</p>
+                                            <p class="mt-0.5 truncate text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $group->message }}">{{ $group->message }}</p>
                                         @elseif (filled($group->file))
                                             <p class="mt-0.5 truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $group->file }}:{{ $group->line }}</p>
                                         @endif

@@ -21,7 +21,7 @@
 <div wire:poll.{{ $refresh }}s>
     <x-monitor::section>
         <x-slot:actions>
-            <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
+            <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
                     class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                 <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
             </button>
@@ -100,10 +100,10 @@
                                  own when inactive. --}}
                             @php($inactiveNote = $task->isActive ? null : __('monitor::messages.schedule.no_longer_scheduled'))
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 {{ $task->isActive ? '' : 'line-through opacity-50' }}"
-                                title="{{ $inactiveNote }}"
+                                data-tooltip="{{ $inactiveNote }}"
                                 onclick="window.location='{{ route('monitor.schedule.show', ['hash' => KeyHash::for($task->key)] + $range) }}'">
-                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $inactiveNote ?? ($task->command ?? $task->key) }}">{{ $task->command ?? $task->key }}</td>
-                                <td class="max-w-[12rem] truncate py-2 pr-2 font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $inactiveNote ?? ($task->expression ?? '') }}">{{ $task->schedule ?? '—' }}</td>
+                                <td class="max-w-[18rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $inactiveNote ?? ($task->command ?? $task->key) }}">{{ $task->command ?? $task->key }}</td>
+                                <td class="max-w-[12rem] truncate py-2 pr-2 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $inactiveNote ?? ($task->expression ?? '') }}">{{ $task->schedule ?? '—' }}</td>
                                 <td class="py-2 pr-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">
                                     <x-monitor::countdown :at="$task->next_run_at" :scope="$task->key"/>
                                 </td>

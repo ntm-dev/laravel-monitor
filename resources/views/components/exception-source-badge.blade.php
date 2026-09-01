@@ -12,7 +12,7 @@
 @if ($type && $colors && $url)
     <a href="{{ $url }}" class="flex items-center gap-1.5 hover:underline">
         <span class="shrink-0 rounded-md border {{ $colors }} px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-tight">{{ __('monitor::messages.exception.source_'.$type) }}</span>
-        <span class="min-w-0 truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" title="{{ $label }}">{{ $label ?? '—' }}</span>
+        <span class="min-w-0 truncate font-mono text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ $label }}">{{ $label ?? '—' }}</span>
     </a>
 @else
     <span class="text-xs text-neutral-400 dark:text-neutral-500">—</span>

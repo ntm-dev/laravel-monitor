@@ -57,7 +57,7 @@
                                         'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
                                     ])>{{ $entry->subtype }}</span>
                                     @if (($entry->payload['attempts'] ?? null) !== null)
-                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" title="{{ __('monitor::messages.common.attempt_count') }}">#{{ $entry->payload['attempts'] }}</span>
+                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" data-tooltip="{{ __('monitor::messages.common.attempt_count') }}">#{{ $entry->payload['attempts'] }}</span>
                                     @endif
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>

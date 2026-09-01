@@ -64,6 +64,8 @@ class Icons
 
     public const CHEVRON_DOWN = 'm19.5 8.25-7.5 7.5-7.5-7.5';
 
+    public const CHEVRON_DOUBLE_LEFT = 'M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5';
+
     public const CHEVRON_UP_DOWN = 'M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9';
 
     public const CHECK = 'm4.5 12.75 6 6 9-13.5';
