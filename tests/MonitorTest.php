@@ -904,7 +904,7 @@ class MonitorTest extends TestCase
             // unique on the page) — the page heading already shows the bare
             // name regardless of this fallback, so asserting "tinker" alone
             // would pass either way.
-            ->assertSee('dark:text-neutral-400" title="tinker">tinker</td>', false);
+            ->assertSee('dark:text-neutral-400" data-tooltip="tinker">tinker</td>', false);
     }
 
     public function test_command_run_page_truncates_a_long_invocation_instead_of_overflowing_the_card(): void
@@ -928,7 +928,7 @@ class MonitorTest extends TestCase
         // eliding the text.
         $this->get('/monitor/commands/runs/'.$commandRow->request_id)
             ->assertOk()
-            ->assertSee('min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" title="app:sync-data --day='.$longArgument.'"', false);
+            ->assertSee('min-w-0 shrink truncate font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="app:sync-data --day='.$longArgument.'"', false);
     }
 
     public function test_command_run_page_breadcrumb_links_back_to_that_command_own_runs(): void
