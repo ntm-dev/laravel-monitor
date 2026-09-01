@@ -72,7 +72,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mt-1 min-w-0 flex-1 break-all text-2xl/none font-semibold {{ $handled ? 'text-neutral-900 dark:text-neutral-100' : 'text-rose-600 dark:text-rose-400' }}" title="{{ $class }}">{{ $class }}</div>
+                    <div class="mt-1 min-w-0 flex-1 break-all text-2xl/none font-semibold {{ $handled ? 'text-neutral-900 dark:text-neutral-100' : 'text-rose-600 dark:text-rose-400' }}" data-tooltip="{{ $class }}">{{ $class }}</div>
                     @if (filled($message))
                         <p class="break-words text-sm text-neutral-600 dark:text-neutral-300">{{ $message }}</p>
                     @endif
@@ -112,7 +112,7 @@
                                     <td class="max-w-[14rem] py-2 pr-3">
                                         <x-monitor::exception-source-badge :type="$occurrence->sourceType" :label="$occurrence->sourceLabel" :url="$occurrence->sourceUrl"/>
                                     </td>
-                                    <td class="max-w-[22rem] truncate py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300" title="{{ $occurrence->message }}">{{ $occurrence->message ?? '—' }}</td>
+                                    <td class="max-w-[22rem] truncate py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ $occurrence->message }}">{{ $occurrence->message ?? '—' }}</td>
                                     <td class="py-2 pr-3 text-xs text-neutral-600 dark:text-neutral-300">{{ $occurrence->user }}</td>
                                 </tr>
                             @endforeach

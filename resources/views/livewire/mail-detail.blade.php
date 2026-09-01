@@ -33,20 +33,20 @@
                     <div class="flex max-w-full items-baseline gap-2">
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.to') }}</dt>
                         <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
-                        <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ $entry->payload['to'] ?? '' }}">{{ $entry->payload['to'] ?? '—' }}</dd>
+                        <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" data-tooltip="{{ $entry->payload['to'] ?? '' }}">{{ $entry->payload['to'] ?? '—' }}</dd>
                     </div>
                     @if (filled($entry->payload['cc'] ?? null))
                         <div class="flex max-w-full items-baseline gap-2">
                             <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.cc') }}</dt>
                             <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
-                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ $entry->payload['cc'] }}">{{ $entry->payload['cc'] }}</dd>
+                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" data-tooltip="{{ $entry->payload['cc'] }}">{{ $entry->payload['cc'] }}</dd>
                         </div>
                     @endif
                     @if (filled($entry->payload['bcc'] ?? null))
                         <div class="flex max-w-full items-baseline gap-2">
                             <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.bcc') }}</dt>
                             <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
-                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ $entry->payload['bcc'] }}">{{ $entry->payload['bcc'] }}</dd>
+                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" data-tooltip="{{ $entry->payload['bcc'] }}">{{ $entry->payload['bcc'] }}</dd>
                         </div>
                     @endif
                     <div class="flex max-w-full items-baseline gap-2">
@@ -58,7 +58,7 @@
                         <dt class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.attachments') }}</dt>
                         <div class="relative -bottom-px min-w-6 grow border-b-2 border-dotted border-neutral-300 dark:border-white/20"></div>
                         @if ($attachmentNames !== [])
-                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" title="{{ implode(', ', $attachmentNames) }}">{{ count($attachmentNames) }} ({{ implode(', ', $attachmentNames) }})</dd>
+                            <dd class="max-w-[60%] truncate font-mono text-xs text-neutral-900 dark:text-white" data-tooltip="{{ implode(', ', $attachmentNames) }}">{{ count($attachmentNames) }} ({{ implode(', ', $attachmentNames) }})</dd>
                         @else
                             <dd class="shrink-0 font-mono text-xs text-neutral-900 dark:text-white">{{ $entry->payload['attachments'] ?? 0 }}</dd>
                         @endif

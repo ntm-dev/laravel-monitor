@@ -101,7 +101,7 @@
                                     </span>
                                 </th>
                                 <th class="w-8 cursor-pointer select-none pb-2 pr-4 font-normal" wire:click="sort('priority')">
-                                    <span class="inline-flex items-center gap-1" title="{{ __('monitor::messages.issue.sort_by_priority') }}">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="{{ __('monitor::messages.issue.sort_by_priority') }}">
                                         <x-monitor::priority-bars priority="none" class="{{ $sortBy === 'priority' ? 'opacity-100' : 'opacity-40' }}"/>
                                         <x-monitor::sort-caret field="priority" :sort-by="$sortBy" :sort-direction="$sortDirection"/>
                                     </span>
@@ -151,17 +151,17 @@
                                         <x-monitor::issues.priority-picker type="exception" :issue-key="$exception->key" :priority="$exception->priority"/>
                                     </td>
                                     <td class="max-w-[26rem] cursor-pointer py-2.5 pr-3" onclick="window.location='{{ route('monitor.issues.show', $exception->uuid) }}'">
-                                        <p class="truncate font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200" title="{{ $exception->latest['class'] ?? $exception->key }}">{{ $exception->latest['class'] ?? $exception->key }}</p>
+                                        <p class="truncate font-mono text-xs font-medium text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $exception->latest['class'] ?? $exception->key }}">{{ $exception->latest['class'] ?? $exception->key }}</p>
                                         @if (($exception->latest['message'] ?? '') !== '')
                                             <p class="mt-0.5 line-clamp-1 text-xs text-neutral-400 dark:text-neutral-500">{{ $exception->latest['message'] }}</p>
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs font-medium text-neutral-700 dark:text-neutral-200">{{ number_format($exception->count) }}</td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $exception->users > 0 ? number_format($exception->users) : '—' }}</td>
-                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" title="{{ $exception->first_seen?->diffForHumans() }}">
+                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $exception->first_seen?->diffForHumans() }}">
                                         @if ($exception->first_seen) <x-monitor::relative-time :at="$exception->first_seen"/> @endif
                                     </td>
-                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" title="{{ $exception->last_seen?->diffForHumans() }}">
+                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $exception->last_seen?->diffForHumans() }}">
                                         @if ($exception->last_seen) <x-monitor::relative-time :at="$exception->last_seen"/> @endif
                                     </td>
                                     <td class="py-2.5 pl-2 text-right">
@@ -199,7 +199,7 @@
                                     </span>
                                 </th>
                                 <th class="w-8 cursor-pointer select-none pb-2 pr-4 font-normal" wire:click="sort('priority')">
-                                    <span class="inline-flex items-center gap-1" title="{{ __('monitor::messages.issue.sort_by_priority') }}">
+                                    <span class="inline-flex items-center gap-1" data-tooltip="{{ __('monitor::messages.issue.sort_by_priority') }}">
                                         <x-monitor::priority-bars priority="none" class="{{ $sortBy === 'priority' ? 'opacity-100' : 'opacity-40' }}"/>
                                         <x-monitor::sort-caret field="priority" :sort-by="$sortBy" :sort-direction="$sortDirection"/>
                                     </span>
@@ -248,7 +248,7 @@
                                     </td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs font-medium text-neutral-700 dark:text-neutral-200">{{ number_format($item->count) }}</td>
                                     <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-amber-600 dark:text-amber-400">{{ $fmt($item->max_duration) }}</td>
-                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" title="{{ $item->last_seen?->diffForHumans() }}">
+                                    <td class="whitespace-nowrap py-2.5 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $item->last_seen?->diffForHumans() }}">
                                         @if ($item->last_seen) <x-monitor::relative-time :at="$item->last_seen"/> @endif
                                     </td>
                                     <td class="py-2.5 pl-2 text-right">

@@ -20,8 +20,11 @@ return [
         'logs' => 'Nhật ký',
         'settings' => 'Cài đặt',
         'support' => 'Hỗ trợ',
+        'collapse' => 'Thu gọn thanh điều hướng',
+        'expand' => 'Mở rộng thanh điều hướng',
         'sign_out' => 'Đăng xuất',
         'live_refresh' => 'Trực tiếp · làm mới mỗi :seconds giây',
+        'refresh_in' => 'Làm mới sau :seconds giây',
     ],
 
     'group' => [
@@ -30,12 +33,15 @@ return [
     ],
 
     'header' => [
+        'timezone_utc' => 'UTC',
         'timezone_local' => 'GIỜ ĐỊA PHƯƠNG',
         'starting_date' => 'Ngày bắt đầu',
         'ending_date' => 'Ngày kết thúc',
+        'time' => 'Giờ',
         'apply' => 'Áp dụng',
         'pick_both_dates' => 'Chọn cả hai ngày.',
-        'start_before_end' => 'Ngày bắt đầu phải trước ngày kết thúc.',
+        'end_at_least_1h_after_start' => 'Giờ kết thúc phải sau giờ bắt đầu ít nhất 1 giờ.',
+        'no_future_dates' => 'Không được chọn ngày giờ trong tương lai.',
     ],
 
     'exception' => [

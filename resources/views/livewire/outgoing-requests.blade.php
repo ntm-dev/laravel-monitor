@@ -70,7 +70,7 @@
                         @foreach ($domains as $domain)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.outgoing.show', ['hash' => KeyHash::for($domain->key)] + $range) }}'">
-                                <td class="max-w-[16rem] py-2 pr-2" title="{{ $domain->key }}">
+                                <td class="max-w-[16rem] py-2 pr-2" data-tooltip="{{ $domain->key }}">
                                     <span class="flex items-center gap-1.5">
                                         <x-monitor::icon :path="Icons::REQUESTS" :stroke="1.8" class="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500 group-hover:text-blue-600 dark:group-hover:text-blue-400"/>
                                         <span class="truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $domain->key }}</span>

@@ -27,7 +27,7 @@
                         <option value="{{ $user->id }}">{{ $user->name }}</option>
                     @endforeach
                 </select>
-                <button type="button" wire:click="$refresh" title="{{ __('monitor::messages.common.refresh') }}"
+                <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
                         class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                     <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
                 </button>
@@ -57,7 +57,7 @@
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_routes') }}"
                            class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 {{ $search !== '' ? 'pr-7' : 'pr-2' }} text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
                     @if ($search !== '')
-                        <button type="button" wire:click="clearSearch" title="{{ __('monitor::messages.common.clear') }}"
+                        <button type="button" wire:click="clearSearch" data-tooltip="{{ __('monitor::messages.common.clear') }}"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400">
                             <x-monitor::icon :path="Icons::CLOSE" :stroke="2" class="h-3.5 w-3.5"/>
                         </button>
@@ -123,7 +123,7 @@
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => KeyHash::for($route->key)] + $range) }}'">
                                 <td class="py-2 pr-2 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($route->method) }}">{{ $route->method }}</td>
-                                <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" title="{{ $route->key }}">{{ $route->path }}</td>
+                                <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $route->key }}">{{ $route->path }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $route->client_errors > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">
                                     <span class="inline-flex items-center justify-end gap-1">

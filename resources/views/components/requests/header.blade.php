@@ -29,7 +29,7 @@
             </a>
             @if ($breadcrumbLabel !== null)
                 <span class="shrink-0">›</span>
-                <a href="{{ $breadcrumbUrl }}" title="{{ $breadcrumbLabel }}"
+                <a href="{{ $breadcrumbUrl }}" data-tooltip="{{ $breadcrumbLabel }}"
                    class="min-w-0 truncate font-mono hover:text-neutral-900 dark:hover:text-neutral-100">
                     {{ $breadcrumbLabel }}
                 </a>
@@ -38,18 +38,18 @@
 
         @if ($job !== null)
             <div class="mt-1 flex flex-wrap items-center gap-2.5">
-                <h1 class="min-w-0 truncate text-2xl font-bold tracking-tight" title="{{ $jobClass }}">{{ $jobClass }}</h1>
+                <h1 class="min-w-0 truncate text-2xl font-bold tracking-tight" data-tooltip="{{ $jobClass }}">{{ $jobClass }}</h1>
             </div>
         @else
             <div class="mt-1 flex flex-wrap items-center gap-2.5">
                 <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $badgeClass }}">{{ $method }}</span>
                 <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs {{ $badgeClass }}">{{ $status ?: '—' }}</span>
-                <h1 class="min-w-0 truncate text-2xl font-bold tracking-tight" title="{{ $path }}">{{ $path }}</h1>
+                <h1 class="min-w-0 truncate text-2xl font-bold tracking-tight" data-tooltip="{{ $path }}">{{ $path }}</h1>
             </div>
 
             @if ($url)
                 <div class="mt-1 flex items-center gap-1.5" x-data="{ copied: false }">
-                    <p class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" title="{{ $url }}">{{ $url }}</p>
+                    <p class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $url }}">{{ $url }}</p>
                     <button type="button"
                             @click="navigator.clipboard.writeText(@js($url)); copied = true; setTimeout(() => copied = false, 1500)"
                             class="shrink-0 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200">

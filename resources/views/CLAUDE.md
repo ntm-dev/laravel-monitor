@@ -52,3 +52,19 @@ comment-open and gets compiled as a literal `{{ }}` echo of the rest of the comm
 producing garbled output (seen once as `<?php echo e(-- ...` swallowing everything up to the next
 `{{`/`}}` pair, corrupting an unrelated line further down). Describe the directive in comments
 without the leading `@` (e.g. "php block", "foreach directive"), or avoid mentioning it at all.
+Same failure mode for a literal `--}}` written out inside a `{{-- --}}` comment's own body (e.g.
+a comment explaining Blade's comment syntax itself) — Blade just does a substring search for the
+next `--}}` to find the end, so that inner occurrence closes the comment early and dumps the rest
+of the intended comment text onto the page as visible content.
+
+**A `//`/`/* */` JS comment inside an HTML attribute value (`x-data="{ ... }"`, any other
+Alpine `x-`/`:`-bound attribute) is one stray `"` or `@word` away from corrupting the page.**
+The attribute is still HTML-parsed even though its content is JS: a literal double-quote ends
+the attribute early (dumping the rest of the JS as visible page text), and a bare `@word` risks
+the directive-in-comment failure above since Blade's directive scan doesn't know it's inside JS.
+Bit us in `header.blade.php`'s custom-range `x-data` — twice, across two separate incidents.
+**Prefer `{{-- ... --}}` over `//` for explanatory comments living inside such an attribute** —
+Blade comments are deleted wholesale at compile time, so nothing in their body (quotes, `@word`,
+just not a literal `--}}`, see above) can reach the browser at all. A comment inside a `<script>`
+tag is NOT at risk this way — script content isn't attribute-value-parsed — so this only applies
+to comments written inside an HTML attribute's own quoted string.

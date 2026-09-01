@@ -56,7 +56,7 @@
                                         <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$entry->sourceUrl"/>
                                     </td>
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $entry->payload['mailer'] ?? '—' }}</td>
-                                    <td class="max-w-[16rem] truncate py-2 pr-3 text-xs text-neutral-700 dark:text-neutral-200" title="{{ $entry->payload['subject'] ?? '' }}">{{ $entry->payload['subject'] ?? '(no subject)' }}</td>
+                                    <td class="max-w-[16rem] truncate py-2 pr-3 text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $entry->payload['subject'] ?? '' }}">{{ $entry->payload['subject'] ?? '(no subject)' }}</td>
                                     <td class="py-2 pr-3">
                                         {{-- Icon + total recipients, with a dark dotted-line breakdown tooltip on hover.
                                              Positioned via Alpine as position:fixed (coordinates from getBoundingClientRect on hover) rather than CSS group-hover +
@@ -97,7 +97,7 @@
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
                                     <td class="cursor-pointer py-2 pl-2 text-right" onclick="window.location='{{ $sendUrl }}'">
                                         <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 hover:border-neutral-200 dark:hover:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:text-neutral-600 dark:hover:text-neutral-300 hover:shadow-sm"
-                                              title="{{ __('monitor::messages.common.open_mail') }}">
+                                              data-tooltip="{{ __('monitor::messages.common.open_mail') }}">
                                             <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     </td>

@@ -82,7 +82,7 @@
             @elseif ($kind === 'phase')
                 <span class="shrink-0 font-mono text-[11px] uppercase tracking-tight text-neutral-600 dark:text-neutral-300">{{ $entry->label }}</span>
                 @if ($entry->metadata['controller'] ?? null)
-                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500" title="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
+                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
                 @endif
             @else
                 @if ($duplicateColor)
@@ -142,7 +142,7 @@
                         <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
                     @endif
                     @if ($entry->metadata['controller'] ?? null)
-                        <span class="max-w-sm truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" title="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
+                        <span class="max-w-sm truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
                     @endif
                 </div>
             @else

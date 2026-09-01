@@ -62,7 +62,7 @@
                             @endif
                         </span>
                         <span class="self-center min-w-0 truncate text-neutral-700 dark:text-neutral-200"
-                            title="{{ $log->summary }}">{{ $log->summary }}
+                            data-tooltip="{{ $log->summary }}">{{ $log->summary }}
                         </span>
                     </button>
                     <div x-show="expanded" x-cloak class="flex flex-col divide-y divide-neutral-200  dark:divide-white/5 pl-4 pr-2.5">

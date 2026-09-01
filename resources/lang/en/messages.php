@@ -20,8 +20,11 @@ return [
         'logs' => 'Logs',
         'settings' => 'Settings',
         'support' => 'Support',
+        'collapse' => 'Collapse sidebar',
+        'expand' => 'Expand sidebar',
         'sign_out' => 'Sign out',
         'live_refresh' => 'Live · refreshes every :seconds s',
+        'refresh_in' => 'Refreshes in :seconds s',
     ],
 
     'group' => [
@@ -30,12 +33,15 @@ return [
     ],
 
     'header' => [
+        'timezone_utc' => 'UTC',
         'timezone_local' => 'LOCAL',
         'starting_date' => 'Starting date',
         'ending_date' => 'Ending date',
+        'time' => 'Time',
         'apply' => 'Apply',
         'pick_both_dates' => 'Pick both dates.',
-        'start_before_end' => 'Start must be before end.',
+        'end_at_least_1h_after_start' => 'End must be at least 1 hour after start.',
+        'no_future_dates' => 'Dates cannot be in the future.',
     ],
 
     'exception' => [

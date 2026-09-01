@@ -83,5 +83,5 @@
               },
           }"
           x-text="label"
-          title="{{ \LaravelMonitor\Support\Format::datetime($at) }} {{ \LaravelMonitor\Support\Format::timezone() }}"></span>
+          data-tooltip="{{ \LaravelMonitor\Support\Format::datetime($at) }} {{ \LaravelMonitor\Support\Format::timezone() }}"></span>
 @endif

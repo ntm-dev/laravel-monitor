@@ -72,7 +72,7 @@
                                                 } }}">{{ $status ?? __('monitor::messages.common.failed') }}</span>
                                         @endif
                                     </td>
-                                    <td class="max-w-[20rem] py-2 pr-3" title="{{ $entry->payload['url'] ?? $entry->key }}">
+                                    <td class="max-w-[20rem] py-2 pr-3" data-tooltip="{{ $entry->payload['url'] ?? $entry->key }}">
                                         <span class="flex items-center gap-1.5">
                                             <x-monitor::icon :path="Icons::REQUESTS" :stroke="1.8" class="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500 group-hover:text-blue-600 dark:group-hover:text-blue-400"/>
                                             <span class="truncate font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['url'] ?? $entry->key }}</span>

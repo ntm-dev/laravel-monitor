@@ -7,7 +7,7 @@
 @endphp
 <x-monitor::layout :title="trim($method.' '.$path)">
     <div class="flex min-h-screen">
-        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
+        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
             <x-monitor::requests.header :root="$root" :range="$range" :job="$job" :breadcrumb-tab="$breadcrumbTab" :breadcrumb-label="$breadcrumbLabel" :breadcrumb-url="$breadcrumbUrl"/>

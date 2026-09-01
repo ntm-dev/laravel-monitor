@@ -22,31 +22,31 @@
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 <template x-if="selected()?.type === 'query'">
-                    <a :href="selected()?.queryUrl" title="{{ __('monitor::messages.common.view_query') }}"
+                    <a :href="selected()?.queryUrl" data-tooltip="{{ __('monitor::messages.common.view_query') }}"
                         class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                     </a>
                 </template>
                 <template x-if="selected()?.type === 'notification'">
-                    <a :href="selected()?.notificationUrl" title="{{ __('monitor::messages.common.view_notification') }}"
+                    <a :href="selected()?.notificationUrl" data-tooltip="{{ __('monitor::messages.common.view_notification') }}"
                         class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                     </a>
                 </template>
                 <template x-if="selected()?.type === 'mail'">
-                    <a :href="selected()?.mailUrl" title="{{ __('monitor::messages.common.view_mail') }}"
+                    <a :href="selected()?.mailUrl" data-tooltip="{{ __('monitor::messages.common.view_mail') }}"
                         class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                     </a>
                 </template>
                 <template x-if="selected()?.type === 'exception'">
-                    <a :href="selected()?.exceptionUrl" title="{{ __('monitor::messages.common.view_exception') }}"
+                    <a :href="selected()?.exceptionUrl" data-tooltip="{{ __('monitor::messages.common.view_exception') }}"
                         class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                     </a>
                 </template>
                 <template x-if="selected()?.type === 'http'">
-                    <a :href="selected()?.outgoingUrl" title="{{ __('monitor::messages.common.view_outgoing_request') }}"
+                    <a :href="selected()?.outgoingUrl" data-tooltip="{{ __('monitor::messages.common.view_outgoing_request') }}"
                         class="flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-400 hover:border-neutral-200 hover:bg-white hover:text-emerald-700 dark:hover:border-neutral-700 dark:hover:bg-neutral-900 dark:hover:text-emerald-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3" />
                     </a>
@@ -65,7 +65,7 @@
                 <div class="mb-1.5 flex items-center justify-between">
                     <span
                         class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.sql') }}</span>
-                    <button type="button" @click="copySql()" title="{{ __('monitor::messages.common.copy') }}"
+                    <button type="button" @click="copySql()" data-tooltip="{{ __('monitor::messages.common.copy') }}"
                         class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! sqlCopied" />
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2"
@@ -121,7 +121,7 @@
                         {{-- rtl + text-align:left truncates the front of the
                              path, keeping file:line visible. --}}
                         <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            style="direction: rtl; text-align: left;" :title="selected()?.metadata?.location"
+                            style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.location"
                             x-text="selected()?.metadata?.location"></dd>
                     </div>
                 </template>
@@ -133,7 +133,7 @@
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.key') }}</dt>
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        :title="selected()?.metadata?.key" x-text="selected()?.metadata?.key"></dd>
+                        :data-tooltip="selected()?.metadata?.key" x-text="selected()?.metadata?.key"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.operation') }}</dt>
@@ -169,7 +169,7 @@
                     {{-- rtl + text-align:left truncates the front of the
                          FQCN, keeping the class name visible. --}}
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" :title="selected()?.metadata?.notification"
+                        style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.notification"
                         x-text="selected()?.label"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
@@ -181,7 +181,7 @@
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.notifiable') }}</dt>
                         <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            :title="selected()?.metadata?.notifiable"
+                            :data-tooltip="selected()?.metadata?.notifiable"
                             x-text="selected()?.metadata?.notifiable"></dd>
                     </div>
                 </template>
@@ -198,7 +198,7 @@
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.subject') }}</dt>
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        :title="selected()?.metadata?.subject" x-text="selected()?.metadata?.subject"></dd>
+                        :data-tooltip="selected()?.metadata?.subject" x-text="selected()?.metadata?.subject"></dd>
                 </div>
                 <template x-if="mailRecipients()">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
@@ -210,27 +210,27 @@
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.to') }}</dt>
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        :title="selected()?.metadata?.to" x-text="selected()?.metadata?.to"></dd>
+                        :data-tooltip="selected()?.metadata?.to" x-text="selected()?.metadata?.to"></dd>
                 </div>
                 <template x-if="selected()?.metadata?.cc">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.cc') }}</dt>
                         <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            :title="selected()?.metadata?.cc" x-text="selected()?.metadata?.cc"></dd>
+                            :data-tooltip="selected()?.metadata?.cc" x-text="selected()?.metadata?.cc"></dd>
                     </div>
                 </template>
                 <template x-if="selected()?.metadata?.bcc">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.bcc') }}</dt>
                         <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            :title="selected()?.metadata?.bcc" x-text="selected()?.metadata?.bcc"></dd>
+                            :data-tooltip="selected()?.metadata?.bcc" x-text="selected()?.metadata?.bcc"></dd>
                     </div>
                 </template>
                 <template x-if="selected()?.metadata?.notification">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.via') }}</dt>
                         <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            :title="selected()?.metadata?.notification"
+                            :data-tooltip="selected()?.metadata?.notification"
                             x-text="selected()?.metadata?.notification"></dd>
                     </div>
                 </template>
@@ -238,7 +238,7 @@
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.attachments') }}</dt>
                         <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            :title="mailAttachments()" x-text="mailAttachments()"></dd>
+                            :data-tooltip="mailAttachments()" x-text="mailAttachments()"></dd>
                     </div>
                 </template>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
@@ -252,7 +252,7 @@
                         {{-- rtl + text-align:left truncates the front of the
                              FQCN, keeping the class name visible. --}}
                         <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                            style="direction: rtl; text-align: left;" :title="mailClass()"
+                            style="direction: rtl; text-align: left;" :data-tooltip="mailClass()"
                             x-text="mailClass()"></dd>
                     </div>
                 </template>
@@ -273,7 +273,7 @@
                     {{-- rtl + text-align:left truncates the front of the
                          FQCN, keeping the class name visible. --}}
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" :title="selected()?.metadata?.model"
+                        style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.model"
                         x-text="selected()?.metadata?.model"></dd>
                 </div>
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
@@ -310,7 +310,7 @@
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.url') }}</dt>
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        :title="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
+                        :data-tooltip="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
@@ -327,7 +327,7 @@
                     {{-- rtl + text-align:left truncates the front of the
                          FQCN, keeping the class name visible. --}}
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" :title="selected()?.metadata?.key"
+                        style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.key"
                         x-text="selected()?.metadata?.key"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
@@ -401,13 +401,13 @@
                     {{-- rtl + text-align:left truncates the front of the
                          FQCN, keeping the class name visible. --}}
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" :title="selected()?.metadata?.class"
+                        style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.class"
                         x-text="selected()?.metadata?.class"></dd>
                 </div>
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.file') }}</dt>
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" :title="exceptionLocation()"
+                        style="direction: rtl; text-align: left;" :data-tooltip="exceptionLocation()"
                         x-text="exceptionLocation()"></dd>
                 </div>
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">

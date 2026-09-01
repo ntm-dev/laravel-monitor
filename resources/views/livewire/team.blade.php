@@ -30,7 +30,7 @@
                     <div class="flex items-center gap-1.5">
                         <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $t('name') }}</span>
                         <span class="min-w-0 flex-1 truncate text-sm text-right text-neutral-700 dark:text-neutral-200">{{ $actor->name }}</span>
-                        <button type="button" x-on:click="editing = true; $wire.startEditingName()" title="{{ $t('edit_name') }}"
+                        <button type="button" x-on:click="editing = true; $wire.startEditingName()" data-tooltip="{{ $t('edit_name') }}"
                                 class="shrink-0 rounded p-1 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200">
                             <x-monitor::icon :path="Icons::PENCIL" class="h-4 w-4"/>
                         </button>
@@ -60,7 +60,7 @@
             <div class="flex items-center gap-1.5" x-data="{ open: false }" x-on:email-change-requested.window="open = false">
                 <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $t('email_address') }}</span>
                 <span class="min-w-0 flex-1 truncate text-sm text-right text-neutral-700 dark:text-neutral-200">{{ $actor->email }}</span>
-                <button type="button" x-on:click="open = true; $wire.startEditingEmail()" title="{{ $t('edit_email') }}"
+                <button type="button" x-on:click="open = true; $wire.startEditingEmail()" data-tooltip="{{ $t('edit_email') }}"
                         class="shrink-0 rounded p-1 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200">
                     <x-monitor::icon :path="Icons::PENCIL" class="h-4 w-4"/>
                 </button>

@@ -18,7 +18,7 @@
                 <p class="text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.body_omitted', ['size' => number_format($body['_size'] ?? 0)]) }}</p>
             @else
                 <div class="relative max-h-96 overflow-auto rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                    <button type="button" title="{{ __('monitor::messages.common.copy') }}"
+                    <button type="button" data-tooltip="{{ __('monitor::messages.common.copy') }}"
                             @click="navigator.clipboard.writeText(@js($bodyJson)); bodyCopied = true; setTimeout(() => bodyCopied = false, 1500)"
                             class="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-neutral-400 backdrop-blur hover:text-neutral-700 dark:bg-neutral-900/80 dark:hover:text-neutral-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5" x-show="! bodyCopied"/>
