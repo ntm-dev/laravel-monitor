@@ -31,15 +31,15 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::card class="flex flex-col p-4">
+            <x-monitor::card class="flex flex-col p-4" x-data="{ hidden: {} }">
                 <x-monitor::metric :label="__('monitor::messages.common.calls')" :value="number_format($success + $failed)">
-                    <x-monitor::legend :label="__('monitor::messages.common.unsuccessful')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
-                    <x-monitor::legend :label="__('monitor::messages.common.successful')" dot="bg-emerald-500" :value="number_format($success)"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.unsuccessful')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'" series-key="unsuccessful"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.successful')" dot="bg-emerald-500" :value="number_format($success)" series-key="successful"/>
                 </x-monitor::metric>
                 <div class="mt-5">
                     <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                        ['label' => __('monitor::messages.common.successful'), 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
-                        ['label' => __('monitor::messages.common.unsuccessful'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
+                        ['key' => 'successful', 'label' => __('monitor::messages.common.successful'), 'dot' => 'bg-emerald-500', 'data' => $successBuckets],
+                        ['key' => 'unsuccessful', 'label' => __('monitor::messages.common.unsuccessful'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
                     ]"/>
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>

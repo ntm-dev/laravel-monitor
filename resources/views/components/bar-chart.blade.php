@@ -28,10 +28,11 @@
             <div class="relative flex h-full flex-1 flex-col items-center justify-end"
                  :class="{ 'bg-neutral-100/60 dark:bg-neutral-800/60': hoverIndex === {{ $chartI }} }"
                  @mouseenter="setHoverIndex({{ $chartI }})">
-                @foreach (array_reverse($series) as $chartSerie)
+                @foreach (array_reverse($series, true) as $chartSerie)
                     @php($chartValue = $chartSerie['data'][$chartI] ?? 0)
                     @if ($chartValue > 0)
                         <div class="{{ $barWidth }} first:rounded-t-[2px] {{ $chartSerie['bar'] ?? $chartSerie['dot'] }}"
+                             @if (isset($chartSerie['key'])) x-show="!hidden['{{ $chartSerie['key'] }}']" @endif
                              style="height: {{ max(2, $chartValue / $chartMax * 100) }}%"></div>
                     @endif
                 @endforeach
@@ -43,7 +44,8 @@
                     <p class="font-mono text-[11px] text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($since->copy()->addSeconds($chartI * $chartSeconds)) }} <span class="text-neutral-500">{{ $chartTz }}</span></p>
                     <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
                         @foreach ($series as $chartSerie)
-                            <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                            <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400"
+                               @if (isset($chartSerie['key'])) :class="{ 'opacity-40': hidden['{{ $chartSerie['key'] }}'] }" @endif>
                                 <span class="inline-block h-2.5 w-1 rounded-full {{ $chartSerie['dot'] }}"></span>{{ $chartSerie['label'] }}
                                 <span class="ml-auto text-neutral-100">{{ number_format($chartSerie['data'][$chartI] ?? 0) }}</span>
                             </p>

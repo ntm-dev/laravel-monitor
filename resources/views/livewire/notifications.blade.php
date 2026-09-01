@@ -31,10 +31,10 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::card class="flex flex-col p-4">
+            <x-monitor::card class="flex flex-col p-4" x-data="{ hidden: {} }">
                 <x-monitor::metric :label="__('monitor::messages.nav.notifications')" :value="number_format($total)">
                     @foreach ($channels as $channel)
-                        <x-monitor::legend :label="$channel->label" :dot="$channel->dot" :value="number_format($channel->count)"/>
+                        <x-monitor::legend :label="$channel->label" :dot="$channel->dot" :value="number_format($channel->count)" :series-key="$channel->key"/>
                     @endforeach
                 </x-monitor::metric>
                 <div class="mt-5">

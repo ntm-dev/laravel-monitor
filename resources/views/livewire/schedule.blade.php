@@ -34,17 +34,17 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::card class="flex flex-col p-4">
+            <x-monitor::card class="flex flex-col p-4" x-data="{ hidden: {} }">
                 <x-monitor::metric :label="__('monitor::messages.nav.schedule')" :value="number_format($finished + $failed + $skipped)">
-                    <x-monitor::legend :label="__('monitor::messages.common.failed')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'"/>
-                    <x-monitor::legend :label="__('monitor::messages.common.skipped')" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($skipped)"/>
-                    <x-monitor::legend :label="__('monitor::messages.common.processed')" dot="bg-emerald-500" :value="number_format($finished)"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.failed')" dot="bg-rose-500" :value="number_format($failed)" :color="$failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'" series-key="failed"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.skipped')" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($skipped)" series-key="skipped"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.processed')" dot="bg-emerald-500" :value="number_format($finished)" series-key="processed"/>
                 </x-monitor::metric>
                 <div class="mt-5">
                     <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                        ['label' => __('monitor::messages.common.processed'), 'dot' => 'bg-emerald-500', 'data' => $finishedBuckets],
-                        ['label' => __('monitor::messages.common.skipped'), 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $skippedBuckets],
-                        ['label' => __('monitor::messages.common.failed'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
+                        ['key' => 'processed', 'label' => __('monitor::messages.common.processed'), 'dot' => 'bg-emerald-500', 'data' => $finishedBuckets],
+                        ['key' => 'skipped', 'label' => __('monitor::messages.common.skipped'), 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $skippedBuckets],
+                        ['key' => 'failed', 'label' => __('monitor::messages.common.failed'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],
                     ]"/>
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>
