@@ -23,31 +23,33 @@
                   stroke="#2dd4bf" stroke-width="0.4" stroke-dasharray="4" vector-effect="non-scaling-stroke"/>
         @endif
         @foreach ($series as $serie)
-            @foreach ($serie['lines'] as $points)
-                <polyline points="{{ $points }}" fill="none" stroke="{{ $serie['color'] }}"
-                          stroke-width="{{ \LaravelMonitor\View\Components\LineChart::STROKE_WIDTH }}"
-                          stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-            @endforeach
+            <g x-show="!hidden['{{ $serie['key'] }}']">
+                @foreach ($serie['lines'] as $points)
+                    <polyline points="{{ $points }}" fill="none" stroke="{{ $serie['color'] }}"
+                              stroke-width="{{ \LaravelMonitor\View\Components\LineChart::STROKE_WIDTH }}"
+                              stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+                @endforeach
+            </g>
         @endforeach
     </svg>
     {{-- Isolated data points render as HTML dots so the non-uniform SVG scale can't distort them. --}}
     @foreach ($series as $serie)
         @foreach ($serie['dots'] as $dot)
-            <div class="pointer-events-none absolute rounded-full"
+            <div class="pointer-events-none absolute rounded-full" x-show="!hidden['{{ $serie['key'] }}']"
                  style="width: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; height: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; transform: translate(-50%, -50%); left: {{ $dot['x'] }}%; top: {{ $dot['y'] }}%; background: {{ $serie['color'] }}"></div>
         @endforeach
     @endforeach
     <div class="pointer-events-none absolute inset-y-0 z-10 w-px bg-neutral-300 dark:bg-neutral-600"
          x-show="hoverIndex !== null" x-cloak
          :style="{ left: (((hoverIndex ?? 0) + 0.5) / {{ $buckets }} * 100) + '%' }"></div>
-    {{-- Hover markers reuse the polyline coordinates (lineHoverY); hidden when the hovered bucket has no data. --}}
+    {{-- Hover markers reuse the polyline coordinates (lineHoverY); hidden when the hovered bucket has no data or the series is toggled off. --}}
     <div class="pointer-events-none absolute z-10 rounded-full"
          style="width: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; height: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; transform: translate(-50%, -50%); background: #f59e0b"
-         x-show="hoverIndex !== null && lineHoverY.p95[hoverIndex] !== null" x-cloak
+         x-show="hoverIndex !== null && lineHoverY.p95[hoverIndex] !== null && !hidden['p95']" x-cloak
          :style="{ left: (((hoverIndex ?? 0) + 0.5) / {{ $buckets }} * 100) + '%', top: (lineHoverY.p95[hoverIndex ?? 0] ?? 0) + '%' }"></div>
     <div class="pointer-events-none absolute z-10 rounded-full"
          style="width: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; height: {{ \LaravelMonitor\View\Components\LineChart::DOT_DIAMETER }}px; transform: translate(-50%, -50%); background: #404040"
-         x-show="hoverIndex !== null && lineHoverY.avg[hoverIndex] !== null" x-cloak
+         x-show="hoverIndex !== null && lineHoverY.avg[hoverIndex] !== null && !hidden['avg']" x-cloak
          :style="{ left: (((hoverIndex ?? 0) + 0.5) / {{ $buckets }} * 100) + '%', top: (lineHoverY.avg[hoverIndex ?? 0] ?? 0) + '%' }"></div>
     <div class="absolute inset-0 flex" @mouseleave="clearHoverIndex()">
         @foreach ($tooltips as $i => $tooltip)
@@ -58,11 +60,11 @@
                      x-show="hoverIndex === {{ $i }}" x-cloak>
                     <p class="font-mono text-[11px] text-neutral-200">{{ $tooltip['time'] }} <span class="text-neutral-500">{{ $timezone }}</span></p>
                     <div class="mt-2 space-y-1.5 border-t border-neutral-700/60 pt-2">
-                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400" :class="{ 'opacity-40': hidden['avg'] }">
                             <span class="inline-block h-2.5 w-1 rounded-full bg-neutral-600"></span>{{ __('monitor::messages.common.avg') }}
                             <span class="ml-auto text-neutral-100">{{ $tooltip['avg'] }}</span>
                         </p>
-                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400">
+                        <p class="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-tight text-neutral-400" :class="{ 'opacity-40': hidden['p95'] }">
                             <span class="inline-block h-2.5 w-1 rounded-full bg-amber-500"></span>{{ __('monitor::messages.common.p95') }}
                             <span class="ml-auto text-neutral-100">{{ $tooltip['p95'] }}</span>
                         </p>

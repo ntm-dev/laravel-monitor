@@ -84,6 +84,7 @@ class Notifications extends Card
         $hasCustomChannels = $bySubtype->keys()->diff(self::KNOWN_CHANNELS)->isNotEmpty();
 
         $channelSeries = $knownChannels->map(fn ($channel) => [
+            'key' => $channel,
             'label' => ucfirst($channel),
             'dot' => self::CHANNEL_COLORS[$channel] ?? 'bg-neutral-400 dark:bg-neutral-500',
             'data' => $storage->countsPerBucket('notification', $since, $buckets, $channel, null, $until),
@@ -102,17 +103,18 @@ class Notifications extends Card
                 }
             }
 
-            $channelSeries[] = ['label' => 'Custom', 'dot' => self::CUSTOM_CHANNEL_COLOR, 'data' => $customBuckets];
+            $channelSeries[] = ['key' => 'custom', 'label' => 'Custom', 'dot' => self::CUSTOM_CHANNEL_COLOR, 'data' => $customBuckets];
         }
 
         $channels = $knownChannels->map(fn ($channel) => (object) [
+            'key' => $channel,
             'label' => ucfirst($channel),
             'dot' => self::CHANNEL_COLORS[$channel] ?? 'bg-neutral-400 dark:bg-neutral-500',
             'count' => $bySubtype->get($channel)?->count ?? 0,
         ])->values();
 
         if ($hasCustomChannels) {
-            $channels->push((object) ['label' => 'Custom', 'dot' => self::CUSTOM_CHANNEL_COLOR, 'count' => $customTotal]);
+            $channels->push((object) ['key' => 'custom', 'label' => 'Custom', 'dot' => self::CUSTOM_CHANNEL_COLOR, 'count' => $customTotal]);
         }
 
         $groups = $storage->keyStats('notification', $since, $until);

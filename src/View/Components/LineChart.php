@@ -32,7 +32,7 @@ class LineChart extends Component
      * `lines` holds one polyline point string per run of >=2 consecutive buckets with
      * data; buckets whose neighbours are both empty become standalone `dots` instead.
      *
-     * @var list<array{color: string, lines: list<string>, dots: list<array{x: float, y: float}>}>
+     * @var list<array{key: string, color: string, lines: list<string>, dots: list<array{x: float, y: float}>}>
      */
     public array $series = [];
 
@@ -75,6 +75,7 @@ class LineChart extends Component
 
         foreach ([['p95', '#f59e0b', $p95], ['avg', '#404040', $avg]] as [$name, $color, $data]) {
             $this->series[] = [
+                'key' => $name,
                 'color' => $color,
                 'lines' => $this->lines($data),
                 'dots' => $this->isolatedDots($data),

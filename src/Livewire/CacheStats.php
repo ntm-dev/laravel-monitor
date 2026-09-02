@@ -78,15 +78,15 @@ class CacheStats extends Card
         return [
             'events' => $hits + $misses + $writes + $deletes,
             'eventSeries' => [
-                ['label' => 'Hits', 'dot' => 'bg-emerald-500', 'total' => $hits, 'data' => $hitBuckets],
-                ['label' => 'Misses', 'dot' => 'bg-amber-500', 'total' => $misses, 'data' => $missBuckets, 'warn' => true],
-                ['label' => 'Writes', 'dot' => 'bg-blue-500', 'total' => $writes, 'data' => $writeBuckets],
-                ['label' => 'Deletes', 'dot' => 'bg-neutral-400 dark:bg-neutral-500', 'total' => $deletes, 'data' => $deleteBuckets],
+                ['key' => 'hits', 'label' => 'Hits', 'dot' => 'bg-emerald-500', 'total' => $hits, 'data' => $hitBuckets],
+                ['key' => 'misses', 'label' => 'Misses', 'dot' => 'bg-amber-500', 'total' => $misses, 'data' => $missBuckets, 'warn' => true],
+                ['key' => 'writes', 'label' => 'Writes', 'dot' => 'bg-blue-500', 'total' => $writes, 'data' => $writeBuckets],
+                ['key' => 'deletes', 'label' => 'Deletes', 'dot' => 'bg-neutral-400 dark:bg-neutral-500', 'total' => $deletes, 'data' => $deleteBuckets],
             ],
             'failures' => $writeFailures + $forgetFailures,
             'failureSeries' => [
-                ['label' => 'Write', 'dot' => 'bg-rose-500', 'total' => $writeFailures, 'data' => $writeFailedBuckets, 'warn' => true],
-                ['label' => 'Delete', 'dot' => 'bg-rose-400', 'total' => $forgetFailures, 'data' => $forgetFailedBuckets, 'warn' => true],
+                ['key' => 'write_failed', 'label' => 'Write', 'dot' => 'bg-rose-500', 'total' => $writeFailures, 'data' => $writeFailedBuckets, 'warn' => true],
+                ['key' => 'forget_failed', 'label' => 'Delete', 'dot' => 'bg-rose-400', 'total' => $forgetFailures, 'data' => $forgetFailedBuckets, 'warn' => true],
             ],
             'keys' => $keys->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalKeys' => $total,

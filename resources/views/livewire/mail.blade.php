@@ -31,15 +31,15 @@
                  setHoverIndex(i) { this.hoverIndex = i },
                  clearHoverIndex() { this.hoverIndex = null },
              }">
-            <x-monitor::card class="flex flex-col p-4">
+            <x-monitor::card class="flex flex-col p-4" x-data="{ hidden: {} }">
                 <x-monitor::metric :label="__('monitor::messages.common.mails')" :value="number_format($direct + $viaNotification)">
-                    <x-monitor::legend :label="__('monitor::messages.common.direct')" dot="bg-blue-500" :value="number_format($direct)"/>
-                    <x-monitor::legend :label="__('monitor::messages.common.via_notification')" dot="bg-purple-500" :value="number_format($viaNotification)"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.direct')" dot="bg-blue-500" :value="number_format($direct)" series-key="direct"/>
+                    <x-monitor::legend :label="__('monitor::messages.common.via_notification')" dot="bg-purple-500" :value="number_format($viaNotification)" series-key="via_notification"/>
                 </x-monitor::metric>
                 <div class="mt-5">
                     <x-monitor::bar-chart :since="$since" :until="$until" height="h-[167px]" :series="[
-                        ['label' => __('monitor::messages.common.direct'), 'dot' => 'bg-blue-500', 'data' => $directBuckets],
-                        ['label' => __('monitor::messages.common.via_notification'), 'dot' => 'bg-purple-500', 'data' => $viaNotificationBuckets],
+                        ['key' => 'direct', 'label' => __('monitor::messages.common.direct'), 'dot' => 'bg-blue-500', 'data' => $directBuckets],
+                        ['key' => 'via_notification', 'label' => __('monitor::messages.common.via_notification'), 'dot' => 'bg-purple-500', 'data' => $viaNotificationBuckets],
                     ]"/>
                 </div>
                 <x-monitor::chart-footer :since="$since" :until="$until"/>
