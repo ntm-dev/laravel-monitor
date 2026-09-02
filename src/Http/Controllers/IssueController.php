@@ -5,7 +5,10 @@ namespace LaravelMonitor\Http\Controllers;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\ExceptionStorage;
+use LaravelMonitor\Contracts\IssueStorage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Livewire\Concerns\BuildsExceptionDetail;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Livewire\Issues;
@@ -26,15 +29,19 @@ class IssueController
     use BuildsExceptionDetail;
     use ResolvesUserNames;
 
-    public function __construct(protected Storage $storage)
-    {
+    public function __construct(
+        protected IssueStorage $issueStorage,
+        protected ExceptionStorage $exceptionStorage,
+        protected TimelineStorage $timelineStorage,
+        protected AggregateStorage $aggregateStorage,
+    ) {
     }
 
     public function show(string $uuid): View
     {
         app()->setLocale(Preferences::locale());
 
-        $issue = $this->storage->findIssueByUuid($uuid);
+        $issue = $this->issueStorage->findIssueByUuid($uuid);
 
         abort_unless($issue !== null, 404);
 
@@ -60,8 +67,8 @@ class IssueController
         $since = CarbonImmutable::now()->subYears(5);
         $tz = Format::timezone();
 
-        $group = $this->storage->exceptionGroups($since, null)->firstWhere('key', $key);
-        $occurrences = $this->storage->recent('exception', $since, 200, null, $key, null);
+        $group = $this->exceptionStorage->exceptionGroups($since, null)->firstWhere('key', $key);
+        $occurrences = $this->timelineStorage->recent('exception', $since, 200, null, $key, null);
         $latest = $occurrences->first();
         $payload = $latest->payload ?? [];
 
@@ -73,10 +80,10 @@ class IssueController
         $handled = ($group?->unhandled ?? 0) === 0;
 
         $lastSeen = $group?->last_seen ?? $latest?->created_at;
-        $firstSeen = $this->storage->firstSeen('exception', $key) ?? $group?->first_seen;
+        $firstSeen = $this->timelineStorage->firstSeen('exception', $key) ?? $group?->first_seen;
         $phpVersion = $payload['php_version'] ?? null;
         $laravelVersion = $payload['laravel_version'] ?? null;
-        $occurrencesCount = $group?->count ?? $this->storage->stats('exception', $since, null, $key, null)->count;
+        $occurrencesCount = $group?->count ?? $this->aggregateStorage->stats('exception', $since, null, $key, null)->count;
 
         return [
             'type' => 'exception',
@@ -90,7 +97,7 @@ class IssueController
             'frameGroups' => $this->frameGroups($payload['frames'] ?? []),
             'markdown' => $this->markdown($payload, $handled),
             'summary' => $this->summary($lastSeen, $firstSeen, $phpVersion, $laravelVersion, (int) ($group?->users ?? 0), $occurrencesCount, $servers, $tz),
-            'occurrences' => $this->occurrenceRows($occurrences, $names, $this->storage),
+            'occurrences' => $this->occurrenceRows($occurrences, $names, $this->timelineStorage),
         ];
     }
 
@@ -101,7 +108,7 @@ class IssueController
         abort_unless($area !== null, 404);
 
         $since = CarbonImmutable::now()->subYears(5);
-        $stats = $this->storage->stats($type, $since, null, $key, null);
+        $stats = $this->aggregateStorage->stats($type, $since, null, $key, null);
 
         abort_unless($stats->count > 0, 404);
 

@@ -102,7 +102,7 @@ class Requests extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $userId = $this->userId !== '' ? $this->userId : null;
         $threshold = (int) config('monitor.thresholds.request', 1000);
@@ -151,7 +151,7 @@ class Requests extends Card
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        $topUsers = $storage->topUsers('request', $since, 100, $until);
+        $topUsers = $this->userStorage()->topUsers('request', $since, 100, $until);
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
 
         // One query grouped by subtype instead of five separate stats()

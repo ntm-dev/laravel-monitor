@@ -6,7 +6,8 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\IssueStorage;
 use LaravelMonitor\Livewire\Issues;
 
 /**
@@ -69,16 +70,16 @@ trait SyncsOpenIssues
      *
      * @return array{0: Collection, 1: Collection} [exceptions, performance]
      */
-    protected function syncOpenIssues(Storage $storage, DateTimeInterface $since, ?DateTimeInterface $until): array
+    protected function syncOpenIssues(AggregateStorage $aggregateStorage, IssueStorage $issueStorage, DateTimeInterface $since, ?DateTimeInterface $until): array
     {
-        $exceptions = $storage->aggregateByKey('exception', $since, null, $this->groupLimit(), 'last_seen', $until);
-        $storage->syncIssues('exception', $exceptions->pluck('last_seen', 'key')->filter()->all());
+        $exceptions = $aggregateStorage->aggregateByKey('exception', $since, null, $this->groupLimit(), 'last_seen', $until);
+        $issueStorage->syncIssues('exception', $exceptions->pluck('last_seen', 'key')->filter()->all());
 
         if ($exceptions->count() < $this->groupLimit()) {
-            $storage->deleteMissingIssues('exception', $exceptions->pluck('key')->all());
+            $issueStorage->deleteMissingIssues('exception', $exceptions->pluck('key')->all());
         }
 
-        $performance = $this->performanceIssues($storage, $since, $until);
+        $performance = $this->performanceIssues($aggregateStorage, $since, $until);
         $grouped = $performance->groupBy('type');
 
         // Every configured area, not just ones with a row in $performance
@@ -87,10 +88,10 @@ trait SyncsOpenIssues
         // would leave its previously-open issues stuck open forever.
         foreach (Issues::PERFORMANCE_AREAS as $type => $area) {
             $items = $grouped->get($type, collect());
-            $storage->syncIssues($type, $items->pluck('last_seen', 'key')->filter()->all());
+            $issueStorage->syncIssues($type, $items->pluck('last_seen', 'key')->filter()->all());
 
             if (! in_array($type, $this->truncatedPerformanceTypes, true)) {
-                $storage->deleteMissingIssues($type, $items->pluck('key')->all());
+                $issueStorage->deleteMissingIssues($type, $items->pluck('key')->all());
             }
         }
 
@@ -106,7 +107,7 @@ trait SyncsOpenIssues
      *
      * @return Collection<int, object{type: string, badge: string, label: string, key: string, count: int, max_duration: float}>
      */
-    protected function performanceIssues(Storage $storage, DateTimeInterface $since, ?DateTimeInterface $until): Collection
+    protected function performanceIssues(AggregateStorage $aggregateStorage, DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
         $items = collect();
         $this->truncatedPerformanceTypes = [];
@@ -114,7 +115,7 @@ trait SyncsOpenIssues
         foreach (Issues::PERFORMANCE_AREAS as $type => $area) {
             $threshold = (int) config("monitor.thresholds.{$area['threshold']}", 1000);
 
-            $raw = $storage->aggregateByKey($type, $since, null, $this->groupLimit(), 'max_duration', $until);
+            $raw = $aggregateStorage->aggregateByKey($type, $since, null, $this->groupLimit(), 'max_duration', $until);
 
             if ($raw->count() >= $this->groupLimit()) {
                 $this->truncatedPerformanceTypes[] = $type;

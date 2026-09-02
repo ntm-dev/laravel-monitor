@@ -94,11 +94,11 @@ class Exceptions extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $userId = $this->userId !== '' ? $this->userId : null;
 
-        $groups = $storage->exceptionGroups($since, $until, $userId);
+        $groups = $this->exceptionStorage()->exceptionGroups($since, $until, $userId);
 
         if ($this->search !== '') {
             $needle = strtolower($this->search);
@@ -119,7 +119,7 @@ class Exceptions extends Card
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        $topUsers = $storage->topUsers('exception', $since, 100, $until);
+        $topUsers = $this->userStorage()->topUsers('exception', $since, 100, $until);
         $names = $this->resolveNames($topUsers->pluck('user_id')->all());
         $tz = Format::timezone();
 

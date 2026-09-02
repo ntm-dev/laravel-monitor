@@ -4,7 +4,9 @@ namespace LaravelMonitor\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\HashResolver;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\Requests;
 use LaravelMonitor\Recorders\Requests as RequestsRecorder;
@@ -23,7 +25,7 @@ class UnmatchedRouteTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /users', [], 20, '2xx');
         Monitor::flush();
 
-        $routes = app(Storage::class)->routeStats('request', CarbonImmutable::now()->subHour());
+        $routes = app(AggregateStorage::class)->routeStats('request', CarbonImmutable::now()->subHour());
 
         $this->assertCount(2, $routes);
 
@@ -56,12 +58,11 @@ class UnmatchedRouteTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /users', [], 30, '2xx');
         Monitor::flush();
 
-        $storage = app(Storage::class);
         $hash = KeyHash::for(RequestsRecorder::UNMATCHED_ROUTE);
 
-        $this->assertSame(RequestsRecorder::UNMATCHED_ROUTE, $storage->resolveKeyHash('request', $hash));
+        $this->assertSame(RequestsRecorder::UNMATCHED_ROUTE, app(HashResolver::class)->resolveKeyHash('request', $hash));
 
-        $entries = $storage->recent('request', CarbonImmutable::now()->subHour(), key: RequestsRecorder::UNMATCHED_ROUTE);
+        $entries = app(TimelineStorage::class)->recent('request', CarbonImmutable::now()->subHour(), key: RequestsRecorder::UNMATCHED_ROUTE);
         $this->assertCount(2, $entries);
     }
 }

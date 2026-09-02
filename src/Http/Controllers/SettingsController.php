@@ -4,7 +4,6 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\Preferences;
@@ -29,7 +28,6 @@ class SettingsController
             'locale' => ['required', 'string', 'in:'.implode(',', Preferences::availableLocales())],
             'timezone' => ['required', 'string', 'in:'.implode(',', Preferences::timezones())],
             'enabled' => ['nullable', 'boolean'],
-            'storage_driver' => ['required', 'string', Rule::in(Settings::storageDrivers())],
             'database_table' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_.]+$/'],
             'dashboard_path' => ['required', 'string', 'max:255', 'regex:#^[A-Za-z0-9/_-]+$#'],
             'retention_hours' => ['required', 'integer', 'min:1', 'max:87600'],
@@ -58,7 +56,6 @@ class SettingsController
 
         Settings::save([
             'enabled' => $request->boolean('enabled'),
-            'storage_driver' => $validated['storage_driver'],
             'database_table' => $validated['database_table'],
             'dashboard_path' => $path,
             'retention_hours' => (int) $validated['retention_hours'],

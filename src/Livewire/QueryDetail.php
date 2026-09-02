@@ -36,7 +36,8 @@ class QueryDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
+        $timelineStorage = $this->timelineStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
@@ -46,7 +47,7 @@ class QueryDetail extends Card
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        $entries = $storage->recent('query', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE);
+        $entries = $timelineStorage->recent('query', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE);
 
         // One batched rootTypesFor()/rootLabelsFor() pair instead of a
         // findByRequestId() per row — same approach as
@@ -55,8 +56,8 @@ class QueryDetail extends Card
         // tasks, so it takes both calls (not just a 'request'-only lookup)
         // to know which detail-page route a call actually belongs to.
         $requestIds = $entries->pluck('request_id')->filter()->unique()->values()->all();
-        $rootTypes = $storage->rootTypesFor($requestIds);
-        $rootLabels = $storage->rootLabelsFor($requestIds);
+        $rootTypes = $timelineStorage->rootTypesFor($requestIds);
+        $rootLabels = $timelineStorage->rootLabelsFor($requestIds);
 
         $entries = $entries->map(function ($entry) use ($rootTypes, $rootLabels) {
             $entry->sourceType = $rootTypes->get($entry->request_id);
@@ -78,7 +79,7 @@ class QueryDetail extends Card
         // independently of $entries so it stays fixed to the newest call
         // regardless of which page of the calls table is showing. Falls back
         // to $key only when no entry is loaded to take it from.
-        $latest = $storage->recent('query', $since, 1, null, $key, $until)->first();
+        $latest = $timelineStorage->recent('query', $since, 1, null, $key, $until)->first();
         $sql = $latest !== null ? ($latest->payload['sql'] ?? $key) : $key;
 
         // Recorders\Queries no longer tags a slow/fast subtype at record
@@ -95,13 +96,13 @@ class QueryDetail extends Card
             'duration' => $storage->durationStats('query', $since, $buckets, $key, null, $until),
             'entries' => $entries,
             'sql' => $sql,
-            'firstSeen' => $storage->firstSeen('query', $key),
+            'firstSeen' => $timelineStorage->firstSeen('query', $key),
             // Derived from the loaded page of entries (not the full period)
             // — a quick summary, not an exhaustive audit. One row per
             // distinct connection name; 'type' is only set when every
             // sampled call against that connection agreed on the same PDO
-            // role (see DatabaseStorage::queryStats() for why a connection
-            // can carry more than one).
+            // role (see DatabaseCacheAndQueryStorage::queryStats() for why a
+            // connection can carry more than one).
             'connections' => $entries
                 ->pluck('payload.connection')
                 ->filter()

@@ -102,28 +102,15 @@ scheduled (or for any range older than the aggregator has backfilled), those
 reads fall back to scanning raw entries directly rather than under-reporting
 — slower, but never silently wrong.
 
-## Storage drivers
+## Storage
 
-The default `database` driver stores entries in a `monitor_entries` table (MySQL, PostgreSQL, SQLite). Point it at a separate connection to keep monitoring data out of your main database:
+Entries are stored in a `monitor_entries` table (MySQL, PostgreSQL, SQLite). Point it at a separate connection to keep monitoring data out of your main database:
 
 ```env
 MONITOR_DB_CONNECTION=monitor_sqlite
 ```
 
-Custom drivers implement `LaravelMonitor\Contracts\Storage` and are registered in a service provider:
-
-```php
-use LaravelMonitor\StorageManager;
-
-public function boot(): void
-{
-    $this->app->make(StorageManager::class)->extend('redis', function ($app) {
-        return new RedisStorage($app['redis']);
-    });
-}
-```
-
-Then set `MONITOR_STORAGE_DRIVER=redis`.
+The read side is split into several narrow contracts under `LaravelMonitor\Contracts` — `AggregateStorage`, `TimelineStorage`, `UserStorage`, `CacheAndQueryStorage`, `ExceptionStorage`, `IssueStorage`, `HashResolver` — plus `EntryWriter` for writes, each bound to its own `Database*Storage` class in `MonitorServiceProvider::registerBindings()`. A page only resolves the contract(s) it actually needs (see `LaravelMonitor\Livewire\Card`'s typed accessors), instead of one god-interface every page depended on in full. There's no single pluggable "storage driver" any more — swapping the backend means rebinding each of these contracts to your own implementation in a service provider.
 
 ## Recording custom entries
 

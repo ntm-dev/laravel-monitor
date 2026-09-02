@@ -4,7 +4,7 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\HashResolver;
 use LaravelMonitor\Http\Headings\CommandHeading;
 use LaravelMonitor\Http\Headings\ExceptionHeading;
 use LaravelMonitor\Http\Headings\Heading;
@@ -15,6 +15,7 @@ use LaravelMonitor\Http\Headings\OutgoingHeading;
 use LaravelMonitor\Http\Headings\QueryHeading;
 use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Http\Headings\ScheduleHeading;
+use LaravelMonitor\Http\Headings\UserHeading;
 use LaravelMonitor\Livewire\Card;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
@@ -74,8 +75,12 @@ class DashboardController
             'hasCustomRange' => filled($from) && filled($to),
             // Query-string state carried through every dashboard link.
             'range' => array_filter(['period' => $period, 'from' => $from, 'to' => $to]),
-            // Range passed to every Livewire card.
-            'rangeProps' => ['period' => $period, 'from' => $from, 'to' => $to],
+            // Range passed to every Livewire card. `userId` rides along here
+            // too (harmless on cards without that property — Livewire only
+            // fills properties that actually exist) so a "Filter by: Jobs"/
+            // etc. link from the User Detail page can deep-link straight
+            // into that tab's own list, already scoped to the one user.
+            'rangeProps' => ['period' => $period, 'from' => $from, 'to' => $to, 'userId' => $request->query('userId', '')],
             'tabs' => $tabs,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
@@ -88,7 +93,6 @@ class DashboardController
             'timezone' => Format::timezone(),
             'rangeMax' => now(Preferences::timezone())->format(Format::RANGE),
             'system' => $tab === 'settings' ? Settings::current() : null,
-            'storageDrivers' => $tab === 'settings' ? Settings::storageDrivers() : null,
             'prefs' => $tab === 'settings' ? Preferences::all() : null,
             'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
             'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,
@@ -128,7 +132,11 @@ class DashboardController
             return $hash;
         }
 
-        $key = app(Storage::class)->resolveKeyHash(self::ENTRY_TYPES[$tab] ?? $tab, $hash);
+        // 'users' resolves against the user_id column, not a per-type
+        // grouping key — see HashResolver::resolveUserIdHash()'s own docs.
+        $key = $tab === 'users'
+            ? app(HashResolver::class)->resolveUserIdHash($hash)
+            : app(HashResolver::class)->resolveKeyHash(self::ENTRY_TYPES[$tab] ?? $tab, $hash);
 
         abort_unless($key !== null, 404);
 
@@ -154,6 +162,7 @@ class DashboardController
             'notifications' => app(NotificationHeading::class)($key),
             'mail' => app(MailHeading::class)($key),
             'outgoing' => app(OutgoingHeading::class)($key),
+            'users' => (new UserHeading)($key),
             default => null,
         };
     }

@@ -27,7 +27,7 @@ class NotificationDetail extends Card
 
     protected function data(): array
     {
-        $storage = $this->storage();
+        $storage = $this->timelineStorage();
         $entry = ctype_digit($this->key) ? $storage->findById((int) $this->key, 'notification') : null;
 
         $mail = null;

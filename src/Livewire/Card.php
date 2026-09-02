@@ -3,7 +3,13 @@
 namespace LaravelMonitor\Livewire;
 
 use Carbon\CarbonImmutable;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\CacheAndQueryStorage;
+use LaravelMonitor\Contracts\ExceptionStorage;
+use LaravelMonitor\Contracts\HashResolver;
+use LaravelMonitor\Contracts\IssueStorage;
+use LaravelMonitor\Contracts\TimelineStorage;
+use LaravelMonitor\Contracts\UserStorage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Preferences;
 use Livewire\Component;
@@ -175,7 +181,7 @@ abstract class Card extends Component
      * Parse a Format::RANGE boundary (from/to) as wall-clock time in the
      * viewer's Preferences::timezone(), then normalize it to the app's own
      * timezone. Storage always deals in `created_at` values naive to
-     * config('app.timezone') (see DatabaseStorage::store()/hydrate()) — a
+     * config('app.timezone') (see DatabaseEntryWriter::store()/BuildsQueries::hydrate()) — a
      * Carbon instance still tagged with the viewer's timezone would print
      * the wrong wall-clock string once it reaches a SQL binding, since
      * Illuminate\Database\Connection::prepareBindings() formats a
@@ -229,9 +235,49 @@ abstract class Card extends Component
         ]);
     }
 
-    protected function storage(): Storage
+    /**
+     * One typed accessor per Storage sub-contract (see
+     * MonitorServiceProvider::registerBindings()) instead of a single
+     * generic storage() returning the old god-interface — a card that only
+     * ever calls e.g. $this->userStorage() never triggers autoloading of
+     * DatabaseIssueStorage or any of the others. PHP resolves a method's
+     * return-type class lazily, the first time that specific method actually
+     * runs, so only the accessor(s) a given card actually calls cost
+     * anything here.
+     */
+    protected function aggregateStorage(): AggregateStorage
     {
-        return app(Storage::class);
+        return app(AggregateStorage::class);
+    }
+
+    protected function timelineStorage(): TimelineStorage
+    {
+        return app(TimelineStorage::class);
+    }
+
+    protected function userStorage(): UserStorage
+    {
+        return app(UserStorage::class);
+    }
+
+    protected function cacheAndQueryStorage(): CacheAndQueryStorage
+    {
+        return app(CacheAndQueryStorage::class);
+    }
+
+    protected function exceptionStorage(): ExceptionStorage
+    {
+        return app(ExceptionStorage::class);
+    }
+
+    protected function issueStorage(): IssueStorage
+    {
+        return app(IssueStorage::class);
+    }
+
+    protected function hashResolver(): HashResolver
+    {
+        return app(HashResolver::class);
     }
 
     /**

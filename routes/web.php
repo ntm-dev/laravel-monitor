@@ -88,6 +88,11 @@ Route::domain(config('monitor.domain'))
                 ->where(['tab' => 'requests', 'hash' => '[0-9a-f]{32}'])
                 ->defaults('tab', 'requests')
                 ->name('monitor.requests.routes.show');
+
+            Route::get('/users/{hash}', DashboardController::class)
+                ->where(['tab' => 'users', 'hash' => '[0-9a-f]{32}'])
+                ->defaults('tab', 'users')
+                ->name('monitor.users.show');
             // A plain `RequestDetailController::class` action here would
             // silently misbehave: Laravel binds non-class-typed controller
             // parameters *positionally* (see ControllerDispatcher::dispatch()

@@ -46,7 +46,8 @@ class NotificationClassDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
+        $timelineStorage = $this->timelineStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
@@ -63,11 +64,11 @@ class NotificationClassDetail extends Card
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        $entries = $storage->recent('notification', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE);
+        $entries = $timelineStorage->recent('notification', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE);
 
         $requestIds = $entries->pluck('request_id')->filter()->unique()->values()->all();
-        $rootTypes = $storage->rootTypesFor($requestIds);
-        $rootLabels = $storage->rootLabelsFor($requestIds);
+        $rootTypes = $timelineStorage->rootTypesFor($requestIds);
+        $rootLabels = $timelineStorage->rootLabelsFor($requestIds);
 
         $entries = $entries->map(function ($entry) use ($rootTypes, $rootLabels) {
             $entry->sourceType = $rootTypes->get($entry->request_id);

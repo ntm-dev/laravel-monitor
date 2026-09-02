@@ -36,7 +36,7 @@ class CommandDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
@@ -54,7 +54,7 @@ class CommandDetail extends Card
             'successBuckets' => $storage->countsPerBucket('command', $since, $buckets, 'success', $key, $until),
             'failedBuckets' => $storage->countsPerBucket('command', $since, $buckets, 'failed', $key, $until),
             'duration' => $storage->durationStats('command', $since, $buckets, $key, null, $until),
-            'entries' => $storage->recent('command', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
+            'entries' => $this->timelineStorage()->recent('command', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
             'totalEntries' => $totalEntries,
             'page' => $page,
             'lastPage' => $lastPage,

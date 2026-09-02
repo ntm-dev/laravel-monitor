@@ -116,7 +116,7 @@ class IssuesTest extends TestCase
 
         Livewire::test(Issues::class)->set('view', 'performance');
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $this->assertSame('open', $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->status);
 
         // Threshold raised past the query's own max_duration — it no
@@ -142,7 +142,7 @@ class IssuesTest extends TestCase
 
         Livewire::test(Issues::class)->set('view', 'performance');
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $this->assertSame('open', $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->status);
 
         config(['monitor.thresholds.query' => 1000]);
@@ -170,7 +170,7 @@ class IssuesTest extends TestCase
 
     public function test_a_resolved_exception_that_recurs_reopens_itself(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         \Illuminate\Support\Carbon::setTestNow(now()->subMinutes(5));
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'resolved');
@@ -191,7 +191,7 @@ class IssuesTest extends TestCase
 
     public function test_an_ignored_performance_issue_does_not_reopen_on_recurrence(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
         Monitor::flush();
@@ -228,7 +228,7 @@ class IssuesTest extends TestCase
 
     public function test_set_issue_priority_persists_and_creates_the_row_if_missing(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         $storage->setIssuePriority('exception', 'App\\Exceptions\\Boom', 'high');
 
@@ -240,7 +240,7 @@ class IssuesTest extends TestCase
 
     public function test_set_issue_priority_rejects_an_invalid_value(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         Monitor::record(RecordType::Exception, 'App\\Exceptions\\Boom', ['class' => 'App\\Exceptions\\Boom', 'message' => 'boom'], null, 'unhandled');
         Monitor::flush();
@@ -254,7 +254,7 @@ class IssuesTest extends TestCase
 
     public function test_find_issue_by_uuid_returns_the_matching_row(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
 
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
@@ -268,14 +268,14 @@ class IssuesTest extends TestCase
 
     public function test_find_issue_by_uuid_returns_null_for_an_unknown_uuid(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         $this->assertNull($storage->findIssueByUuid((string) \Illuminate\Support\Str::uuid()));
     }
 
     public function test_sync_issues_assigns_a_uuid_to_newly_created_rows(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
 
         $storage->syncIssues('exception', ['App\\Exceptions\\Boom' => now()]);
 
@@ -287,7 +287,7 @@ class IssuesTest extends TestCase
 
     public function test_delete_missing_issues_deletes_only_the_absent_open_keys(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->syncIssues('query', ['keep' => now(), 'drop' => now()]);
 
         $deleted = $storage->deleteMissingIssues('query', ['keep']);
@@ -300,7 +300,7 @@ class IssuesTest extends TestCase
 
     public function test_delete_missing_issues_with_no_current_keys_deletes_every_open_issue_of_that_type(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->syncIssues('query', ['a' => now(), 'b' => now()]);
 
         $storage->deleteMissingIssues('query', []);
@@ -312,7 +312,7 @@ class IssuesTest extends TestCase
 
     public function test_delete_missing_issues_leaves_ignored_issues_alone(): void
     {
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->syncIssues('query', ['a' => now()]);
         $storage->setIssueStatus('query', 'a', 'ignored');
 

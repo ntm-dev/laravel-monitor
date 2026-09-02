@@ -7,7 +7,7 @@ namespace LaravelMonitor\Support;
  * command/mailable FQCN, normalized SQL shape, ...) — same shape as
  * Fingerprint's exception hash, but generic. One-way: turning a hash back
  * into its raw key means matching it against known keys, see
- * Contracts\Storage::resolveKeyHash().
+ * Contracts\HashResolver::resolveKeyHash()/resolveUserIdHash().
  */
 class KeyHash
 {

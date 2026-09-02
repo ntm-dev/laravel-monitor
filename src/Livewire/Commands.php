@@ -59,7 +59,7 @@ class Commands extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
 
         $bySubtype = $storage->statsBySubtype('command', $since, $until);

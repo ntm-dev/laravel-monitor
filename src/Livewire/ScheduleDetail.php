@@ -36,7 +36,7 @@ class ScheduleDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
@@ -56,7 +56,7 @@ class ScheduleDetail extends Card
             'failedBuckets' => $storage->countsPerBucket('scheduled_task', $since, $buckets, 'failed', $key, $until),
             'skippedBuckets' => $storage->countsPerBucket('scheduled_task', $since, $buckets, 'skipped', $key, $until),
             'duration' => $storage->durationStats('scheduled_task', $since, $buckets, $key, 'finished', $until),
-            'entries' => $storage->recent('scheduled_task', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
+            'entries' => $this->timelineStorage()->recent('scheduled_task', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE),
             'totalEntries' => $totalEntries,
             'page' => $page,
             'lastPage' => $lastPage,

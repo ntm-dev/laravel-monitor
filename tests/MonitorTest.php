@@ -12,7 +12,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\EntryWriter;
+use LaravelMonitor\Contracts\ExceptionStorage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\RequestDetail;
 use LaravelMonitor\Support\Fingerprint;
@@ -51,7 +54,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /posts', [], 50, '4xx');
         Monitor::flush();
 
-        $storage = app(Storage::class);
+        $storage = app(AggregateStorage::class);
         $since = CarbonImmutable::now()->subHour();
 
         $bySubtype = $storage->statsBySubtype('request', $since);
@@ -74,7 +77,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /posts', [], 50, '2xx');
         Monitor::flush();
 
-        $groups = app(Storage::class)->aggregateByKey('request', CarbonImmutable::now()->subHour());
+        $groups = app(AggregateStorage::class)->aggregateByKey('request', CarbonImmutable::now()->subHour());
 
         $this->assertCount(2, $groups);
         $this->assertSame('GET /users', $groups->first()->key);
@@ -88,13 +91,12 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Exception, 'RuntimeException', ['message' => 'boom']);
         Monitor::flush();
 
-        $storage = app(Storage::class);
         $since = CarbonImmutable::now()->subHour();
 
-        $this->assertSame(1, $storage->stats('exception', $since)->count);
-        $this->assertSame('boom', $storage->recent('exception', $since)->first()->payload['message']);
+        $this->assertSame(1, app(AggregateStorage::class)->stats('exception', $since)->count);
+        $this->assertSame('boom', app(TimelineStorage::class)->recent('exception', $since)->first()->payload['message']);
 
-        $storage->purge();
+        app(EntryWriter::class)->purge();
         $this->assertDatabaseCount('monitor_entries', 0);
     }
 
@@ -1143,8 +1145,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Exception, $key, ['class' => 'App\\Boom', 'message' => 'Kaboom'], null, 'handled', 2);
         Monitor::flush();
 
-        $storage = app(Storage::class);
-        $group = $storage->exceptionGroups(CarbonImmutable::now()->subHour())->firstWhere('key', $key);
+        $group = app(ExceptionStorage::class)->exceptionGroups(CarbonImmutable::now()->subHour())->firstWhere('key', $key);
 
         $this->assertNotNull($group);
         $this->assertSame(3, $group->count);
@@ -1152,7 +1153,7 @@ class MonitorTest extends TestCase
         $this->assertSame(1, $group->handled);
         $this->assertSame(2, $group->users);
         $this->assertSame('App\\Boom', $group->class);
-        $this->assertNotNull($storage->firstSeen('exception', $key));
+        $this->assertNotNull(app(TimelineStorage::class)->firstSeen('exception', $key));
     }
 
     public function test_exception_detail_page_renders(): void
@@ -1390,7 +1391,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
-        $storage = app(Storage::class);
+        $storage = app(TimelineStorage::class);
         $requestId = $monitor->requestId();
 
         $this->assertNotNull($requestId);
@@ -1438,7 +1439,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
         Monitor::flush();
 
-        $storage = app(Storage::class);
+        $storage = app(TimelineStorage::class);
         $requestId = $monitor->requestId();
         $root = $storage->findByRequestId($requestId);
 
@@ -1482,7 +1483,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Request, 'GET /legacy', ['method' => 'GET', 'path' => '/legacy', 'status' => 200], 60, '2xx', 1);
         Monitor::flush();
 
-        $storage = app(Storage::class);
+        $storage = app(TimelineStorage::class);
         $requestId = $monitor->requestId();
         $root = $storage->findByRequestId($requestId);
         $children = $storage->timelineFor($requestId);
@@ -1774,7 +1775,7 @@ class MonitorTest extends TestCase
     }
 
     /**
-     * Regression test: Storage::jobExecutionsByJobId() must return a job's
+     * Regression test: TimelineStorage::jobExecutionsByJobId() must return a job's
      * retried outcomes oldest-first — MergesJobTimelines::jobTrack() numbers
      * "Attempt #N" purely by position in that collection (see its own
      * docblock), so an unordered query result (previously: no orderBy() at
@@ -1807,7 +1808,7 @@ class MonitorTest extends TestCase
             ]);
         }
 
-        $executions = app(Storage::class)->jobExecutionsByJobId([$jobId], CarbonImmutable::parse('2024-01-01 00:00:00'));
+        $executions = app(TimelineStorage::class)->jobExecutionsByJobId([$jobId], CarbonImmutable::parse('2024-01-01 00:00:00'));
 
         $orderedAttempts = $executions->get($jobId)->map(fn ($execution) => $execution->outcome->payload['attempts'])->values()->all();
 
@@ -2088,6 +2089,32 @@ class MonitorTest extends TestCase
         $this->assertSame('job-abc123', $queuedPayload['job_id']);
         $this->assertSame('job-abc123', $processedPayload['job_id']);
         $this->assertSame(1, $processedPayload['attempts']);
+    }
+
+    /**
+     * Regression test: recordQueued() used to omit userId entirely, so a
+     * job's dispatch-time entry never carried who triggered it — unlike
+     * Recorders\Requests/Exceptions/Logs, which already capture
+     * currentUserId(). That silently zeroed out any per-user "queued jobs"
+     * count (see Storage::userStats()), since it only counts type=job rows
+     * with subtype='queued'.
+     */
+    public function test_job_recorder_captures_the_authenticated_application_user_on_queue(): void
+    {
+        // The app's own 'web' guard, not the dashboard's `monitor` guard
+        // TestCase::setUp() logs in — see
+        // test_exception_recorder_captures_the_authenticated_application_user()
+        // for why the guard must be explicit here.
+        $this->actingAs(new \Illuminate\Auth\GenericUser(['id' => 42]), 'web');
+
+        $job = $this->syncJob('job-abc123');
+
+        event($this->jobQueuedEvent('sync', 'default', 'job-abc123', $job, json_encode([])));
+        Monitor::flush();
+
+        $row = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->first();
+
+        $this->assertSame('web:42', $row->user_id);
     }
 
     /**
@@ -2439,7 +2466,7 @@ class MonitorTest extends TestCase
         ], null, 'unhandled');
         Monitor::flush();
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->syncIssues('exception', [$key => now()]);
         $uuid = $storage->issueStatuses('exception', [$key])->get($key)->uuid;
 
@@ -2457,7 +2484,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Query, 'select * from big_table', [], 600);
         Monitor::flush();
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->syncIssues('query', ['select * from big_table' => now()]);
         $uuid = $storage->issueStatuses('query', ['select * from big_table'])->get('select * from big_table')->uuid;
 
@@ -2478,7 +2505,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
@@ -2492,7 +2519,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
@@ -2508,7 +2535,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 
@@ -2522,7 +2549,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $storage->setIssuePriority('exception', 'App\\Exceptions\\Boom', 'high');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
@@ -2549,7 +2576,7 @@ class MonitorTest extends TestCase
         // the exception alone.
         $test = Livewire::test(\LaravelMonitor\Livewire\Issues::class);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $id = $storage->issueStatuses('exception', [$key])->get($key)->id;
 
         $test->call('setPriority', 'exception', $key, 'high')
@@ -2571,7 +2598,7 @@ class MonitorTest extends TestCase
 
         $key = DB::table('monitor_entries')->where('type', 'exception')->value('key');
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssuePriority('exception', $key, 'high');
 
         Livewire::test(\LaravelMonitor\Livewire\Issues::class)
@@ -2585,7 +2612,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $storage = app(\LaravelMonitor\Contracts\Storage::class);
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
         $storage->setIssueStatus('exception', 'App\\Exceptions\\Boom', 'open');
         $uuid = $storage->issueStatuses('exception', ['App\\Exceptions\\Boom'])->get('App\\Exceptions\\Boom')->uuid;
 

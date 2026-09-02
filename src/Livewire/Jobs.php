@@ -22,6 +22,8 @@ class Jobs extends Card
 
     public string $search = '';
 
+    public string $userId = '';
+
     public string $sortBy = 'processed';
 
     public string $sortDirection = 'desc';
@@ -29,6 +31,11 @@ class Jobs extends Card
     public int $page = 1;
 
     public function updatedSearch(): void
+    {
+        $this->page = 1;
+    }
+
+    public function updatedUserId(): void
     {
         $this->page = 1;
     }
@@ -68,15 +75,16 @@ class Jobs extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
+        $userId = $this->userId !== '' ? $this->userId : null;
 
-        $bySubtype = $storage->statsBySubtype('job', $since, $until);
+        $bySubtype = $storage->statsBySubtype('job', $since, $until, $userId);
 
-        $processed = $storage->aggregateByKey('job', $since, 'processed', self::MAX_KEYS, 'count', $until);
-        $failed = $storage->aggregateByKey('job', $since, 'failed', self::MAX_KEYS, 'count', $until);
-        $released = $storage->aggregateByKey('job', $since, 'released', self::MAX_KEYS, 'count', $until);
-        $queued = $storage->aggregateByKey('job', $since, 'queued', self::MAX_KEYS, 'count', $until);
+        $processed = $storage->aggregateByKey('job', $since, 'processed', self::MAX_KEYS, 'count', $until, $userId);
+        $failed = $storage->aggregateByKey('job', $since, 'failed', self::MAX_KEYS, 'count', $until, $userId);
+        $released = $storage->aggregateByKey('job', $since, 'released', self::MAX_KEYS, 'count', $until, $userId);
+        $queued = $storage->aggregateByKey('job', $since, 'queued', self::MAX_KEYS, 'count', $until, $userId);
 
         $jobs = collect();
 
@@ -120,11 +128,11 @@ class Jobs extends Card
             'processed' => $bySubtype->get('processed')?->count ?? 0,
             'failed' => $bySubtype->get('failed')?->count ?? 0,
             'released' => $bySubtype->get('released')?->count ?? 0,
-            'queuedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'queued', null, $until),
-            'processedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'processed', null, $until),
-            'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', null, $until),
-            'releasedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'released', null, $until),
-            'duration' => $storage->durationStats('job', $since, $buckets, null, null, $until),
+            'queuedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'queued', null, $until, $userId),
+            'processedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'processed', null, $until, $userId),
+            'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', null, $until, $userId),
+            'releasedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'released', null, $until, $userId),
+            'duration' => $storage->durationStats('job', $since, $buckets, null, null, $until, $userId),
             'jobs' => $jobs->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalJobs' => $total,
             'page' => $page,

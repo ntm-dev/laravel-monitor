@@ -4,7 +4,7 @@ namespace LaravelMonitor\Tests;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\EntryWriter;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Monitor;
 use LaravelMonitor\MonitorServiceProvider;
@@ -69,7 +69,7 @@ abstract class TestCase extends Orchestra
         $this->actingAs($owner, MonitorUser::guardName());
 
         $this->app->make(Monitor::class)->flush();
-        $this->app->make(Storage::class)->purge();
+        $this->app->make(EntryWriter::class)->purge();
     }
 
     protected function withoutMonitorAuth(): static

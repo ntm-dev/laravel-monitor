@@ -2,7 +2,7 @@
 
 namespace LaravelMonitor\Http\Headings;
 
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
  * Heading for a mail detail page. $key means one of two things,
@@ -13,7 +13,7 @@ use LaravelMonitor\Contracts\Storage;
  */
 class MailHeading
 {
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

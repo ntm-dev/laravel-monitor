@@ -29,12 +29,12 @@ class ExceptionDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $timelineStorage = $this->timelineStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
-        $group = $storage->exceptionGroups($since, $until)->firstWhere('key', $key);
-        $occurrences = $storage->recent('exception', $since, 200, null, $key, $until);
+        $group = $this->exceptionStorage()->exceptionGroups($since, $until)->firstWhere('key', $key);
+        $occurrences = $timelineStorage->recent('exception', $since, 200, null, $key, $until);
         $latest = $occurrences->first();
         $payload = $latest->payload ?? [];
 
@@ -47,10 +47,10 @@ class ExceptionDetail extends Card
         $tz = Format::timezone();
 
         $lastSeen = $group?->last_seen ?? $latest?->created_at;
-        $firstSeen = $storage->firstSeen('exception', $key) ?? $group?->first_seen;
+        $firstSeen = $timelineStorage->firstSeen('exception', $key) ?? $group?->first_seen;
         $phpVersion = $payload['php_version'] ?? null;
         $laravelVersion = $payload['laravel_version'] ?? null;
-        $occurrencesCount = $group?->count ?? $storage->stats('exception', $since, null, $key, $until)->count;
+        $occurrencesCount = $group?->count ?? $this->aggregateStorage()->stats('exception', $since, null, $key, $until)->count;
 
         return [
             'key' => $key,
@@ -70,10 +70,10 @@ class ExceptionDetail extends Card
             'handledCount' => $group?->handled ?? 0,
             'unhandledCount' => $group?->unhandled ?? 0,
             // Timeline for this exception
-            'handledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'handled', $key, $until),
-            'unhandledBuckets' => $storage->countsPerBucket('exception', $since, $buckets, 'unhandled', $key, $until),
+            'handledBuckets' => $this->aggregateStorage()->countsPerBucket('exception', $since, $buckets, 'handled', $key, $until),
+            'unhandledBuckets' => $this->aggregateStorage()->countsPerBucket('exception', $since, $buckets, 'unhandled', $key, $until),
             // Occurrences table
-            'occurrences' => $this->occurrenceRows($occurrences, $names, $storage),
+            'occurrences' => $this->occurrenceRows($occurrences, $names, $timelineStorage),
         ];
     }
 }

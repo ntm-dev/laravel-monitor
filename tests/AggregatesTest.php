@@ -5,7 +5,7 @@ namespace LaravelMonitor\Tests;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
 use LaravelMonitor\Support\Aggregator;
 
 class AggregatesTest extends TestCase
@@ -65,7 +65,7 @@ class AggregatesTest extends TestCase
         // bucket at $bucketStart (that's where the real 'request' entries
         // landed), so asking further back than that would correctly bail
         // out to the (now-empty) raw table instead of under-reporting.
-        $storage = app(Storage::class);
+        $storage = app(AggregateStorage::class);
         $counts = $storage->countsPerBucket('request', $bucketStart, 10, '2xx', null, $now);
 
         $this->assertSame(2, array_sum($counts));
@@ -87,7 +87,7 @@ class AggregatesTest extends TestCase
         // scan of monitor_entries.
         DB::table('monitor_entries')->delete();
 
-        $stats = app(Storage::class)->stats('request', $bucketStart, '2xx');
+        $stats = app(AggregateStorage::class)->stats('request', $bucketStart, '2xx');
 
         $this->assertSame(2, $stats->count);
         $this->assertSame(200.0, $stats->avg_duration);
@@ -109,7 +109,7 @@ class AggregatesTest extends TestCase
 
         DB::table('monitor_entries')->delete();
 
-        $bySubtype = app(Storage::class)->statsBySubtype('request', $bucketStart);
+        $bySubtype = app(AggregateStorage::class)->statsBySubtype('request', $bucketStart);
 
         $this->assertSame(1, $bySubtype->get('2xx')->count);
         $this->assertSame(100.0, $bySubtype->get('2xx')->avg_duration);
@@ -136,7 +136,7 @@ class AggregatesTest extends TestCase
         // only visible via the raw-scan fallback.
         $this->insertEntry('request', '2xx', $now->subMinutes(20), duration: 500.0);
 
-        $stats = app(Storage::class)->stats('request', $now->subMinutes(30), '2xx');
+        $stats = app(AggregateStorage::class)->stats('request', $now->subMinutes(30), '2xx');
 
         $this->assertSame(2, $stats->count);
     }
@@ -164,7 +164,7 @@ class AggregatesTest extends TestCase
         // A fresh raw entry the (stalled) aggregator never rolled up.
         $this->insertEntry('request', '2xx', $now->subMinutes(2), duration: 150.0);
 
-        $stats = app(Storage::class)->stats('request', $now->subMinutes(10), '2xx');
+        $stats = app(AggregateStorage::class)->stats('request', $now->subMinutes(10), '2xx');
 
         $this->assertSame(1, $stats->count);
         $this->assertSame(150.0, $stats->avg_duration);
@@ -180,7 +180,7 @@ class AggregatesTest extends TestCase
         $this->insertEntry('request', '2xx', $bucketStart->addSeconds(5), 'GET /users');
         $this->insertEntry('request', '2xx', $bucketStart->addSeconds(10), 'GET /posts');
 
-        $storage = app(Storage::class);
+        $storage = app(AggregateStorage::class);
         $counts = $storage->countsPerBucket('request', $now->subMinutes(10), 10, '2xx', 'GET /users', $now);
 
         $this->assertSame(1, array_sum($counts));

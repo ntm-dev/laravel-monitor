@@ -49,7 +49,7 @@ class CacheStats extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
 
         $hitBuckets = $storage->countsPerBucket('cache', $since, $buckets, 'hit', null, $until);
@@ -67,7 +67,7 @@ class CacheStats extends Card
         $forgetFailures = array_sum($forgetFailedBuckets);
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'total';
-        $keys = $storage->cacheKeyStats($since, $until)
+        $keys = $this->cacheAndQueryStorage()->cacheKeyStats($since, $until)
             ->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')
             ->values();
 

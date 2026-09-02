@@ -5,7 +5,7 @@ namespace LaravelMonitor\Tests;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use LaravelMonitor\Storage\DatabaseStorage;
+use LaravelMonitor\Storage\DatabaseAggregateStorage;
 
 class DurationSamplingTest extends TestCase
 {
@@ -39,7 +39,7 @@ class DurationSamplingTest extends TestCase
         $this->insertRequest($now->subMinutes(6), 40.0);
         $this->insertRequest($now->subMinutes(5), 50.0);
 
-        $storage = new class(app('db')) extends DatabaseStorage
+        $storage = new class(app('db')) extends DatabaseAggregateStorage
         {
             protected function maxSampleRows(): int
             {

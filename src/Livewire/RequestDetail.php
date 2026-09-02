@@ -78,7 +78,7 @@ class RequestDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
         $threshold = (int) config('monitor.thresholds.request', 1000);
@@ -150,7 +150,7 @@ class RequestDetail extends Card
             'clientErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::ClientError->value, $key, $until),
             'serverErrorBuckets' => $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::ServerError->value, $key, $until),
             'duration' => $duration,
-            'entries' => $storage->recent('request', $since, self::PER_PAGE, $subtype, $key, $until, ($page - 1) * self::PER_PAGE, $minDuration),
+            'entries' => $this->timelineStorage()->recent('request', $since, self::PER_PAGE, $subtype, $key, $until, ($page - 1) * self::PER_PAGE, $minDuration),
             'totalEntries' => $totalEntries,
             'statusFilter' => $statusFilter,
             'statusFilterCounts' => $statusFilterCounts,

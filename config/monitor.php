@@ -70,18 +70,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Storage Driver
+    | Storage
     |--------------------------------------------------------------------------
     |
-    | Where captured entries are persisted. "database" ships with the package
-    | and works with MySQL, PostgreSQL and SQLite. Register your own driver
-    | with LaravelMonitor\StorageManager::extend() to add more.
+    | Captured entries are persisted to a database table (works with MySQL,
+    | PostgreSQL and SQLite) via the Database*Storage classes bound in
+    | MonitorServiceProvider::registerBindings() — connection/table are
+    | shared across all of them.
     |
     */
 
     'storage' => [
-        'driver' => env('MONITOR_STORAGE_DRIVER', 'database'),
-
         'database' => [
             'connection' => env('MONITOR_DB_CONNECTION'),
             'table' => 'monitor_entries',

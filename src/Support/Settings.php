@@ -18,7 +18,6 @@ class Settings
     /** Scalar override key => config path it maps onto. */
     protected const SCALARS = [
         'enabled' => 'monitor.enabled',
-        'storage_driver' => 'monitor.storage.driver',
         'database_table' => 'monitor.storage.database.table',
         'dashboard_path' => 'monitor.path',
         'retention_hours' => 'monitor.retention.hours',
@@ -84,7 +83,6 @@ class Settings
     {
         return [
             'enabled' => (bool) config('monitor.enabled', true),
-            'storage_driver' => (string) config('monitor.storage.driver', 'database'),
             'database_table' => (string) config('monitor.storage.database.table', 'monitor_entries'),
             'dashboard_path' => trim((string) config('monitor.path', 'monitor'), '/'),
             'retention_hours' => (int) config('monitor.retention.hours', 168),
@@ -142,16 +140,6 @@ class Settings
         }
 
         return $rows;
-    }
-
-    /**
-     * Storage drivers offered by the picker (built-in plus the current value).
-     *
-     * @return list<string>
-     */
-    public static function storageDrivers(): array
-    {
-        return array_values(array_unique(['database', (string) config('monitor.storage.driver', 'database')]));
     }
 
     /**

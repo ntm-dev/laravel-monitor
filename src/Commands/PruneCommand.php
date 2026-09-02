@@ -4,7 +4,9 @@ namespace LaravelMonitor\Commands;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\EntryWriter;
+use LaravelMonitor\Contracts\IssueStorage;
 use LaravelMonitor\Livewire\Concerns\SyncsOpenIssues;
 
 class PruneCommand extends Command
@@ -15,12 +17,12 @@ class PruneCommand extends Command
 
     protected $description = 'Delete monitor entries older than the retention period';
 
-    public function handle(Storage $storage): int
+    public function handle(EntryWriter $entryWriter, AggregateStorage $aggregateStorage, IssueStorage $issueStorage): int
     {
         $hours = (int) ($this->option('hours') ?? config('monitor.retention.hours', 168));
         $before = CarbonImmutable::now()->subHours($hours);
 
-        $deleted = $storage->purge($before);
+        $deleted = $entryWriter->purge($before);
 
         // Reconcile monitor_issues against what's left after the purge
         // above — the same open/bump-then-delete-missing pass the Issues
@@ -28,9 +30,9 @@ class PruneCommand extends Command
         // threshold (or an exception whose last entry the purge just
         // removed) gets deleted here too, instead of only whenever someone
         // next happens to load the dashboard.
-        $this->syncOpenIssues($storage, $this->since(), $this->until());
+        $this->syncOpenIssues($aggregateStorage, $issueStorage, $this->since(), $this->until());
 
-        $expired = $storage->expireStaleIssues();
+        $expired = $issueStorage->expireStaleIssues();
 
         $this->info($deleted >= 0
             ? "Pruned {$deleted} entries older than {$hours} hours."

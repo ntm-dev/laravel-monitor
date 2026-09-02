@@ -3,7 +3,7 @@
 namespace LaravelMonitor\Livewire\Concerns;
 
 use Illuminate\Support\Collection;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
  * Shape a fetched exception's raw payload (frames, message, class, ...)
@@ -54,7 +54,7 @@ trait BuildsExceptionDetail
      *
      * @param  array<int|string, string>  $names  user_id => display name
      */
-    protected function occurrenceRows(Collection $occurrences, array $names, Storage $storage): Collection
+    protected function occurrenceRows(Collection $occurrences, array $names, TimelineStorage $storage): Collection
     {
         $requestIds = $occurrences->pluck('request_id')->filter()->unique()->values()->all();
         $rootTypes = $storage->rootTypesFor($requestIds);

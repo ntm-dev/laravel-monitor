@@ -3,7 +3,7 @@
 namespace LaravelMonitor\Commands;
 
 use Illuminate\Console\Command;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\EntryWriter;
 
 class ClearCommand extends Command
 {
@@ -11,7 +11,7 @@ class ClearCommand extends Command
 
     protected $description = 'Delete all monitor entries';
 
-    public function handle(Storage $storage): int
+    public function handle(EntryWriter $storage): int
     {
         $storage->purge();
 

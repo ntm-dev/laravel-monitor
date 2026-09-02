@@ -15,6 +15,8 @@ class Logs extends Card
 
     public string $level = '';
 
+    public string $userId = '';
+
     public int $limit = self::DEFAULT_LIMIT;
 
     /** Bumps how many rows the next render fetches — called by the sentinel at the bottom of the list (x-intersect in logs.blade.php) instead of a wire:click "Load more" button. */
@@ -29,6 +31,11 @@ class Logs extends Card
         $this->limit = self::DEFAULT_LIMIT;
     }
 
+    public function updatedUserId(): void
+    {
+        $this->limit = self::DEFAULT_LIMIT;
+    }
+
     protected function view(): string
     {
         return 'monitor::livewire.logs';
@@ -36,8 +43,9 @@ class Logs extends Card
 
     protected function data(): array
     {
-        $storage = $this->storage();
-        $logs = $storage->recent('log', $this->since(), $this->limit, $this->level ?: null, null, $this->until());
+        $storage = $this->timelineStorage();
+        $userId = $this->userId !== '' ? $this->userId : null;
+        $logs = $storage->recent('log', $this->since(), $this->limit, $this->level ?: null, null, $this->until(), userId: $userId);
 
         // Same batched rootTypesFor()/rootLabelsFor() pair as
         // QueryDetail/BuildsExceptionDetail::occurrenceRows() — one query

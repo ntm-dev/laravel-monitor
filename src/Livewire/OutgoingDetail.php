@@ -27,7 +27,7 @@ class OutgoingDetail extends Card
 
     protected function data(): array
     {
-        $entry = ctype_digit($this->key) ? $this->storage()->findById((int) $this->key, 'outgoing_request') : null;
+        $entry = ctype_digit($this->key) ? $this->timelineStorage()->findById((int) $this->key, 'outgoing_request') : null;
 
         return [
             'entry' => $entry,
