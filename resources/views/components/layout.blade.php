@@ -265,7 +265,28 @@
 
             function position(el) {
                 var rect = el.getBoundingClientRect();
-                var tipRect = ensureTip().getBoundingClientRect();
+                var tipEl = ensureTip();
+                // A `position: fixed` box with `width: auto` shrink-to-fits
+                // against "viewport width minus its own current left" — a
+                // *live* recalculation on every layout pass, not a one-off
+                // taken at measurement time here. Resetting `left` to 0
+                // before measuring (so this first pass reflects the content
+                // alone, not whatever `left` a previous tooltip left behind)
+                // isn't enough by itself: the *final* `left` set below is
+                // clamped to leave only a slim 4px margin past the
+                // measured width, and this box keeps recomputing
+                // shrink-to-fit against that narrower "available width" on
+                // every later reflow (a resize, a scroll-triggered repaint,
+                // even just this box's own opacity transition) — a shorter
+                // measured width there re-wraps the text, which then
+                // measures shorter still next time, visibly collapsing a
+                // one-line tooltip into a dozen. Freezing the box at an
+                // explicit pixel width once, from this unconstrained
+                // measurement, stops it from ever shrink-to-fitting again.
+                tipEl.style.width = 'auto';
+                tipEl.style.left = '0px';
+                var tipRect = tipEl.getBoundingClientRect();
+                tipEl.style.width = tipRect.width + 'px';
                 var left = rect.left + rect.width / 2 - tipRect.width / 2;
                 left = Math.max(4, Math.min(left, window.innerWidth - tipRect.width - 4));
                 var top = rect.top - tipRect.height - 6;

@@ -69,7 +69,7 @@
 
                 <x-monitor::requests.event-summary :summary="$summary"/>
 
-                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack"/>
+                <x-monitor::requests.timeline :tracks="$tracks" :default-track="$defaultTrack" :scroll-to-outcome-id="$scrollToOutcomeId"/>
             </main>
         </div>
     </div>

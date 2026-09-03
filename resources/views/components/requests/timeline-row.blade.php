@@ -42,38 +42,53 @@
     // each track's own expand state is independent.
     $visible = in_array($kind, ['root', 'attempt'], true) ? 'true' : "expandedTracks['{$trackId}']";
     $toggleClick = "toggleTrack('{$trackId}')";
-    // A job track's own root row navigates to that job's own page instead
-    // of toggling in place (see View\Components\Requests\Timeline's
-    // $jobBaseUrl/$jobUrl) -- landing there already expands (and scales the
-    // whole page around) this exact job, same as expanding it here would
-    // have, so nothing is lost by replacing the toggle with a real navigation.
-    // But when this exact track is already expanded (it's the one the page
-    // navigated here to view), clicking again should still collapse it in
-    // place -- navigating to the page we're already on wouldn't visibly do
-    // anything, which is the bug this ternary fixes.
+    // A job track's own root row's *body* (everything except the chevron,
+    // see below) still switches the page's General/Headers/Body/Events
+    // sections and active nav tab to that job's own — request-detail-page.blade.php
+    // already rendered every track's own bundle up front (see its own
+    // $infos), so this is a plain Alpine toggle (`activeInfo`, defined on
+    // that page's own outer x-data, an ancestor scope this reaches into the
+    // same way it already reaches `expandedTracks`/`toggleTrack` below) —
+    // not a real navigation the way this used to be, guarded against
+    // relanding on the track already showing. history.pushState keeps the
+    // url bar/back-button/bookmarking in sync without paying for a reload;
+    // document.title mirrors components/layout.blade.php's own "$title —
+    // Monitor" format since nothing server-rendered is left to update it.
+    // Every other page this component renders on (job/command/schedule
+    // detail) has no such per-track bundle to switch to at all — $jobUrl
+    // (and so $navigateClick) is always null there instead.
     $navigateClick = $jobUrl !== null
-        ? "expandedTracks['{$trackId}'] ? ({$toggleClick}) : (window.location = ".json_encode($jobUrl).')'
+        ? sprintf(
+            "if (activeInfo !== %1\$s) { activeInfo = %1\$s; history.pushState(null, '', %2\$s); document.title = (infoTitles[%1\$s] || '') + ' — Monitor'; }",
+            json_encode($trackId),
+            json_encode($jobUrl),
+        )
         : null;
 @endphp
 @if ($part === 'label')
     <div x-show="{{ $visible }}"
-         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || $scrollable || ($kind === 'root' && $focusable)])
+         @class(['relative flex h-9 min-w-0 items-center pr-3', 'cursor-pointer' => $detailable || $navigateClick || $scrollable])
          :class="{{ $highlightClass }}"
          @mouseenter="hoveredId = '{{ $entry->id }}'; showTooltip($event, @js($tooltipText))"
          @mouseleave="hoveredId = null; hideTooltip()"
          @if ($detailable) @click="selectRow('{{ $entry->id }}')"
          @elseif ($navigateClick) @click="{{ $navigateClick }}"
-         @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}"
          @elseif ($scrollable) @click="scrollToBar('{{ $entry->id }}')" @endif>
         @for ($i = 0; $i < $depth; $i++)
             <span class="h-9 w-4 shrink-0 border-l ml-2 border-neutral-300 dark:border-neutral-700"></span>
         @endfor
         <div class="flex min-w-0 translate-y-px items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
-                @if ($navigateClick || $focusable)
+                @if ($focusable)
+                    {{-- The ONLY thing that expands/collapses a track --
+                         the rest of the row (see $navigateClick above) is
+                         its own separate click target, navigating to that
+                         job's own page instead. @click.stop keeps a chevron
+                         click from also reaching that handler. --}}
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
-                                      class="h-3 w-3 shrink-0 text-neutral-400 transition-transform dark:text-neutral-500"
-                                      x-bind:class="expandedTracks['{{ $trackId }}'] ? '' : '-rotate-90'"/>
+                                      class="h-3 w-3 shrink-0 cursor-pointer text-neutral-400 transition-transform dark:text-neutral-500"
+                                      x-bind:class="expandedTracks['{{ $trackId }}'] ? '' : '-rotate-90'"
+                                      @click.stop="{{ $toggleClick }}"/>
                 @endif
                 <span class="font-mono text-[11px] font-semibold text-neutral-800 dark:text-neutral-100">{{ $rootLabel }}</span>
                 <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $entry->label }}</span>
@@ -103,13 +118,12 @@
          EventSummary "N duplicates" click handler's scrollIntoView() (see
          timeline.blade.php) — first in the timeline == first chronologically. --}}
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
-        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || $scrollable || ($kind === 'root' && $focusable), 'scroll-mt-[169px]' => $kind === 'root'])
+        <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || $scrollable, 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
              @if ($kind === 'root') data-track-root="{{ $trackId }}" @endif
              @mouseenter="hoveredId = '{{ $entry->id }}'" @mouseleave="hoveredId = null"
              @if ($detailable) @click="selectRow('{{ $entry->id }}')"
              @elseif ($navigateClick) @click="{{ $navigateClick }}"
-             @elseif ($kind === 'root' && $focusable) @click="{{ $toggleClick }}"
              @elseif ($scrollable) @click="scrollToBar('{{ $entry->id }}')" @endif>
             @if ($kind === 'root')
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>

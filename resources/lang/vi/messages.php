@@ -471,7 +471,8 @@ return [
 
     'job' => [
         'queued_at' => 'Đưa vào hàng đợi',
-        'end_time' => 'Thời gian kết thúc',
+        'popped_at' => 'Lấy khỏi hàng đợi lúc',
+        'started_processing_at' => 'Bắt đầu xử lý lúc',
     ],
 
     'command' => [

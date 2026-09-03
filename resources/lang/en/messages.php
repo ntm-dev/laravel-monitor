@@ -471,7 +471,8 @@ return [
 
     'job' => [
         'queued_at' => 'Queued',
-        'end_time' => 'End Time',
+        'popped_at' => 'Popping at',
+        'started_processing_at' => 'Start process at',
     ],
 
     'command' => [

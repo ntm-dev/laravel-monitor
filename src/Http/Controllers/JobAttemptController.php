@@ -28,7 +28,8 @@ use LaravelMonitor\Support\Sql;
  * Http\Controllers\Concerns\MergesJobTimelines) already splices this job's
  * execution in, so this page would otherwise just be a strictly smaller,
  * duplicate view of the same data. Only a job with no resolvable dispatcher
- * (no job_id at all — the sync connection never gets one — or dispatched
+ * (no job_id at all — the sync connection never fires JobQueued, so it
+ * never gets a 'queued' placeholder to walk back to — or dispatched
  * outside any tracked context) renders its own standalone timeline here,
  * same as before this existed.
  */
@@ -84,6 +85,7 @@ class JobAttemptController
             'root' => $root,
             'tracks' => $tracks,
             'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
+            'scrollToOutcomeId' => $jobId,
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,
