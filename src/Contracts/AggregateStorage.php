@@ -19,7 +19,7 @@ interface AggregateStorage
      *
      * $orderBy is one of: count, avg_duration, max_duration, last_seen.
      * Sampled at high volume — see durationStats() — `count`/`users` are
-     * exact only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * exact only up to maxSampleRows() matching rows.
      */
     public function aggregateByKey(
         string $type,
@@ -70,7 +70,7 @@ interface AggregateStorage
      * monitor_aggregates when it covers the range and no key/user filter is
      * given; otherwise scans raw entries, sampled at high volume — see
      * durationStats() — so counts are exact only up to
-     * DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * maxSampleRows() matching rows.
      *
      * @return int[]
      */
@@ -89,7 +89,7 @@ interface AggregateStorage
      * avg_per_bucket / p95_per_bucket arrays (float|null per time slice).
      * Percentiles are computed in PHP (no portable cross-driver SQL
      * percentile), so the underlying row fetch is capped at the most recent
-     * DatabaseAggregateStorage::MAX_SAMPLE_ROWS matches — an approximation past
+     * maxSampleRows() matches — an approximation past
      * that volume, not an exact percentile.
      */
     public function durationStats(
@@ -110,7 +110,7 @@ interface AggregateStorage
      * Requests::UNMATCHED_ROUTE sentinel, with `methods` listing the distinct
      * HTTP methods behind it (null for every ordinary route).
      * Sampled at high volume — see durationStats() — so `count` and the
-     * error breakdowns are exact only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS
+     * error breakdowns are exact only up to maxSampleRows()
      * matching rows; use stats()/aggregateByKey() for exact totals.
      */
     public function routeStats(
@@ -128,7 +128,7 @@ interface AggregateStorage
      * (e.g. notification class) with a real percentile, not just the
      * count/avg_duration/max_duration aggregateByKey() computes in SQL.
      * Sampled at high volume — see durationStats() — so `count` is exact
-     * only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * only up to maxSampleRows() matching rows.
      *
      * `$subtype` narrows the sample to one status, for types whose duration
      * only means something on a subset of their entries (a scheduled task's

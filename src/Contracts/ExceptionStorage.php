@@ -12,7 +12,7 @@ interface ExceptionStorage
      * key, class, message, file, line, count, handled, unhandled, users
      * (distinct impacted users), first_seen and last_seen. Sampled at high
      * volume — `count` and the handled/unhandled/users tallies are exact
-     * only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * only up to maxSampleRows() matching rows.
      */
     public function exceptionGroups(
         DateTimeInterface $since,

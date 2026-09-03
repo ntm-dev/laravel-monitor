@@ -199,8 +199,8 @@ class DatabaseAggregateStorage implements AggregateStorage
     }
 
     /**
-     * Samples up to MAX_SAMPLE_ROWS / $buckets rows per bucket instead of the
-     * most recent MAX_SAMPLE_ROWS overall. A flat "most recent N" cap starves
+     * Samples up to maxSampleRows() / $buckets rows per bucket instead of the
+     * most recent maxSampleRows() overall. A flat "most recent N" cap starves
      * the earlier buckets once total volume for the range exceeds the cap —
      * e.g. a busy install with 250k requests in a 24h window would only ever
      * see duration data for roughly the last 19 of those 24 hours, while the
@@ -376,7 +376,7 @@ class DatabaseAggregateStorage implements AggregateStorage
             // sampleDurationsAcrossBuckets() for why that matters.
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->limit(self::MAX_SAMPLE_ROWS)
+            ->limit($this->maxSampleRows())
             ->get(['key', 'duration', 'created_at']);
 
         $groups = [];

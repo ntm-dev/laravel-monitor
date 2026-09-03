@@ -12,7 +12,7 @@ interface CacheAndQueryStorage
      * hit_ratio, hits, misses, writes, deletes, failures, total. Callers
      * sort/paginate themselves. Sampled at high volume — `total` and the
      * hit/miss/write/delete/failure tallies are exact only up to
-     * DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * maxSampleRows() matching rows.
      */
     public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 
@@ -20,7 +20,7 @@ interface CacheAndQueryStorage
      * Per (query, connection) breakdown, unsorted: one row per pair exposing
      * key (the SQL), connection, calls, total, avg, p95. Callers sort/
      * paginate themselves. Sampled at high volume — `calls`/`total` are
-     * exact only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * exact only up to maxSampleRows() matching rows.
      */
     public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 }

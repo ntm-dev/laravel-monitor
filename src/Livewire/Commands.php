@@ -76,7 +76,7 @@ class Commands extends Card
 
         $commands = $groups->map(function (object $group) use ($failed) {
             // Both sides are independently sampled at high volume (see
-            // DatabaseStorage::MAX_SAMPLE_ROWS), so clamp rather than trust
+            // maxSampleRows()), so clamp rather than trust
             // the subtraction to stay non-negative.
             $failedCount = (int) ($failed->get($group->key)?->count ?? 0);
 

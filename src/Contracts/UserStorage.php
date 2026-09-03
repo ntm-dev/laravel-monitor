@@ -15,7 +15,7 @@ interface UserStorage
     /**
      * Distinct authenticated user_id count per time bucket, requests only —
      * the "Authenticated Users" chart on the Users tab. Sampled at high
-     * volume — exact only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS
+     * volume — exact only up to maxSampleRows()
      * matching rows.
      *
      * @return int[]
@@ -30,7 +30,7 @@ interface UserStorage
      * Request counts per time bucket split by whether the request carried a
      * user_id — the "Requests" chart on the Users tab (Authenticated vs
      * Guest). Sampled at high volume — exact only up to
-     * DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * maxSampleRows() matching rows.
      *
      * @return array{authenticated: int[], guest: int[]}
      */
@@ -43,7 +43,7 @@ interface UserStorage
     /**
      * Users generating the most entries of a type. Each item exposes:
      * user_id, count. Sampled at high volume — `count` is exact only up to
-     * DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows.
+     * maxSampleRows() matching rows.
      */
     public function topUsers(
         string $type,
@@ -58,7 +58,7 @@ interface UserStorage
      * client_errors (4xx), server_errors (5xx), requests (total request
      * count), queued_jobs, exceptions, last_seen. Unsorted — callers sort/
      * paginate themselves. Sampled at high volume — so the counts are exact
-     * only up to DatabaseAggregateStorage::MAX_SAMPLE_ROWS matching rows
+     * only up to maxSampleRows() matching rows
      * across request + job + exception combined.
      */
     public function userStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;

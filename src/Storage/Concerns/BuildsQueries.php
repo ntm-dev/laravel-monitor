@@ -45,19 +45,16 @@ trait BuildsQueries
      * left uncapped: it reports a single exact total, not a per-group
      * breakdown, and the covering index alone keeps it fast without needing
      * to sacrifice exactness.
-     */
-    protected const MAX_SAMPLE_ROWS = 50000;
-
-    /**
-     * A method, not a bare reference to the constant, so tests can subclass
-     * a Database*Storage class and shrink this to reproduce cap-related
-     * sampling behavior (e.g. an early bucket losing all representation once
-     * total volume exceeds the cap) without needing to actually insert tens
-     * of thousands of rows.
+     *
+     * A method, not a class constant, so tests can subclass a Database*Storage
+     * class and shrink this to reproduce cap-related sampling behavior without
+     * needing to actually insert tens of thousands of rows. (Traits can't
+     * declare constants until PHP 8.2, and this package supports 8.1, so the
+     * cap lives here rather than as a MAX_SAMPLE_ROWS const.)
      */
     protected function maxSampleRows(): int
     {
-        return self::MAX_SAMPLE_ROWS;
+        return 50000;
     }
 
     public function __construct(
@@ -136,7 +133,7 @@ trait BuildsQueries
     /**
      * strtotime(), not CarbonImmutable::parse(): this runs once per raw row
      * in durationStats()/countsPerBucket()'s raw-scan path — up to
-     * MAX_SAMPLE_ROWS of them — and Carbon's object construction plus
+     * maxSampleRows() of them — and Carbon's object construction plus
      * format-guessing measurably added up at that volume next to
      * strtotime()'s plain C parser, for a value that's immediately reduced
      * to an int and thrown away.
