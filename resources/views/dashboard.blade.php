@@ -54,6 +54,12 @@
                 @elseif ($tab === 'outgoing' && filled($key))
                     {{-- $key is the destination host (aggregate across all calls to it) --}}
                     @livewire('monitor.outgoing-domain-detail', $rangeProps + ['key' => $key])
+                @elseif ($tab === 'users' && filled($key))
+                    {{-- $key is the resolved user_id; rangeProps already carries an (empty)
+                         'userId' from the query string, so spreading it first (not the usual
+                         "$rangeProps + [...]") is needed to actually override it with the one
+                         this page resolved. --}}
+                    @livewire('monitor.user-detail', [...$rangeProps, 'userId' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])
                 @endif

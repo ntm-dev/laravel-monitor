@@ -198,6 +198,33 @@
         })();
     </script>
 
+    {{-- Any Livewire round trip that fails — an action call or a wire:poll
+         cycle alike — pops a toast instead of failing silently. wire:poll in
+         particular gives no other visible sign a refresh cycle didn't land:
+         the page just quietly stops updating until the next successful poll.
+         Livewire.hook('request', …) is registered once, globally, so this
+         covers every component's polls/actions without each one wiring its
+         own handler. preventDefault() is deliberately never called — this
+         only adds the toast on top of Livewire's own default failure
+         handling (e.g. its debug-mode error overlay), it doesn't replace it. --}}
+    <script>
+        (function () {
+            function hookLivewire() {
+                if (! window.Livewire) return;
+                window.Livewire.hook('request', function ({ fail }) {
+                    fail(function () {
+                        window.dispatchEvent(new CustomEvent('toast', {
+                            detail: { level: 'danger', message: @js(__('monitor::messages.common.update_failed')) },
+                        }));
+                    });
+                });
+            }
+
+            document.addEventListener('livewire:init', hookLivewire);
+            hookLivewire();
+        })();
+    </script>
+
     {{-- Renders every data-tooltip="…" in the app as the dark box above,
          instead of each of the ~50 views that set one drawing its own —
          same idea as components/requests/timeline-row.blade.php's own

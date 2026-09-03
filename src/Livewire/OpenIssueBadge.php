@@ -37,7 +37,7 @@ class OpenIssueBadge extends Card
 
     protected function data(): array
     {
-        $storage = $this->storage();
+        $storage = $this->issueStorage();
 
         // syncIssues() (called from here via syncOpenIssues()) is the only
         // thing that writes a new/recurring issue into monitor_issues — it
@@ -45,7 +45,7 @@ class OpenIssueBadge extends Card
         // this, a new exception/slow query never reaches openIssueCount()
         // until someone happens to have the Issues page open somewhere,
         // so this badge would sit stale on every other tab indefinitely.
-        $this->syncOpenIssues($storage, $this->since(), $this->until());
+        $this->syncOpenIssues($this->aggregateStorage(), $storage, $this->since(), $this->until());
 
         return [
             'count' => $storage->openIssueCount(),

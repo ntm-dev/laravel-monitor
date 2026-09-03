@@ -4,7 +4,7 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
@@ -36,7 +36,7 @@ class CommandRunController
         'lazy_loading' => 'lazy_loading',
     ];
 
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 
@@ -55,7 +55,7 @@ class CommandRunController
         // dispatched it into its own payload instead (see
         // Monitor::finalizePendingCommand()) — looked up here via the same
         // correlation_id mechanism Recorders\Mail/Notifications use to pair
-        // their own two entries (see Contracts\Storage::findByCorrelationId())
+        // their own two entries (see Contracts\TimelineStorage::findByCorrelationId())
         // to link back to it from the General card, rather than sharing a
         // timeline with it: everything on this page happened after the
         // scheduler already finished dispatching this run, so it belongs on

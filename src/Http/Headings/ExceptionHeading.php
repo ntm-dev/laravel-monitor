@@ -3,7 +3,7 @@
 namespace LaravelMonitor\Http\Headings;
 
 use Carbon\CarbonImmutable;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
  * Heading for an exception detail page: the message as both title and tooltip
@@ -12,7 +12,7 @@ use LaravelMonitor\Contracts\Storage;
  */
 class ExceptionHeading
 {
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

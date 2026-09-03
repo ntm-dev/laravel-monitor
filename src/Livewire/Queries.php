@@ -63,10 +63,10 @@ class Queries extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
 
-        $queries = $storage->queryStats($since, $until);
+        $queries = $this->cacheAndQueryStorage()->queryStats($since, $until);
 
         // Connection list is derived from the current period's data rather
         // than a separate query — cheap since queryStats() already fetched

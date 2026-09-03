@@ -12,7 +12,7 @@ use LaravelMonitor\Support\RecordType;
  * @method static mixed ignore(callable $callback)
  * @method static void stopRecording()
  * @method static void startRecording()
- * @method static \LaravelMonitor\Contracts\Storage storage()
+ * @method static \LaravelMonitor\Contracts\EntryWriter storage()
  *
  * @see \LaravelMonitor\Monitor
  */

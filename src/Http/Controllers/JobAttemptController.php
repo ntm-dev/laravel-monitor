@@ -6,7 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\KeyHash;
@@ -50,7 +50,7 @@ class JobAttemptController
         'lazy_loading' => 'lazy_loading',
     ];
 
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

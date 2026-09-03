@@ -6,7 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Livewire\Card;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
@@ -59,7 +59,7 @@ class RequestDetailController
         'lazy_loading' => 'lazy_loading',
     ];
 
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

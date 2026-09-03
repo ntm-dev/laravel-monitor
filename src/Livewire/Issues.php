@@ -3,7 +3,7 @@
 namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Collection;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\IssueStorage;
 use LaravelMonitor\Livewire\Concerns\SyncsOpenIssues;
 use LaravelMonitor\Support\Format;
 use Livewire\Attributes\Url;
@@ -92,15 +92,15 @@ class Issues extends Card
             return;
         }
 
-        $current = $this->storage()->issueStatuses($type, [$key])->get($key);
+        $current = $this->issueStorage()->issueStatuses($type, [$key])->get($key);
 
         if ($current !== null && $current->priority === $priority) {
             return;
         }
 
-        $this->storage()->setIssuePriority($type, $key, $priority);
+        $this->issueStorage()->setIssuePriority($type, $key, $priority);
 
-        $id = $current->id ?? $this->storage()->issueStatuses($type, [$key])->get($key)->id;
+        $id = $current->id ?? $this->issueStorage()->issueStatuses($type, [$key])->get($key)->id;
 
         $this->notify('success', __('monitor::messages.issue.toast_priority_updated_list', ['id' => $id, 'level' => Format::priorityLabel($priority)]));
     }
@@ -193,7 +193,7 @@ class Issues extends Card
             return;
         }
 
-        $this->storage()->setIssueStatus($type, $key, $status);
+        $this->issueStorage()->setIssueStatus($type, $key, $status);
     }
 
     protected function view(): string
@@ -205,11 +205,11 @@ class Issues extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->issueStorage();
 
         $openIssueCountBefore = $storage->openIssueCount();
 
-        [$exceptions, $performance] = $this->syncOpenIssues($storage, $since, $until);
+        [$exceptions, $performance] = $this->syncOpenIssues($this->aggregateStorage(), $storage, $since, $until);
 
         $openIssueCount = $storage->openIssueCount();
 
@@ -231,7 +231,7 @@ class Issues extends Card
         // name instead of falling back to the raw fingerprint key — see
         // Exceptions::data(), which already relies on this for the same
         // reason.
-        $latest = $storage->exceptionGroups($since, $until)->keyBy('key');
+        $latest = $this->exceptionStorage()->exceptionGroups($since, $until)->keyBy('key');
 
         $exceptions = $exceptions->map(function ($group) use ($latest) {
             $found = $latest->get($group->key);
@@ -313,7 +313,7 @@ class Issues extends Card
      * shouldn't happen in practice since data() always syncs immediately
      * before calling this, but keeps the view safe either way).
      */
-    protected function attachIssueStatus(Storage $storage, string $type, Collection $items): Collection
+    protected function attachIssueStatus(IssueStorage $storage, string $type, Collection $items): Collection
     {
         $statuses = $storage->issueStatuses($type, $items->pluck('key')->unique()->all());
 

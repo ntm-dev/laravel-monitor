@@ -7,12 +7,27 @@ use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\AggregateStorage;
+use LaravelMonitor\Contracts\CacheAndQueryStorage;
+use LaravelMonitor\Contracts\EntryWriter;
+use LaravelMonitor\Contracts\ExceptionStorage;
+use LaravelMonitor\Contracts\HashResolver;
+use LaravelMonitor\Contracts\IssueStorage;
+use LaravelMonitor\Contracts\TimelineStorage;
+use LaravelMonitor\Contracts\UserStorage;
 use LaravelMonitor\Hooks\CommandLifecycleEndHook;
 use LaravelMonitor\Hooks\ControllerStartHook;
 use LaravelMonitor\Hooks\RequestLifecycleEndHook;
 use LaravelMonitor\Livewire as Cards;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Storage\DatabaseAggregateStorage;
+use LaravelMonitor\Storage\DatabaseCacheAndQueryStorage;
+use LaravelMonitor\Storage\DatabaseEntryWriter;
+use LaravelMonitor\Storage\DatabaseExceptionStorage;
+use LaravelMonitor\Storage\DatabaseHashResolver;
+use LaravelMonitor\Storage\DatabaseIssueStorage;
+use LaravelMonitor\Storage\DatabaseTimelineStorage;
+use LaravelMonitor\Storage\DatabaseUserStorage;
 use Livewire\Livewire;
 
 class MonitorServiceProvider extends ServiceProvider
@@ -60,14 +75,35 @@ class MonitorServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Each Storage sub-contract (Contracts\AggregateStorage, ::UserStorage,
+     * ...) is its own bound singleton backed by its own Database*Storage
+     * class/file, rather than one bound Contracts\Storage backed by one
+     * Database*Storage god-class the way this used to work — a page that
+     * only needs e.g. UserStorage never even autoloads
+     * DatabaseIssueStorage's file. Singleton, not bind(): a couple of these
+     * (DatabaseAggregateStorage's aggregatesCoverCache in particular) memo
+     * across calls within one request, and the old StorageManager-backed
+     * Storage binding was effectively a singleton too (Manager caches its
+     * created driver instances).
+     */
     private function registerBindings(): void
     {
         $this->app->singleton(Monitor::class);
         $this->app->singleton(ControllerStartHook::class);
         $this->app->singleton(RequestLifecycleEndHook::class);
         $this->app->singleton(CommandLifecycleEndHook::class);
-        $this->app->singleton(StorageManager::class);
-        $this->app->bind(Storage::class, fn ($app) => $app[StorageManager::class]->driver());
+
+        $config = fn ($app) => $app['config']->get('monitor.storage.database', []);
+
+        $this->app->singleton(EntryWriter::class, fn ($app) => new DatabaseEntryWriter($app['db'], $config($app)));
+        $this->app->singleton(AggregateStorage::class, fn ($app) => new DatabaseAggregateStorage($app['db'], $config($app)));
+        $this->app->singleton(TimelineStorage::class, fn ($app) => new DatabaseTimelineStorage($app['db'], $config($app)));
+        $this->app->singleton(UserStorage::class, fn ($app) => new DatabaseUserStorage($app['db'], $config($app)));
+        $this->app->singleton(CacheAndQueryStorage::class, fn ($app) => new DatabaseCacheAndQueryStorage($app['db'], $config($app)));
+        $this->app->singleton(ExceptionStorage::class, fn ($app) => new DatabaseExceptionStorage($app['db'], $config($app)));
+        $this->app->singleton(IssueStorage::class, fn ($app) => new DatabaseIssueStorage($app['db'], $config($app)));
+        $this->app->singleton(HashResolver::class, fn ($app) => new DatabaseHashResolver($app['db'], $config($app)));
     }
 
     private function captureTimestamp(): void
@@ -276,6 +312,7 @@ class MonitorServiceProvider extends ServiceProvider
         Livewire::component('monitor.mail-class-detail', Cards\MailClassDetail::class);
         Livewire::component('monitor.outgoing-detail', Cards\OutgoingDetail::class);
         Livewire::component('monitor.outgoing-domain-detail', Cards\OutgoingDomainDetail::class);
+        Livewire::component('monitor.user-detail', Cards\UserDetail::class);
     }
 
     protected function registerAuthorization(): void

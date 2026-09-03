@@ -3,7 +3,7 @@
 namespace LaravelMonitor\Http\Headings;
 
 use Carbon\CarbonImmutable;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Support\Cron;
 
 /**
@@ -16,7 +16,7 @@ use LaravelMonitor\Support\Cron;
  */
 class ScheduleHeading
 {
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

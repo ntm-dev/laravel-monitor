@@ -2,7 +2,7 @@
 
 namespace LaravelMonitor\Http\Headings;
 
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
  * Heading for an outgoing (HTTP client) request detail page. $key means one
@@ -13,7 +13,7 @@ use LaravelMonitor\Contracts\Storage;
  */
 class OutgoingHeading
 {
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 

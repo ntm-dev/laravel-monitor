@@ -38,7 +38,7 @@ class JobDetail extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
@@ -61,7 +61,7 @@ class JobDetail extends Card
             'releasedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'released', $key, $until),
             'duration' => $storage->durationStats('job', $since, $buckets, $key, null, $until),
             'entries' => $this->withoutSupersededQueuedRows(
-                $storage->recent('job', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE)
+                $this->timelineStorage()->recent('job', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE)
             ),
             'totalEntries' => $totalEntries,
             'page' => $page,

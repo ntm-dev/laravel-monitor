@@ -171,17 +171,6 @@
                     </div>
 
                     <div class="{{ $rowClass }}">
-                        <label for="s-driver"
-                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.storage_driver') }}</label>
-                        <select id="s-driver" name="storage_driver" class="{{ $fieldClass }}">
-                            @foreach ($storageDrivers as $driver)
-                                <option value="{{ $driver }}" @selected($system['storage_driver'] === $driver)>{{ $driver }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="{{ $rowClass }}">
                         <label for="s-table"
                             class="{{ $labelClass }}">{{ __('monitor::messages.settings.database_table') }}</label>
                         <input id="s-table" name="database_table"

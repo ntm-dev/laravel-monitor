@@ -6,7 +6,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\EntryWriter;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\State\CommandState;
 use LaravelMonitor\State\RequestState;
@@ -954,7 +954,7 @@ class Monitor
         // Only set for a command-based scheduled task's own subprocess (see
         // beginCommandRun()'s $scheduledTaskRunId param) — the same
         // correlation_id mechanism Recorders\Mail/Notifications use to pair
-        // their own two entries (see Contracts\Storage::findByCorrelationId()),
+        // their own two entries (see Contracts\TimelineStorage::findByCorrelationId()),
         // reused here so CommandRunController can look up the dispatching
         // scheduled_task entry to link to, and ScheduleRunController the
         // reverse. Purely a cross-reference — this run's own timeline stays
@@ -1042,8 +1042,8 @@ class Monitor
         $this->recording = true;
     }
 
-    public function storage(): Storage
+    public function storage(): EntryWriter
     {
-        return $this->app->make(Storage::class);
+        return $this->app->make(EntryWriter::class);
     }
 }

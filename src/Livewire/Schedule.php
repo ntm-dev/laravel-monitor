@@ -74,7 +74,7 @@ class Schedule extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
 
         $bySubtype = $storage->statsBySubtype('scheduled_task', $since, $until);
@@ -100,13 +100,13 @@ class Schedule extends Card
         // cadence changed shows as two rows, its old cadence's own history
         // staying put (and marked inactive below) instead of quietly
         // merging into whatever the *latest* run happens to be scheduled
-        // under. Storage::aggregateByKey()/latestPayloadByKey() only group
-        // by the raw `key` column and can't make that split, so this pulls
+        // under. AggregateStorage::aggregateByKey()/latestPayloadByKey() only
+        // group by the raw `key` column and can't make that split, so this pulls
         // every row (payload included) instead — see self::MAX_SAMPLE_ROWS
         // for why that stays cheap for this type.
         $groups = [];
 
-        foreach ($storage->recent('scheduled_task', $since, self::MAX_SAMPLE_ROWS, null, null, $until) as $row) {
+        foreach ($this->timelineStorage()->recent('scheduled_task', $since, self::MAX_SAMPLE_ROWS, null, null, $until) as $row) {
             $expression = $row->payload['expression'] ?? null;
             $repeatSeconds = $row->payload['repeat_seconds'] ?? null;
             $groupKey = "{$row->key}\0{$expression}\0{$repeatSeconds}";

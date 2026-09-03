@@ -4,7 +4,7 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use LaravelMonitor\Contracts\Storage;
+use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Http\Controllers\Concerns\MergesJobTimelines;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
@@ -45,7 +45,7 @@ class ScheduleRunController
         'lazy_loading' => 'lazy_loading',
     ];
 
-    public function __construct(protected Storage $storage)
+    public function __construct(protected TimelineStorage $storage)
     {
     }
 
@@ -68,7 +68,7 @@ class ScheduleRunController
         // to link to) — its `command` entry carries this run's own id as its
         // correlation_id (see Monitor::finalizePendingCommand()), the same
         // mechanism Recorders\Mail/Notifications use to pair their own two
-        // entries (see Contracts\Storage::findByCorrelationId()).
+        // entries (see Contracts\TimelineStorage::findByCorrelationId()).
         $commandRun = $this->storage->findByCorrelationId('command', $runId, $root->created_at);
 
         [$groups, $footerTabs] = Nav::grouped();

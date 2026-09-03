@@ -34,7 +34,7 @@ class IssueManagePanel extends Card
             return;
         }
 
-        $this->storage()->setIssueStatus($issue->type, $issue->key, $status);
+        $this->issueStorage()->setIssueStatus($issue->type, $issue->key, $status);
 
         // Same nudge Issues.php's own resolve()/ignore() send, so the
         // sidebar's OpenIssueBadge count doesn't drift behind this change.
@@ -61,13 +61,13 @@ class IssueManagePanel extends Card
             return;
         }
 
-        $this->storage()->setIssuePriority($issue->type, $issue->key, $priority);
+        $this->issueStorage()->setIssuePriority($issue->type, $issue->key, $priority);
         $this->notify('success', __('monitor::messages.issue.toast_priority_updated', ['level' => Format::priorityLabel($priority)]));
     }
 
     protected function issue(): ?object
     {
-        return $this->storage()->findIssueByUuid($this->uuid);
+        return $this->issueStorage()->findIssueByUuid($this->uuid);
     }
 
     protected function view(): string

@@ -13,7 +13,7 @@ class Application extends Card
     {
         $since = $this->since();
         $until = $this->until();
-        $storage = $this->storage();
+        $storage = $this->aggregateStorage();
         $buckets = $this->chartBuckets();
         $threshold = (int) config('monitor.thresholds.request', 1000);
 
@@ -28,7 +28,7 @@ class Application extends Card
         return [
             'exceptions' => $storage->stats('exception', $since, null, null, $until)->count,
             'exceptionBuckets' => $storage->countsPerBucket('exception', $since, $buckets, null, null, $until),
-            'impactedUsers' => $storage->topUsers('exception', $since, 100, $until)->count(),
+            'impactedUsers' => $this->userStorage()->topUsers('exception', $since, 100, $until)->count(),
             'slowRoutes' => $slowRoutes->take(3),
             'slowRouteCount' => $slowRoutes->count(),
             'threshold' => $threshold,
