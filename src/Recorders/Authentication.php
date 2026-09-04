@@ -42,6 +42,13 @@ class Authentication extends Recorder
             return;
         }
 
+        // While this listener runs, the guard involved still has $event->user
+        // set — Illuminate\Auth\SessionGuard::logout() fires Logout before
+        // clearing it. See Monitor::rememberLoggedOutUser()'s own docblock
+        // for why capturing it here matters for entries recorded earlier in
+        // this same request/job/command.
+        $this->monitor->rememberLoggedOutUser($event->guard, $event->user);
+
         $this->monitor->record(
             type: RecordType::Auth,
             key: $this->identifier($event->guard, $event->user),

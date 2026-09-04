@@ -114,7 +114,7 @@ class Requests extends Recorder
             ], fn ($value) => $value !== null),
             duration: $duration,
             subtype: HttpStatusGroup::forStatus($status)->value,
-            userId: $this->monitor->currentUserId(),
+            userId: $this->monitor->lazyCurrentUserId(),
         );
     }
 

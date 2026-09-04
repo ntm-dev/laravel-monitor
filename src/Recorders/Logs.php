@@ -46,7 +46,7 @@ class Logs extends Recorder
                 'context' => Str::mediumText(json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION) ?: '{}'),
             ],
             subtype: $event->level,
-            userId: $this->monitor->currentUserId(),
+            userId: $this->monitor->lazyCurrentUserId(),
         );
     }
 
