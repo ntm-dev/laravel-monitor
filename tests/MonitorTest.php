@@ -3167,6 +3167,74 @@ class MonitorTest extends TestCase
         $this->assertNull($this->app->make(\LaravelMonitor\Monitor::class)->currentUserId());
     }
 
+    public function test_current_user_id_never_resolves_a_guard_the_application_itself_has_not_touched(): void
+    {
+        \Illuminate\Support\Facades\Auth::extend('never_resolving', fn () => new NeverResolvingFixtureGuard());
+        config(['auth.guards.untouched' => ['driver' => 'never_resolving']]);
+
+        NeverResolvingFixtureGuard::$userCalls = 0;
+
+        $this->assertNull($this->app->make(\LaravelMonitor\Monitor::class)->currentUserId());
+
+        // user() is what runs the session lookup, the "remember me" cookie
+        // check and the provider's own SELECT. Monitoring must never be the
+        // thing that triggers it — that query would be recorded by
+        // Recorders\Queries as if the application had issued it.
+        $this->assertSame(0, NeverResolvingFixtureGuard::$userCalls);
+    }
+
+    public function test_a_log_recorded_before_the_application_authenticates_still_gets_that_user(): void
+    {
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Late Login',
+            'email' => 'late-login@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        \Illuminate\Support\Facades\Log::info('emitted before the application authenticated anyone');
+
+        // Authentication happens after the log line — resolving the user id
+        // when the entry was recorded would have stamped null onto it forever.
+        \Illuminate\Support\Facades\Auth::guard('web')->setUser($user);
+
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'log',
+            'key' => 'emitted before the application authenticated anyone',
+            'user_id' => "web:{$user->id}",
+        ]);
+    }
+
+    public function test_a_log_recorded_before_a_logout_still_gets_that_user_once_flushed(): void
+    {
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'About To Log Out',
+            'email' => 'about-to-log-out@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'owner',
+        ]);
+
+        \Illuminate\Support\Facades\Auth::guard('web')->setUser($user);
+
+        \Illuminate\Support\Facades\Log::info('emitted right before logout');
+
+        // Real logout — Illuminate\Auth\SessionGuard::logout() fires Logout
+        // (Recorders\Authentication observes it and remembers the user)
+        // *before* clearing the guard's own user, same ordering a real
+        // logout request has.
+        \Illuminate\Support\Facades\Auth::guard('web')->logout();
+
+        Monitor::flush();
+
+        $this->assertDatabaseHas('monitor_entries', [
+            'type' => 'log',
+            'key' => 'emitted right before logout',
+            'user_id' => "web:{$user->id}",
+        ]);
+    }
+
     public function test_a_log_emitted_while_browsing_the_monitor_dashboard_is_not_recorded(): void
     {
         // Same self-exclusion as test_login_with_wrong_password_does_not_record_monitors_own_auth_entry:
@@ -3725,5 +3793,52 @@ class LazyLoadingFixtureModel extends \Illuminate\Database\Eloquent\Model
     public function related(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(self::class, 'id', 'id');
+    }
+}
+
+/**
+ * Stands in for a configured guard the application never touches during a
+ * request. Counts every user() call so a test can assert monitoring never
+ * makes one — in a real guard that call is what queries the database.
+ */
+class NeverResolvingFixtureGuard implements \Illuminate\Contracts\Auth\Guard
+{
+    public static int $userCalls = 0;
+
+    public function check(): bool
+    {
+        return $this->user() !== null;
+    }
+
+    public function guest(): bool
+    {
+        return ! $this->check();
+    }
+
+    public function user(): ?\Illuminate\Contracts\Auth\Authenticatable
+    {
+        self::$userCalls++;
+
+        return null;
+    }
+
+    public function id(): int|string|null
+    {
+        return $this->user()?->getAuthIdentifier();
+    }
+
+    public function validate(array $credentials = []): bool
+    {
+        return false;
+    }
+
+    public function hasUser(): bool
+    {
+        return false;
+    }
+
+    public function setUser(\Illuminate\Contracts\Auth\Authenticatable $user): void
+    {
+        //
     }
 }

@@ -14,7 +14,7 @@ class Entry
         public array $payload = [],
         public ?float $duration = null,
         public ?string $subtype = null,
-        public int|string|null $userId = null,
+        public int|string|LazyValue|null $userId = null,
         public ?string $requestId = null,
         public ?float $startOffset = null,
         ?CarbonImmutable $timestamp = null,
@@ -35,7 +35,11 @@ class Entry
             // migration) is the one and only place these get truncated to a
             // fixed precision.
             'duration' => $this->duration,
-            'user_id' => $this->userId,
+            // Resolved here, not when the entry was recorded: a deferred user
+            // id (see Monitor::lazyCurrentUserId()) is only settled once the
+            // whole request/job/command has run, and toArray() is reached
+            // solely from Monitor::flush() via Storage\DatabaseEntryWriter.
+            'user_id' => $this->userId instanceof LazyValue ? $this->userId->resolve() : $this->userId,
             'request_id' => $this->requestId,
             'start_offset' => $this->startOffset,
             'created_at' => $this->timestamp,

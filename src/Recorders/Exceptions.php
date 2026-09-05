@@ -79,7 +79,7 @@ class Exceptions extends Recorder
                 ),
             ],
             subtype: $handled ? 'handled' : 'unhandled',
-            userId: $this->monitor->currentUserId(),
+            userId: $this->monitor->lazyCurrentUserId(),
         );
     }
 
