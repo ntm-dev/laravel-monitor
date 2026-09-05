@@ -1,6 +1,4 @@
 @php
-    use LaravelMonitor\Support\Icons;
-
     $columns = [
         'key' => ['label' => __('monitor::messages.common.key'), 'align' => 'left'],
         'hit_ratio' => ['label' => __('monitor::messages.common.hit_ratio'), 'align' => 'right'],
@@ -17,10 +15,7 @@
 <div wire:poll.{{ $refresh }}s>
     <x-monitor::section>
         <x-slot:actions>
-            <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
-                    class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
-            </button>
+            <x-monitor::refresh-button/>
         </x-slot:actions>
 
         {{-- Overview charts --}}

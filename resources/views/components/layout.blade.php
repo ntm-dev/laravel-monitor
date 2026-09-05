@@ -42,6 +42,15 @@
     <script src="https://cdn.jsdelivr.net/npm/sql-formatter@4.0.2/dist/sql-formatter.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        {{-- shadow-top-* mirror Tailwind's own shadow-sm/DEFAULT/md/lg/xl values
+             with the y-offsets negated, for elements that need a shadow cast
+             upward (e.g. a sticky footer shadowing the content scrolled
+             beneath it — components/navigation.blade.php's footer nav).
+             Each still composes with the stock shadow-{color}/{opacity}
+             utilities (shadow-black/5, dark:shadow-white/10, …) the same way
+             shadow-lg does — Tailwind extracts the color from any boxShadow
+             theme value, custom ones included, so that composability isn't
+             something these have to opt into separately. --}}
         tailwind.config = {
             darkMode: 'class',
             theme: {
@@ -49,6 +58,13 @@
                     fontFamily: {
                         sans: ['InterVariable', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
                         mono: ['"CommitMono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+                    },
+                    boxShadow: {
+                        'top-sm': '0 -1px 2px 0 rgb(0 0 0 / 0.05)',
+                        top: '0 -1px 3px 0 rgb(0 0 0 / 0.1), 0 -1px 2px -1px rgb(0 0 0 / 0.1)',
+                        'top-md': '0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1)',
+                        'top-lg': '0 -10px 15px -3px rgb(0 0 0 / 0.1), 0 -4px 6px -4px rgb(0 0 0 / 0.1)',
+                        'top-xl': '0 -20px 25px -5px rgb(0 0 0 / 0.1), 0 -8px 10px -6px rgb(0 0 0 / 0.1)',
                     },
                 },
             },
@@ -217,6 +233,51 @@
                             detail: { level: 'danger', message: @js(__('monitor::messages.common.update_failed')) },
                         }));
                     });
+                });
+            }
+
+            document.addEventListener('livewire:init', hookLivewire);
+            hookLivewire();
+        })();
+    </script>
+
+    {{-- Every x-monitor::refresh-button reads this one store: it spins the
+         icon and no-ops the click while a round trip is in flight, for
+         *any* component's poll/action — not just the one the button
+         belongs to — since a single global flag is what "all refresh
+         buttons spin together" means. Registered on alpine:init rather
+         than lazily inside some component's x-data (the monitorClock
+         pattern in refresh-ring.blade.php) because refresh-button reads it
+         immediately on first paint, before any such component could have
+         run its init(). Same Livewire.hook('request', …) entry point as
+         the toast-on-failure hook above — it already fires for every
+         component's polls/actions, wire:poll included.
+
+         `active` is a getter over a request *count*, not a plain boolean —
+         the dashboard Overview embeds three independently-polling
+         components at once (Overview/Application/Users cards, each its own
+         wire:poll), so their requests overlap rather than running one at a
+         time. A boolean set true-per-start/false-per-finish would go false
+         the instant the FIRST of several concurrent requests lands, even
+         with others still in flight — cutting every refresh-ring's spin
+         short and having refresh-button's click guard drop early. Counting
+         only reaches zero (active: false) once every concurrent request has
+         actually finished. --}}
+    <script>
+        document.addEventListener('alpine:init', function () {
+            Alpine.store('monitorPolling', {
+                count: 0,
+                get active() { return this.count > 0; },
+            });
+        });
+
+        (function () {
+            function hookLivewire() {
+                if (! window.Livewire) return;
+                window.Livewire.hook('request', function ({ succeed, fail }) {
+                    Alpine.store('monitorPolling').count++;
+                    succeed(function () { Alpine.store('monitorPolling').count--; });
+                    fail(function () { Alpine.store('monitorPolling').count--; });
                 });
             }
 
