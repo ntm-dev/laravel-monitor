@@ -14,7 +14,6 @@ use LaravelMonitor\Support\RecordType;
 
 use function gethostname;
 use function memory_get_peak_usage;
-use function memory_reset_peak_usage;
 use function preg_replace;
 use function str_contains;
 use function str_replace;
@@ -47,11 +46,9 @@ class ScheduledTasks extends Recorder
         // Fires right before the task's own body runs — see ScheduleRunCommand::runEvent(),
         // which dispatches this synchronously ahead of $event->run(). A cron-triggered
         // `schedule:run` can run several due tasks in one PHP process, and `schedule:work`
-        // never restarts its process at all, so without this reset, record()'s
-        // memory_get_peak_usage() below would report the cumulative peak across every task
-        // that process has ever run, not this one's own — same reasoning as
-        // Recorders\Jobs::resetPeakMemory().
-        memory_reset_peak_usage();
+        // never restarts its process at all, so the peak record() reports below has to be
+        // scoped to this one task (see Recorder::resetPeakMemoryUsage()).
+        $this->resetPeakMemoryUsage();
     }
 
     public function recordFinished(ScheduledTaskFinished $event): void

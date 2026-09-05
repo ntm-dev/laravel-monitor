@@ -87,15 +87,13 @@ class Jobs extends Recorder
 
     /**
      * Fires before the job is even popped off the queue, ahead of
-     * JobProcessing — a long-running worker never restarts its PHP process
-     * between jobs, so without this reset memory_get_peak_usage() in
-     * recordProcessed()/recordFailed()/recordReleased() would report the
-     * cumulative peak across every job that process has ever run, not this
-     * one's own.
+     * JobProcessing — scoping the peak reported by
+     * recordProcessed()/recordFailed()/recordReleased() to this one job
+     * (see Recorder::resetPeakMemoryUsage()).
      */
     public function resetPeakMemory(JobPopping $event): void
     {
-        memory_reset_peak_usage();
+        $this->resetPeakMemoryUsage();
 
         $this->lastPoppedAt = microtime(true);
     }

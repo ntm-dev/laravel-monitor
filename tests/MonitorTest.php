@@ -2229,7 +2229,7 @@ class MonitorTest extends TestCase
         return new $class(...$args);
     }
 
-    protected function jobQueuedEvent(string $connectionName, string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
+    protected function jobQueuedEvent(string $connectionName, ?string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
     {
         return $this->constructEventCompatibly(\Illuminate\Queue\Events\JobQueued::class, compact('connectionName', 'queue', 'id', 'job', 'payload', 'delay'));
     }
@@ -2369,7 +2369,7 @@ class MonitorTest extends TestCase
             public $queue = null;
         };
 
-        event(new \Illuminate\Queue\Events\JobQueued('custom', null, 'job-abc123', $job, json_encode([]), null));
+        event($this->jobQueuedEvent('custom', null, 'job-abc123', $job, json_encode([])));
 
         Monitor::flush();
 
