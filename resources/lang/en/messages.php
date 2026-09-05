@@ -23,8 +23,8 @@ return [
         'collapse' => 'Collapse sidebar',
         'expand' => 'Expand sidebar',
         'sign_out' => 'Sign out',
-        'live_refresh' => 'Live · refreshes every :seconds s',
-        'refresh_in' => 'Refreshes in :seconds s',
+        'live_refresh' => 'Live · refreshes every :seconds :unit',
+        'refresh_in' => 'Refreshes in :seconds :unit',
     ],
 
     'group' => [
@@ -346,6 +346,7 @@ return [
         'copy_as_markdown' => 'Copy as Markdown',
 
         'refresh' => 'Refresh',
+        'refreshing' => 'Refreshing…',
         'update_failed' => 'Failed to refresh — will retry automatically',
         'clear' => 'Clear',
         'search' => 'Search',
@@ -417,6 +418,7 @@ return [
         'open_mail' => 'Open mail',
         'user_count' => 'user|users',
         'route_count' => 'route|routes',
+        'second_count' => 'second|seconds',
         'key_count' => 'Key|Keys',
         'run_count' => 'Run|Runs',
         'command_count' => 'Command|Commands',
