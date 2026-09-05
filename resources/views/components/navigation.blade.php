@@ -5,9 +5,37 @@
      those own their own URL and render everything once server-side, no
      wire:poll anywhere on the page, so the active tab's refresh ring would be
      showing a countdown to a refresh that never happens. --}}
-@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true])
+@props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true, 'reactiveTabExpr' => null])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
+
+    // The link/icon classes below are identical whichever tab this is --
+    // only *which* tab currently gets them differs, either $tab === $tabKey
+    // (baked in once, server-side, the same for every page but Request
+    // Detail) or, there, an Alpine expression (see $reactiveTabExpr) so a
+    // request/job toggle there can flip the active tab without a real
+    // navigation -- see request-detail-page.blade.php's own $infos.
+    $linkActiveClasses = 'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+    $linkInactiveClasses = 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100';
+    $iconActiveClasses = 'text-blue-600 dark:text-blue-400';
+    $iconInactiveClasses = 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300';
+
+    // A single ":class" expression per tag, resolved once here rather than
+    // switched between "class="/":class=" with an @if/@else split across the
+    // attribute list -- Blade's <x-.../> component-tag compiler doesn't
+    // reliably recognize a component tag whose attributes are interrupted by
+    // a directive, and silently leaves the whole tag as literal, uncompiled
+    // text when it doesn't (bit us on <x-monitor::icon>, breaking the sidebar
+    // layout). A plain <a> tag doesn't have this problem -- only Blade's
+    // component-tag compiler is affected -- but the two now share one helper
+    // for consistency.
+    $classExpr = function (string $base, string $tabKey, string $activeClasses, string $inactiveClasses) use ($reactiveTabExpr, $tab) {
+        if ($reactiveTabExpr !== null) {
+            return "'{$base} ' + (({$reactiveTabExpr}) === ".\Illuminate\Support\Js::from($tabKey).' ? '.\Illuminate\Support\Js::from($activeClasses).' : '.\Illuminate\Support\Js::from($inactiveClasses).')';
+        }
+
+        return \Illuminate\Support\Js::from(\Illuminate\Support\Arr::toCssClasses([$base, $activeClasses => $tab === $tabKey, $inactiveClasses => $tab !== $tabKey]));
+    };
 @endphp
 {{-- collapsed mirrors the localStorage key the pre-paint script in
      components/layout.blade.php reads, so the initial Alpine state always
@@ -46,12 +74,8 @@
                 @foreach ($items as $tabKey => $item)
                     <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                        data-tooltip="{{ $item['label'] }}"
-                       @class([
-                           'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm',
-                           'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
-                           'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $tab !== $tabKey,
-                       ])>
-                        <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300' }}"/>
+                       :class="{{ $classExpr('group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm', $tabKey, $linkActiveClasses, $linkInactiveClasses) }}">
+                        <x-monitor::icon :path="$item['icon']" :class="$classExpr('h-4 w-4 shrink-0', $tabKey, $iconActiveClasses, $iconInactiveClasses)"/>
                         <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                         @if ($tabKey === 'issues')
                             <span class="monitor-nav-label">
@@ -76,12 +100,8 @@
             @foreach ($footerTabs as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                    data-tooltip="{{ $item['label'] }}"
-                   @class([
-                       'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm',
-                       'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
-                       'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $tab !== $tabKey,
-                   ])>
-                    <x-monitor::icon :path="$item['icon']" class="h-4 w-4 shrink-0 {{ $tab === $tabKey ? 'text-blue-600 dark:text-blue-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300' }}"/>
+                   :class="{{ $classExpr('group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm', $tabKey, $linkActiveClasses, $linkInactiveClasses) }}">
+                    <x-monitor::icon :path="$item['icon']" :class="$classExpr('h-4 w-4 shrink-0', $tabKey, $iconActiveClasses, $iconInactiveClasses)"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                     @if ($tab === $tabKey && $tabKey !== 'settings' && $autoRefreshes)
                         {{-- Settings has no wire:poll — it's a static config form,

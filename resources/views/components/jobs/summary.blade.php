@@ -12,10 +12,38 @@
         default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     };
 
+    // Microsecond precision + explicit UTC offset, same as
+    // requests/summary.blade.php's own "date" row (Format::timezone()
+    // itself already applies Preferences::timezone() before formatting —
+    // this suffix is just making that already-converted offset explicit).
+    $timezoneSuffix = ' '.\LaravelMonitor\Support\Format::timezone();
+
+    // 'popped_at'/'started_at' are raw microtime(true) epoch floats (see
+    // Recorders\Jobs), not the DateTimeInterface Format::datetime() expects
+    // — same round-trip Support\Timeline::preciseTimestamp() already uses
+    // elsewhere to turn one back into a precise, timezone-aware instant.
+    $preciseTimestamp = fn (float $epoch) => \LaravelMonitor\Support\Format::datetime(
+        \Carbon\CarbonImmutable::createFromFormat('U.u', number_format($epoch, 6, '.', '')),
+        \LaravelMonitor\Support\Format::DATETIME_PRECISE,
+    ).$timezoneSuffix;
+
+    // Duration's own tooltip shows the precise moment this job actually
+    // ended -- reconstructed from started_at + duration where available
+    // (both microsecond-precise), falling back to created_at (recorded at
+    // job-finish time, see Recorders\Jobs) for older entries that predate
+    // started_at being captured.
+    $jobEndTime = isset($payload['started_at'])
+        ? $preciseTimestamp((float) $payload['started_at'] + ((float) $root->duration / 1000))
+        : \LaravelMonitor\Support\Format::datetime($root->created_at, \LaravelMonitor\Support\Format::DATETIME_PRECISE).$timezoneSuffix;
+
     $general = array_filter([
         'status' => $status,
-        'queued_at' => $queuedAt !== null ? \LaravelMonitor\Support\Format::datetime($queuedAt) : null,
-        'end_time' => \LaravelMonitor\Support\Format::datetime($root->created_at),
+        'queued_at' => $queuedAt !== null
+            ? \LaravelMonitor\Support\Format::datetime($queuedAt, \LaravelMonitor\Support\Format::DATETIME_PRECISE).$timezoneSuffix
+            : null,
+        'popped_at' => isset($payload['popped_at']) ? $preciseTimestamp((float) $payload['popped_at']) : null,
+        'started_processing_at' => isset($payload['started_at']) ? $preciseTimestamp((float) $payload['started_at']) : null,
+        'duration' => \LaravelMonitor\Support\Format::duration($root->duration),
         'connection' => $payload['connection'] ?? '—',
         'queue' => $payload['queue'] ?? 'default',
         'peak_memory' => \LaravelMonitor\Support\Number::fileSize($payload['peak_memory'] ?? null),
@@ -25,7 +53,9 @@
     $generalLabels = [
         'status' => __('monitor::messages.common.status'),
         'queued_at' => __('monitor::messages.job.queued_at'),
-        'end_time' => __('monitor::messages.job.end_time'),
+        'popped_at' => __('monitor::messages.job.popped_at'),
+        'started_processing_at' => __('monitor::messages.job.started_processing_at'),
+        'duration' => __('monitor::messages.common.duration'),
         'connection' => __('monitor::messages.common.connection'),
         'queue' => __('monitor::messages.common.queue'),
         'peak_memory' => __('monitor::messages.common.peak_memory'),
@@ -43,6 +73,8 @@
                     <dd class="shrink-0">
                         <span class="rounded px-1.5 py-0.5 font-mono text-[10px] uppercase {{ $badgeClass }}">{{ $value }}</span>
                     </dd>
+                @elseif ($key === 'duration')
+                    <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $jobEndTime }}">{{ $value }}</dd>
                 @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
                 @endif

@@ -17,8 +17,28 @@
             <div class="min-w-0">
                 <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400"
                     x-text="selected()?.badge"></h3>
-                <span class="mt-0.5 block font-mono text-xs text-neutral-400 dark:text-neutral-500"
-                    x-text="selectedTimestamp()"></span>
+                {{-- Same single timestamp line every type has always shown
+                     here — just microsecond-precise now (already formatted
+                     server-side, timezone included, see
+                     Support\Timeline::stampPreciseTimestamps()) rather than
+                     JS's own Date, which only carries millisecond precision.
+                     text-[11px] + whitespace-nowrap (a touch smaller than
+                     this h3's own text-xs above) so the full
+                     microsecond+timezone string ("2026-09-03
+                     22:25:37.082014 +07:00") still fits this 320px-wide
+                     panel on one line instead of wrapping. Always
+                     started_at, uniformly for every type -- it used to show
+                     ended_at instead for query/cache/mail/... (only
+                     phase/attempt got started_at), and for a query whose
+                     whole duration is a fraction of a millisecond the two
+                     only differ in their last couple of digits, reading
+                     (wrongly) like the exact same instant repeated in both
+                     this header AND the Duration row's own end-time tooltip
+                     further down. started_at here + ended_at only on that
+                     tooltip keeps the two genuinely distinct at a glance,
+                     for every type alike. --}}
+                <span class="mt-0.5 block whitespace-nowrap font-mono text-[11px] text-neutral-400 dark:text-neutral-500"
+                    x-text="selected()?.metadata?.started_at"></span>
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 <template x-if="selected()?.type === 'query'">
@@ -86,7 +106,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duplicates') }}</dt>
@@ -157,7 +177,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -188,7 +208,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -244,7 +264,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
                 <template x-if="mailClass()">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
@@ -315,7 +335,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -381,7 +401,7 @@
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
@@ -416,6 +436,47 @@
                         :class="selected()?.metadata?.handled ? 'text-emerald-600 dark:text-emerald-400' :
                             'text-rose-600 dark:text-rose-400'"
                         x-text="selected()?.metadata?.handled ? 'True' : 'False'"></dd>
+                </div>
+            </dl>
+        </template>
+
+        {{-- A job's own attempt row -- see View\Components\Requests\Timeline's
+             "JOB (Attempt #N)" badge and Support\Timeline::stampPreciseTimestamps().
+             No SQL/recipients/... section like the types above (an attempt
+             has none), so its own duration lives here instead -- its own
+             started_at is shown right under the badge above instead of a
+             labelled row here (see the header block). --}}
+        <template x-if="selected()?.kind === 'attempt'">
+            <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                    <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.class') }}</dt>
+                    <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
+                        style="direction: rtl; text-align: left;" :data-tooltip="selected()?.label"
+                        x-text="selected()?.label"></dd>
+                </div>
+                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
+                    {{-- Hovering the duration shows the precise (microsecond)
+                         moment this attempt actually ended -- ended_at is
+                         only ever absent for a duration-less entry (see
+                         TimelineEntry::$duration), which an attempt never is
+                         (Timeline::rootDuration() always resolves one). --}}
+                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
+                </div>
+            </dl>
+        </template>
+
+        {{-- A lifecycle phase (bootstrap/middleware/.../end) -- same
+             reasoning as the attempt block above: no other section, so its
+             own duration lives here (its own started_at is under the badge
+             above instead, see the header block). --}}
+        <template x-if="selected()?.kind === 'phase'">
+            <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
+                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>

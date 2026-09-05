@@ -86,10 +86,22 @@ class Timeline extends Component
     public float $minWidthPx = 0.0;
 
     /**
+     * The specific attempt row (see addAttemptRows()) whose {@see TimelineEntry::$id}
+     * matches $scrollToOutcomeId, null when that constructor param is null or
+     * matches no attempt on the page. timeline-script.blade.php's init()
+     * scrolls straight to this row (via its `data-row-id`) instead of merely
+     * the default track's own root row — the requested attempt can otherwise
+     * still sit well below the fold, e.g. a job's 3rd retry several rows
+     * under its track's root.
+     */
+    public ?string $scrollTargetRowId = null;
+
+    /**
      * @param  list<array{id: string, badge: string, label: string, start: float, duration: float, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: TimelineEntry[]}>, totalAttemptsDuration?: float}>  $tracks
      * @param  ?string  $jobBaseUrl  This page's own url (see RequestDetailController::requestUrl()) a job track's own row appends its latest attempt's outcome id onto, so clicking it navigates there instead of merely expanding in place — null on every other page this component renders on (job/command/schedule detail), which has nowhere of that kind to navigate a job track to.
+     * @param  ?string  $scrollToOutcomeId  The route's own trailing job-id segment forwarded by the calling controller (see MergesJobTimelines::defaultTrackId(), which the same value already selects the default *track* from) — names one specific attempt's own outcome id, so landing here from that exact attempt's link scrolls straight to its row instead of just expanding (and scrolling to the top of) its track.
      */
-    public function __construct(public array $tracks, public string $defaultTrack = 'root', public ?string $jobBaseUrl = null)
+    public function __construct(public array $tracks, public string $defaultTrack = 'root', public ?string $jobBaseUrl = null, public ?string $scrollToOutcomeId = null)
     {
         $primary = collect($tracks)->firstWhere('id', $defaultTrack) ?? $tracks[0];
         $primaryDuration = max(1.0, (float) $primary['duration']);
@@ -252,6 +264,17 @@ class Timeline extends Component
      */
     protected function addAttemptRows(array $track, array $attempt, float $trackBarStartOffset, array &$entriesById): void
     {
+        $idPrefix = "{$track['id']}:attempt-{$attempt['attempt']}";
+
+        // addEntrySourceRows() below namespaces this attempt's own 'request'
+        // entry (see Timeline::build()) as "{$idPrefix}:request" — computed
+        // here rather than read back off $this->rows after the call, since
+        // that id is a known, already-relied-upon format (the job track's
+        // own root row hardcodes the same "{id}:request" shape above).
+        if ($this->scrollToOutcomeId !== null && $attempt['outcomeId'] === $this->scrollToOutcomeId) {
+            $this->scrollTargetRowId = "{$idPrefix}:request";
+        }
+
         // $attempt['start']/$track['start'] are both offsets from the same
         // origin (the page's overall root — see MergesJobTimelines::jobTrack()),
         // so their difference is this attempt's own offset *within* the
@@ -262,7 +285,7 @@ class Timeline extends Component
         // attempt track, where the two happen to be equal).
         $this->addEntrySourceRows(
             entries: $attempt['entries'],
-            idPrefix: "{$track['id']}:attempt-{$attempt['attempt']}",
+            idPrefix: $idPrefix,
             trackId: $track['id'],
             rootBadge: $track['badge'],
             barStartOffset: $trackBarStartOffset + ($attempt['start'] - $track['start']),
@@ -296,6 +319,8 @@ class Timeline extends Component
         ?string $attemptStatus,
         array &$entriesById,
     ): void {
+        $attemptLabel = $attemptNumber !== null ? __('monitor::messages.common.attempt') : null;
+
         $byId = collect($entries)->keyBy('id');
         $byParent = collect($entries)->groupBy(fn (TimelineEntry $entry) => $entry->parentId ?? 'request');
 
@@ -337,11 +362,17 @@ class Timeline extends Component
                 'attempt' => $isAttempt ? $attemptNumber : null,
                 'jobStatus' => $isAttempt ? $attemptStatus : null,
                 'attemptsDuration' => null,
-                // Only a job track's own synthetic root row (built directly
-                // in __construct(), not here) ever carries one — every row
-                // built through here is either a non-job track's root (no
-                // "other job" to navigate to) or a plain event/phase/attempt row.
-                'jobUrl' => null,
+                // The primary (non-job) track's own root row gets
+                // $jobBaseUrl itself here -- the same base URL a job
+                // track's own row (built directly in __construct(), not
+                // here) appends an outcome id onto, but bare, since this
+                // root's own info is what already shows there with no
+                // trailing job id at all. Lets a visitor who navigated to a
+                // job's own info click back to this root's, the way
+                // switching between two different jobs' own tracks already
+                // works. Every other row built through here (phase/event/
+                // attempt) has nothing of that kind to navigate to.
+                'jobUrl' => $row['kind'] === 'root' ? $this->jobBaseUrl : null,
             ];
         }
 
@@ -380,9 +411,32 @@ class Timeline extends Component
             ->countBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
 
         foreach ($entries as $entry) {
+            // 'root'/'attempt'/'phase'/'event' — same classification
+            // TimelineRow's own $kind param already drives (see
+            // buildRows()), re-derived here since entriesById is built
+            // straight off $entries, not $this->rows. Lets the detail
+            // panel (timeline-detail-panel.blade.php) branch on kind rather
+            // than $entry->type, which is ambiguous for this purpose
+            // ('request' is shared by every root AND attempt entry, and a
+            // phase's own type varies per phase name).
+            $kind = match (true) {
+                $entry->parentId === null => $attemptNumber !== null ? 'attempt' : 'root',
+                in_array($entry->type, TimelineSupport::phases(), true) => 'phase',
+                default => 'event',
+            };
+
             $entriesById[$entry->id] = [
                 'type' => $entry->type,
-                'badge' => TimelineRow::badgeFor($entry->type, $entry->label),
+                'kind' => $kind,
+                // "JOB (Attempt #N)" for an attempt row -- $rootBadge is
+                // already this track's own "JOB" (see MergesJobTimelines::jobTrack()),
+                // and TimelineRow::badgeFor() has nothing better to offer
+                // here anyway (every attempt/root entry shares the same
+                // generic $entry->type === 'request', which falls back to a
+                // plain, unhelpful "REQUEST").
+                'badge' => $kind === 'attempt'
+                    ? "{$rootBadge} ({$attemptLabel} #{$attemptNumber})"
+                    : TimelineRow::badgeFor($entry->type, $entry->label),
                 'label' => $entry->label,
                 'start' => $entry->start,
                 'duration' => $entry->duration,

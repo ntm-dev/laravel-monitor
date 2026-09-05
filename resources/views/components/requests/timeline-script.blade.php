@@ -234,9 +234,31 @@
              in Alpine's init — measuring offsetWidth now would catch its
              pre-stretch size. --}}
         this.$nextTick(() => this.refreshTicks());
-        if (!{{ $defaultTrack !== ($tracks[0]['id'] ?? null) ? 'true' : 'false' }}) return;
+        if (!{{ $scrollTargetRowId !== null || $defaultTrack !== ($tracks[0]['id'] ?? null) ? 'true' : 'false' }}) return;
         this.$nextTick(() => {
-            this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
+            {{-- $scrollTargetRowId (see View\Components\Requests\Timeline)
+                 names one specific attempt's own row, not just its track's
+                 root -- landing here via that exact attempt's own link (e.g.
+                 its 3rd retry, several rows below the track's root) should
+                 scroll straight to it rather than merely the track's top.
+                 Centered on both axes, same as scrollToType() below (fired
+                 by the EventSummary cards) -- 'start' only moves the
+                 vertical axis and can leave an off-track row sitting right
+                 under the page's own sticky header, since (unlike a track's
+                 own root row) an attempt row carries no scroll-mt-[169px]
+                 offset for it (see TimelineRow.php's $rootColor/'root' kind
+                 — that class is root-only). Not 'smooth' like scrollToType()
+                 though: that one fires from a stable, already-settled page
+                 on a user click, but this runs from init() while
+                 measureViewport()/the zoom-driven pane-width reflow are
+                 still settling -- a 'smooth' scroll's in-flight animation
+                 got silently cut short once, landing near the start, when a
+                 resize/layout shift happened to land mid-animation. --}}
+            @if ($scrollTargetRowId !== null)
+                this.$refs.rows.querySelector(`[data-row-id='{{ $scrollTargetRowId }}']`)?.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'center' });
+            @else
+                this.$refs.rows.querySelector(`[data-track-root='{{ $defaultTrack }}']`)?.scrollIntoView({ behavior: 'auto', block: 'start' });
+            @endif
         });
     },
     toggleTrack(id) {
@@ -269,10 +291,6 @@
     dragScrollStart: 0,
     data: {!! $entriesJson !!},
     selected() { return this.selectedId !== null ? this.data[this.selectedId] : null },
-    selectedTimestamp() {
-        const iso = this.selected()?.metadata?.created_at;
-        return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' }) : '';
-    },
     exceptionLocation() {
         const file = this.selected()?.metadata?.file;
         const line = this.selected()?.metadata?.line;

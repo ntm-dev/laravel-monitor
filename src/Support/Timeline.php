@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Support;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use LaravelMonitor\ExecutionStage;
@@ -79,9 +80,16 @@ class Timeline
      * @param  object  $root  the `request`/`job`/`command`/`scheduled_task` row this
      *                        track's own timeline is built around
      * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
+     * @param  float  $trackStart  the real wall-clock moment this track's own
+     *                             $root started (Unix epoch, microsecond
+     *                             precision — see MergesJobTimelines::startedAt()),
+     *                             i.e. what every entry's own `start` offset
+     *                             (ms, relative to this track) is measured
+     *                             from. Stamps each entry's own precise
+     *                             started_at/ended_at metadata below.
      * @return TimelineEntry[]
      */
-    public static function build(object $root, Collection $children): array
+    public static function build(object $root, Collection $children, float $trackStart): array
     {
         $visibleChildren = $children->reject(fn (object $row) => $row->type === 'log');
 
@@ -107,7 +115,52 @@ class Timeline
 
         self::assignDuplicateColors($events);
 
-        return array_merge([$requestEntry], $phases, $events);
+        $entries = [$requestEntry, ...$phases, ...$events];
+
+        self::stampPreciseTimestamps($entries, $trackStart);
+
+        return $entries;
+    }
+
+    /**
+     * Every entry's own `start`/`duration` (ms, relative to $trackStart) is
+     * already what positions its bar — reusing that same math here, instead
+     * of e.g. each event's own `created_at` (a different, less precise
+     * moment — see Recorders\Jobs::recordProcessed()'s own 'started_at'
+     * docs), keeps the inspector panel's timestamps exactly consistent with
+     * what's actually drawn. Stamped directly into $entry->metadata as
+     * ready-to-render strings (not a raw epoch) since a microsecond-precision
+     * instant round-trips through JS's own Date (millisecond-only) lossily —
+     * see Format::DATETIME_PRECISE.
+     *
+     * @param  TimelineEntry[]  $entries
+     */
+    protected static function stampPreciseTimestamps(array $entries, float $trackStart): void
+    {
+        // Computed once, not per entry below — same viewer-configured offset
+        // (see Preferences::timezone()) for the whole page, and appended the
+        // same way Requests\summary.blade.php's own "date" row already does,
+        // so a precise timestamp here still reads as unambiguous UTC+N as
+        // every other timestamp in this package.
+        $timezone = ' '.Format::timezone();
+
+        foreach ($entries as $entry) {
+            $startEpoch = $trackStart + ($entry->start / 1000);
+
+            $entry->metadata['started_at'] = self::preciseTimestamp($startEpoch).$timezone;
+
+            if ($entry->duration !== null) {
+                $entry->metadata['ended_at'] = self::preciseTimestamp($startEpoch + ($entry->duration / 1000)).$timezone;
+            }
+        }
+    }
+
+    protected static function preciseTimestamp(float $epoch): string
+    {
+        return Format::datetime(
+            CarbonImmutable::createFromFormat('U.u', number_format($epoch, 6, '.', '')),
+            Format::DATETIME_PRECISE,
+        );
     }
 
     /**
@@ -288,13 +341,16 @@ class Timeline
     protected static function metadataFor(object $row): array
     {
         // 'phase' is internal bookkeeping for parentPhaseId() above, not
-        // something the detail panel shows.
+        // something the detail panel shows. No 'created_at' here — the
+        // panel's own started_at/ended_at (see stampPreciseTimestamps())
+        // already supersede it, computed from the same start/duration that
+        // positions this entry's own bar rather than the row's raw DB
+        // timestamp.
         $metadata = Arr::except($row->payload, ['phase']) + [
             'subtype' => $row->subtype,
             'key' => $row->key,
             'duration' => $row->duration,
             'user_id' => $row->user_id,
-            'created_at' => $row->created_at?->toIso8601String(),
         ];
 
         return array_filter($metadata, fn ($value) => $value !== null && $value !== '');

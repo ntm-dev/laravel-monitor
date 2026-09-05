@@ -97,7 +97,7 @@ class TimelineRow extends Component
         'exception' => 'text-rose-600 dark:text-rose-600',
     ];
 
-    /** Event types with their own inspector panel — everything else (root, phases, other event types) isn't clickable. */
+    /** Event types with their own dedicated section in the inspector panel — see $detailable, which every phase/attempt row also opens (for its own started_at/ended_at) regardless of this list. */
     protected const DETAILABLE_TYPES = ['query', 'cache', 'mail', 'notification', 'lazy_loading', 'exception', 'http', 'queue'];
 
     public string $durationLabel;
@@ -137,7 +137,7 @@ class TimelineRow extends Component
     /** Whether clicking this row opens the inspector panel. */
     public bool $detailable;
 
-    /** Whether clicking this row scrolls its bar to the center of the chart pane without opening the inspector — a phase header has no per-event detail to show, but is still worth jumping to directly. */
+    /** Whether clicking this row scrolls its bar to the center of the chart pane without opening the inspector — only a phase header now (an attempt row also has no per-type section, but opens the inspector anyway for its own started_at/ended_at, see $detailable). */
     public bool $scrollable;
 
     /** Bar background for a 'root' or 'attempt' row — neutral unless that row itself carries a status (an HTTP root's status code, or an attempt row's job outcome). */
@@ -242,7 +242,13 @@ class TimelineRow extends Component
             $this->slow => self::SLOW_BAR,
             default => self::NEUTRAL_BAR,
         };
-        $this->detailable = $kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true);
+        // 'phase'/'attempt': no type-specific section of their own in
+        // timeline-detail-panel.blade.php (unlike a query/cache/... event
+        // row), but still worth opening the panel for -- it's the only place
+        // either shows its own precise started_at/ended_at (see
+        // Support\Timeline::stampPreciseTimestamps()).
+        $this->detailable = ($kind === 'event' && in_array($entry->type, self::DETAILABLE_TYPES, true))
+            || $kind === 'phase' || $kind === 'attempt';
         $this->scrollable = $kind === 'phase';
         $this->detail = $this->resolveDetail();
         $this->detailShort = Str::limit($this->detail, 90);

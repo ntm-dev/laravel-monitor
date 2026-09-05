@@ -58,7 +58,7 @@ trait MergesJobTimelines
             'label' => $root->key ?? $rootBadge,
             'start' => 0.0,
             'duration' => max(0.0, (float) ($root->duration ?? 0)),
-            'entries' => Timeline::build($root, $children),
+            'entries' => Timeline::build($root, $children, $rootStart),
         ]];
 
         foreach ($resolvedJobIds as $jobId) {
@@ -83,9 +83,20 @@ trait MergesJobTimelines
     {
         $attempts = $executions->values()->map(function (object $execution, int $index) use ($rootStart) {
             $outcome = $execution->outcome;
-            $duration = $outcome->duration !== null ? (float) $outcome->duration : 0.0;
-
             $processingStartedAt = $this->startedAt($outcome);
+            $entries = Timeline::build($outcome, $execution->children, $processingStartedAt);
+
+            // entries[0] is always this attempt's own request-shaped root
+            // entry (see Timeline::build()) — its duration is already
+            // stretched past $outcome->duration when a child (query/cache/...)
+            // ends later than the outcome's own raw recorded duration (see
+            // Timeline::rootDuration()). Reusing that same value here, rather
+            // than $outcome->duration directly, keeps this attempt's own
+            // bounding box — and therefore the parent job track's, computed
+            // from these below — from ending up shorter than what
+            // View\Components\Requests\Timeline actually renders for it.
+            $duration = (float) ($entries[0]->duration ?? 0);
+
             // round(..., 3): not a display concern (see
             // View\Components\Requests\Timeline, which renders this
             // unrounded) — startedAt() returns a raw Unix-epoch-scale float
@@ -116,7 +127,7 @@ trait MergesJobTimelines
                 'outcomeId' => $outcome->request_id,
                 'start' => $start,
                 'duration' => max(0.0, $duration),
-                'entries' => Timeline::build($outcome, $execution->children),
+                'entries' => $entries,
             ];
         })->all();
 

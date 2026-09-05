@@ -87,6 +87,7 @@ class CommandRunController
             'scheduledTask' => $scheduledTask,
             'tracks' => $tracks,
             'defaultTrack' => $this->defaultTrackId($tracks, $jobId),
+            'scrollToOutcomeId' => $jobId,
             'summary' => $this->eventsSummary($children),
             'groups' => $groups,
             'footerTabs' => $footerTabs,

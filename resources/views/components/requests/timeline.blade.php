@@ -41,6 +41,7 @@
         'totalDuration' => $totalDuration,
         'minWidthPx' => $minWidthPx,
         'defaultTrack' => $defaultTrack,
+        'scrollTargetRowId' => $scrollTargetRowId,
         'tracks' => $tracks,
         'entriesJson' => $entriesJson,
     ])->render() !!}"

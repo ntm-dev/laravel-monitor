@@ -73,10 +73,11 @@ class JobDetail extends Card
 
     /**
      * Drops a 'queued' row once this page also has the outcome (processed/
-     * failed/released) it was dispatch-time placeholder for — both share the
-     * queue driver's own job_id (see Recorders\Jobs::recordQueued()'s
-     * `job_id` payload field; empty for the sync connection, so this is a
-     * no-op there). Without this, a job that both dispatched and finished
+     * failed/released) it was dispatch-time placeholder for — both share
+     * the job's own payload uuid (see Recorders\Jobs::recordQueued()'s
+     * `job_id` payload field; the sync connection never fires JobQueued at
+     * all, so there's no 'queued' row to drop there and this is a no-op).
+     * Without this, a job that both dispatched and finished
      * inside the same period reads as two separate, unrelated rows instead
      * of one attempt whose status simply hasn't landed yet — its outcome
      * row is left untouched, since a retried job can still produce more than

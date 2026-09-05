@@ -1454,7 +1454,7 @@ class MonitorTest extends TestCase
         $this->assertSame('render', $children['select * from posts']->payload['phase']);
         $this->assertSame('unwinding', $children['insert into sessions']->payload['phase']);
 
-        $entries = \LaravelMonitor\Support\Timeline::build($root, $children->values());
+        $entries = \LaravelMonitor\Support\Timeline::build($root, $children->values(), $root->created_at->timestamp);
         $phasesById = collect($entries)->keyBy('type');
 
         $renderQuery = collect($entries)->first(fn ($entry) => ($entry->metadata['sql'] ?? null) === 'select * from posts');
@@ -1491,10 +1491,74 @@ class MonitorTest extends TestCase
         $legacyRow = $children->first();
         unset($legacyRow->payload['phase']);
 
-        $entries = \LaravelMonitor\Support\Timeline::build($root, collect([$legacyRow]));
+        $entries = \LaravelMonitor\Support\Timeline::build($root, collect([$legacyRow]), $root->created_at->timestamp);
         $query = collect($entries)->first(fn ($entry) => $entry->type === 'query');
 
         $this->assertNotNull($query->parentId);
+    }
+
+    /**
+     * Regression test: every entry's own started_at/ended_at metadata (see
+     * Support\Timeline::stampPreciseTimestamps()) must be derived from the
+     * exact same start/duration (ms, relative to $trackStart) that already
+     * positions its bar on the timeline — not e.g. the row's own DB
+     * created_at, a different (less precise) moment — and rendered to full
+     * microsecond precision (Format::DATETIME_PRECISE), not JS's own
+     * millisecond-only Date. An entry with no meaningful duration (see
+     * TimelineEntry::$duration) gets no ended_at at all.
+     */
+    public function test_timeline_build_stamps_precise_started_at_and_ended_at_from_each_entrys_own_offset(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        Monitor::record(RecordType::Query, 'select * from posts', ['sql' => 'select * from posts'], 12.5);
+        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 100, '2xx', 1);
+        Monitor::flush();
+
+        $storage = app(TimelineStorage::class);
+        $requestId = $monitor->requestId();
+        $root = $storage->findByRequestId($requestId);
+        $children = $storage->timelineFor($requestId);
+
+        // A row with no measurable duration at all (an unhandled exception,
+        // say) — constructed directly rather than recorded, since Timeline
+        // only reads a handful of properties off it (see eventEntry()).
+        $noDurationRow = (object) [
+            'id' => 999999,
+            'type' => 'exception',
+            'subtype' => 'unhandled',
+            'key' => 'fingerprint-abc',
+            'payload' => ['class' => 'RuntimeException', 'message' => 'boom'],
+            'duration' => null,
+            'user_id' => null,
+            'created_at' => $root->created_at,
+            'start_offset' => 50.0,
+        ];
+
+        $trackStart = 1_700_000_000.123456;
+
+        $entries = \LaravelMonitor\Support\Timeline::build($root, $children->push($noDurationRow), $trackStart);
+
+        $requestEntry = collect($entries)->firstWhere('id', 'request');
+        $query = collect($entries)->first(fn ($entry) => $entry->type === 'query');
+        $exception = collect($entries)->first(fn ($entry) => $entry->type === 'exception');
+
+        $preciseTimestamp = fn (float $epoch) => \LaravelMonitor\Support\Format::datetime(
+            \Carbon\CarbonImmutable::createFromFormat('U.u', number_format($epoch, 6, '.', '')),
+            \LaravelMonitor\Support\Format::DATETIME_PRECISE,
+        ).' '.\LaravelMonitor\Support\Format::timezone();
+
+        // The request entry's own start is always 0 (see Timeline::build()),
+        // so its started_at is exactly $trackStart.
+        $this->assertSame($preciseTimestamp($trackStart), $requestEntry->metadata['started_at']);
+        $this->assertArrayHasKey('ended_at', $requestEntry->metadata);
+
+        $this->assertSame($preciseTimestamp($trackStart + ($query->start / 1000)), $query->metadata['started_at']);
+        $this->assertSame($preciseTimestamp($trackStart + ($query->end() / 1000)), $query->metadata['ended_at']);
+
+        $this->assertSame($preciseTimestamp($trackStart + ($exception->start / 1000)), $exception->metadata['started_at']);
+        $this->assertArrayNotHasKey('ended_at', $exception->metadata);
     }
 
     public function test_request_recorder_captures_correlated_timeline_end_to_end(): void
@@ -1673,11 +1737,13 @@ class MonitorTest extends TestCase
 
         [$requestId, $jobRequestId] = $this->seedRequestThatDispatchedAJob();
 
-        $this->get("/monitor/requests/{$requestId}/{$jobRequestId}")
+        $response = $this->get("/monitor/requests/{$requestId}/{$jobRequestId}")
             ->assertOk()
-            ->assertViewHas('tab', 'jobs')
             ->assertSee('SendWelcomeEmail')
             ->assertSee('Timeline');
+
+        $data = $response->original->getData();
+        $this->assertSame('jobs', $data['infos'][$data['activeInfoId']]['tab']);
     }
 
     /**
@@ -1698,10 +1764,80 @@ class MonitorTest extends TestCase
 
         $this->get("/monitor/jobs/attempts/{$jobRequestId}")->assertRedirect($expectedUrl);
 
-        $this->get($expectedUrl)
+        $response = $this->get($expectedUrl)
             ->assertOk()
-            ->assertViewHas('tab', 'jobs')
             ->assertSee('SendWelcomeEmail');
+
+        $data = $response->original->getData();
+        $this->assertSame('jobs', $data['infos'][$data['activeInfoId']]['tab']);
+    }
+
+    /**
+     * Regression test: landing on the merged timeline via a specific retry's
+     * own <request_url>/<job_id> link used to only scroll to (and expand)
+     * that job's *track* — its own root row, i.e. wherever attempt #1 sits.
+     * A later retry (say #2) can still be several rows further down, off
+     * the initial viewport, once its track is expanded. The page must
+     * instead scroll straight to that exact attempt's own row (see
+     * View\Components\Requests\Timeline::$scrollTargetRowId).
+     */
+    public function test_request_detail_page_scrolls_to_the_specific_attempt_visited_not_just_its_track(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $requestId = (string) Str::uuid();
+        $attempt1Id = (string) Str::uuid();
+        $attempt2Id = (string) Str::uuid();
+
+        DB::table('monitor_entries')->insert([
+            [
+                'type' => 'request',
+                'subtype' => '2xx',
+                'key' => 'GET /users',
+                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'duration' => 500,
+                'request_id' => $requestId,
+                'created_at' => now(),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'queued',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-retry-1']),
+                'duration' => null,
+                'request_id' => $requestId,
+                'created_at' => now(),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'released',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-retry-1', 'attempts' => 1]),
+                'duration' => 30,
+                'request_id' => $attempt1Id,
+                'created_at' => now(),
+            ],
+            [
+                'type' => 'job',
+                'subtype' => 'processed',
+                'key' => 'App\\Jobs\\SendWelcomeEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-retry-1', 'attempts' => 2]),
+                'duration' => 30,
+                'request_id' => $attempt2Id,
+                'created_at' => now()->addSecond(),
+            ],
+        ]);
+
+        // jobTrack() ids off the earliest recorded outcome's own db id (see
+        // MergesJobTimelines::jobTrack()) — the 'released' row above, since
+        // it's the first outcome inserted for this job_id.
+        $trackDbId = DB::table('monitor_entries')->where('request_id', $attempt1Id)->value('id');
+
+        $response = $this->get(route('monitor.requests.routes.request', ['hash' => KeyHash::for('GET /users'), 'requestId' => $requestId])."/{$attempt2Id}");
+
+        $response->assertOk();
+        $response->assertSee("data-row-id='job-{$trackDbId}:attempt-2:request'", false);
+        $response->assertDontSee("data-track-root='job-{$trackDbId}'\`)?.scrollIntoView", false);
     }
 
     /**
@@ -2046,6 +2182,36 @@ class MonitorTest extends TestCase
     }
 
     /**
+     * A job whose payload carries a real uuid (unlike syncJob()'s fixture,
+     * which has none) alongside a driver-assigned id independent of it —
+     * mirrors Illuminate\Queue\DatabaseQueue::release(), which deletes and
+     * re-inserts the row on every retry, giving each attempt a different
+     * getJobId() while the payload (and its uuid) is carried over unchanged.
+     */
+    protected function jobWithUuid(string $uuid, string $driverId): \Illuminate\Queue\Jobs\SyncJob
+    {
+        $payload = json_encode([
+            'uuid' => $uuid,
+            'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+            'data' => ['commandName' => 'App\\Jobs\\SendWelcomeEmail', 'command' => 'x'],
+            'displayName' => 'App\\Jobs\\SendWelcomeEmail',
+        ]);
+
+        return new class(new \Illuminate\Container\Container, $payload, 'database', 'default', $driverId) extends \Illuminate\Queue\Jobs\SyncJob
+        {
+            public function __construct($container, $job, $connectionName, $queue, protected string $fakeJobId)
+            {
+                parent::__construct($container, $job, $connectionName, $queue);
+            }
+
+            public function getJobId()
+            {
+                return $this->fakeJobId;
+            }
+        };
+    }
+
+    /**
      * Several Illuminate queue/cache events gained extra constructor
      * parameters in later Laravel versions than the package's declared
      * minimum (e.g. JobQueued's `queue`/`delay` post-10.0.0). The CI
@@ -2063,7 +2229,7 @@ class MonitorTest extends TestCase
         return new $class(...$args);
     }
 
-    protected function jobQueuedEvent(string $connectionName, string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
+    protected function jobQueuedEvent(string $connectionName, ?string $queue, string $id, $job, string $payload, ?int $delay = null): \Illuminate\Queue\Events\JobQueued
     {
         return $this->constructEventCompatibly(\Illuminate\Queue\Events\JobQueued::class, compact('connectionName', 'queue', 'id', 'job', 'payload', 'delay'));
     }
@@ -2089,6 +2255,41 @@ class MonitorTest extends TestCase
         $this->assertSame('job-abc123', $queuedPayload['job_id']);
         $this->assertSame('job-abc123', $processedPayload['job_id']);
         $this->assertSame(1, $processedPayload['attempts']);
+    }
+
+    /**
+     * Regression test: Illuminate\Queue\DatabaseQueue::release() deletes and
+     * re-inserts the job row, so a retried attempt's getJobId() differs from
+     * the dispatch's own and from every other retry — correlating on that
+     * driver-assigned id (as this recorder used to) left
+     * MergesJobTimelines::jobTrack() unable to find any attempt past the
+     * first for a job retried on the database queue connection. The
+     * payload's own uuid (see jobWithUuid()) stays constant across every
+     * retry instead, since it's part of the same serialized body every
+     * attempt reuses.
+     */
+    public function test_job_recorder_correlates_retries_via_payload_uuid_when_the_driver_reassigns_the_job_id(): void
+    {
+        $uuid = 'stable-uuid';
+
+        $attempt1 = $this->jobWithUuid($uuid, 'row-1');
+        $attempt2 = $this->jobWithUuid($uuid, 'row-2');
+
+        event($this->jobQueuedEvent('database', 'default', 'row-1', $attempt1, $attempt1->getRawBody()));
+
+        event(new \Illuminate\Queue\Events\JobProcessing('database', $attempt1));
+        event($this->jobReleasedAfterExceptionEvent('database', $attempt1, 30));
+
+        event(new \Illuminate\Queue\Events\JobProcessing('database', $attempt2));
+        event(new \Illuminate\Queue\Events\JobProcessed('database', $attempt2));
+
+        Monitor::flush();
+
+        $jobIds = DB::table('monitor_entries')->where('type', 'job')->orderBy('id')->pluck('payload')
+            ->map(fn ($payload) => json_decode($payload, true)['job_id']);
+
+        $this->assertCount(3, $jobIds);
+        $this->assertTrue($jobIds->every(fn ($jobId) => $jobId === $uuid));
     }
 
     /**
@@ -2168,7 +2369,7 @@ class MonitorTest extends TestCase
             public $queue = null;
         };
 
-        event(new \Illuminate\Queue\Events\JobQueued('custom', null, 'job-abc123', $job, json_encode([]), null));
+        event($this->jobQueuedEvent('custom', null, 'job-abc123', $job, json_encode([])));
 
         Monitor::flush();
 
@@ -2254,6 +2455,31 @@ class MonitorTest extends TestCase
         } else {
             $this->assertArrayNotHasKey('backoff', $payload);
         }
+    }
+
+    /**
+     * Regression test: JobPopping fires before the job is even
+     * deserialized, so it carries no job id at all to key a per-job map by
+     * (see Recorders\Jobs::resetPeakMemory()) — the captured moment must
+     * still end up attributed to the correct outcome once
+     * recordProcessing() actually has one to key it by.
+     */
+    public function test_job_recorder_captures_when_it_was_popped_off_the_queue(): void
+    {
+        $job = $this->syncJob();
+
+        event(new \Illuminate\Queue\Events\JobPopping('sync'));
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
+
+        Monitor::flush();
+
+        $payload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->value('payload'), true);
+
+        $this->assertArrayHasKey('popped_at', $payload);
+        $this->assertArrayHasKey('started_at', $payload);
+        // Popped strictly before it started processing.
+        $this->assertLessThanOrEqual($payload['started_at'], $payload['popped_at']);
     }
 
     /**
