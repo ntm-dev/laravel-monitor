@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
@@ -132,6 +133,18 @@ class Monitor
     }
 
     /**
+     * The guard-qualified id of whoever a guard in $rememberedUserIds' key
+     * position just logged out of, this lifecycle — see rememberLoggedOutUser()
+     * for why this exists. Keyed by guard name so a later login on that same
+     * guard (naturally picked up by the live check in currentUserId(), since
+     * the guard has a user again) still takes priority over the stale
+     * logged-out one.
+     *
+     * @var array<string, string>
+     */
+    private array $rememberedUserIds = [];
+
+    /**
      * The currently authenticated application user's id, prefixed with
      * whichever guard it came from ("{guard}:{id}") — two different guards
      * can independently hand out the same id to two entirely different
@@ -145,7 +158,23 @@ class Monitor
     {
         foreach ($this->authGuardsToCheck() as $guard) {
             try {
-                $user = Auth::guard($guard)->user();
+                $resolved = Auth::guard($guard);
+
+                // hasUser() (a plain "is $this->user set" property read, see
+                // Illuminate\Auth\GuardHelpers) rather than user(): user()
+                // *resolves* the guard — session lookup, "remember me" cookie,
+                // and the provider's own SELECT — so calling it on a guard the
+                // application itself never touched makes monitoring the sole
+                // cause of a query that would otherwise never have run, which
+                // Recorders\Queries then records as if the application had
+                // issued it. Only guards something else already resolved are
+                // read here, and for those user() is free: it returns the
+                // instance already cached on the guard.
+                if (! $resolved->hasUser()) {
+                    continue;
+                }
+
+                $user = $resolved->user();
             } catch (Throwable) {
                 continue;
             }
@@ -155,7 +184,55 @@ class Monitor
             }
         }
 
+        // No guard currently has anyone — but one might have, moments ago in
+        // this same request/job/command, before Recorders\Authentication saw
+        // it log out (see rememberLoggedOutUser()'s own docblock for why an
+        // entry recorded before that logout would otherwise lose its user
+        // once lazyCurrentUserId() finally resolves at flush()).
+        foreach ($this->authGuardsToCheck() as $guard) {
+            if (isset($this->rememberedUserIds[$guard])) {
+                return $this->rememberedUserIds[$guard];
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * Called by Recorders\Authentication right as it observes a Logout event
+     * — while the guard involved still has its (about to be cleared) user,
+     * since Illuminate\Auth\SessionGuard::logout() fires Logout before
+     * nulling out $this->user. Without this, an entry recorded earlier in the
+     * same request/job/command — e.g. a log line right before the logout
+     * call — would carry a lazyCurrentUserId() (see its own docblock) that
+     * only resolves once flush() runs, by which point the guard genuinely
+     * has no one: the request's own last known user would be lost from every
+     * entry that came before the logout, not just the logout entry itself.
+     */
+    public function rememberLoggedOutUser(string $guard, ?Authenticatable $user): void
+    {
+        if ($user === null) {
+            return;
+        }
+
+        $this->rememberedUserIds[$guard] = "{$guard}:{$user->getAuthIdentifier()}";
+    }
+
+    /**
+     * currentUserId(), deferred until the entry carrying it is actually
+     * written (Entry::toArray(), reached only from flush()). Recorders fire
+     * mid-lifecycle — Recorders\Logs on every MessageLogged, Recorders\Jobs
+     * on every dispatch — often before the application has authenticated
+     * anyone, so resolving eagerly would stamp a null user onto entries whose
+     * request does have one moments later. By flush() every middleware,
+     * controller and terminating callback has run, so whatever the
+     * application was ever going to resolve is resolved.
+     *
+     * @return LazyValue<int|string|null>
+     */
+    public function lazyCurrentUserId(): LazyValue
+    {
+        return new LazyValue($this->currentUserId(...));
     }
 
     /**
@@ -181,7 +258,7 @@ class Monitor
         array $payload = [],
         ?float $duration = null,
         ?string $subtype = null,
-        int|string|null $userId = null,
+        int|string|LazyValue|null $userId = null,
     ): void {
         if (! $this->enabled()) {
             return;
@@ -375,6 +452,8 @@ class Monitor
      */
     public function beginRequest(): void
     {
+        $this->rememberedUserIds = [];
+
         $this->request = new RequestState(
             timestamp: $this->timestamp ?? microtime(true),
             id: (string) Str::uuid(),
@@ -401,6 +480,8 @@ class Monitor
      */
     public function beginJobAttempt(): void
     {
+        $this->rememberedUserIds = [];
+
         $this->jobStack[] = [
             'id' => (string) Str::uuid(),
             'start' => microtime(true),
@@ -455,6 +536,8 @@ class Monitor
      */
     public function beginCommandRun(string $name, ?string $scheduledTaskRunId = null): void
     {
+        $this->rememberedUserIds = [];
+
         $this->command = new CommandState(
             // LARAVEL_START (the artisan entry script sets this the same way
             // public/index.php does for requests) rather than "now" — so the
@@ -586,6 +669,8 @@ class Monitor
      */
     public function beginScheduledTaskRun(): void
     {
+        $this->rememberedUserIds = [];
+
         $id = (string) Str::uuid();
 
         $this->scheduledTask = [

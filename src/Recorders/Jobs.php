@@ -58,7 +58,7 @@ class Jobs extends Recorder
                 'job_id' => $this->jobId($event->id ?? ''),
             ], fn ($value) => $value !== null),
             subtype: 'queued',
-            userId: $this->monitor->currentUserId(),
+            userId: $this->monitor->lazyCurrentUserId(),
         );
     }
 
