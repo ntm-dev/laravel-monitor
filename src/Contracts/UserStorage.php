@@ -48,7 +48,7 @@ interface UserStorage
     public function topUsers(
         string $type,
         DateTimeInterface $since,
-        int $limit = 10,
+        ?int $limit = 10,
         ?DateTimeInterface $until = null,
     ): Collection;
 
