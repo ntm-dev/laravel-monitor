@@ -56,7 +56,13 @@
          where the selected-event detail panel's sticky position starts. --}}
     timelineHeaderOffset: 169,
     measureHeaderOffsets() {
-        const pageHeader = document.querySelector('header.sticky.top-0');
+        {{-- A page can hold several page headers with only one shown at a
+             time (the Request Detail page renders one per info bundle and
+             toggles them), so measure the one actually laid out rather than
+             whichever comes first in the DOM — a hidden one measures 0 and
+             would leave this timeline's own sticky bar sitting under it. --}}
+        const pageHeader = Array.from(document.querySelectorAll('header.sticky.top-0'))
+            .find((el) => el.getBoundingClientRect().height > 0);
         this.pageHeaderOffset = pageHeader ? Math.ceil(pageHeader.getBoundingClientRect().height) : 120;
         const ownHeader = this.$refs.stickyHeader;
         this.timelineHeaderOffset = this.pageHeaderOffset + (ownHeader ? Math.ceil(ownHeader.getBoundingClientRect().height) : 49);

@@ -24,8 +24,15 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$activeInfo['tab']" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false" reactive-tab-expr="(activeInfo === 'root' ? 'requests' : 'jobs')"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
+            {{-- `contents` (not a plain block): a `sticky` element only
+                 travels within its own parent's box, so wrapping the header in
+                 an ordinary div sized to exactly the header would give it zero
+                 room to stick. Taking the toggle wrapper out of the box tree
+                 leaves the header a direct child of this page column, the same
+                 place the other detail pages put theirs. x-show still works —
+                 hiding sets an inline `display: none` over this class. --}}
             @foreach ($infos as $id => $info)
-                <div x-show="activeInfo === {{ \Illuminate\Support\Js::from($id) }}">
+                <div class="contents" x-show="activeInfo === {{ \Illuminate\Support\Js::from($id) }}">
                     <x-monitor::requests.header :root="$info['root']" :range="$range" :job="$info['isJob'] ? $info['root'] : null" :breadcrumb-tab="$info['tab']" :breadcrumb-label="$info['breadcrumbLabel']" :breadcrumb-url="$info['breadcrumbUrl']"/>
                 </div>
             @endforeach
