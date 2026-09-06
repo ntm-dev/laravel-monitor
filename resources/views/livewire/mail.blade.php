@@ -14,7 +14,7 @@
 
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
             <div class="relative">
@@ -77,7 +77,7 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($groups as $group)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.mail.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($group->key)] + $range) }}'">
@@ -87,14 +87,14 @@
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($group->p95_duration) }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $group->last_seen->diffForHumans(short: true) }}</td>
                                 <td class="py-2 pl-2 text-right">
-                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
                                         <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                     </span>
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="6" :rows="count($groups)"/>
                     </tbody>
                 </table>

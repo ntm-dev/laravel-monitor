@@ -1,4 +1,4 @@
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
 
     <select wire:model.live="level"
         class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
@@ -81,7 +81,7 @@
                      stops firing on its own instead of needing a client-side
                      "no more results" guard. The spinner only targets the
                      loadMore() round trip (wire:target), not the unrelated
-                     wire:poll refresh already running on the root div. --}}
+                     auto-refresh already running on the root div. --}}
                 <div wire:key="logs-load-more-sentinel" x-intersect="$wire.loadMore()" class="flex items-center justify-center py-3">
                     {{-- wire:loading.flex (not bare wire:loading): Livewire's
                          default reveal sets display:inline-block inline,

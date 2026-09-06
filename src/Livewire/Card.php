@@ -60,6 +60,18 @@ abstract class Card extends Component
     }
 
     /**
+     * What x-monitor::refresh-button calls, in place of the built-in $refresh.
+     * Empty on purpose — re-rendering is the whole effect. It exists only so a
+     * hand-clicked refresh is distinguishable from the silent auto-refresh
+     * (which does call $refresh), letting the tables' loading skeletons key off
+     * `wire:target.except="$refresh"` and stay put while polling.
+     */
+    public function refreshNow(): void
+    {
+        //
+    }
+
+    /**
      * Preset ranges (key => hours) from the package config.
      *
      * @return array<string, int>

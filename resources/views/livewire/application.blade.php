@@ -1,5 +1,5 @@
 @php($fmt = fn ($ms) => \LaravelMonitor\Support\Format::duration($ms))
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section :icon="\LaravelMonitor\Support\Icons::APPLICATION" :title="__('monitor::messages.common.application')">
         <x-slot:actions>
             <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'jobs'] + $range)" external>{{ __('monitor::messages.nav.jobs') }}</x-monitor::link-button>
@@ -52,7 +52,7 @@
                                    dark:bg-neutral-800/50 p-3 transition-transform duration-200
                                    ease-out hover:scale-105 hover:border-neutral-300
                                    dark:hover:border-neutral-700 hover:bg-white
-                                   dark:hover:bg-neutral-900 hover:shadow-xl shadow-md dark:shadow-white/10"
+                                   hover:shadow-xl shadow-md shadow-black/5 dark:shadow-white/5"
                                 >
                                     <span class="min-w-0">
                                         <span class="block font-mono text-[11px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ \Illuminate\Support\Str::before($route->key, ' ') }}</span>

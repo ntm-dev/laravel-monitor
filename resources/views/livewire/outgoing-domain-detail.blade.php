@@ -6,7 +6,7 @@
     $tz = Format::timezone();
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-2"
          x-data="{
              hoverIndex: null,
@@ -42,7 +42,7 @@
                                 <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($entries as $entry)
                                 {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
                                      sourceType/sourceLabel/sourceUrl (set in OutgoingDomainDetail::data()) resolve it
@@ -82,7 +82,7 @@
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                             <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
                         </tbody>
                     </table>

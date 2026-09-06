@@ -14,7 +14,7 @@
 
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
             <div class="relative">
@@ -75,7 +75,7 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($groups as $group)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.notifications.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($group->key)] + $range) }}'">
@@ -92,7 +92,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="6" :rows="count($groups)"/>
                     </tbody>
                 </table>

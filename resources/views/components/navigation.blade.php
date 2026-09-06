@@ -3,8 +3,8 @@
 {{-- autoRefreshes: false on the standalone, non-Livewire detail pages (Request
      Detail's timeline, Job Attempt, Command Run, Schedule Run, Issue Detail) —
      those own their own URL and render everything once server-side, no
-     wire:poll anywhere on the page, so the active tab's refresh ring would be
-     showing a countdown to a refresh that never happens. --}}
+     data-monitor-poll anywhere on the page, so the active tab's refresh ring
+     would be showing a countdown to a refresh that never happens. --}}
 @props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true, 'reactiveTabExpr' => null])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
@@ -43,7 +43,7 @@
 <aside x-data="{ collapsed: localStorage.getItem('monitor-nav-collapsed') === '1' }"
        :class="{ 'monitor-nav-collapsed': collapsed }"
        class="monitor-nav-aside sticky top-0 hidden h-screen shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
-    <div class="p-2 shadow-lg dark:shadow-md dark:shadow-white/10">
+    <div class="p-2 shadow-lg dark:shadow-md dark:shadow-white/5">
         {{-- Collapsed: name hides (.monitor-nav-label), leaving just the app
              icon and the toggle button — flex-col stacks them instead of
              the row overflowing the narrow rail. --}}
@@ -83,8 +83,8 @@
                             </span>
                         @endif
                         @if ($tab === $tabKey && $autoRefreshes)
-                            {{-- Only the active tab actually has a wire:poll running — the
-                                 others are plain links, nothing there is really refreshing. --}}
+                            {{-- Only the active tab is actually polling — the others are
+                                 plain links, nothing there is really refreshing. --}}
                             <span class="monitor-nav-label">
                                 <x-monitor::refresh-ring :refresh="$refresh"/>
                             </span>
@@ -95,7 +95,7 @@
         @endforeach
     </nav>
 
-    <div class="p-2 shadow-top-lg dark:shadow-top-md dark:shadow-white/10">
+    <div class="p-2 shadow-top-lg dark:shadow-top-md dark:shadow-white/5">
         <div class="space-y-px pb-2">
             @foreach ($footerTabs as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
@@ -104,7 +104,7 @@
                     <x-monitor::icon :path="$item['icon']" :class="$classExpr('h-4 w-4 shrink-0', $tabKey, $iconActiveClasses, $iconInactiveClasses)"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                     @if ($tab === $tabKey && $tabKey !== 'settings' && $autoRefreshes)
-                        {{-- Settings has no wire:poll — it's a static config form,
+                        {{-- Settings never polls — it's a static config form,
                              nothing there refreshes even while active. --}}
                         <span class="monitor-nav-label">
                             <x-monitor::refresh-ring :refresh="$refresh"/>

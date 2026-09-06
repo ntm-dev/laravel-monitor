@@ -47,7 +47,7 @@
              upward (e.g. a sticky footer shadowing the content scrolled
              beneath it — components/navigation.blade.php's footer nav).
              Each still composes with the stock shadow-{color}/{opacity}
-             utilities (shadow-black/5, dark:shadow-white/10, …) the same way
+             utilities (shadow-black/5, dark:shadow-white/5, …) the same way
              shadow-lg does — Tailwind extracts the color from any boxShadow
              theme value, custom ones included, so that composability isn't
              something these have to opt into separately. --}}
@@ -249,15 +249,12 @@
          than lazily inside some component's x-data (the monitorClock
          pattern in refresh-ring.blade.php) because refresh-button reads it
          immediately on first paint, before any such component could have
-         run its init(). Same Livewire.hook('request', …) entry point as
-         the toast-on-failure hook above — it already fires for every
-         component's polls/actions, wire:poll included.
+         run its init().
 
-         `active` is a getter over a request *count*, not a plain boolean —
+         `active` is a getter over a round-trip *count*, not a plain boolean —
          the dashboard Overview embeds three independently-polling
-         components at once (Overview/Application/Users cards, each its own
-         wire:poll), so their requests overlap rather than running one at a
-         time. A boolean set true-per-start/false-per-finish would go false
+         components at once (Overview/Application/Users cards), so their
+         requests overlap rather than running one at a time. A boolean set true-per-start/false-per-finish would go false
          the instant the FIRST of several concurrent requests lands, even
          with others still in flight — cutting every refresh-ring's spin
          short and having refresh-button's click guard drop early. Counting
@@ -269,20 +266,82 @@
                 count: 0,
                 get active() { return this.count > 0; },
             });
+
+            {{-- When the last in-flight request settled. Drives both the
+                 auto-refresh timer below and every refresh-ring's countdown,
+                 so the two can't disagree. --}}
+            Alpine.store('monitorRefreshClock', { startedAt: Math.floor(Date.now() / 1000) });
         });
 
         (function () {
+            function settled() {
+                if (--Alpine.store('monitorPolling').count === 0) {
+                    Alpine.store('monitorRefreshClock').startedAt = Math.floor(Date.now() / 1000);
+                }
+            }
+
+            {{-- The 'commit' hook's respond(), not 'request''s succeed/fail:
+                 those two only fire once a network response arrives, so a
+                 message Livewire cancels or squashes into another never
+                 decrements and the count wedges above zero for good — which
+                 now jams auto-refresh, not just the spinner. respond() is
+                 wired to the message's onFinish, which runs on success,
+                 error, cancel and squash alike. --}}
             function hookLivewire() {
                 if (! window.Livewire) return;
-                window.Livewire.hook('request', function ({ succeed, fail }) {
+                window.Livewire.hook('commit', function ({ respond }) {
                     Alpine.store('monitorPolling').count++;
-                    succeed(function () { Alpine.store('monitorPolling').count--; });
-                    fail(function () { Alpine.store('monitorPolling').count--; });
+                    respond(settled);
                 });
             }
 
             document.addEventListener('livewire:init', hookLivewire);
             hookLivewire();
+        })();
+
+        {{-- Auto-refresh driver for every data-monitor-poll root, replacing
+             wire:poll — whose interval is a page-global setInterval Livewire
+             never restarts, so a manual refresh or a filter change left it
+             firing early, mid-countdown. --}}
+        (function () {
+            const interval = {{ (int) config('monitor.refresh', 10) }};
+            let timer = null;
+
+            function nowSeconds() { return Math.floor(Date.now() / 1000); }
+
+            {{-- Delay measured against Date.now(), not a second-floored "now":
+                 flooring both ends rounds the wait up by up to a second every
+                 cycle. --}}
+            function schedule() {
+                clearTimeout(timer);
+                const dueAt = (Alpine.store('monitorRefreshClock').startedAt + interval) * 1000;
+                timer = setTimeout(tick, Math.max(1000, dueAt - Date.now()));
+            }
+
+            function tick() {
+                {{-- Deliberately re-arms without re-anchoring: that keeps the
+                     page due, so schedule()'s 1s floor retries until the tab
+                     is back rather than waiting out a whole fresh interval. --}}
+                if (document.hidden || ! navigator.onLine || Alpine.store('monitorPolling').active) {
+                    return schedule();
+                }
+
+                document.querySelectorAll('[data-monitor-poll]').forEach(function (el) {
+                    const wire = window.Livewire.find(el.getAttribute('wire:id'));
+
+                    if (wire) wire.$refresh();
+                });
+
+                {{-- Re-anchored again when those requests settle; doing it
+                     here too keeps the timer armed even if none resolved. --}}
+                Alpine.store('monitorRefreshClock').startedAt = nowSeconds();
+            }
+
+            {{-- schedule() reads startedAt, so the effect re-runs — re-arming
+                 the timer — every time anything re-anchors the clock. --}}
+            document.addEventListener('alpine:initialized', function () {
+                Alpine.effect(schedule);
+            });
         })();
     </script>
 

@@ -15,7 +15,7 @@
 
     $attachmentNames = $entry !== null ? ($entry->payload['attachment_names'] ?? []) : [];
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     @if ($entry === null)
         <x-monitor::empty-state :label="__('monitor::messages.nav.mail')" :message="__('monitor::messages.common.mail_not_found')" :period-phrase="$periodPhrase"/>
     @else

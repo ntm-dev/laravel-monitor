@@ -3,7 +3,7 @@
     $tz = \LaravelMonitor\Support\Format::timezone();
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2"
          x-data="{
              hoverIndex: null,
@@ -50,11 +50,11 @@
                 </div>
                 <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
                     @foreach ([
-                        'all' => __('monitor::messages.common.view_all'),
-                        'ok' => __('monitor::messages.common.ok_status'),
-                        '4xx' => __('monitor::messages.common.client_error'),
-                        '5xx' => __('monitor::messages.common.server_error'),
-                    ] as $filterKey => $filterLabel)
+                        'all' => ['label' => __('monitor::messages.common.view_all'), 'badge' => 'bg-neutral-200/80 dark:bg-neutral-500/80 text-neutral-600 dark:text-neutral-300'],
+                        'ok' => ['label' => __('monitor::messages.common.ok_status'), 'badge' => 'bg-green-600 dark:border-green-500 dark:bg-green-600 text-white dark:text-white'],
+                        '4xx' => ['label' => __('monitor::messages.common.client_error'), 'badge' => 'bg-amber-600 dark:border-amber-500 dark:bg-amber-600 text-white dark:text-white'],
+                        '5xx' => ['label' => __('monitor::messages.common.server_error'), 'badge' => 'bg-rose-600 dark:border-rose-500 dark:bg-rose-600 text-white dark:text-white'],
+                    ] as $filterKey => $filter)
                         <button type="button" wire:click="setStatusFilter('{{ $filterKey }}')"
                                 wire:loading.attr="disabled" wire:target="setStatusFilter('{{ $filterKey }}')"
                                 @class([
@@ -62,8 +62,8 @@
                                     'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $statusFilter === $filterKey,
                                     'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $statusFilter !== $filterKey,
                                 ])>
-                            {{ $filterLabel }}
-                            <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[10px] text-neutral-600 dark:text-neutral-300">{{ $statusFilterCounts[$filterKey] }}</span>
+                            {{ $filter['label'] }}
+                            <span class="rounded {{ $filter['badge'] }} px-1.5 font-mono text-[10px]">{{ $statusFilterCounts[$filterKey] }}</span>
                             <svg wire:loading wire:target="setStatusFilter('{{ $filterKey }}')" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
@@ -87,7 +87,7 @@
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage,setDurationFilter,setStatusFilter" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
                             {{-- One combined "php" block, not three consecutive ones: Blade's
                                  compiler mis-merges 3+ adjacent inline php blocks (verified via
@@ -115,7 +115,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage,setDurationFilter,setStatusFilter" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="5" :rows="count($entries)"/>
                     </tbody>
                 </table>

@@ -1,6 +1,6 @@
 {{-- Client-side ticking "X ago" — the server-rendered text (from Carbon's
      own diffForHumans(), so it matches everywhere else in the dashboard on
-     first paint) only updates when the page's own wire:poll fires. Once
+     first paint) only updates when the page's own auto-refresh fires. Once
      Alpine hydrates, this instead recomputes every second from the raw
      timestamp using the browser's native Intl.RelativeTimeFormat, so a
      count in seconds keeps advancing every second, one in minutes every

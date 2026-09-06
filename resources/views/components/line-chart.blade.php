@@ -8,7 +8,7 @@
      survives a poll) — it does not re-evaluate the x-data expression just
      because the attribute string changed. Without this key, lineHoverY
      stays frozen at whatever it was on first mount, so the hover dot drifts
-     off the line after any wire:poll refresh or manual $refresh. Changing
+     off the line after any auto-refresh or manual $refresh. Changing
      the key forces morphdom to replace the node instead of patching it,
      which remounts x-data with the fresh value. --}}
 <div wire:key="line-chart-{{ md5(json_encode($hoverY)) }}" class="relative {{ $height }}" x-data="{ lineHoverY: {{ \Illuminate\Support\Js::from($hoverY) }} }">

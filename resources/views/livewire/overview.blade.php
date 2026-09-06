@@ -1,4 +1,4 @@
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section :icon="\LaravelMonitor\Support\Icons::ACTIVITY" :title="__('monitor::messages.group.activity')">
         <x-slot:actions>
             <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'requests'] + $range)" external>{{ __('monitor::messages.nav.requests') }}</x-monitor::link-button>
