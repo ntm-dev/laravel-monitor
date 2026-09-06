@@ -241,7 +241,7 @@ class DatabaseAggregateStorage implements AggregateStorage
                 ->where('type', $type)
                 ->when($subtype !== null, fn (Builder $q) => $q->where('subtype', $subtype))
                 ->when($key !== null, fn (Builder $q) => $q->where('key', $key))
-                ->when($userId !== null, fn (Builder $q) => $q->where('user_id', $userId))
+                ->tap(fn (Builder $q) => $this->whereUser($q, $userId))
                 ->whereNotNull('duration')
                 ->where('created_at', '>=', $bucketStart)
                 ->when($bucketEnd !== null, fn (Builder $q) => $q->where('created_at', '<', $bucketEnd))

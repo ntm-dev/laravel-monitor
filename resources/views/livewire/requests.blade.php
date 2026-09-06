@@ -2,6 +2,7 @@
     use LaravelMonitor\Support\Format;
     use LaravelMonitor\Support\Icons;
     use LaravelMonitor\Support\KeyHash;
+    use LaravelMonitor\Support\UserFilter;
 
     $fmt = fn ($ms) => Format::duration($ms);
 
@@ -17,12 +18,13 @@
 
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 <select wire:model.live="userId" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
                     <option value="">{{ __('monitor::messages.common.all_users') }}</option>
+                    <option value="{{ UserFilter::AUTHENTICATED }}">{{ __('monitor::messages.common.authenticated_users') }}</option>
                     @foreach ($users as $user)
                         <option value="{{ $user->id }}">{{ $user->name }}</option>
                     @endforeach
@@ -115,7 +117,7 @@
                             <th class="w-8 pb-2"></th>
                         </tr>
                     </thead>
-                    <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage,setDurationFilter,search" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($routes as $route)
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => KeyHash::for($route->key)] + $range) }}'">
@@ -149,7 +151,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage,setDurationFilter,search" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="9" :rows="count($routes)"/>
                     </tbody>
                 </table>
