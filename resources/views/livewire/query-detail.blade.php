@@ -6,8 +6,7 @@
     $tz = Format::timezone();
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
-
+<div data-monitor-poll>
     <div class="grid grid-cols-1 gap-1.5 lg:grid-cols-2"
          x-data="{
              hoverIndex: null,
@@ -61,9 +60,9 @@
                         @forelse ($connections as $conn)
                             <span class="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">
                                 {{ $conn['name'] }}
-                                @if ($conn['type'])
-                                    <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$conn['type']] }}">{{ $conn['type'] }}</span>
-                                @endif
+                                @foreach ($conn['types'] as $connectionType)
+                                    <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$connectionType] }}">{{ $connectionType }}</span>
+                                @endforeach
                             </span>
                         @empty
                             <span class="font-mono text-xs text-neutral-400 dark:text-neutral-500">—</span>
@@ -133,7 +132,7 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($entries as $entry)
                                 {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
                                      sourceType/sourceLabel/sourceUrl (set in QueryDetail::data()) resolve it to the
@@ -186,7 +185,7 @@
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                             <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
                         </tbody>
                     </table>

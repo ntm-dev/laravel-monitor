@@ -99,10 +99,9 @@ class QueryDetail extends Card
             'firstSeen' => $timelineStorage->firstSeen('query', $key),
             // Derived from the loaded page of entries (not the full period)
             // — a quick summary, not an exhaustive audit. One row per
-            // distinct connection name; 'type' is only set when every
-            // sampled call against that connection agreed on the same PDO
-            // role (see DatabaseCacheAndQueryStorage::queryStats() for why a
-            // connection can carry more than one).
+            // distinct connection name, listing every PDO role its calls ran
+            // under (see DatabaseCacheAndQueryStorage::queryStats() for why
+            // there can be more than one).
             'connections' => $entries
                 ->pluck('payload.connection')
                 ->filter()
@@ -114,9 +113,12 @@ class QueryDetail extends Card
                         ->where('payload.connection', $connection)
                         ->pluck('payload.connection_type')
                         ->filter()
-                        ->unique();
+                        ->unique()
+                        ->sort()
+                        ->values()
+                        ->all();
 
-                    return ['name' => $connection, 'type' => $types->count() === 1 ? $types->first() : null];
+                    return ['name' => $connection, 'types' => $types];
                 }),
             'totalEntries' => $totalEntries,
             'page' => $page,
