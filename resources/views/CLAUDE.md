@@ -11,6 +11,8 @@
   above `Livewire\Requests::MAX_UNMATCHED_METHODS_SHOWN`). `DatabaseStorage::query()`/`resolveKeyHash()`
   know how to expand that sentinel back into every method variant, so the merged row's detail-page
   link still works.
+- **Keep comments short** — same budget as `.claude/skills/php-conventions`: 1–3 lines, one fact
+  per comment, no background or rejected alternatives. Applies to `{{-- --}}` comments too.
 - **New Blade blocks get a start/end comment pair**, e.g.:
   ```blade
   {{-- start card list query --}}

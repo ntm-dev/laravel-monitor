@@ -21,6 +21,13 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
 - Prefer PHPDoc blocks over inline comments. Only add an inline comment for something
   genuinely non-obvious — a hidden constraint, a workaround for a specific bug, behavior that
   would surprise a reader. Don't restate what the code already says.
+- **Keep comments short.** Budget: 1–3 lines, 4 at the outside. One fact per comment — the
+  constraint itself, not the reasoning that led to it. Cut the background, the alternatives you
+  rejected, and the "so that X works for free" payoff; a reader who needs those can read the
+  code or the git history. If a comment needs more than 4 lines, that's a signal the *code*
+  wants a named method or constant, not a longer preamble.
+  The repo has some pre-existing 10–20-line comment blocks — don't take them as the target, and
+  don't retrofit them either; this rule governs comments you write or touch.
 - Prefer interpolation over `.` concatenation when embedding a value in a string:
   `"monitor::messages.{$key}"`, not
   `'monitor::messages.'.$key`. Use braces around the expression
