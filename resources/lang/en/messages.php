@@ -330,6 +330,7 @@ return [
         'occurrences' => 'Occurrences',
         'source' => 'Source',
         'queued_jobs' => 'Queued Jobs',
+        'queued_from' => 'Queued From',
         'lazy_loads' => 'Lazy Loads',
         'failed' => 'Failed',
         'released' => 'Released',

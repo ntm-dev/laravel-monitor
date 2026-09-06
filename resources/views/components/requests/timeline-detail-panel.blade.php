@@ -398,6 +398,18 @@
                             x-text="selected()?.metadata?.server"></dd>
                     </div>
                 </template>
+                {{-- Where dispatch() was called (Recorders\Jobs). Only on the
+                     dispatch row — an outcome runs in another process. --}}
+                <template x-if="selected()?.metadata?.location">
+                    <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                        <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.queued_from') }}</dt>
+                        {{-- rtl + text-align:left truncates the front of the
+                             path, keeping file:line visible. --}}
+                        <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
+                            style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.location"
+                            x-text="selected()?.metadata?.location"></dd>
+                    </div>
+                </template>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"

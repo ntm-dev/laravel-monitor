@@ -27,6 +27,15 @@ class Jobs extends Recorder
 {
     use NormalizesQueue;
 
+    /**
+     * Subtype of a dispatch-time placeholder, as opposed to a run's own
+     * outcome ('processed'/'failed'/'released'). The distinction matters
+     * because a job that dispatches further jobs records their placeholders
+     * under its OWN request_id and type — so within one job run, `type=job`
+     * covers both the run itself and everything it queued.
+     */
+    public const DISPATCH = 'queued';
+
     /** @var array<string, float> */
     protected array $startedAt = [];
 
@@ -79,8 +88,12 @@ class Jobs extends Recorder
                 // mail/notification pairing, this field already existed
                 // under that name before the uuid switch.
                 'job_id' => $this->jobId($event->payload()['uuid'] ?? $event->id ?? ''),
+                // Where dispatch() was actually called — the only pointer
+                // back to the source, since a job queued by another job runs
+                // in a process with no other trace of its origin.
+                'location' => $this->dispatchLocation(),
             ], fn ($value) => $value !== null),
-            subtype: 'queued',
+            subtype: self::DISPATCH,
             userId: $this->monitor->lazyCurrentUserId(),
         );
     }
@@ -249,6 +262,23 @@ class Jobs extends Recorder
      * keeps this dispatch-time entry's own key consistent with its
      * eventual outcome's.
      */
+    /**
+     * First application (non-vendor) frame behind the dispatch, as an
+     * absolute "file:line" — same frame Recorders\Queries resolves for a
+     * query's origin, but stored full-path so it can be opened straight from
+     * the dashboard rather than resolved against the project root by eye.
+     */
+    protected function dispatchLocation(): ?string
+    {
+        [$file, $line] = $this->monitor->location->forQueryTrace(
+            debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50)
+        );
+
+        return $file !== null
+            ? $this->monitor->location->absoluteFile($file).':'.($line ?? 0)
+            : null;
+    }
+
     protected function displayName(mixed $job): string
     {
         if (! is_object($job)) {

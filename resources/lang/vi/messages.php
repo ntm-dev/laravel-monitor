@@ -330,6 +330,7 @@ return [
         'occurrences' => 'Số lần xảy ra',
         'source' => 'Nguồn',
         'queued_jobs' => 'Jobs đã xếp hàng',
+        'queued_from' => 'Xếp hàng từ',
         'lazy_loads' => 'Lazy Load',
         'failed' => 'Thất bại',
         'released' => 'Đã giải phóng',
