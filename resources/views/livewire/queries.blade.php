@@ -15,7 +15,7 @@
 
     $from = ($page - 1) * $perPage;
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
@@ -25,10 +25,7 @@
                         <option value="{{ $conn }}">{{ $conn }}</option>
                     @endforeach
                 </select>
-                <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
-                        class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                    <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
-                </button>
+                <x-monitor::refresh-button/>
             </div>
         </x-slot:actions>
 
@@ -89,7 +86,7 @@
                                 <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($queries as $query)
                                 <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                     onclick="window.location='{{ route('monitor.queries.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($query->key)] + $range) }}'">
@@ -99,9 +96,9 @@
                                     <td class="py-2 pr-3">
                                         <span class="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                                             {{ $query->connection }}
-                                            @if ($query->connection_type)
-                                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$query->connection_type] }}">{{ $query->connection_type }}</span>
-                                            @endif
+                                            @foreach ($query->connection_types as $connectionType)
+                                                <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$connectionType] }}">{{ $connectionType }}</span>
+                                            @endforeach
                                         </span>
                                     </td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($query->calls) }}</td>
@@ -109,14 +106,18 @@
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($query->avg) }}</td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($query->p95) }}</td>
                                     <td class="py-2 pl-2 text-right">
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border
+                                            border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200
+                                            dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900
+                                            group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm"
+                                        >
                                             <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </span>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                             <x-monitor::table-skeleton :columns="7" :rows="count($queries)"/>
                         </tbody>
                     </table>

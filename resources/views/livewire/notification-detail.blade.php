@@ -5,7 +5,7 @@
     $fmt = fn ($ms) => Format::duration($ms);
     $tz = Format::timezone();
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     @if ($entry === null)
         <x-monitor::empty-state :label="__('monitor::messages.common.notification')" :message="__('monitor::messages.common.notification_not_found')" :period-phrase="$periodPhrase"/>
     @else

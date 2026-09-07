@@ -177,7 +177,7 @@ class TimelineRow extends Component
         /** This row's own track's job outcome status ('processed'/'failed'/'released' — see MergesJobTimelines::jobTrack()), null for every other kind of track. */
         public ?string $jobStatus = null,
         /** Sum of every attempt's own duration for a job track's root row (see MergesJobTimelines::jobTrack()) — shown instead of {@see $entry}'s own duration, which is that root's bounding-box span across every attempt (including idle retry-wait time) rather than how long the job actually ran for. Null for every other kind of row. */
-        public ?int $attemptsDuration = null,
+        public ?float $attemptsDuration = null,
         /** A job track's own root row's url (see View\Components\Requests\Timeline's $jobBaseUrl) — clicking it navigates there instead of merely toggling the track's own expand state, since arriving there already expands (and scales the page around) this exact job. Null for every other kind of row, and for a job track's root when the current page has nowhere of that kind to navigate to. */
         public ?string $jobUrl = null,
     ) {

@@ -20,7 +20,7 @@
      checking a box is pure client state and shouldn't cost a Livewire
      round-trip; only resolveSelected()/ignoreSelected() below ever send it
      to the server, as the pairs list a bulk action applies to. --}}
-<div wire:poll.{{ $refresh }}s
+<div data-monitor-poll
      x-data="{
         selected: {},
         toggle(type, key) {
@@ -166,7 +166,7 @@
                                     </td>
                                     <td class="py-2.5 pl-2 text-right">
                                         <a href="{{ route('monitor.issues.show', $exception->uuid) }}"
-                                           class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:shadow-sm">
+                                           class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
                                             <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </a>
                                     </td>
@@ -253,7 +253,7 @@
                                     </td>
                                     <td class="py-2.5 pl-2 text-right">
                                         <a href="{{ route('monitor.issues.show', $item->uuid) }}"
-                                           class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:shadow-sm">
+                                           class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
                                             <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
                                         </a>
                                     </td>

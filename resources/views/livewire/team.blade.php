@@ -20,7 +20,7 @@
     $secondaryButton = 'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50';
     $primaryButton = 'rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500';
 @endphp
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     <x-monitor::section :icon="Icons::PROFILE" title="{{ __('monitor::messages.team.my_account') }}">
         <x-monitor::card class="p-4">
         <div class="divide-y divide-neutral-100 dark:divide-neutral-800">

@@ -205,6 +205,15 @@ final class Location
         return substr($file, strlen($this->basePath));
     }
 
+    /**
+     * Inverse of normalizeFile(): a project-relative path put back onto the
+     * base path, anything already absolute left alone.
+     */
+    public function absoluteFile(string $file): string
+    {
+        return preg_match('#^([a-zA-Z]:[\\\\/]|/)#', $file) === 1 ? $file : $this->basePath.$file;
+    }
+
     private function joinPaths(string $basePath, string ...$paths): string
     {
         // $this->basePath already carries its own trailing separator (see

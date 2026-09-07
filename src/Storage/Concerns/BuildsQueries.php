@@ -9,6 +9,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Builder;
 use LaravelMonitor\Recorders\Requests;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\UserFilter;
 
 use function is_array;
 
@@ -170,9 +171,24 @@ trait BuildsQueries
                 : $query->where('subtype', $subtype))
             ->when($key !== null, fn (Builder $query) => $this->whereKey($query, $type, $key))
             ->when($until !== null, fn (Builder $query) => $query->where('created_at', '<=', $until))
-            ->when($userId !== null, fn (Builder $query) => $query->where('user_id', $userId))
+            ->tap(fn (Builder $query) => $this->whereUser($query, $userId))
             ->when($minDuration !== null, fn (Builder $query) => $query->where('duration', '>=', $minDuration))
             ->where('created_at', '>=', $since);
+    }
+
+    /**
+     * Apply the dashboard's user scope: the AUTHENTICATED sentinel drops
+     * guests, any other non-null value matches that one user, null is a no-op.
+     */
+    protected function whereUser(Builder $query, int|string|null $userId): Builder
+    {
+        if ($userId === null) {
+            return $query;
+        }
+
+        return $userId === UserFilter::AUTHENTICATED
+            ? $query->whereNotNull('user_id')
+            : $query->where('user_id', $userId);
     }
 
     /**

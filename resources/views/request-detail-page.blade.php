@@ -42,7 +42,7 @@
                     <div x-show="activeInfo === {{ \Illuminate\Support\Js::from($id) }}" class="space-y-4">
                         {{-- start card general info --}}
                         @if ($info['isJob'])
-                            <x-monitor::jobs.summary :root="$info['root']" :queued-at="$info['queuedAt']"/>
+                            <x-monitor::jobs.summary :root="$info['root']" :queued-at="$info['queuedAt']" :queued-from="$info['queuedFrom']"/>
                         @else
                             <x-monitor::requests.summary :root="$info['root']" :user-name="$info['userName']" :timezone="$timezone"/>
                         @endif

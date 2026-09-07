@@ -43,7 +43,7 @@ class Timeline extends Component
     protected const MIN_ITEM_PX = 3;
 
     /**
-     * Every row across every track, in track order: {kind: root|attempt|phase|event|divider, entry: ?TimelineEntry, track: string, rootLabel?: string, focusable?: bool, attempt?: ?int, jobStatus?: ?string, attemptsDuration?: ?int}.
+     * Every row across every track, in track order: {kind: root|attempt|phase|event|divider, entry: ?TimelineEntry, track: string, rootLabel?: string, focusable?: bool, attempt?: ?int, jobStatus?: ?string, attemptsDuration?: ?float}.
      *
      * @var list<array<string, mixed>>
      */

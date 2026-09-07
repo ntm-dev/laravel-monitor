@@ -1,5 +1,7 @@
-{{-- Placeholder <tr> rows shown in place of a paginated table's real rows
-     while a previousPage/nextPage round trip is in flight. Meant to sit in
+{{-- Placeholder <tr> rows shown in place of a table's real rows while a
+     user-initiated round trip — paging, sorting, a filter, the refresh
+     button — is in flight. The silent auto-refresh is excluded at the call
+     site via wire:target.except="$refresh". Meant to sit in
      its own <tbody> alongside the real one (a <table> may have more than
      one) so the placeholder bars share the real header's column widths
      instead of drifting out of alignment. `columns` should match the

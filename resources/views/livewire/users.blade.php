@@ -20,14 +20,14 @@
 @endphp
 {{-- A single, unconditional root element — Livewire finds its component root
      by scanning the rendered HTML for the first tag, so two alternate
-     top-level `<div wire:poll>` roots (one per embedded/standalone branch)
-     left it unable to reliably identify either: it silently fell back to
-     wrapping <x-monitor::section>'s own inner div as the "root" instead,
-     which carries no wire:poll at all — the standalone Users tab never
+     top-level poll roots (one per embedded/standalone branch) left it unable
+     to reliably identify either: it silently fell back to wrapping
+     <x-monitor::section>'s own inner div as the "root" instead, which carries
+     no poll marker at all — the standalone Users tab never
      polled, no matter how long you waited on the page. Keeping the branch
      entirely inside one fixed wrapper is what every other card in this
      package already does. --}}
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     @if ($embedded)
         <x-monitor::section :icon="Icons::USER" :title="__('monitor::messages.nav.users')">
             <x-slot:actions>
@@ -40,14 +40,23 @@
                     <x-monitor::card class="flex flex-col p-4">
                         <x-monitor::badge>{{ __('monitor::messages.nav.exceptions') }}</x-monitor::badge>
                         <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ $impactedUsers->count() }} {{ trans_choice('monitor::messages.common.user_count', $impactedUsers->count()) }} {{ __('monitor::messages.common.impacted_by_exceptions') }} {{ $periodPhrase }}.</p>
-                        <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <div class="mt-4 space-y-2">
                             @foreach ($impactedUsers as $user)
-                                <div class="flex items-center gap-2.5 py-2 text-xs">
+                                <a href="{{ route('monitor.dashboard.user', ['tab' => 'exceptions', 'userId' => $user->user_id] + $range) }}"
+                                    class="flex h-10 shadow-md items-center gap-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700
+                                    bg-white dark:bg-neutral-800/50 px-3 text-xs transition-transform duration-200
+                                    ease-out hover:scale-105 hover:border-neutral-300  dark:hover:border-neutral-700 hover:bg-white
+                                    hover:shadow-xl shadow-md shadow-black/5 dark:shadow-white/5 dark:shadow-md"
+                                >
                                     <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-500/10 text-[10px] font-semibold text-rose-600 dark:text-rose-400">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
                                     <span class="truncate text-neutral-700 dark:text-neutral-200">{{ $user->name }}</span>
                                     <span class="ml-auto shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ number_format($user->count) }}×</span>
-                                </div>
+                                </a>
                             @endforeach
+                        </div>
+                        <div class="mt-auto flex justify-end pt-4">
+                            {{-- The Exceptions tab scoped to signed-in users, not the Users tab. --}}
+                            <x-monitor::link-button :href="route('monitor.dashboard.user', ['tab' => 'exceptions'] + $range)">{{ __('monitor::messages.common.view') }}</x-monitor::link-button>
                         </div>
                     </x-monitor::card>
                 @else
@@ -59,14 +68,22 @@
                     <x-monitor::card class="flex flex-col p-4">
                         <x-monitor::badge>{{ __('monitor::messages.nav.requests') }}</x-monitor::badge>
                         <p class="mt-3 max-w-xs text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.most_active_users') }} {{ $periodPhrase }}.</p>
-                        <div class="mt-4 divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <div class="mt-4 space-y-2">
                             @foreach ($topUsers as $user)
-                                <div class="flex items-center gap-2.5 py-2 text-xs">
+                                <a href="{{ route('monitor.dashboard.user', ['tab' => 'requests', 'userId' => $user->user_id] + $range) }}"
+                                    class="flex h-10 shadow-md items-center gap-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700
+                                    bg-white dark:bg-neutral-800/50 px-3 text-xs transition-transform duration-200
+                                    ease-out hover:scale-105 hover:border-neutral-300  dark:hover:border-neutral-700 hover:bg-white
+                                    hover:shadow-xl shadow-md shadow-black/5 dark:shadow-white/5 dark:shadow-md"
+                                >
                                     <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-[10px] font-semibold text-neutral-600 dark:text-neutral-300">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
                                     <span class="truncate text-neutral-700 dark:text-neutral-200">{{ $user->name }}</span>
                                     <span class="ml-auto shrink-0 font-mono text-neutral-400 dark:text-neutral-500">{{ number_format($user->count) }} req</span>
-                                </div>
+                                </a>
                             @endforeach
+                        </div>
+                        <div class="mt-auto flex justify-end pt-4">
+                            <x-monitor::link-button :href="route('monitor.dashboard', ['tab' => 'users'] + $range)">{{ __('monitor::messages.common.view') }}</x-monitor::link-button>
                         </div>
                     </x-monitor::card>
                 @else
@@ -84,9 +101,13 @@
                         @if ($authEvents->isEmpty())
                             <p class="py-3 text-xs text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_logins_in_period') }}</p>
                         @else
-                            <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <div class="space-y-2">
                                 @foreach ($authEvents as $event)
-                                    <div class="flex items-center gap-2 py-2 text-xs">
+                                    <div class="flex h-10 shadow-md items-center gap-2 rounded-lg border border-neutral-200
+                                        dark:border-neutral-700 bg-white dark:bg-neutral-800/50 px-3 text-xs transition-transform duration-200
+                                        ease-out hover:scale-105 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-white
+                                        hover:shadow-xl shadow-md shadow-black/5 dark:shadow-white/5 dark:shadow-md"
+                                    >
                                         <span @class([
                                             'shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
                                             'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $event->subtype === 'login',
@@ -106,10 +127,7 @@
     @else
         <x-monitor::section>
             <x-slot:actions>
-                <button type="button" wire:click="$refresh" data-tooltip="{{ __('monitor::messages.common.refresh') }}"
-                        class="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                    <x-monitor::icon :path="Icons::REFRESH" :stroke="1.8" class="h-3.5 w-3.5"/>
-                </button>
+                <x-monitor::refresh-button/>
             </x-slot:actions>
 
             {{-- Overview charts --}}
@@ -151,7 +169,7 @@
                                 @endforeach
                             </tr>
                         </thead>
-                        <tbody wire:loading.class="hidden" wire:target="previousPage,nextPage" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($users as $user)
                                 @php($userUrl = route('monitor.users.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($user->user_id)] + $range))
                                 <tr class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" onclick="window.location='{{ $userUrl }}'">
@@ -160,7 +178,6 @@
                                             <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-[10px] font-semibold text-neutral-600 dark:text-neutral-300">{{ strtoupper(mb_substr($user->name, 0, 1)) }}</span>
                                             <span class="max-w-[20rem] truncate font-mono text-xs text-neutral-700 dark:text-neutral-200">
                                                 {{ $user->name }}
-                                                <span class="text-neutral-400 dark:text-neutral-500">({{ $user->user_id }})</span>
                                             </span>
                                         </span>
                                     </td>
@@ -190,7 +207,7 @@
                                 </tr>
                             @endforeach
                         </tbody>
-                        <tbody wire:loading.class.remove="hidden" wire:target="previousPage,nextPage" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
                             <x-monitor::table-skeleton :columns="8" :rows="count($users)"/>
                         </tbody>
                     </table>

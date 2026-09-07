@@ -137,7 +137,7 @@ class RequestDetailController
      * tab, url/title) needs to render either the request's own info
      * ($job === null) or one specific job's (see __invoke()'s own $infos).
      *
-     * @return array{root: object, isJob: bool, queuedAt: ?CarbonImmutable, summary: array, userName: ?string, tab: string, breadcrumbLabel: ?string, breadcrumbUrl: ?string, url: string, title: string}
+     * @return array{root: object, isJob: bool, queuedAt: ?CarbonImmutable, queuedFrom: ?string, summary: array, userName: ?string, tab: string, breadcrumbLabel: ?string, breadcrumbUrl: ?string, url: string, title: string}
      */
     protected function resolveInfo(object $root, ?Collection $children, string $requestId, ?string $job_id, array $range, ?string $jobBaseUrl = null): array
     {
@@ -149,10 +149,14 @@ class RequestDetailController
             : null;
 
         $queuedAt = null;
+        // Where dispatch() was called (see Recorders\Jobs). Only the
+        // placeholder knows — the outcome ran in another process entirely.
+        $queuedFrom = null;
 
         if ($isJob && ($jobDispatchId = $root->payload['job_id'] ?? null) !== null) {
             $queuedEntry = $this->storage->findQueuedJobByJobId($jobDispatchId, CarbonImmutable::now()->subDays(30));
             $queuedAt = $queuedEntry?->created_at;
+            $queuedFrom = $queuedEntry?->payload['location'] ?? null;
         }
 
         $summary = $isJob
@@ -179,6 +183,7 @@ class RequestDetailController
             'root' => $root,
             'isJob' => $isJob,
             'queuedAt' => $queuedAt,
+            'queuedFrom' => $queuedFrom,
             'summary' => $summary,
             'userName' => $userName,
             'tab' => $isJob ? 'jobs' : 'requests',

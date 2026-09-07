@@ -31,6 +31,8 @@ class Users extends Card
 
     public int $page = 1;
 
+    public int $limit = 5;
+
     public function sort(string $column): void
     {
         if (! in_array($column, self::SORTABLE, true)) {
@@ -94,7 +96,7 @@ class Users extends Card
         $page = min(max(1, $this->page), $lastPage);
 
         return [
-            'authenticatedUsers' => $storage->topUsers('request', $since, 1000, $until)->count(),
+            'authenticatedUsers' => $storage->topUsers('request', $since, null, $until)->count(),
             'authenticatedUserBuckets' => $storage->authenticatedUserCountsPerBucket($since, $buckets, $until),
             'authenticatedRequestBuckets' => $requestAuthBuckets['authenticated'],
             'guestRequestBuckets' => $requestAuthBuckets['guest'],
@@ -131,7 +133,7 @@ class Users extends Card
         return [
             'topUsers' => $withNames($topUsers),
             'impactedUsers' => $withNames($impactedUsers),
-            'authenticatedUsers' => $storage->topUsers('request', $since, 1000, $until)->count(),
+            'authenticatedUsers' => $storage->topUsers('request', $since, null, $until)->count(),
             'authEvents' => $timelineStorage->recent('auth', $since, $this->limit, null, null, $until),
         ];
     }

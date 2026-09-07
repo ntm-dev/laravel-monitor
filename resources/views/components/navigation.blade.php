@@ -3,8 +3,8 @@
 {{-- autoRefreshes: false on the standalone, non-Livewire detail pages (Request
      Detail's timeline, Job Attempt, Command Run, Schedule Run, Issue Detail) —
      those own their own URL and render everything once server-side, no
-     wire:poll anywhere on the page, so the active tab's refresh ring would be
-     showing a countdown to a refresh that never happens. --}}
+     data-monitor-poll anywhere on the page, so the active tab's refresh ring
+     would be showing a countdown to a refresh that never happens. --}}
 @props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true, 'reactiveTabExpr' => null])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
@@ -43,7 +43,7 @@
 <aside x-data="{ collapsed: localStorage.getItem('monitor-nav-collapsed') === '1' }"
        :class="{ 'monitor-nav-collapsed': collapsed }"
        class="monitor-nav-aside sticky top-0 hidden h-screen shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
-    <div class="p-2">
+    <div class="p-2 shadow-lg dark:shadow-md dark:shadow-white/5">
         {{-- Collapsed: name hides (.monitor-nav-label), leaving just the app
              icon and the toggle button — flex-col stacks them instead of
              the row overflowing the narrow rail. --}}
@@ -83,8 +83,8 @@
                             </span>
                         @endif
                         @if ($tab === $tabKey && $autoRefreshes)
-                            {{-- Only the active tab actually has a wire:poll running — the
-                                 others are plain links, nothing there is really refreshing. --}}
+                            {{-- Only the active tab is actually polling — the others are
+                                 plain links, nothing there is really refreshing. --}}
                             <span class="monitor-nav-label">
                                 <x-monitor::refresh-ring :refresh="$refresh"/>
                             </span>
@@ -95,7 +95,7 @@
         @endforeach
     </nav>
 
-    <div class="p-2">
+    <div class="p-2 shadow-top-lg dark:shadow-top-md dark:shadow-white/5">
         <div class="space-y-px pb-2">
             @foreach ($footerTabs as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
@@ -104,7 +104,7 @@
                     <x-monitor::icon :path="$item['icon']" :class="$classExpr('h-4 w-4 shrink-0', $tabKey, $iconActiveClasses, $iconInactiveClasses)"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                     @if ($tab === $tabKey && $tabKey !== 'settings' && $autoRefreshes)
-                        {{-- Settings has no wire:poll — it's a static config form,
+                        {{-- Settings never polls — it's a static config form,
                              nothing there refreshes even while active. --}}
                         <span class="monitor-nav-label">
                             <x-monitor::refresh-ring :refresh="$refresh"/>
@@ -122,7 +122,7 @@
         <div class="flex items-center gap-2.5 border-t border-neutral-100 px-2 pb-1 pt-2.5 dark:border-neutral-800">
             <span class="monitor-nav-label flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{{ strtoupper(mb_substr($navActor?->name ?? $appInitial, 0, 1)) }}</span>
             <span class="monitor-nav-label truncate text-sm text-neutral-700 dark:text-neutral-300">{{ $navActor?->name ?? config('app.name', 'Laravel') }}</span>
-            <span class="monitor-nav-label ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ __('monitor::messages.nav.live_refresh', ['seconds' => $refresh]) }}">
+            <span class="monitor-nav-label ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ __('monitor::messages.nav.live_refresh', ['seconds' => $refresh, 'unit' => trans_choice('monitor::messages.common.second_count', $refresh)]) }}">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
             </span>
             {{-- Always visible, even collapsed — sign out is a functional

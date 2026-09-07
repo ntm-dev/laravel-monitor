@@ -1,4 +1,4 @@
-<div wire:poll.{{ $refresh }}s>
+<div data-monitor-poll>
     @if (! $exists)
         <x-monitor::card class="p-10 text-center">
             <p class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.issue.exception_not_found') }}</p>

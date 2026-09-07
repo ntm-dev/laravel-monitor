@@ -3,7 +3,7 @@
      equivalent of requests/summary.blade.php, shown instead of it when the
      page was reached via a job's own <request_url>/<job_id> link (see
      Http\Controllers\RequestDetailController). --}}
-@props(['root', 'queuedAt' => null])
+@props(['root', 'queuedAt' => null, 'queuedFrom' => null])
 @php
     $payload = $root->payload ?? [];
     $status = $root->subtype ?? 'processed';
@@ -41,6 +41,9 @@
         'queued_at' => $queuedAt !== null
             ? \LaravelMonitor\Support\Format::datetime($queuedAt, \LaravelMonitor\Support\Format::DATETIME_PRECISE).$timezoneSuffix
             : null,
+        // Absolute path already (see Recorders\Jobs::dispatchLocation()).
+        // Null for entries recorded before it was captured.
+        'queued_from' => $queuedFrom,
         'popped_at' => isset($payload['popped_at']) ? $preciseTimestamp((float) $payload['popped_at']) : null,
         'started_processing_at' => isset($payload['started_at']) ? $preciseTimestamp((float) $payload['started_at']) : null,
         'duration' => \LaravelMonitor\Support\Format::duration($root->duration),
@@ -53,6 +56,7 @@
     $generalLabels = [
         'status' => __('monitor::messages.common.status'),
         'queued_at' => __('monitor::messages.job.queued_at'),
+        'queued_from' => __('monitor::messages.common.queued_from'),
         'popped_at' => __('monitor::messages.job.popped_at'),
         'started_processing_at' => __('monitor::messages.job.started_processing_at'),
         'duration' => __('monitor::messages.common.duration'),
@@ -75,6 +79,11 @@
                     </dd>
                 @elseif ($key === 'duration')
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $jobEndTime }}">{{ $value }}</dd>
+                @elseif ($key === 'queued_from')
+                    {{-- rtl + text-align:left truncates the front of the
+                         absolute path, keeping file:line visible. --}}
+                    <dd class="min-w-0 truncate font-mono text-xs text-neutral-800 dark:text-neutral-200"
+                        style="direction: rtl; text-align: left;" data-tooltip="{{ $value }}">{{ $value }}</dd>
                 @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
                 @endif

@@ -473,7 +473,7 @@
         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2" class="h-3 w-3"/>
     </button>
     <div x-show="open" x-cloak @click.outside="open = false; openCalendar = null"
-         class="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20">
+         class="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg bg-neutral-900 p-3 shadow-xl shadow-black/20 dark:shadow-md dark:border dark:border-white/20 dark:shadow-white/10">
         {{-- The setting-timezone tab below always renders unconditionally
              (see the comment above showUtcTab/showLocalTab) — this row
              is never empty, so no wrapping x-show is needed. --}}

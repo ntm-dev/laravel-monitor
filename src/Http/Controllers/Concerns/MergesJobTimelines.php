@@ -5,7 +5,11 @@ namespace LaravelMonitor\Http\Controllers\Concerns;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
+use LaravelMonitor\Recorders\Jobs;
+use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Timeline;
+
+use function usort;
 
 /**
  * Shared by RequestDetailController/JobAttemptController/CommandRunController/
@@ -33,39 +37,81 @@ trait MergesJobTimelines
         // jobTrack()'s docblock) would otherwise fall outside a window
         // floored at that later timestamp and never resolve to a track.
         $rootStart = $this->startedAt($root);
+        $since = CarbonImmutable::createFromFormat('U.u', number_format($rootStart, 6, '.', ''));
 
-        $jobExecutions = $this->jobExecutionsFor($children, CarbonImmutable::createFromFormat('U.u', number_format($rootStart, 6, '.', '')));
-
-        // Every 'queued' placeholder whose job_id resolved to at least one
-        // outcome ALSO gets its own track below (see the foreach further
-        // down) — but, unlike an earlier version of this method, its own
-        // "JOB DISPATCH" row stays right where it already was among the
-        // root's own children instead of being removed. Dropping it hid the
-        // only marker of *when* (and in which phase) the root actually
-        // called dispatch(); the separate track below only shows what
-        // happened to the job afterwards (queue wait + however long it took
-        // to run, often well outside the dispatching root's own duration),
-        // which isn't a substitute for that.
-        $resolvedJobIds = $children
-            ->filter(fn (object $row) => $row->type === 'job' && $row->subtype === 'queued')
-            ->map(fn (object $row) => $row->payload['job_id'] ?? null)
-            ->filter(fn (?string $jobId) => $jobId !== null && $jobExecutions->has($jobId))
-            ->unique();
-
-        $tracks = [[
+        $rootTrack = [
             'id' => 'root',
             'badge' => $rootBadge,
             'label' => $root->key ?? $rootBadge,
             'start' => 0.0,
             'duration' => max(0.0, (float) ($root->duration ?? 0)),
             'entries' => Timeline::build($root, $children, $rootStart),
-        ]];
+        ];
 
-        foreach ($resolvedJobIds as $jobId) {
-            $tracks[] = $this->jobTrack($jobExecutions->get($jobId), $rootStart);
+        $jobTracks = $this->jobTracksBelow($children, $rootStart, $since);
+
+        // By when each job ran, not when it was dispatched: 'start' already
+        // positions every bar that way, so dispatch order let a later bar sit
+        // above an earlier one. Stable sort keeps ties in dispatch order.
+        usort($jobTracks, static fn (array $a, array $b) => $a['start'] <=> $b['start']);
+
+        return [$rootTrack, ...$jobTracks];
+    }
+
+    /**
+     * One track per job reachable by following dispatches, at any depth — a
+     * job that dispatches further jobs keeps their placeholders among its own
+     * children, so stopping at one level left those a dead-end marker with no
+     * sign they had run. Breadth-first: one storage round trip per level.
+     * $seen guarantees termination if dispatches ever form a cycle.
+     *
+     * @param  Collection<int, object>  $children
+     * @return list<array<string, mixed>>
+     */
+    protected function jobTracksBelow(Collection $children, float $rootStart, DateTimeInterface $since): array
+    {
+        $tracks = [];
+        $seen = [];
+        $frontier = $children;
+
+        while ($frontier->isNotEmpty()) {
+            $executions = $this->jobExecutionsFor($frontier, $since);
+
+            $jobIds = $this->dispatchedJobIds($frontier)
+                ->filter(fn (string $jobId) => $executions->has($jobId) && ! isset($seen[$jobId]));
+
+            $next = collect();
+
+            foreach ($jobIds as $jobId) {
+                $seen[$jobId] = true;
+                $attempts = $executions->get($jobId);
+                $tracks[] = $this->jobTrack($attempts, $rootStart);
+
+                foreach ($attempts as $attempt) {
+                    $next = $next->concat($attempt->children);
+                }
+            }
+
+            $frontier = $next;
         }
 
         return $tracks;
+    }
+
+    /**
+     * job_ids of every job dispatched from this set of timeline rows.
+     *
+     * @param  Collection<int, object>  $rows
+     * @return Collection<int, string>
+     */
+    protected function dispatchedJobIds(Collection $rows): Collection
+    {
+        return $rows
+            ->filter(fn (object $row) => $row->type === RecordType::Job->value && $row->subtype === Jobs::DISPATCH)
+            ->map(fn (object $row) => $row->payload['job_id'] ?? null)
+            ->filter(fn (?string $jobId) => $jobId !== null)
+            ->unique()
+            ->values();
     }
 
     /**
@@ -181,12 +227,7 @@ trait MergesJobTimelines
 
     protected function jobExecutionsFor(Collection $children, DateTimeInterface $since): Collection
     {
-        $jobIds = $children
-            ->filter(fn (object $row) => $row->type === 'job' && $row->subtype === 'queued')
-            ->map(fn (object $row) => $row->payload['job_id'] ?? null)
-            ->filter()
-            ->values()
-            ->all();
+        $jobIds = $this->dispatchedJobIds($children)->all();
 
         if ($jobIds === []) {
             return collect();

@@ -2,7 +2,7 @@
 
      `at` is a DateTimeInterface (or null). The remaining time is computed and
      rendered entirely client-side so it keeps ticking every second between
-     Livewire's much slower wire:poll refreshes.
+     Livewire's much slower auto-refreshes.
 
      All countdowns on the page share one Alpine.store('monitorClock') tick
      rather than each running its own setInterval: two independent timers
@@ -45,7 +45,7 @@
               // client-side can compute this task's *actual* next occurrence
               // (that's the cron expression, evaluated server-side) — so
               // instead of sitting on 'due now' for however long is left
-              // until this row's own wire:poll tick happens to land, ask
+              // until this row's own auto-refresh tick happens to land, ask
               // Livewire to refresh shortly after going due, swapping in a
               // fresh $at (and therefore a fresh countdown) almost at once.
               refreshRequested: false,

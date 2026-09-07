@@ -7,7 +7,9 @@ use DateTimeInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\TimelineStorage;
+use LaravelMonitor\Recorders\Jobs;
 use LaravelMonitor\Storage\Concerns\BuildsQueries;
+use LaravelMonitor\Support\RecordType;
 
 class DatabaseTimelineStorage implements TimelineStorage
 {
@@ -37,6 +39,15 @@ class DatabaseTimelineStorage implements TimelineStorage
     {
         $row = $this->table()
             ->where('type', $rootType)
+            // A run's root is its outcome, never one of the dispatches it
+            // made — those share its request_id AND its type (see
+            // Recorders\Jobs::DISPATCH), so without this the root could
+            // resolve to a queued placeholder that happened to be inserted
+            // first. Same rule jobExecutionsByJobId() already applies.
+            ->when(
+                $rootType === RecordType::Job->value,
+                fn (Builder $query) => $query->where('subtype', '!=', Jobs::DISPATCH),
+            )
             ->where('request_id', $requestId)
             ->first();
 
@@ -73,7 +84,19 @@ class DatabaseTimelineStorage implements TimelineStorage
     {
         return $this->table()
             ->where('request_id', $requestId)
-            ->where('type', '!=', $rootType)
+            // Excluding the root's own type drops too much for a job root:
+            // the jobs this run dispatched are children of it, yet share its
+            // type (see Recorders\Jobs::DISPATCH). Dropping them left a job
+            // that queued further jobs with no dispatch rows on its timeline
+            // and, since MergesJobTimelines reads them from here, no tracks
+            // for those jobs either.
+            ->when(
+                $rootType === RecordType::Job->value,
+                fn (Builder $query) => $query->where(fn (Builder $q) => $q
+                    ->where('type', '!=', RecordType::Job->value)
+                    ->orWhere('subtype', Jobs::DISPATCH)),
+                fn (Builder $query) => $query->where('type', '!=', $rootType),
+            )
             ->orderBy('start_offset')
             ->orderBy('id')
             ->get()

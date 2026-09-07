@@ -45,6 +45,17 @@ Route::domain(config('monitor.domain'))
         Route::post('/email-changes/{token}', [EmailChangeController::class, 'store'])->name('monitor.email-changes.store');
 
         Route::middleware(EnsureMonitorAuthenticated::class)->group(function () {
+            // The dashboard's user scope, as a path segment rather than the old
+            // `?userId=`. Dropping the optional segment (`/{tab}/userId`) scopes
+            // to signed-in users as a whole, leaving guests out.
+            // Declared first: `/requests/{requestId}` below is unconstrained and
+            // would otherwise match `/requests/userId` as a request id. {tab}
+            // stays unconstrained too — this file loads in the provider's
+            // register() phase, so a Nav::keys() pattern would resolve the tab
+            // labels through a translator that isn't bound yet.
+            Route::get('/{tab}/userId/{userId?}', DashboardController::class)
+                ->name('monitor.dashboard.user');
+
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');

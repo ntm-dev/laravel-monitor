@@ -110,15 +110,19 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
         foreach ($groups as $group) {
             $durations = $group['durations'];
 
+            ksort($group['connectionTypes']);
+
             $result[] = (object) [
                 'key' => $group['key'],
                 'connection' => $group['connection'],
-                // Only shown when every sampled call agreed on one role —
-                // a connection name can carry more than one role across
-                // calls (e.g. a sticky read/write split alternating between
-                // the two), and showing one at random would be exactly the
-                // guesswork this column replaced Sql::isWrite() to avoid.
-                'connection_type' => count($group['connectionTypes']) === 1 ? array_key_first($group['connectionTypes']) : null,
+                // Every PDO role the sampled calls actually ran under, not
+                // one picked from them: the same statement legitimately hits
+                // both sides of a read/write split (a SELECT inside a
+                // transaction, or after a write while sticky, is routed to
+                // the write connection). Collapsing that to a single role
+                // would be guesswork; collapsing it to nothing made a mixed
+                // query indistinguishable from one with no role recorded.
+                'connection_types' => array_keys($group['connectionTypes']),
                 'calls' => $group['calls'],
                 'total' => round(array_sum($durations), 2),
                 'avg' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),

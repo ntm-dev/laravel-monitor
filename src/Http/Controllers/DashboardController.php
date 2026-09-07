@@ -21,6 +21,7 @@ use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Settings;
+use LaravelMonitor\Support\UserFilter;
 
 /**
  * Renders the dashboard shell: resolves the active tab and time range, then
@@ -80,7 +81,7 @@ class DashboardController
             // fills properties that actually exist) so a "Filter by: Jobs"/
             // etc. link from the User Detail page can deep-link straight
             // into that tab's own list, already scoped to the one user.
-            'rangeProps' => ['period' => $period, 'from' => $from, 'to' => $to, 'userId' => $request->query('userId', '')],
+            'rangeProps' => ['period' => $period, 'from' => $from, 'to' => $to, 'userId' => $this->resolveUserId($request)],
             'tabs' => $tabs,
             'groups' => $groups,
             'footerTabs' => $footerTabs,
@@ -103,6 +104,20 @@ class DashboardController
             'currentRouteName' => $request->route()->getName(),
             'currentRouteParams' => $request->route()->parameters(),
         ]);
+    }
+
+    /**
+     * The active user scope, read off the `/{tab}/userId/{userId?}` route: one
+     * user id, the "signed-in users only" sentinel when that trailing segment
+     * was dropped, or no scope at all on every other dashboard URL.
+     */
+    protected function resolveUserId(Request $request): string
+    {
+        if (! $request->route()->named('monitor.dashboard.user')) {
+            return '';
+        }
+
+        return (string) $request->route('userId', UserFilter::AUTHENTICATED);
     }
 
     /**

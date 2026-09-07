@@ -66,7 +66,7 @@ class DatabaseUserStorage implements UserStorage
     public function topUsers(
         string $type,
         DateTimeInterface $since,
-        int $limit = 10,
+        ?int $limit = 10,
         ?DateTimeInterface $until = null,
     ): Collection {
         // See DatabaseCacheAndQueryStorage::cacheKeyStats() for why the
@@ -84,7 +84,7 @@ class DatabaseUserStorage implements UserStorage
             ->selectRaw('count(*) as aggregate_count')
             ->groupBy('user_id')
             ->orderByDesc('aggregate_count')
-            ->limit($limit)
+            ->when($limit !== null, static fn (Builder $q) => $q->limit($limit))
             ->get()
             ->map(function ($row) {
                 $row->count = (int) $row->aggregate_count;

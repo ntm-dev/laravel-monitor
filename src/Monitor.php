@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use LaravelMonitor\Contracts\EntryWriter;
 use LaravelMonitor\Models\MonitorUser;
+use LaravelMonitor\Recorders\Jobs;
 use LaravelMonitor\State\CommandState;
 use LaravelMonitor\State\RequestState;
 use LaravelMonitor\Support\LivewireSnapshot;
@@ -306,7 +307,7 @@ class Monitor
             // it triggers correlates onto *this* task's run, not onto
             // schedule:run itself.
             $this->currentJob()['id'] ?? $this->request?->id ?? $this->scheduledTask['id'] ?? $this->command?->id ?? null,
-            $this->startOffsetFor($type, $duration),
+            $this->startOffsetFor($type, $duration, $subtype),
         );
 
         if ($type === RecordType::Request && $this->request !== null) {
@@ -351,7 +352,7 @@ class Monitor
      * elapsedMsPrecise()'s own docs for why that still means round(x, 3),
      * not leaving the raw subtraction unrounded.
      */
-    protected function startOffsetFor(RecordType $type, ?float $duration): ?float
+    protected function startOffsetFor(RecordType $type, ?float $duration, ?string $subtype = null): ?float
     {
         if ($this->request !== null) {
             if ($type === RecordType::Request) {
@@ -362,7 +363,12 @@ class Monitor
         }
 
         if (($job = $this->currentJob()) !== null) {
-            if ($type === RecordType::Job) {
+            // Only the run's own outcome sits at zero. A 'queued' entry here
+            // is a job this run dispatched — an event within it, offset like
+            // any other child (see Recorders\Jobs::DISPATCH). The request
+            // branch above needs no such check: a dispatch is RecordType::Job
+            // there, already distinct from its RecordType::Request root.
+            if ($type === RecordType::Job && $subtype !== Jobs::DISPATCH) {
                 return 0.0;
             }
 
