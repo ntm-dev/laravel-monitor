@@ -178,17 +178,17 @@ trait BuildsQueries
 
     /**
      * Apply the dashboard's user scope: the AUTHENTICATED sentinel drops
-     * guests, any other non-null value matches that one user, null is a no-op.
+     * guests, GUEST keeps only them, any other non-null value matches that one
+     * user, null is a no-op.
      */
     protected function whereUser(Builder $query, int|string|null $userId): Builder
     {
-        if ($userId === null) {
-            return $query;
-        }
-
-        return $userId === UserFilter::AUTHENTICATED
-            ? $query->whereNotNull('user_id')
-            : $query->where('user_id', $userId);
+        return match ($userId) {
+            null => $query,
+            UserFilter::AUTHENTICATED => $query->whereNotNull('user_id'),
+            UserFilter::GUEST => $query->whereNull('user_id'),
+            default => $query->where('user_id', $userId),
+        };
     }
 
     /**

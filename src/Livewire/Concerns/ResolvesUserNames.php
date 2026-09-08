@@ -2,10 +2,30 @@
 
 namespace LaravelMonitor\Livewire\Concerns;
 
+use DateTimeInterface;
+use Illuminate\Support\Collection;
 use Throwable;
 
 trait ResolvesUserNames
 {
+    /**
+     * The named {id, name} options behind x-monitor::user-filter: only users
+     * who actually produced entries of this type in the window, so the select
+     * never offers one that matches nothing.
+     *
+     * @return Collection<int, object>
+     */
+    protected function userFilterOptions(string $type, DateTimeInterface $since, ?DateTimeInterface $until = null, int $limit = 100): Collection
+    {
+        $users = $this->userStorage()->topUsers($type, $since, $limit, $until);
+        $names = $this->resolveNames($users->pluck('user_id')->all());
+
+        return $users->map(fn ($user) => (object) [
+            'id' => $user->user_id,
+            'name' => $names[$user->user_id],
+        ]);
+    }
+
     /**
      * Every id is guard-qualified ("{guard}:{identifier}", see
      * Monitor::currentUserId()/Recorders\Authentication) — two different

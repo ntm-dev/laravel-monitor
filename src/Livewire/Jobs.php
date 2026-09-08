@@ -2,8 +2,12 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+
 class Jobs extends Card
 {
+    use ResolvesUserNames;
+
     public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'queued', 'processed', 'released', 'failed', 'avg_duration'];
@@ -138,6 +142,7 @@ class Jobs extends Card
             'page' => $page,
             'lastPage' => $lastPage,
             'perPage' => self::PER_PAGE,
+            'users' => $this->userFilterOptions('job', $since, $until),
             'threshold' => (int) config('monitor.thresholds.job', 1000),
         ];
     }

@@ -466,6 +466,7 @@ return [
         'impacted_by_exceptions' => 'bị ảnh hưởng bởi ngoại lệ',
         'most_active_users' => 'Người dùng hoạt động nhiều nhất',
         'authenticated_users' => 'Người dùng đã xác thực',
+        'guest_users' => 'Khách',
         'auth_events' => 'Sự kiện xác thực',
         'showing_latest_of' => '(hiển thị :count mới nhất trong tổng :total)',
         'laravel' => 'Laravel',

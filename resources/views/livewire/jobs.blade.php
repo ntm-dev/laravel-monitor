@@ -18,7 +18,10 @@
 <div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
-            <x-monitor::refresh-button/>
+            <div class="flex items-center gap-2">
+                <x-monitor::user-filter :users="$users"/>
+                <x-monitor::refresh-button/>
+            </div>
         </x-slot:actions>
 
         {{-- Overview charts --}}

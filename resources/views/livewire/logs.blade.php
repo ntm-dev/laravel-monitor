@@ -1,12 +1,17 @@
 <div data-monitor-poll>
 
-    <select wire:model.live="level"
-        class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
-        <option value="">{{ __('monitor::messages.common.all_levels') }}</option>
-        @foreach (['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info'] as $option)
-            <option value="{{ $option }}">{{ ucfirst($option) }}</option>
-        @endforeach
-    </select>
+    {{-- start log filters --}}
+    <div class="flex items-center gap-2">
+        <select wire:model.live="level"
+            class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+            <option value="">{{ __('monitor::messages.common.all_levels') }}</option>
+            @foreach (['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info'] as $option)
+                <option value="{{ $option }}">{{ ucfirst($option) }}</option>
+            @endforeach
+        </select>
+        <x-monitor::user-filter :users="$users"/>
+    </div>
+    {{-- end log filters --}}
 
     @if ($logs->isEmpty())
         <x-monitor::empty-state :label="__('monitor::messages.nav.logs')" :message="__('monitor::messages.common.no_log_entries')" :period-phrase="$periodPhrase" />

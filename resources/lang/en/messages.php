@@ -466,6 +466,7 @@ return [
         'impacted_by_exceptions' => 'impacted by exceptions',
         'most_active_users' => 'Most active users',
         'authenticated_users' => 'Authenticated users',
+        'guest_users' => 'Guests',
         'auth_events' => 'Auth events',
         'showing_latest_of' => '(showing latest :count of :total)',
         'laravel' => 'Laravel',
