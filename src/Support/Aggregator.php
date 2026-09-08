@@ -52,8 +52,8 @@ class Aggregator
 
     protected function aggregateBucket(ConnectionInterface $connection, int $bucket, int $period): void
     {
-        $start = CarbonImmutable::createFromTimestamp($bucket);
-        $end = CarbonImmutable::createFromTimestamp($bucket + $period);
+        $start = StorageTime::fromTimestamp($bucket);
+        $end = StorageTime::fromTimestamp($bucket + $period);
 
         $rows = $this->entriesTable($connection)
             ->select('type', 'subtype')
