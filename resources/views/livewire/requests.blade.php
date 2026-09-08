@@ -2,7 +2,6 @@
     use LaravelMonitor\Support\Format;
     use LaravelMonitor\Support\Icons;
     use LaravelMonitor\Support\KeyHash;
-    use LaravelMonitor\Support\UserFilter;
 
     $fmt = fn ($ms) => Format::duration($ms);
 
@@ -14,21 +13,17 @@
         'count' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
         'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
+        'last_seen' => ['label' => __('monitor::messages.common.last_seen'), 'align' => 'right'],
     ];
 
     $from = ($page - 1) * $perPage;
+    $tz = Format::timezone();
 @endphp
 <div data-monitor-poll>
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
-                <select wire:model.live="userId" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
-                    <option value="">{{ __('monitor::messages.common.all_users') }}</option>
-                    <option value="{{ UserFilter::AUTHENTICATED }}">{{ __('monitor::messages.common.authenticated_users') }}</option>
-                    @foreach ($users as $user)
-                        <option value="{{ $user->id }}">{{ $user->name }}</option>
-                    @endforeach
-                </select>
+                <x-monitor::user-filter :users="$users"/>
                 <x-monitor::refresh-button/>
             </div>
         </x-slot:actions>
@@ -119,8 +114,14 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($routes as $route)
-                            <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => KeyHash::for($route->key)] + $range) }}'">
+                            @php($hash = KeyHash::for($route->key))
+                            {{-- Keyed so a re-sort or a page change moves the existing
+                                 row instead of rewriting the one in that slot: the
+                                 Last seen cell is an Alpine island, whose contents a
+                                 morph leaves alone. --}}
+                            <tr wire:key="route-{{ $hash }}"
+                                class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                                onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => $hash] + $range) }}'">
                                 <td class="py-2 pr-2 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($route->method) }}">{{ $route->method }}</td>
                                 <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $route->key }}">{{ $route->path }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->success) }}</td>
@@ -143,6 +144,9 @@
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->count) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($route->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($route->avg_duration) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($route->p95_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($route->p95_duration) }}</td>
+                                <td class="whitespace-nowrap py-2 pl-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetime($route->last_seen) }} {{ $tz }}">
+                                    <x-monitor::relative-time :at="$route->last_seen"/>
+                                </td>
                                 <td class="py-2 pl-2 text-right">
                                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
                                         <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
@@ -152,7 +156,7 @@
                         @endforeach
                     </tbody>
                     <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="9" :rows="count($routes)"/>
+                        <x-monitor::table-skeleton :columns="10" :rows="count($routes)"/>
                     </tbody>
                 </table>
 

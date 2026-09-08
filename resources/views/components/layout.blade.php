@@ -271,6 +271,37 @@
                  auto-refresh timer below and every refresh-ring's countdown,
                  so the two can't disagree. --}}
             Alpine.store('monitorRefreshClock', { startedAt: Math.floor(Date.now() / 1000) });
+
+            {{-- The 1s heartbeat every countdown/refresh-ring/relative-time
+                 on the page shares, in whole seconds — registered here rather
+                 than lazily by whichever of those hydrates first, so there is
+                 one definition of it. Those components keep their own lazy
+                 fallback for rendering outside this layout.
+
+                 relative-time used to run a setInterval per cell instead:
+                 each started when its own cell hydrated, so a table advanced
+                 at as many sub-second phases as it had rows, every digit
+                 flipping on its own beat. One tick confines every change to
+                 the same instants, and runs one timer rather than one per
+                 visible timestamp.
+
+                 Aligned to the wall-clock second so the first tick after page
+                 load isn't a partial one. --}}
+            Alpine.store('monitorClock', { now: Math.floor(Date.now() / 1000) });
+
+            setTimeout(function () {
+                Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000);
+                setInterval(() => (Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000)), 1000);
+            }, 1000 - (Date.now() % 1000));
+
+            {{-- A background tab throttles the interval above to a crawl, so
+                 every timestamp is however stale on return: catch them up on
+                 the spot rather than a tick later. --}}
+            document.addEventListener('visibilitychange', function () {
+                if (! document.hidden) {
+                    Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000);
+                }
+            });
         });
 
         (function () {
