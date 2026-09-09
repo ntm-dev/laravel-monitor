@@ -403,7 +403,7 @@ class Timeline extends Component
 
         // How many times each normalized SQL shape shows up among this
         // bundle's own (threshold-recorded) queries — surfaced in the
-        // inspector panel as "Duplicates". Scoped per bundle (track, or one
+        // inspector panel as "Calls". Scoped per bundle (track, or one
         // job attempt), matching Support\Timeline::assignDuplicateColors(),
         // which stamps the tree pane's coloured dot the same way.
         $queryDuplicateCounts = collect($entries)

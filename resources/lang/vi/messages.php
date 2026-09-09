@@ -256,7 +256,6 @@ return [
 
     'common' => [
         'duration' => 'Thời gian',
-        'duplicates' => 'Trùng lặp',
         'connection' => 'Connection',
         'file' => 'Tệp',
         'key' => 'Khóa',
