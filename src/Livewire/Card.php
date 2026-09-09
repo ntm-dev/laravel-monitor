@@ -12,6 +12,7 @@ use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Contracts\UserStorage;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Preferences;
+use LaravelMonitor\Support\StorageTime;
 use Livewire\Component;
 use Throwable;
 
@@ -139,7 +140,7 @@ abstract class Card extends Component
         $bucketSeconds = $this->bucketSeconds();
         $timestamp = CarbonImmutable::now()->subHours($hours)->getTimestamp();
 
-        return CarbonImmutable::createFromTimestamp((int) floor($timestamp / $bucketSeconds) * $bucketSeconds);
+        return StorageTime::fromTimestamp((int) floor($timestamp / $bucketSeconds) * $bucketSeconds);
     }
 
     /**

@@ -14,7 +14,7 @@ class Requests extends Card
 
     public const PER_PAGE = 25;
 
-    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration'];
+    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration', 'last_seen'];
 
     /** Above this many distinct methods, the merged Unmatched Route row shows "ANY" instead of listing them. */
     public const MAX_UNMATCHED_METHODS_SHOWN = 3;
@@ -145,14 +145,19 @@ class Requests extends Card
         };
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'count';
-        $routes = $routes->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values();
+        // last_seen sorts on its timestamp: SORT_REGULAR can't order the
+        // CarbonImmutable instances routeStats() returns.
+        $routes = $routes
+            ->sortBy(
+                fn ($route) => $sortBy === 'last_seen' ? $route->last_seen->getTimestamp() : $route->{$sortBy},
+                SORT_REGULAR,
+                $this->sortDirection === 'desc',
+            )
+            ->values();
 
         $total = $routes->count();
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
-
-        $topUsers = $this->userStorage()->topUsers('request', $since, 100, $until);
-        $names = $this->resolveNames($topUsers->pluck('user_id')->all());
 
         // One query grouped by subtype instead of five separate stats()
         // calls (total + 2xx/3xx/4xx/5xx) — see Overview.php.
@@ -176,10 +181,7 @@ class Requests extends Card
             'page' => $page,
             'lastPage' => $lastPage,
             'perPage' => self::PER_PAGE,
-            'users' => $topUsers->map(fn ($user) => (object) [
-                'id' => $user->user_id,
-                'name' => $names[$user->user_id],
-            ]),
+            'users' => $this->userFilterOptions('request', $since, $until),
             'threshold' => $threshold,
         ];
     }

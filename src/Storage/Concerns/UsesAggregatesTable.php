@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
+use LaravelMonitor\Support\StorageTime;
 
 /**
  * The monitor_aggregates fast-path: stats()/statsBySubtype()/countsPerBucket()
@@ -80,7 +81,7 @@ trait UsesAggregatesTable
         }
 
         $requiredUpTo = $until !== null ? CarbonImmutable::parse($until) : CarbonImmutable::now();
-        $latestBucketEnd = CarbonImmutable::createFromTimestamp((int) $bounds->latest);
+        $latestBucketEnd = StorageTime::fromTimestamp((int) $bounds->latest);
 
         if ($requiredUpTo->lessThanOrEqualTo($latestBucketEnd)) {
             return true;

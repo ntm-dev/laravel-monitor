@@ -119,8 +119,6 @@ class Exceptions extends Card
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        $topUsers = $this->userStorage()->topUsers('exception', $since, 100, $until);
-        $names = $this->resolveNames($topUsers->pluck('user_id')->all());
         $tz = Format::timezone();
 
         // One query grouped by subtype instead of three separate stats()
@@ -143,10 +141,7 @@ class Exceptions extends Card
             'lastPage' => $lastPage,
             'perPage' => self::PER_PAGE,
             'from' => ($page - 1) * self::PER_PAGE,
-            'users' => $topUsers->map(fn ($user) => (object) [
-                'id' => $user->user_id,
-                'name' => $names[$user->user_id],
-            ]),
+            'users' => $this->userFilterOptions('exception', $since, $until),
         ];
     }
 

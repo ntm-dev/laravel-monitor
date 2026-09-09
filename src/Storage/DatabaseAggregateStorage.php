@@ -13,6 +13,7 @@ use LaravelMonitor\Storage\Concerns\BuildsQueries;
 use LaravelMonitor\Storage\Concerns\UsesAggregatesTable;
 use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\StorageTime;
 
 use function is_array;
 
@@ -232,10 +233,10 @@ class DatabaseAggregateStorage implements AggregateStorage
 
         for ($i = 0; $i < $buckets; $i++) {
             $isLastBucket = $i === $buckets - 1;
-            $bucketStart = CarbonImmutable::createFromTimestamp($startTimestamp + (int) round($i * $bucketSize));
+            $bucketStart = StorageTime::fromTimestamp($startTimestamp + (int) round($i * $bucketSize));
             $bucketEnd = $isLastBucket
                 ? null
-                : CarbonImmutable::createFromTimestamp($startTimestamp + (int) round(($i + 1) * $bucketSize));
+                : StorageTime::fromTimestamp($startTimestamp + (int) round(($i + 1) * $bucketSize));
 
             $subqueries[] = $this->table()
                 ->where('type', $type)
@@ -289,7 +290,7 @@ class DatabaseAggregateStorage implements AggregateStorage
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
-            ->get(['key', 'subtype', 'duration']);
+            ->get(['key', 'subtype', 'duration', 'created_at']);
 
         // A single foreach pass with plain arrays, not groupBy()->map()
         // with pluck()/filter()/whereIn() chains per group: at the sample
@@ -311,7 +312,9 @@ class DatabaseAggregateStorage implements AggregateStorage
             $groupKey = $unmatched ? Requests::UNMATCHED_ROUTE : $row->key;
 
             $group = &$groups[$groupKey];
-            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => [], 'methods' => []];
+            // Rows arrive newest-first, so the first row seen per group is
+            // its last_seen.
+            $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => [], 'methods' => [], 'last_seen' => $row->created_at];
 
             if ($unmatched) {
                 $group['methods'][Str::before($row->key, ' ')] = true;
@@ -353,6 +356,7 @@ class DatabaseAggregateStorage implements AggregateStorage
                 'network_errors' => $group['network_errors'],
                 'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                 'p95_duration' => $this->percentile($durations, 0.95),
+                'last_seen' => CarbonImmutable::parse($group['last_seen']),
             ];
         }
 

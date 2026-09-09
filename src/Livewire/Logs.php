@@ -3,12 +3,15 @@
 namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Str;
+use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\JsonTree;
 
 use function str_replace;
 
 class Logs extends Card
 {
+    use ResolvesUserNames;
+
     protected const DEFAULT_LIMIT = 50;
 
     protected const LOAD_MORE_STEP = 20;
@@ -79,6 +82,7 @@ class Logs extends Card
 
         return [
             'logs' => $logs,
+            'users' => $this->userFilterOptions('log', $this->since(), $this->until()),
             // Fewer rows than asked for means storage has run out — the
             // sentinel in logs.blade.php only renders while this is true.
             'hasMore' => $logs->count() >= $this->limit,

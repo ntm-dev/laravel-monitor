@@ -104,7 +104,7 @@ interface AggregateStorage
 
     /**
      * Per-route breakdown for a type: one item per key exposing
-     * key, methods, count, success, client_errors, server_errors, avg_duration, p95_duration.
+     * key, methods, count, success, client_errors, server_errors, avg_duration, p95_duration, last_seen.
      * For type 'request', every entry whose key ends in " Recorders\Requests::UNMATCHED_ROUTE"
      * (no matched Laravel route) is merged into a single row keyed by the bare
      * Requests::UNMATCHED_ROUTE sentinel, with `methods` listing the distinct
