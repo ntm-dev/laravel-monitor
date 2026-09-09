@@ -5,6 +5,7 @@ namespace LaravelMonitor\Support;
 use Carbon\CarbonInterval;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
+use Symfony\Component\HttpFoundation\Response;
 
 class Format
 {
@@ -271,5 +272,11 @@ class Format
             $status >= 400 => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
             default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
         };
+    }
+
+    /** The reason phrase for an HTTP status code (e.g. 404 -> "Not Found"), null for a code Symfony doesn't recognize. */
+    public static function statusText(int $status): ?string
+    {
+        return Response::$statusTexts[$status] ?? null;
     }
 }
