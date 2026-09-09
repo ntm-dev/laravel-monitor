@@ -72,7 +72,7 @@
                             </tr>
                         @endforeach
                     </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden animate-pulse divide-y divide-neutral-100 dark:divide-neutral-800">
+                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
                         <x-monitor::table-skeleton :columns="4" :rows="count($entries)"/>
                     </tbody>
                 </table>

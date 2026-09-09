@@ -145,6 +145,26 @@
             animation: monitor-marquee-bounce 6s ease-in-out infinite;
         }
     </style>
+    {{-- Shimmer sweep for skeleton loading bars (components/table-skeleton.blade.php):
+         a light gradient band slides left-to-right over the bar's flat
+         background-color on a loop. Layered as background-image on top of
+         Tailwind's bg-neutral-100/dark:bg-neutral-800 (a separate CSS
+         property, so both coexist) rather than replacing those utilities. --}}
+    <style>
+        @keyframes monitor-skeleton-shimmer {
+            0% { background-position: -150% 0; }
+            100% { background-position: 250% 0; }
+        }
+        .monitor-skeleton {
+            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .7) 50%, rgba(255, 255, 255, 0) 100%);
+            background-size: 60% 100%;
+            background-repeat: no-repeat;
+            animation: monitor-skeleton-shimmer 1.6s ease-in-out infinite;
+        }
+        .dark .monitor-skeleton {
+            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .12) 50%, rgba(255, 255, 255, 0) 100%);
+        }
+    </style>
     {{-- Global tooltip skin: every data-tooltip="…" attribute in the app
          renders as this dark box, matching the
          one components/requests/timeline-row.blade.php already draws by

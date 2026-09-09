@@ -12,7 +12,7 @@
     <tr>
         @for ($j = 0; $j < $columns; $j++)
             <td class="py-2 pr-2">
-                <div class="h-3 rounded bg-neutral-100 dark:bg-neutral-800"></div>
+                <div class="monitor-skeleton h-3 rounded bg-neutral-100 dark:bg-neutral-800"></div>
             </td>
         @endfor
     </tr>
