@@ -343,6 +343,7 @@ return [
         'vendor_frames' => 'vendor frame|vendor frames',
         'json_items' => 'item|items',
         'loading_more' => 'Loading more',
+        'scroll_to_top' => 'Scroll to top',
         'copied' => 'Copied!',
         'copy_as_markdown' => 'Copy as Markdown',
 
