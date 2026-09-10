@@ -256,7 +256,6 @@ return [
 
     'common' => [
         'duration' => 'Duration',
-        'duplicates' => 'Duplicates',
         'connection' => 'Connection',
         'file' => 'File',
         'key' => 'Key',

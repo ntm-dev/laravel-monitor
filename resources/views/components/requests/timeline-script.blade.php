@@ -302,6 +302,15 @@
         const line = this.selected()?.metadata?.line;
         return file ? (line ? file + ':' + line : file) : '';
     },
+    {{-- The front-truncated direction:rtl dd's below need this: an absolute
+         path (leading slash) is a neutral bidi character with no strong
+         char before it, so it renders at the RTL paragraph's own edge
+         instead of in place, showing as a stray trailing slash. The LRM
+         forces a strong LTR anchor at the start so the rest of the path
+         reorders normally. --}}
+    truncatedPath(value) {
+        return value ? '\u200E' + value : '';
+    },
     mailRecipients() {
         const m = this.selected()?.metadata;
         if (!m) return '';

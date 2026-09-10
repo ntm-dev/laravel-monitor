@@ -81,6 +81,12 @@ class Exceptions extends Recorder
             subtype: $handled ? 'handled' : 'unhandled',
             userId: $this->monitor->lazyCurrentUserId(),
         );
+
+        // Unhandled exceptions skip the events that normally advance the
+        // timeline's lifecycle stage — see Monitor::markUnhandledException().
+        if (! $handled) {
+            $this->monitor->markUnhandledException();
+        }
     }
 
     /**

@@ -28,10 +28,9 @@ class Sql
     }
 
     /**
-     * How many of this request/job/command's own `query` rows share a
-     * normalized shape with at least one other — surfaced on the Queries
-     * summary card as an N+1 signal. `key` is already the normalized shape
-     * (see Recorders\Queries::record()), so no re-normalizing needed here.
+     * How many distinct normalized SQL shapes repeat among this
+     * request/job/command's own `query` rows (N+1 signal) — three rows
+     * sharing one shape count as one duplicate, not three.
      *
      * @param  Collection<int, object>  $queryRows
      */
@@ -40,7 +39,6 @@ class Sql
         return $queryRows
             ->groupBy('key')
             ->filter(fn (Collection $group) => $group->count() > 1)
-            ->flatten()
             ->count();
     }
 }

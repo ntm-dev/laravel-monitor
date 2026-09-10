@@ -18,6 +18,7 @@ use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Str as SupportStr;
 use Throwable;
 
+use function in_array;
 use function is_string;
 use function ltrim;
 use function trim;
@@ -881,6 +882,30 @@ class Monitor
     public function markUnwinding(): void
     {
         $this->transitionStage(ExecutionStage::AfterMiddleware, from: ExecutionStage::Render);
+    }
+
+    /**
+     * Same boundary as markUnwinding(), but for a request an uncaught
+     * exception interrupted — PreparingResponse/ResponsePrepared never fire
+     * on that path, so without this the stage stays stuck wherever the
+     * exception hit. Only ever advances the stage, never backward.
+     */
+    public function markUnhandledException(): void
+    {
+        if ($this->request === null) {
+            return;
+        }
+
+        $stagesBeforeUnwinding = [
+            ExecutionStage::Bootstrap,
+            ExecutionStage::BeforeMiddleware,
+            ExecutionStage::Action,
+            ExecutionStage::Render,
+        ];
+
+        if (in_array($this->request->stage, $stagesBeforeUnwinding, true)) {
+            $this->transitionStage(ExecutionStage::AfterMiddleware);
+        }
     }
 
     /**

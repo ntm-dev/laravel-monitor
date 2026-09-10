@@ -85,7 +85,8 @@
                 <div class="mb-1.5 flex items-center justify-between">
                     <span
                         class="font-mono text-[10px] uppercase tracking-tight text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.sql') }}</span>
-                    <button type="button" @click="copySql()" data-tooltip="{{ __('monitor::messages.common.copy') }}"
+                    <button type="button" @click="copySql()"
+                        :data-tooltip="sqlCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
                         class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! sqlCopied" />
                         <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2"
@@ -109,7 +110,7 @@
                         :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duplicates') }}</dt>
+                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.calls') }}</dt>
                     <dd class="font-mono"
                         :class="selected()?.duplicateCount > 1 ? 'font-medium text-amber-600 dark:text-amber-400' :
                             'text-neutral-800 dark:text-neutral-200'"
@@ -142,7 +143,7 @@
                              path, keeping file:line visible. --}}
                         <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
                             style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.location"
-                            x-text="selected()?.metadata?.location"></dd>
+                            x-text="truncatedPath(selected()?.metadata?.location)"></dd>
                     </div>
                 </template>
             </dl>
@@ -407,7 +408,7 @@
                              path, keeping file:line visible. --}}
                         <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
                             style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.location"
-                            x-text="selected()?.metadata?.location"></dd>
+                            x-text="truncatedPath(selected()?.metadata?.location)"></dd>
                     </div>
                 </template>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
@@ -440,7 +441,7 @@
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.file') }}</dt>
                     <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
                         style="direction: rtl; text-align: left;" :data-tooltip="exceptionLocation()"
-                        x-text="exceptionLocation()"></dd>
+                        x-text="truncatedPath(exceptionLocation())"></dd>
                 </div>
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                     <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.handled') }}</dt>
