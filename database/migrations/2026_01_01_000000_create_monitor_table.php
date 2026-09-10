@@ -112,6 +112,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('username')->nullable()->unique();
             $table->string('password');
             $table->string('role', 16)->default('viewer');
             $table->text('totp_secret')->nullable();

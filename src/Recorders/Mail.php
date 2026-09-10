@@ -7,10 +7,14 @@ use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Str;
 use LaravelMonitor\Support\RecordType;
+use Symfony\Component\Mime\Email;
 use Throwable;
 
 class Mail extends Recorder
 {
+    /** Stored bodies larger than this (chars) are truncated. */
+    protected const MAX_BODY_CHARS = 10000;
+
     /**
      * When the current send started, set by MessageSending and read back by
      * MessageSent — same technique as CacheInteractions' before/after timing.
@@ -102,11 +106,24 @@ class Mail extends Recorder
                 'attachments' => $attachments > 0 ? $attachments : null,
                 'attachment_names' => $attachmentNames !== [] ? $attachmentNames : null,
                 'correlation_id' => is_string($notification) ? $this->monitor->pendingNotificationCorrelationId() : null,
+                'body' => ($this->config['details']['record_body'] ?? false) ? $this->body($event->message) : null,
             ]),
             duration: $duration,
             subtype: is_string($notification) ? 'notification' : 'direct',
         );
 
         $this->startedAt = null;
+    }
+
+    /** Best-effort rendered body (HTML preferred, text as a fallback), capped in size. */
+    protected function body(Email $message): ?string
+    {
+        try {
+            $body = $message->getHtmlBody() ?? $message->getTextBody();
+
+            return is_string($body) ? Str::limit($body, self::MAX_BODY_CHARS) : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

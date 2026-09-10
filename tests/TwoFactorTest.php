@@ -65,7 +65,7 @@ class TwoFactorTest extends TestCase
         $user = $this->createTotpEnabledUser();
 
         $this->post('/monitor/login', [
-            'email' => $user->email,
+            'login' => $user->email,
             'password' => 'password',
         ])->assertRedirect('/monitor/two-factor-challenge');
 
@@ -78,7 +78,7 @@ class TwoFactorTest extends TestCase
         $this->withoutMonitorAuth();
         $user = $this->createTotpEnabledUser();
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
 
         $code = (new Google2FA())->getCurrentOtp(decrypt($user->getRawOriginal('totp_secret'), false));
 
@@ -95,7 +95,7 @@ class TwoFactorTest extends TestCase
         $this->withoutMonitorAuth();
         $user = $this->createTotpEnabledUser();
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
 
         $this->post('/monitor/two-factor-challenge', ['code' => '000000'])
             ->assertSessionHasErrors('code');
@@ -112,7 +112,7 @@ class TwoFactorTest extends TestCase
         $this->withoutMonitorAuth();
         $user = $this->createTotpEnabledUser();
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
 
         $this->post('/monitor/two-factor-challenge', ['code' => '000000'])
             ->assertSessionHasErrors('code');
@@ -139,7 +139,7 @@ class TwoFactorTest extends TestCase
         $plainRecoveryCode = 'RECOVERY01';
         $user->update(['totp_recovery_codes' => [Hash::make($plainRecoveryCode), Hash::make('OTHERCODE')]]);
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
 
         $this->post('/monitor/two-factor-challenge', ['code' => $plainRecoveryCode])
             ->assertRedirect('/monitor');
@@ -155,11 +155,11 @@ class TwoFactorTest extends TestCase
         $user = $this->createTotpEnabledUser();
         $user->update(['totp_recovery_codes' => [Hash::make('ONETIME01')]]);
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
         $this->post('/monitor/two-factor-challenge', ['code' => 'ONETIME01']);
         $this->withoutMonitorAuth();
 
-        $this->post('/monitor/login', ['email' => $user->email, 'password' => 'password']);
+        $this->post('/monitor/login', ['login' => $user->email, 'password' => 'password']);
         $this->post('/monitor/two-factor-challenge', ['code' => 'ONETIME01'])
             ->assertSessionHasErrors('code');
 

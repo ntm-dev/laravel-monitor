@@ -15,6 +15,7 @@ use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Str;
 use LaravelMonitor\Http\Controllers\Concerns\NormalizesQueue;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\Trace;
 use ReflectionClass;
 
 use function array_key_exists;
@@ -92,6 +93,7 @@ class Jobs extends Recorder
                 // back to the source, since a job queued by another job runs
                 // in a process with no other trace of its origin.
                 'location' => $this->dispatchLocation(),
+                'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
             ], fn ($value) => $value !== null),
             subtype: self::DISPATCH,
             userId: $this->monitor->lazyCurrentUserId(),

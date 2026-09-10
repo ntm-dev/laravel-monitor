@@ -94,7 +94,8 @@ class TeamTest extends TestCase
         Mail::fake();
 
         Livewire::test(Team::class)->call('invite', 'new-member@example.com', 'viewer')
-            ->assertDispatched('member-invited');
+            ->assertDispatched('member-invited')
+            ->assertSet('memberInvited', true);
 
         $this->assertDatabaseHas('monitor_invitations', ['email' => 'new-member@example.com', 'role' => 'viewer']);
         Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->invitation->email === 'new-member@example.com');
@@ -585,4 +586,44 @@ class TeamTest extends TestCase
 
         $this->assertNull(MonitorEmailChange::find($emailChange->id));
     }
+
+    public function test_member_can_set_their_own_username(): void
+    {
+        Livewire::test(Team::class)->call('updateUsername', 'the_owner');
+
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $this->assertSame('the_owner', $owner->username);
+    }
+
+    public function test_member_can_clear_their_username(): void
+    {
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $owner->update(['username' => 'the_owner']);
+
+        Livewire::test(Team::class)->call('updateUsername', '');
+
+        $this->assertNull($owner->fresh()->username);
+    }
+
+    public function test_username_rejects_an_invalid_format(): void
+    {
+        Livewire::test(Team::class)->call('updateUsername', 'a b!')->assertHasErrors('username');
+
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $this->assertNull($owner->username);
+    }
+
+    public function test_username_must_be_unique_against_another_members_username(): void
+    {
+        MonitorUser::create([
+            'name' => 'Existing', 'email' => 'username-taken@example.com', 'username' => 'taken',
+            'password' => Hash::make('password'), 'role' => 'viewer',
+        ]);
+
+        Livewire::test(Team::class)->call('updateUsername', 'taken')->assertHasErrors('username');
+
+        $owner = MonitorUser::where('email', 'owner@example.com')->firstOrFail();
+        $this->assertNull($owner->username);
+    }
+
 }

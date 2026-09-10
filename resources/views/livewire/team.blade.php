@@ -20,7 +20,10 @@
     $secondaryButton = 'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50';
     $primaryButton = 'rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500';
 @endphp
-<div data-monitor-poll>
+{{-- No data-monitor-poll here, unlike the other dashboard cards: this page
+     is full of in-progress inline-edit forms (name/username/email/password/
+     TOTP) an auto-refresh would blow away mid-edit. --}}
+<div>
     <x-monitor::section :icon="Icons::PROFILE" title="{{ __('monitor::messages.team.my_account') }}">
         <x-monitor::card class="p-4">
         <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -53,6 +56,39 @@
             @enderror
             @if ($nameUpdated)
                 <p class="text-sm text-emerald-600 dark:text-emerald-400">{{ $t('name_updated') }}</p>
+            @endif
+        </div>
+
+        <div class="py-4">
+            {{-- Optional login alias alongside email — see Team::updateUsername(). --}}
+            <div x-data="{ editing: false }" x-on:username-updated.window="editing = false">
+                <template x-if="! editing">
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $t('username') }}</span>
+                        <span class="min-w-0 flex-1 truncate text-sm text-right text-neutral-700 dark:text-neutral-200">{{ $actor->username ?? $t('username_not_set') }}</span>
+                        <button type="button" x-on:click="editing = true; $wire.startEditingUsername()" data-tooltip="{{ $t('edit_username') }}"
+                                class="shrink-0 rounded p-1 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200">
+                            <x-monitor::icon :path="Icons::PENCIL" class="h-4 w-4"/>
+                        </button>
+                    </div>
+                </template>
+                <template x-if="editing">
+                    <form x-on:submit.prevent="$wire.updateUsername($refs.username.value)" class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-0 flex-1">
+                            <label class="{{ $labelClass }}">{{ $t('username') }}</label>
+                            <input type="text" x-ref="username" autofocus value="{{ $actor->username }}" class="{{ $fieldClass }}">
+                        </div>
+                        <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">{{ $t('save') }}</button>
+                        <button type="button" x-on:click="editing = false"
+                                class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
+                    </form>
+                </template>
+            </div>
+            @error('username')
+                <p class="text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
+            @enderror
+            @if ($usernameUpdated)
+                <p class="text-sm text-emerald-600 dark:text-emerald-400">{{ $t('username_updated') }}</p>
             @endif
         </div>
 
@@ -323,27 +359,6 @@
             </x-monitor::card>
         </div>
 
-        @if ($pendingInvitations->isNotEmpty())
-            <div class="mt-6 flex items-center gap-2 px-1 pb-3">
-                <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingInvitations->count()) }} {{ $pendingInvitations->count() === 1 ? $t('pending_invite') : $t('pending_invites') }}</h3>
-            </div>
-            <x-monitor::card class="p-4">
-                <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    @foreach ($pendingInvitations as $invitation)
-                        <div class="flex items-center gap-3 py-2.5">
-                            <span class="min-w-0 flex-1 truncate font-mono text-sm text-neutral-700 dark:text-neutral-200">{{ $invitation->email }}</span>
-                            <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($invitation->role) }}">{{ $roleLabel($invitation->role) }}</span>
-                            <span class="shrink-0 font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $t('expires', ['time' => $invitation->expires_at->diffForHumans()]) }}</span>
-                            @if ($actor->isOwner() || $invitation->invited_by === $actor->id)
-                                <button type="button" wire:click="cancelInvite({{ $invitation->id }})"
-                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-            </x-monitor::card>
-        @endif
-
         @if ($pendingEmailChanges->isNotEmpty())
             <div class="mt-6 flex items-center gap-2 px-1 pb-3">
                 <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($pendingEmailChanges->count()) }} {{ $pendingEmailChanges->count() === 1 ? $t('pending_email_change') : $t('pending_email_changes') }}</h3>
@@ -423,6 +438,9 @@
             @endif
             </div>
         </div>
+        @if ($memberInvited)
+            <p class="px-1 pb-3 text-sm text-emerald-600 dark:text-emerald-400">{{ $t('member_invited') }}</p>
+        @endif
 
         <x-monitor::card class="p-4">
             <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -498,6 +516,23 @@
                 @empty
                     <p class="py-3 text-sm text-neutral-400 dark:text-neutral-500">{{ $t('no_members_match') }}</p>
                 @endforelse
+                {{-- Pending invites, right below the real members — not a
+                     separate block, so this is one list of "who's on the
+                     team or about to be". --}}
+                @foreach ($pendingInvitations as $invitation)
+                    <div class="flex items-center gap-3 py-2.5">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-mono text-sm text-neutral-500 dark:text-neutral-400">{{ $invitation->email }}</p>
+                            <p class="truncate font-mono text-xs text-neutral-400 dark:text-neutral-500">{{ $t('expires', ['time' => $invitation->expires_at->diffForHumans()]) }}</p>
+                        </div>
+                        <span class="shrink-0 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $t('pending_confirmation') }}</span>
+                        <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($invitation->role) }}">{{ $roleLabel($invitation->role) }}</span>
+                        @if ($actor->isOwner() || $invitation->invited_by === $actor->id)
+                            <button type="button" wire:click="cancelInvite({{ $invitation->id }})"
+                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
+                        @endif
+                    </div>
+                @endforeach
             </div>
         </x-monitor::card>
 

@@ -71,8 +71,11 @@ class Team extends Card
         ];
     }
 
+    public bool $memberInvited = false;
+
     public function invite(string $email, string $role): void
     {
+        $this->memberInvited = false;
         $actor = $this->actor();
 
         if (! $actor->canManageTeam()) {
@@ -99,6 +102,7 @@ class Team extends Card
 
         Mail::to($email)->send(new TeamInvitationMail($invitation, $plainToken));
 
+        $this->memberInvited = true;
         $this->dispatch('member-invited');
     }
 
@@ -140,6 +144,56 @@ class Team extends Card
 
         $this->nameUpdated = true;
         $this->dispatch('name-updated');
+    }
+
+    public bool $usernameUpdated = false;
+
+    public function startEditingUsername(): void
+    {
+        $this->usernameUpdated = false;
+        $this->resetErrorBag('username');
+    }
+
+    /**
+     * Optional login alias alongside email — LoginController matches either.
+     * Blank clears it back to email-only; set, it must be unique.
+     */
+    public function updateUsername(?string $username): void
+    {
+        $username = trim((string) $username);
+        $actor = $this->actor();
+
+        if ($username === '') {
+            $actor->update(['username' => null]);
+            $this->usernameUpdated = true;
+            $this->dispatch('username-updated');
+
+            return;
+        }
+
+        if (! preg_match('/^[a-zA-Z0-9_.-]{3,50}$/', $username)) {
+            $this->addError('username', __('monitor::messages.team.error_invalid_username'));
+
+            return;
+        }
+
+        // Never a real email collision to guard against separately: '@' isn't
+        // in the allowed charset above, so a username can never equal one.
+        $taken = MonitorUser::query()
+            ->where('id', '!=', $actor->id)
+            ->where('username', $username)
+            ->exists();
+
+        if ($taken) {
+            $this->addError('username', __('monitor::messages.team.error_username_already_taken'));
+
+            return;
+        }
+
+        $actor->update(['username' => $username]);
+
+        $this->usernameUpdated = true;
+        $this->dispatch('username-updated');
     }
 
     public bool $emailChangeRequested = false;

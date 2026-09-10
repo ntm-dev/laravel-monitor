@@ -2,6 +2,11 @@
 
 use LaravelMonitor\Recorders;
 
+// Shared by every table name below (entries/aggregates/issues/auth) — one
+// knob for installs where a bare "monitor_" prefix collides with another
+// package's own tables, rather than renaming each table individually.
+$tablePrefix = env('MONITOR_TABLE_PREFIX', 'monitor_');
+
 return [
 
     /*
@@ -15,6 +20,9 @@ return [
     */
 
     'enabled' => env('MONITOR_ENABLED', true),
+
+    // Prefix shared by every table this package creates — see $tablePrefix above.
+    'table_prefix' => $tablePrefix,
 
     /*
     |--------------------------------------------------------------------------
@@ -83,7 +91,7 @@ return [
     'storage' => [
         'database' => [
             'connection' => env('MONITOR_DB_CONNECTION'),
-            'table' => 'monitor_entries',
+            'table' => $tablePrefix.'entries',
         ],
     ],
 
@@ -101,12 +109,12 @@ return [
 
     'auth' => [
         'guard' => 'monitor',
-        'table' => 'monitor_users',
-        'invitations_table' => 'monitor_invitations',
-        'password_resets_table' => 'monitor_password_resets',
-        'email_changes_table' => 'monitor_email_changes',
-        'webauthn_table' => 'monitor_webauthn_credentials',
-        'oauth_accounts_table' => 'monitor_oauth_accounts',
+        'table' => $tablePrefix.'users',
+        'invitations_table' => $tablePrefix.'invitations',
+        'password_resets_table' => $tablePrefix.'password_resets',
+        'email_changes_table' => $tablePrefix.'email_changes',
+        'webauthn_table' => $tablePrefix.'webauthn_credentials',
+        'oauth_accounts_table' => $tablePrefix.'oauth_accounts',
         'oauth' => [
             'google' => [
                 'client_id' => env('MONITOR_GOOGLE_CLIENT_ID'),
@@ -155,12 +163,12 @@ return [
     */
 
     'aggregates' => [
-        'table' => 'monitor_aggregates',
+        'table' => $tablePrefix.'aggregates',
         'period' => env('MONITOR_AGGREGATE_PERIOD', 60),
     ],
 
     'issues' => [
-        'table' => 'monitor_issues',
+        'table' => $tablePrefix.'issues',
     ],
 
     /*
@@ -206,6 +214,7 @@ return [
 
     'recorders' => [
 
+        // Always on by default — too essential to gate like Queries/Models/CacheInteractions below.
         Recorders\Requests::class => [
             'enabled' => env('MONITOR_REQUESTS_ENABLED', true),
             'ignore_paths' => [
@@ -221,13 +230,21 @@ return [
         // though this recorder now captures every query — renaming them
         // would silently drop any existing .env override.
         Recorders\Queries::class => [
-            'enabled' => env('MONITOR_SLOW_QUERIES_ENABLED', true),
+            'enabled' => env('MONITOR_SLOW_QUERIES_ENABLED', app()->isLocal()),
             // Milliseconds. Every query is recorded regardless of this
             // value — it's read live by the Query Detail page to decide
             // which calls to highlight as slow (Livewire\QueryDetail's
             // $slowThreshold), not used to tag anything at record time.
             'threshold' => env('MONITOR_SLOW_QUERY_THRESHOLD', 100),
             'ignore_paths' => [],
+            // Detail sub-options — each its own Settings toggle, nested
+            // under this recorder and only shown while it's enabled (see
+            // Settings::recorders()). Off outside local: a full call stack
+            // per query is real overhead on top of the single-frame
+            // 'location' this recorder always captures.
+            'details' => [
+                'trace' => env('MONITOR_QUERIES_TRACE_ENABLED', app()->isLocal()),
+            ],
         ],
 
         Recorders\Exceptions::class => [
@@ -242,6 +259,9 @@ return [
 
         Recorders\Jobs::class => [
             'enabled' => env('MONITOR_JOBS_ENABLED', true),
+            'details' => [
+                'trace' => env('MONITOR_JOBS_TRACE_ENABLED', app()->isLocal()),
+            ],
         ],
 
         Recorders\ScheduledTasks::class => [
@@ -257,11 +277,11 @@ return [
         // that already call Model::preventLazyLoading()/shouldBeStrict()
         // themselves; see Recorders\Models.
         Recorders\Models::class => [
-            'enabled' => env('MONITOR_MODELS_ENABLED', true),
+            'enabled' => env('MONITOR_MODELS_ENABLED', app()->isLocal()),
         ],
 
         Recorders\CacheInteractions::class => [
-            'enabled' => env('MONITOR_CACHE_ENABLED', true),
+            'enabled' => env('MONITOR_CACHE_ENABLED', app()->isLocal()),
             'ignore_keys' => [
                 'illuminate:*',
                 'laravel:pulse:*',
@@ -273,14 +293,24 @@ return [
 
         Recorders\OutgoingRequests::class => [
             'enabled' => env('MONITOR_OUTGOING_ENABLED', true),
+            'details' => [
+                'trace' => env('MONITOR_OUTGOING_TRACE_ENABLED', app()->isLocal()),
+                'record_body' => env('MONITOR_OUTGOING_BODY_ENABLED', app()->isLocal()),
+            ],
         ],
 
         Recorders\Notifications::class => [
             'enabled' => env('MONITOR_NOTIFICATIONS_ENABLED', true),
+            'details' => [
+                'record_data' => env('MONITOR_NOTIFICATIONS_DATA_ENABLED', app()->isLocal()),
+            ],
         ],
 
         Recorders\Mail::class => [
             'enabled' => env('MONITOR_MAIL_ENABLED', true),
+            'details' => [
+                'record_body' => env('MONITOR_MAIL_BODY_ENABLED', app()->isLocal()),
+            ],
         ],
 
         Recorders\Authentication::class => [

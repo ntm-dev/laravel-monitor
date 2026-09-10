@@ -11,6 +11,8 @@ use LaravelMonitor\MonitorServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
+use function putenv;
+
 abstract class TestCase extends Orchestra
 {
     /**
@@ -146,5 +148,17 @@ abstract class TestCase extends Orchestra
         // Belt-and-suspenders alongside MonitorServiceProvider::boot(): keep the dashboard
         // tests immune to Livewire's smart_wire_keys bug even if provider boot order changes.
         $app['config']->set('livewire.smart_wire_keys', false);
+
+        // config/monitor.php only enables the heavy recorders (Requests/Queries/
+        // Models/CacheInteractions) by default in the local environment. This
+        // runs before that file is `require`d by MonitorServiceProvider's
+        // mergeConfigFrom(), so force them on via their env-var override (the
+        // highest-priority path config/monitor.php itself already documents)
+        // rather than depend on Testbench's own environment name.
+        foreach (['MONITOR_REQUESTS_ENABLED', 'MONITOR_SLOW_QUERIES_ENABLED', 'MONITOR_MODELS_ENABLED', 'MONITOR_CACHE_ENABLED'] as $envVar) {
+            putenv("{$envVar}=true");
+            $_ENV[$envVar] = 'true';
+            $_SERVER[$envVar] = 'true';
+        }
     }
 }

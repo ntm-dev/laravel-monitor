@@ -51,23 +51,30 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            @php($url = $entry->sourceUrl ?? route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range))
-                            <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                            {{-- $sourceUrl: whatever triggered this send, when there was one
+                                 (a request/job/command/scheduled task) — clicking the source
+                                 badge below jumps there. $sendUrl: this notification's own
+                                 detail page — always present, unlike $sourceUrl, so the trailing
+                                 icon column stays clickable even for a send with no source. --}}
+                            @php
+                                $sourceUrl = $entry->sourceUrl;
+                                $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range);
+                            @endphp
+                            <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
-                                <td class="cursor-pointer max-w-[16rem] py-2 pr-3" onclick="window.location='{{ $url }}'">
-                                    <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$entry->sourceUrl"/>
+                                <td class="{{ $sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($sourceUrl) onclick="window.location='{{ $sourceUrl }}'" @endif>
+                                    <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$sourceUrl"/>
                                 </td>
                                 <td class="max-w-[16rem] truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['notifiable'] ?? '' }}">{{ $entry->payload['notifiable'] ?? '—' }}</td>
                                 <td class="py-2 pr-3">
                                     <span class="rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">{{ $entry->subtype ?? '—' }}</span>
                                 </td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
-                                <td class="py-2 pl-2 text-right">
-                                    @if ($entry->sourceUrl)
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" data-tooltip="{{ __('monitor::messages.common.open_request') }}">
-                                            <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
-                                        </span>
-                                    @endif
+                                <td class="cursor-pointer py-2 pl-2 text-right" onclick="window.location='{{ $sendUrl }}'">
+                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm"
+                                          data-tooltip="{{ __('monitor::messages.common.open_notification') }}">
+                                        <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                    </span>
                                 </td>
                             </tr>
                         @endforeach

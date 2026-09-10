@@ -10,25 +10,43 @@ use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Settings;
 
 /**
- * Persists dashboard settings from the single settings form:
- *  - per-viewer display preferences (theme/language/timezone) into the
- *    {@see Preferences::COOKIE} cookie, and
- *  - app-wide Environment + Recorders overrides, stored server-side via
- *    {@see Settings} and layered over config/monitor.php.
+ * Persists dashboard settings from two separate forms on the same page:
+ *  - {@see preferences()} — per-viewer display (theme/language/timezone),
+ *    into the {@see Preferences::COOKIE} cookie. Open to any signed-in
+ *    monitor user — it's a personal display choice, not a team setting.
+ *  - {@see system()} — app-wide Environment + Recorders overrides, stored
+ *    server-side via {@see Settings} and layered over config/monitor.php.
+ *    Restricted to canManageSettings() (owner/admin).
  * {@see reset()} clears the app-wide overrides back to the config defaults.
  */
 class SettingsController
 {
+    public function preferences(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'theme' => ['required', 'string', 'in:'.implode(',', Preferences::THEMES)],
+            'locale' => ['required', 'string', 'in:'.implode(',', Preferences::availableLocales())],
+            'timezone' => ['required', 'string', 'in:'.implode(',', Preferences::timezones())],
+        ]);
+
+        $cookie = cookie(
+            name: Preferences::COOKIE,
+            value: json_encode($validated),
+            minutes: 60 * 24 * 365,
+        );
+
+        $path = trim((string) config('monitor.path', 'monitor'), '/');
+
+        return $this->backTo($path, 'success', __('monitor::messages.settings.preferences_saved'))->withCookie($cookie);
+    }
+
     public function system(Request $request): RedirectResponse
     {
         abort_unless($request->user(MonitorUser::guardName())->canManageSettings(), 403);
 
         $validated = $request->validate([
-            'theme' => ['required', 'string', 'in:'.implode(',', Preferences::THEMES)],
-            'locale' => ['required', 'string', 'in:'.implode(',', Preferences::availableLocales())],
-            'timezone' => ['required', 'string', 'in:'.implode(',', Preferences::timezones())],
             'enabled' => ['nullable', 'boolean'],
-            'database_table' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_.]+$/'],
+            'table_prefix' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_.]+$/'],
             'dashboard_path' => ['required', 'string', 'max:255', 'regex:#^[A-Za-z0-9/_-]+$#'],
             'retention_hours' => ['required', 'integer', 'min:1', 'max:87600'],
             'refresh' => ['required', 'integer', 'min:1', 'max:3600'],
@@ -42,6 +60,9 @@ class SettingsController
             'period_hours.*' => ['nullable', 'integer', 'min:1', 'max:87600'],
             'recorders' => ['nullable', 'array'],
             'recorders.*' => ['in:1'],
+            'recorder_details' => ['nullable', 'array'],
+            'recorder_details.*' => ['array'],
+            'recorder_details.*.*' => ['in:1'],
         ]);
 
         $periods = $this->buildPeriods($validated['period_labels'], $validated['period_hours']);
@@ -56,7 +77,7 @@ class SettingsController
 
         Settings::save([
             'enabled' => $request->boolean('enabled'),
-            'database_table' => $validated['database_table'],
+            'table_prefix' => $validated['table_prefix'],
             'dashboard_path' => $path,
             'retention_hours' => (int) $validated['retention_hours'],
             'refresh' => (int) $validated['refresh'],
@@ -66,21 +87,12 @@ class SettingsController
             'outgoing_request_threshold' => (int) $validated['outgoing_request_threshold'],
             'periods' => $periods,
             'recorders' => $this->recorderToggles($request),
+            'recorder_details' => $this->recorderDetailToggles($request),
         ]);
-
-        $cookie = cookie(
-            name: Preferences::COOKIE,
-            value: json_encode([
-                'theme' => $validated['theme'],
-                'locale' => $validated['locale'],
-                'timezone' => $validated['timezone'],
-            ]),
-            minutes: 60 * 24 * 365,
-        );
 
         // Redirect to the (possibly new) path so the dashboard never lands on a
         // stale URL after the prefix changes on the next boot.
-        return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'))->withCookie($cookie);
+        return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'));
     }
 
     public function reset(Request $request): RedirectResponse
@@ -130,6 +142,29 @@ class SettingsController
 
         foreach (array_keys(Settings::recorderClasses()) as $name) {
             $toggles[$name] = array_key_exists($name, $submitted);
+        }
+
+        return $toggles;
+    }
+
+    /**
+     * Every recorder's detail-option toggles: only the keys Settings::
+     * recorderDetailKeys() actually declares, true when that checkbox was
+     * submitted.
+     *
+     * @return array<string, array<string, bool>>
+     */
+    protected function recorderDetailToggles(Request $request): array
+    {
+        $submitted = (array) $request->input('recorder_details', []);
+        $toggles = [];
+
+        foreach (Settings::recorderDetailKeys() as $name => $keys) {
+            $toggles[$name] = [];
+
+            foreach ($keys as $key) {
+                $toggles[$name][$key] = array_key_exists($key, $submitted[$name] ?? []);
+            }
         }
 
         return $toggles;

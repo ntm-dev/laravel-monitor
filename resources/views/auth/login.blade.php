@@ -20,8 +20,8 @@
                 <form method="POST" action="{{ route('monitor.login.store') }}" class="mt-4 space-y-4">
                     @csrf
                     <div>
-                        <label for="email" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.email') }}</label>
-                        <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
+                        <label for="login" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.email_or_username') }}</label>
+                        <input type="text" name="login" id="login" value="{{ old('login') }}" required autofocus autocomplete="username"
                                class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
                     </div>
                     <div>

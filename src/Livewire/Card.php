@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Livewire;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterval;
 use LaravelMonitor\Contracts\AggregateStorage;
 use LaravelMonitor\Contracts\CacheAndQueryStorage;
 use LaravelMonitor\Contracts\ExceptionStorage;
@@ -207,21 +208,27 @@ abstract class Card extends Component
     }
 
     /**
-     * Human phrase describing the selected range, e.g. "in the last 24 hours".
+     * Human phrase describing the selected range, e.g. "in the last 24
+     * hours" / "trong 24 giờ qua". Carbon's locale is set explicitly since
+     * Laravel never syncs it to the app's (see Format::durationUnits()).
      */
     public function periodPhrase(): string
     {
         if ($this->hasCustomRange()) {
-            return 'in the selected range';
+            return __('monitor::messages.common.period_phrase_custom');
         }
 
         $hours = self::periods()[$this->period] ?? 1;
 
-        return 'in the last '.match (true) {
-            $hours === 1 => 'hour',
-            $hours % 24 === 0 && $hours >= 48 => ($hours / 24).' days',
-            default => $hours.' hours',
-        };
+        // Days from 48h up so the 24h preset still reads "24 hours"; skip
+        // week so longer presets stay in days too ("30 days", not "4 weeks 2 days").
+        $interval = $hours >= 48 && $hours % 24 === 0
+            ? CarbonInterval::days(intdiv($hours, 24))
+            : CarbonInterval::hours($hours);
+
+        return __('monitor::messages.common.period_phrase', [
+            'duration' => $interval->locale(app()->getLocale())->forHumans(['skip' => ['week']]),
+        ]);
     }
 
     /**

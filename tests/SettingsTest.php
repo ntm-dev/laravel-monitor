@@ -56,4 +56,51 @@ class SettingsTest extends TestCase
 
         $this->assertSame(42, config('monitor.refresh'));
     }
+
+    public function test_apply_overlays_a_table_prefix_onto_every_table(): void
+    {
+        Settings::save(['table_prefix' => 'custom_']);
+
+        Settings::apply();
+
+        $this->assertSame('custom_', config('monitor.table_prefix'));
+        $this->assertSame('custom_entries', config('monitor.storage.database.table'));
+        $this->assertSame('custom_aggregates', config('monitor.aggregates.table'));
+        $this->assertSame('custom_issues', config('monitor.issues.table'));
+        $this->assertSame('custom_users', config('monitor.auth.table'));
+        $this->assertSame('custom_invitations', config('monitor.auth.invitations_table'));
+        $this->assertSame('custom_password_resets', config('monitor.auth.password_resets_table'));
+        $this->assertSame('custom_email_changes', config('monitor.auth.email_changes_table'));
+        $this->assertSame('custom_webauthn_credentials', config('monitor.auth.webauthn_table'));
+        $this->assertSame('custom_oauth_accounts', config('monitor.auth.oauth_accounts_table'));
+    }
+
+    public function test_table_suffixes_names_every_table_this_package_creates(): void
+    {
+        $this->assertSame([
+            'entries', 'aggregates', 'issues', 'users', 'invitations',
+            'password_resets', 'email_changes', 'webauthn_credentials', 'oauth_accounts',
+        ], Settings::tableSuffixes());
+    }
+
+    public function test_recorders_columns_split_the_full_recorder_list_evenly(): void
+    {
+        $recorders = Settings::recorders();
+        $columns = Settings::recorderColumns();
+
+        $this->assertCount(2, $columns);
+        $this->assertSame($recorders, array_merge(...$columns));
+    }
+
+    public function test_recorders_warning_names_every_heavy_recorder(): void
+    {
+        $warning = Settings::recordersWarning();
+
+        foreach (['Queries', 'Models', 'CacheInteractions'] as $name) {
+            $this->assertStringContainsString($name, $warning);
+        }
+
+        // Essential enough to always default on — not a "heavy" recorder.
+        $this->assertStringNotContainsString('Requests', $warning);
+    }
 }

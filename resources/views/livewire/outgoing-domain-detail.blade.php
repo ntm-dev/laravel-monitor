@@ -31,7 +31,7 @@
                 <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_individual_requests_recorded_in_period') }}</p>
             @else
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[760px] text-sm">
+                    <table class="w-full min-w-[800px] text-sm">
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
@@ -40,6 +40,7 @@
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.url') }}</th>
                                 <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
+                                <th class="w-8 pb-2"></th>
                             </tr>
                         </thead>
                         <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -47,14 +48,20 @@
                                 {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
                                      sourceType/sourceLabel/sourceUrl (set in OutgoingDomainDetail::data()) resolve it
                                      to the right detail page instead of assuming every call came from an HTTP request. --}}
-                                @php($status = $entry->payload['status'] ?? null)
-                                @php($method = $entry->payload['method'] ?? null)
-                                @php($methodClass = match ($method) {
-                                    'POST' => 'text-emerald-600',
-                                    'PUT', 'PATCH' => 'text-blue-500',
-                                    'DELETE' => 'text-rose-600 dark:text-rose-400',
-                                    default => 'text-neutral-500 dark:text-neutral-400',
-                                })
+                                {{-- Merged into one php block, not four stacked
+                                     inline-php blocks — see resources/views/CLAUDE.md's
+                                     "three or more consecutive inline-php blocks" gotcha. --}}
+                                @php
+                                    $sendUrl = route('monitor.outgoing.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range);
+                                    $status = $entry->payload['status'] ?? null;
+                                    $method = $entry->payload['method'] ?? null;
+                                    $methodClass = match ($method) {
+                                        'POST' => 'text-emerald-600',
+                                        'PUT', 'PATCH' => 'text-blue-500',
+                                        'DELETE' => 'text-rose-600 dark:text-rose-400',
+                                        default => 'text-neutral-500 dark:text-neutral-400',
+                                    };
+                                @endphp
                                 <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                     <td class="{{ $entry->sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($entry->sourceUrl) onclick="window.location='{{ $entry->sourceUrl }}'" @endif>
@@ -79,11 +86,17 @@
                                         </span>
                                     </td>
                                     <td class="py-2 text-right font-mono text-xs {{ ($entry->duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
+                                    <td class="cursor-pointer py-2 pl-2 text-right" onclick="window.location='{{ $sendUrl }}'">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm"
+                                              data-tooltip="{{ __('monitor::messages.common.open_outgoing_request') }}">
+                                            <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                        </span>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
                         <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                            <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
+                            <x-monitor::table-skeleton :columns="7" :rows="count($entries)"/>
                         </tbody>
                     </table>
                 </div>

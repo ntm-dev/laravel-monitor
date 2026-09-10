@@ -110,6 +110,26 @@
         </div>
     </x-monitor::card>
 
+    {{-- Full call stack of the most recent occurrence — the 'trace' detail
+         option (Settings::RECORDER_DETAILS) is off by default, so this card
+         is absent for most installs. Collapsed by default even when
+         present: unlike the timeline panel's one-entry view, this page
+         already has the SQL card open above it. --}}
+    @if ($trace)
+        <x-monitor::card class="mt-1.5" x-data="{ expanded: false }">
+            <button type="button" @click="expanded = ! expanded" class="flex w-full items-center justify-between gap-2 p-4 text-left">
+                <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 dark:text-neutral-500">
+                    <x-monitor::chevrons-updown x-show="expanded" direction="down-up"/>
+                    <x-monitor::chevrons-updown x-show="! expanded" x-cloak direction="up-down"/>
+                </span>
+            </button>
+            <div x-show="expanded" x-cloak class="border-t border-neutral-100 px-4 pb-4 pt-3 dark:border-neutral-800">
+                <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">{{ $trace }}</pre>
+            </div>
+        </x-monitor::card>
+    @endif
+
     {{-- Individual calls --}}
     <div class="mt-6">
         <div class="flex items-center gap-2 px-1 pb-3">

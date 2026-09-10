@@ -17,6 +17,7 @@ use LaravelMonitor\Http\Headings\RequestHeading;
 use LaravelMonitor\Http\Headings\ScheduleHeading;
 use LaravelMonitor\Http\Headings\UserHeading;
 use LaravelMonitor\Livewire\Card;
+use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
@@ -94,6 +95,7 @@ class DashboardController
             'timezone' => Format::timezone(),
             'rangeMax' => now(Preferences::timezone())->format(Format::RANGE),
             'system' => $tab === 'settings' ? Settings::current() : null,
+            'canManageSettings' => $tab === 'settings' ? (bool) $request->user(MonitorUser::guardName())?->canManageSettings() : null,
             'prefs' => $tab === 'settings' ? Preferences::all() : null,
             'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
             'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,

@@ -8,8 +8,16 @@ use Illuminate\Notifications\Events\NotificationSent;
 use LaravelMonitor\Support\RecordType;
 use Throwable;
 
+use function is_string;
+use function json_encode;
+use function method_exists;
+use function strlen;
+
 class Notifications extends Recorder
 {
+    /** Stored data larger than this (encoded, in bytes) is dropped in favor of a size marker. */
+    protected const MAX_DATA_BYTES = 10000;
+
     /**
      * When the current channel's send started, set by NotificationSending
      * and read back by NotificationSent — same technique as
@@ -61,6 +69,7 @@ class Notifications extends Recorder
                 'channel' => $event->channel,
                 'notifiable' => $notifiable,
                 'correlation_id' => $event->channel === 'mail' ? $this->monitor->pendingNotificationCorrelationId() : null,
+                'data' => ($this->config['details']['record_data'] ?? false) ? $this->data($event) : null,
             ]),
             duration: $duration,
             subtype: $event->channel,
@@ -71,5 +80,33 @@ class Notifications extends Recorder
         }
 
         $this->startedAt = null;
+    }
+
+    /**
+     * Best-effort generic representation of what was sent — toArray() is
+     * what the 'database' channel itself renders to, so it's the closest
+     * thing to a channel-agnostic payload every notification already
+     * exposes. Not every notification implements it; capped in size like
+     * Recorders\Requests::body().
+     */
+    protected function data(NotificationSent $event): mixed
+    {
+        if (! method_exists($event->notification, 'toArray')) {
+            return null;
+        }
+
+        try {
+            $data = $event->notification->toArray($event->notifiable);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $encoded = json_encode($data);
+
+        if (! is_string($encoded) || strlen($encoded) > self::MAX_DATA_BYTES) {
+            return ['_truncated' => true, '_size' => is_string($encoded) ? strlen($encoded) : null];
+        }
+
+        return $data;
     }
 }

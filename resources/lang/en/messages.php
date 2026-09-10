@@ -78,7 +78,10 @@ return [
         'use_browser_timezone' => 'Use browser timezone',
 
         'environment_editable_hint' => 'Overrides for config/monitor.php defaults. Saved values win; anything left at its default keeps following the config file.',
+        'viewer_read_only' => 'Your role can view these settings but not change them.',
         'save_system' => 'Save settings',
+        'save_preferences' => 'Save preferences',
+        'preferences_saved' => 'Preferences saved.',
         'reset' => 'Reset to defaults',
         'settings_saved' => 'Settings saved.',
         'settings_reset' => 'Reset to config defaults.',
@@ -92,10 +95,15 @@ return [
         'tz_no_match' => 'No timezone found.',
         'storage_note' => 'Advanced — changing the storage or dashboard path applies from the next request; the dashboard reloads at the new URL. Storage changes can hide existing data until the new table is populated.',
         'recorders_hint' => 'Toggle which framework events are recorded.',
+        'recorders_heavy_warning' => 'These recorders may add noticeable overhead when enabled: :names. Their detail options below (trace, body, data) are heavier still.',
+        'recorder_detail_trace' => 'Trace call stack',
+        'recorder_detail_body' => 'Record body',
+        'recorder_detail_data' => 'Record data',
 
         'recording' => 'Recording',
         'storage_driver' => 'Storage driver',
-        'database_table' => 'Database table',
+        'table_prefix' => 'Table prefix',
+        'table_prefix_hint' => 'Tables created with this prefix:',
         'retention' => 'Retention',
         'dashboard_path' => 'Dashboard path',
         'dashboard_refresh' => 'Dashboard refresh',
@@ -113,6 +121,10 @@ return [
         'name' => 'Name',
         'edit_name' => 'Edit name',
         'name_updated' => 'Your name has been updated.',
+        'username' => 'Username',
+        'username_not_set' => 'Not set',
+        'edit_username' => 'Edit username',
+        'username_updated' => 'Your username has been updated.',
 
         'email_address' => 'Email address',
         'email_change_sent' => 'Confirmation email sent — please check your email.',
@@ -151,8 +163,8 @@ return [
 
         'recovery_codes_title' => 'Recovery codes — save these now, they won\'t be shown again',
 
-        'pending_invite' => 'Pending Invite',
-        'pending_invites' => 'Pending Invites',
+        'pending_confirmation' => 'Pending confirmation',
+        'member_invited' => 'Invitation sent.',
         'expires' => 'expires :time',
 
         'pending_email_change' => 'Pending Email Change',
@@ -189,6 +201,8 @@ return [
         'leave_confirm' => 'Leave the team?',
 
         'error_invalid_name' => 'Please enter your name.',
+        'error_invalid_username' => 'Username must be 3–50 characters: letters, numbers, dots, underscores, or hyphens.',
+        'error_username_already_taken' => 'That username is already taken.',
         'error_invalid_email' => 'Please enter a valid email address.',
         'error_email_already_member' => 'This email is already a member.',
         'error_wrong_password' => 'Your current password was incorrect.',
@@ -202,6 +216,7 @@ return [
 
     'auth' => [
         'email' => 'Email',
+        'email_or_username' => 'Email or username',
         'password' => 'Password',
         'name' => 'Name',
         'confirm_password' => 'Confirm password',
@@ -236,6 +251,12 @@ return [
 
         'set_up' => 'Set up',
         'create_owner_account' => 'Create the owner account',
+        'setup_hint' => 'This is the first sign-in — the account you create here becomes the owner.',
+        'verify_server_access' => 'Verify server access',
+        'verify_server_access_hint' => 'Run this command on the server to generate a one-time code, then paste it below.',
+        'setup_code' => 'Setup code',
+        'verify_code_button' => 'Verify code',
+        'setup_code_invalid' => 'This code is invalid or has expired.',
     ],
 
     'email' => [
@@ -258,6 +279,7 @@ return [
         'duration' => 'Duration',
         'connection' => 'Connection',
         'file' => 'File',
+        'trace' => 'Trace',
         'key' => 'Key',
         'operation' => 'Operation',
         'store' => 'Store',
@@ -391,6 +413,8 @@ return [
         'no_calls_recorded_in_period' => 'No calls recorded in this period.',
         'no_individual_requests_recorded_in_period' => 'No individual requests recorded in this period.',
         'no_logins_in_period' => 'No logins in this period.',
+        'period_phrase' => 'in the last :duration',
+        'period_phrase_custom' => 'in the selected range',
         'command' => 'Command',
         'query' => 'Query',
         'calls' => 'Calls',
@@ -417,6 +441,8 @@ return [
         'attempt_count' => 'Attempt count',
         'open_request' => 'Open timeline',
         'open_mail' => 'Open mail',
+        'open_outgoing_request' => 'Open request',
+        'open_notification' => 'Open notification',
         'user_count' => 'user|users',
         'route_count' => 'route|routes',
         'second_count' => 'second|seconds',

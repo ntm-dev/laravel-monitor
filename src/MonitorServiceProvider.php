@@ -353,6 +353,7 @@ class MonitorServiceProvider extends ServiceProvider
             Commands\PruneCommand::class,
             Commands\ClearCommand::class,
             Commands\AggregateCommand::class,
+            Commands\SetupCodeCommand::class,
         ]);
     }
 
