@@ -21,6 +21,16 @@ interface TimelineStorage
      * (e.g. every "ok" status group for a status filter tab). $minDuration
      * keeps only entries whose own duration is at or above it (a duration
      * filter tab).
+     *
+     * $beforeId/$afterId are a keyset cursor (the id of an already-fetched
+     * row), for callers paging an infinite-scroll list instead of a numbered
+     * $offset — a growing $offset re-scans and re-transfers every row already
+     * shown each time the list grows, where an id cursor only touches the
+     * rows on the new side of it. $beforeId keeps only entries older than
+     * that row (paging further down); $afterId keeps only entries newer than
+     * it (topping the list up with anything inserted since). id order is a
+     * safe cursor here: it's an auto-increment PK on an insert-only table, so
+     * it tracks created_at (this method's own sort key) exactly.
      */
     public function recent(
         string $type,
@@ -32,6 +42,8 @@ interface TimelineStorage
         int $offset = 0,
         ?float $minDuration = null,
         int|string|null $userId = null,
+        ?int $beforeId = null,
+        ?int $afterId = null,
     ): Collection;
 
     /**

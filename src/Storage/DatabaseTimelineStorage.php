@@ -25,8 +25,12 @@ class DatabaseTimelineStorage implements TimelineStorage
         int $offset = 0,
         ?float $minDuration = null,
         int|string|null $userId = null,
+        ?int $beforeId = null,
+        ?int $afterId = null,
     ): Collection {
         return $this->query($type, $since, $subtype, $key, $until, $userId, $minDuration)
+            ->when($beforeId !== null, fn (Builder $query) => $query->where('id', '<', $beforeId))
+            ->when($afterId !== null, fn (Builder $query) => $query->where('id', '>', $afterId))
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->offset($offset)

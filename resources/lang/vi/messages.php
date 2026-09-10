@@ -342,6 +342,7 @@ return [
         'vendor_frames' => 'khung vendor',
         'json_items' => 'mục',
         'loading_more' => 'Đang tải thêm',
+        'scroll_to_top' => 'Lên đầu trang',
         'copied' => 'Đã sao chép!',
         'copy_as_markdown' => 'Sao chép dạng Markdown',
 

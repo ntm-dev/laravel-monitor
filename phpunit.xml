@@ -13,4 +13,13 @@
             <directory>src</directory>
         </include>
     </source>
+    <php>
+        <!--
+            Testbench logs every PHP deprecation by default, and the Logs recorder
+            records anything logged — so a vendor deprecation (Livewire 3.6.4's test
+            helper writing a dynamic property on PHP 8.2+) lands in monitor_entries
+            next to the entries a test recorded itself.
+        -->
+        <env name="LOG_DEPRECATIONS_WHILE_TESTING" value="false"/>
+    </php>
 </phpunit>
