@@ -9,6 +9,18 @@ class SettingsTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * TestCase force-enables the heavy recorders via this same override
+     * file for every test — reset it so "nothing saved yet" assertions here
+     * describe Settings in isolation, not layered on that baseline.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Settings::reset();
+    }
+
     protected function tearDown(): void
     {
         Settings::reset();

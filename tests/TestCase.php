@@ -11,8 +11,6 @@ use LaravelMonitor\MonitorServiceProvider;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
-use function putenv;
-
 abstract class TestCase extends Orchestra
 {
     /**
@@ -148,17 +146,51 @@ abstract class TestCase extends Orchestra
         // Belt-and-suspenders alongside MonitorServiceProvider::boot(): keep the dashboard
         // tests immune to Livewire's smart_wire_keys bug even if provider boot order changes.
         $app['config']->set('livewire.smart_wire_keys', false);
+    }
 
-        // config/monitor.php only enables the heavy recorders (Requests/Queries/
-        // Models/CacheInteractions) by default in the local environment. This
-        // runs before that file is `require`d by MonitorServiceProvider's
-        // mergeConfigFrom(), so force them on via their env-var override (the
-        // highest-priority path config/monitor.php itself already documents)
-        // rather than depend on Testbench's own environment name.
-        foreach (['MONITOR_REQUESTS_ENABLED', 'MONITOR_SLOW_QUERIES_ENABLED', 'MONITOR_MODELS_ENABLED', 'MONITOR_CACHE_ENABLED'] as $envVar) {
-            putenv("{$envVar}=true");
-            $_ENV[$envVar] = 'true';
-            $_SERVER[$envVar] = 'true';
+    /**
+     * Testbench registers providers (MonitorServiceProvider::register(), which
+     * calls Settings::apply()) *before* calling defineEnvironment() — so the
+     * heavy-recorder override has to be written here instead, the latest hook
+     * that still runs early enough for this test's own boot to see it.
+     */
+    protected function resolveApplicationEnvironmentVariables($app): void
+    {
+        parent::resolveApplicationEnvironmentVariables($app);
+
+        $this->writeSettingsOverride($app, [
+            'recorders' => [
+                'Requests' => true,
+                'Queries' => true,
+                'Models' => true,
+                'CacheInteractions' => true,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    protected function writeSettingsOverride($app, array $values): void
+    {
+        $path = $app->bootstrapPath('cache/monitor-settings.php');
+        $dir = dirname($path);
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
         }
+
+        $existing = is_file($path) ? (require $path) : [];
+        $merged = array_replace_recursive(is_array($existing) ? $existing : [], $values);
+
+        // Same technique as Settings::write(): a temp file + atomic rename(),
+        // so a require() landing mid-write never sees a half-written array.
+        $tmp = $path.'.'.uniqid('', true).'.tmp';
+        file_put_contents($tmp, '<?php'.PHP_EOL.PHP_EOL.'return '.var_export($merged, true).';'.PHP_EOL, LOCK_EX);
+        rename($tmp, $path);
+
+        // Seed Settings::$cache directly rather than relying on Settings::apply()
+        // (called moments later) to require() this file back off disk in time.
+        (new \ReflectionProperty(\LaravelMonitor\Support\Settings::class, 'cache'))->setValue(null, $merged);
     }
 }

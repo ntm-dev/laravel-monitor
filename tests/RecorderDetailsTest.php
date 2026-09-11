@@ -13,35 +13,37 @@ use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use LaravelMonitor\Facades\Monitor;
-use LaravelMonitor\Recorders\Jobs;
-use LaravelMonitor\Recorders\Mail;
-use LaravelMonitor\Recorders\Notifications;
-use LaravelMonitor\Recorders\OutgoingRequests;
-use LaravelMonitor\Recorders\Queries;
 use ReflectionClass;
 use Symfony\Component\Mime\Email;
 
 /**
- * config/monitor.php's recorders.*.details toggles (Queries/Jobs/
- * OutgoingRequests' "trace", OutgoingRequests/Mail's "record_body",
- * Notifications' "record_data") — all off by default outside local (see
- * Settings::RECORDER_DETAILS), captured only once explicitly enabled.
+ * config/monitor.php's recorders.*.details toggles — off by default outside
+ * local (Settings::RECORDER_DETAILS) — need forcing on before boot via
+ * TestCase::writeSettingsOverride(), since a config() call from inside a
+ * test body never reaches the already-constructed Recorder instance.
  */
 class RecorderDetailsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_query_trace_is_only_captured_once_its_detail_toggle_is_on(): void
+    protected function resolveApplicationEnvironmentVariables($app): void
+    {
+        parent::resolveApplicationEnvironmentVariables($app);
+
+        $this->writeSettingsOverride($app, [
+            'recorder_details' => [
+                'Queries' => ['trace' => true],
+                'Jobs' => ['trace' => true],
+                'OutgoingRequests' => ['trace' => true, 'record_body' => true],
+                'Mail' => ['record_body' => true],
+                'Notifications' => ['record_data' => true],
+            ],
+        ]);
+    }
+
+    public function test_query_trace_is_captured_once_its_detail_toggle_is_on(): void
     {
         event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
-        Monitor::flush();
-
-        $this->assertNull($this->latestPayload('query')['trace']);
-
-        DB::table('monitor_entries')->delete();
-        config(['monitor.recorders.'.Queries::class.'.details.trace' => true]);
-
-        event(new QueryExecuted('select * from posts', [], 5.0, DB::connection()));
         Monitor::flush();
 
         $trace = $this->latestPayload('query')['trace'];
@@ -52,8 +54,6 @@ class RecorderDetailsTest extends TestCase
 
     public function test_job_trace_is_captured_once_its_detail_toggle_is_on(): void
     {
-        config(['monitor.recorders.'.Jobs::class.'.details.trace' => true]);
-
         event($this->queuedEvent());
         Monitor::flush();
 
@@ -65,11 +65,6 @@ class RecorderDetailsTest extends TestCase
 
     public function test_outgoing_request_trace_and_body_are_captured_once_enabled(): void
     {
-        config([
-            'monitor.recorders.'.OutgoingRequests::class.'.details.trace' => true,
-            'monitor.recorders.'.OutgoingRequests::class.'.details.record_body' => true,
-        ]);
-
         Http::fake(['*' => Http::response(['ok' => true], 200)]);
 
         Http::post('https://api.example.test/orders', ['token' => 'shh', 'amount' => 10]);
@@ -85,8 +80,6 @@ class RecorderDetailsTest extends TestCase
 
     public function test_mail_body_is_captured_once_its_detail_toggle_is_on(): void
     {
-        config(['monitor.recorders.'.Mail::class.'.details.record_body' => true]);
-
         $email = new Email;
         $email->subject('Welcome')->to('a@b.com')->from('noreply@x.com')->html('<p>Hello there</p>');
 
@@ -99,8 +92,6 @@ class RecorderDetailsTest extends TestCase
 
     public function test_notification_data_is_captured_once_its_detail_toggle_is_on(): void
     {
-        config(['monitor.recorders.'.Notifications::class.'.details.record_data' => true]);
-
         $notifiable = new class {};
         $notification = new class
         {
