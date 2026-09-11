@@ -2983,12 +2983,16 @@ class MonitorTest extends TestCase
 
         $code = \LaravelMonitor\Support\SetupCode::generate();
 
-        CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinutes(11));
+        // SetupCode reads time via Illuminate\Support\Carbon (mutable), not
+        // CarbonImmutable — on Carbon versions where the two don't share a
+        // test-now clock, faking only CarbonImmutable leaves it seeing the
+        // real, still-valid time.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::now()->addMinutes(11));
 
         $this->post('/monitor/setup/verify-code', ['code' => $code])
             ->assertSessionHasErrors('code');
 
-        CarbonImmutable::setTestNow();
+        \Illuminate\Support\Carbon::setTestNow();
     }
 
     public function test_setup_store_is_blocked_without_verifying_the_code_first(): void
