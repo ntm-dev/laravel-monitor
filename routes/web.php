@@ -25,6 +25,7 @@ Route::domain(config('monitor.domain'))
     ->prefix(config('monitor.path', 'monitor'))
     ->group(function () {
         Route::get('/setup', [SetupController::class, 'show'])->name('monitor.setup');
+        Route::post('/setup/verify-code', [SetupController::class, 'verifyCode'])->middleware('throttle:10,1')->name('monitor.setup.verify-code');
         Route::post('/setup', [SetupController::class, 'store'])->name('monitor.setup.store');
         Route::get('/login', [LoginController::class, 'show'])->name('monitor.login');
         Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:10,1')->name('monitor.login.store');
@@ -147,6 +148,7 @@ Route::domain(config('monitor.domain'))
                     ->name("monitor.{$groupTab}.sends.show");
             }
 
+            Route::post('/settings/preferences', [SettingsController::class, 'preferences'])->name('monitor.settings.preferences');
             Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');
             Route::post('/settings/reset', [SettingsController::class, 'reset'])->name('monitor.settings.reset');
             Route::post('/webauthn/register/options', [WebauthnController::class, 'registerOptions'])->name('monitor.webauthn.register.options');

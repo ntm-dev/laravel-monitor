@@ -146,6 +146,18 @@
                             x-text="truncatedPath(selected()?.metadata?.location)"></dd>
                     </div>
                 </template>
+                {{-- Full call stack (Recorders\Queries' 'trace' detail
+                     option — off by default, see Settings::RECORDER_DETAILS).
+                     Shown inline, not collapsed: this panel is already a
+                     one-entry-at-a-time view, unlike Query Detail's table
+                     of every occurrence. --}}
+                <template x-if="selected()?.metadata?.trace">
+                    <div class="px-4 py-2.5 text-xs">
+                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                            x-text="selected()?.metadata?.trace"></dd>
+                    </div>
+                </template>
             </dl>
         </template>
 
@@ -333,6 +345,15 @@
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                         :data-tooltip="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
                 </div>
+                {{-- Full call stack (OutgoingRequests' 'trace' detail option
+                     — off by default, see Settings::RECORDER_DETAILS). --}}
+                <template x-if="selected()?.metadata?.trace">
+                    <div class="px-4 py-2.5 text-xs">
+                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                            x-text="selected()?.metadata?.trace"></dd>
+                    </div>
+                </template>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
@@ -409,6 +430,17 @@
                         <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
                             style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.location"
                             x-text="truncatedPath(selected()?.metadata?.location)"></dd>
+                    </div>
+                </template>
+                {{-- Full call stack (Recorders\Jobs' 'trace' detail option —
+                     off by default, see Settings::RECORDER_DETAILS). Only
+                     ever set on the dispatch ('queued') row, same as location
+                     above. --}}
+                <template x-if="selected()?.metadata?.trace">
+                    <div class="px-4 py-2.5 text-xs">
+                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                            x-text="selected()?.metadata?.trace"></dd>
                     </div>
                 </template>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">

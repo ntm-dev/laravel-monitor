@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  */
 class MonitorUser extends Authenticatable
 {
-    protected $fillable = ['name', 'email', 'password', 'role', 'totp_secret', 'totp_enabled_at', 'totp_recovery_codes'];
+    protected $fillable = ['name', 'email', 'username', 'password', 'role', 'totp_secret', 'totp_enabled_at', 'totp_recovery_codes'];
 
     protected $hidden = ['password', 'totp_secret', 'totp_recovery_codes'];
 

@@ -6,6 +6,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Sql;
+use LaravelMonitor\Support\Trace;
 
 class Queries extends Recorder
 {
@@ -57,6 +58,7 @@ class Queries extends Recorder
                 // already carries request_id and the Query Detail page
                 // resolves that back to "METHOD /path" itself.
                 'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
+                'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
             ],
             duration: $event->time,
         );

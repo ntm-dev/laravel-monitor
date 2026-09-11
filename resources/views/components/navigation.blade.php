@@ -103,9 +103,9 @@
                    :class="{{ $classExpr('group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm', $tabKey, $linkActiveClasses, $linkInactiveClasses) }}">
                     <x-monitor::icon :path="$item['icon']" x-bind:class="{{ $classExpr('h-4 w-4 shrink-0', $tabKey, $iconActiveClasses, $iconInactiveClasses) }}"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
-                    @if ($tab === $tabKey && $tabKey !== 'settings' && $autoRefreshes)
-                        {{-- Settings never polls — it's a static config form,
-                             nothing there refreshes even while active. --}}
+                    @if ($tab === $tabKey && ! in_array($tabKey, ['settings', 'team'], true) && $autoRefreshes)
+                        {{-- Settings/Team never poll — static config and
+                             in-progress edit forms, nothing there refreshes. --}}
                         <span class="monitor-nav-label">
                             <x-monitor::refresh-ring :refresh="$refresh"/>
                         </span>

@@ -59,6 +59,15 @@ a comment explaining Blade's comment syntax itself) — Blade just does a substr
 next `--}}` to find the end, so that inner occurrence closes the comment early and dumps the rest
 of the intended comment text onto the page as visible content.
 
+**A `{{-- ... --}}` Blade comment written inside an `@php ... @endphp` block is not valid PHP.**
+Everything between `@php`/`@endphp` compiles straight into a raw `<?php ... ?>` block — Blade's
+comment stripping doesn't run there, so `{{--` is just two `{` tokens PHP can't parse. Worse,
+**`php -l` on the raw `.blade.php` file never catches this** (verified: it reports "No syntax
+errors" even for a `@php` block with an unmatched paren) — the file has no literal `<?php ?>`
+tags for PHP's own lexer to find, so the whole file, `@php` blocks included, is inert text to
+`php -l`. Only the IDE's own Blade-aware diagnostics catch it. Use a plain `//` comment for
+anything written inside a `@php` block instead. Bit us once in `settings.blade.php`.
+
 **A `//`/`/* */` JS comment inside an HTML attribute value (`x-data="{ ... }"`, any other
 Alpine `x-`/`:`-bound attribute) is one stray `"` or `@word` away from corrupting the page.**
 The attribute is still HTML-parsed even though its content is JS: a literal double-quote ends

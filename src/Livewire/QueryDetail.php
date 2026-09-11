@@ -81,6 +81,10 @@ class QueryDetail extends Card
         // to $key only when no entry is loaded to take it from.
         $latest = $timelineStorage->recent('query', $since, 1, null, $key, $until)->first();
         $sql = $latest !== null ? ($latest->payload['sql'] ?? $key) : $key;
+        // Same "most recent call" source as $sql above — the 'trace' detail
+        // option (Settings::RECORDER_DETAILS) is off by default, so this is
+        // usually null.
+        $trace = $latest !== null ? ($latest->payload['trace'] ?? null) : null;
 
         // Recorders\Queries no longer tags a slow/fast subtype at record
         // time (a config change after the fact would leave old rows
@@ -96,6 +100,7 @@ class QueryDetail extends Card
             'duration' => $storage->durationStats('query', $since, $buckets, $key, null, $until),
             'entries' => $entries,
             'sql' => $sql,
+            'trace' => $trace,
             'firstSeen' => $timelineStorage->firstSeen('query', $key),
             // Derived from the loaded page of entries (not the full period)
             // — a quick summary, not an exhaustive audit. One row per

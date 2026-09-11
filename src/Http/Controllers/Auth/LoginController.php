@@ -7,6 +7,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use LaravelMonitor\Models\MonitorUser;
 
@@ -20,17 +21,22 @@ class LoginController
     public function store(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = MonitorUser::query()->where('email', $credentials['email'])->first();
+        // A single "email or username" field: username is optional per
+        // MonitorUser, so most accounts only ever match on email.
+        $user = MonitorUser::query()
+            ->where('email', $credentials['login'])
+            ->orWhere('username', $credentials['login'])
+            ->first();
 
-        if ($user === null || ! Auth::guard(MonitorUser::guardName())->validate($credentials)) {
+        if ($user === null || ! Hash::check($credentials['password'], $user->password)) {
             event(new Failed(MonitorUser::guardName(), $user, $credentials));
 
             throw ValidationException::withMessages([
-                'email' => 'These credentials do not match our records.',
+                'login' => 'These credentials do not match our records.',
             ]);
         }
 

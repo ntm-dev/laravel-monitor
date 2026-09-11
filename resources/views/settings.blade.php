@@ -1,18 +1,21 @@
-{{-- Settings page — one form saves everything:
-     - per-viewer display preferences (theme/language/timezone) → cookie, and
-     - app-wide Environment + Recorders overrides over config/monitor.php,
-       persisted server-side via Support\Settings (a saved value wins; anything
-       left untouched keeps following the config file).
+{{-- Settings page — two separate forms:
+     - Preferences (theme/language/timezone) → cookie, own form, open to
+       any signed-in viewer — a personal display choice, not a team setting.
+     - Environment + Recorders overrides over config/monitor.php → stored
+       server-side via Support\Settings, gated to $canManageSettings.
      Data prepared by Http\Controllers\DashboardController. --}}
 @php
     $rowClass = 'flex items-center justify-between gap-4 py-2.5';
     $labelClass = 'text-sm text-neutral-700 dark:text-neutral-300';
+    // Shared disabled look for every text/number/select field below (a
+    // viewer's read-only <fieldset>), not just the browser's own default.
+    $disabledClass = 'disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-neutral-800/60 dark:disabled:text-neutral-500';
     $fieldClass =
-        'w-44 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        "w-44 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {$disabledClass}";
     $numClass =
-        'w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-right font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        "w-24 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-right font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {$disabledClass}";
     $periodInput =
-        'rounded-md border border-neutral-200 bg-white px-2 py-1.5 font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+        "rounded-md border border-neutral-200 bg-white px-2 py-1.5 font-mono text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {$disabledClass}";
     $periodItems = collect($system['periods'])
         ->map(fn($hours, $label) => ['label' => (string) $label, 'hours' => $hours])
         ->values();
@@ -30,10 +33,11 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']) }" class="space-y-4">
+    {{-- Preferences: own form, own submit — every viewer can save this,
+         regardless of $canManageSettings. --}}
+    <form method="POST" action="{{ route('monitor.settings.preferences') }}" x-data="{ theme: '{{ $prefs['theme'] }}' }" class="space-y-4">
         @csrf
 
-        {{-- Per-viewer preferences (cookie) --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
@@ -129,6 +133,23 @@
             </div>
         </x-monitor::section>
 
+        <div class="flex items-center justify-end gap-2">
+            <button type="submit"
+                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_preferences') }}</button>
+        </div>
+    </form>
+
+    @unless ($canManageSettings)
+        <div class="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300">
+            {{ __('monitor::messages.settings.viewer_read_only') }}
+        </div>
+    @endunless
+
+    {{-- Environment + Recorders + Threshold: own form, gated to
+         $canManageSettings — app-wide config, not a personal preference. --}}
+    <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ recordingEnabled: @js($system['enabled']) }" class="space-y-4">
+        @csrf
+
         {{-- App-wide environment (config overrides) --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }" :collapsible="true">
             <x-slot:actions>
@@ -138,6 +159,7 @@
                 x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 -translate-y-2">
+            <fieldset @disabled(! $canManageSettings) class="contents">
             <x-monitor::card class="p-4">
                 <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
@@ -156,27 +178,66 @@
                         <label class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.recorders') }}</label>
                         <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
                             {{ __('monitor::messages.settings.recorders_hint') }}</p>
-                        <div class="grid gap-x-8 sm:grid-cols-2">
-                            @foreach ($system['recorders'] as $recorder)
-                                <div
-                                    class="flex items-center justify-between gap-4 border-b border-neutral-100 py-2.5 dark:border-neutral-800">
-                                    <span class="flex min-w-0 items-center gap-2 font-mono text-xs text-neutral-700 dark:text-neutral-300">
-                                        <x-monitor::icon :path="$recorder['icon']" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
-                                        <span class="truncate">{{ $recorder['name'] }}</span>
-                                    </span>
-                                    <x-monitor::toggle name="recorders[{{ $recorder['name'] }}]" :checked="$recorder['enabled']" />
+                        {{-- One consolidated notice (Settings::recordersWarning()) instead of
+                             a warning line repeated under every heavy toggle below. --}}
+                        <p class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+                            {{ $system['recordersWarning'] }}</p>
+                        {{-- Independent flex columns (Settings::recorderColumns()), not a
+                             CSS grid pairing left/right by row: a recorder whose detail
+                             toggles push it taller would otherwise stretch its unrelated
+                             row-mate on the other side too, since grid rows size to their
+                             tallest cell. --}}
+                        <div class="flex flex-col gap-x-8 sm:flex-row">
+                            {{-- start recorder toggle column --}}
+                            @foreach ($system['recorderColumns'] as $column)
+                                <div class="flex flex-1 flex-col">
+                                    @foreach ($column as $recorder)
+                                        <div class="border-b border-neutral-100 py-2.5 dark:border-neutral-800" x-data="{ enabled: {{ $recorder['enabled'] ? 'true' : 'false' }} }">
+                                            <div class="flex items-center justify-between gap-4">
+                                                <span class="flex min-w-0 items-center gap-2 font-mono text-xs text-neutral-700 dark:text-neutral-300">
+                                                    <x-monitor::icon :path="$recorder['icon']" class="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-500"/>
+                                                    <span class="truncate">{{ $recorder['name'] }}</span>
+                                                </span>
+                                                <x-monitor::toggle name="recorders[{{ $recorder['name'] }}]" :checked="$recorder['enabled']" x-model="enabled" />
+                                            </div>
+                                            @if ($recorder['details'] !== [])
+                                                {{-- start recorder detail toggle row --}}
+                                                <div x-show="enabled" x-cloak class="mt-2 flex flex-col gap-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
+                                                    @foreach ($recorder['details'] as $detail)
+                                                        <div>
+                                                            <div class="flex items-center justify-between gap-4">
+                                                                <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $detail['label'] }}</span>
+                                                                <x-monitor::toggle name="recorder_details[{{ $recorder['name'] }}][{{ $detail['key'] }}]" :checked="$detail['enabled']" />
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                                {{-- end recorder detail toggle row --}}
+                                            @endif
+                                        </div>
+                                    @endforeach
                                 </div>
                             @endforeach
+                            {{-- end recorder toggle column --}}
                         </div>
                     </div>
 
-                    <div class="{{ $rowClass }}">
-                        <label for="s-table"
-                            class="{{ $labelClass }}">{{ __('monitor::messages.settings.database_table') }}</label>
-                        <input id="s-table" name="database_table"
-                            value="{{ old('database_table', $system['database_table']) }}"
-                            class="{{ $fieldClass }} font-mono">
+                    {{-- start table prefix preview --}}
+                    <div class="py-2.5" x-data="{ prefix: @js(old('table_prefix', $system['table_prefix'])), suffixes: @js($system['tableSuffixes']) }">
+                        <div class="flex items-center justify-between gap-4">
+                            <label for="s-table" class="{{ $labelClass }}">{{ __('monitor::messages.settings.table_prefix') }}</label>
+                            <input id="s-table" name="table_prefix" x-model="prefix"
+                                value="{{ old('table_prefix', $system['table_prefix']) }}"
+                                class="{{ $fieldClass }} font-mono">
+                        </div>
+                        <p class="mb-1.5 mt-2 text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.table_prefix_hint') }}</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            <template x-for="suffix in suffixes" :key="suffix">
+                                <span class="rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300" x-text="prefix + suffix"></span>
+                            </template>
+                        </div>
                     </div>
+                    {{-- end table prefix preview --}}
 
                     <div class="{{ $rowClass }}">
                         <label for="s-path"
@@ -227,11 +288,13 @@
                                 </div>
                             </template>
                         </div>
-                        <button type="button" @click="items.push({ label: '', hours: '' })"
-                            class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
-                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::PLUS" :stroke="2"
-                                class="h-3.5 w-3.5" />{{ __('monitor::messages.settings.add_period') }}
-                        </button>
+                        @if ($canManageSettings)
+                            <button type="button" @click="items.push({ label: '', hours: '' })"
+                                class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::PLUS" :stroke="2"
+                                    class="h-3.5 w-3.5" />{{ __('monitor::messages.settings.add_period') }}
+                            </button>
+                        @endif
                         <p class="mt-1.5 text-xs text-neutral-400 dark:text-neutral-500">
                             {{ __('monitor::messages.settings.periods_help') }}</p>
                     </div>
@@ -239,6 +302,7 @@
                 <p class="mt-3 text-[11px] text-neutral-400 dark:text-neutral-500">
                     {{ __('monitor::messages.settings.storage_note') }}</p>
             </x-monitor::card>
+            </fieldset>
             </div>
         </x-monitor::section>
 
@@ -251,6 +315,7 @@
                 x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 -translate-y-2">
+            <fieldset @disabled(! $canManageSettings) class="contents">
             <x-monitor::card class="p-4">
                 <p class="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
                     {{ __('monitor::messages.settings.environment_editable_hint') }}</p>
@@ -300,15 +365,18 @@
                     </div>
                 </div>
             </x-monitor::card>
+            </fieldset>
             </div>
         </x-monitor::section>
 
-        <div class="flex items-center justify-end gap-2">
-            <button type="submit" formnovalidate formaction="{{ route('monitor.settings.reset') }}"
-                class="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">{{ __('monitor::messages.settings.reset') }}</button>
-            <button type="submit"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
-        </div>
+        @if ($canManageSettings)
+            <div class="flex items-center justify-end gap-2">
+                <button type="submit" formnovalidate formaction="{{ route('monitor.settings.reset') }}"
+                    class="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">{{ __('monitor::messages.settings.reset') }}</button>
+                <button type="submit"
+                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
+            </div>
+        @endif
     </form>
 </div>
 

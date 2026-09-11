@@ -2942,10 +2942,60 @@ class MonitorTest extends TestCase
 
         $this->get('/monitor/setup')
             ->assertOk()
+            ->assertSeeText('Verify server access');
+    }
+
+    public function test_setup_page_shows_the_account_form_after_the_code_is_verified(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $code = \LaravelMonitor\Support\SetupCode::generate();
+
+        $this->post('/monitor/setup/verify-code', ['code' => $code])
+            ->assertRedirect('/monitor/setup');
+
+        $this->get('/monitor/setup')
+            ->assertOk()
             ->assertSeeText('Create the owner account');
     }
 
-    public function test_setup_creates_the_first_user_as_owner_and_logs_them_in(): void
+    public function test_setup_verify_code_rejects_a_wrong_code(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        \LaravelMonitor\Support\SetupCode::generate();
+
+        $this->post('/monitor/setup/verify-code', ['code' => 'WRONG-CODE'])
+            ->assertSessionHasErrors('code');
+
+        $this->get('/monitor/setup')->assertSeeText('Verify server access');
+    }
+
+    public function test_setup_verify_code_rejects_an_expired_code(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $code = \LaravelMonitor\Support\SetupCode::generate();
+
+        // SetupCode reads time via Illuminate\Support\Carbon (mutable), not
+        // CarbonImmutable — on Carbon versions where the two don't share a
+        // test-now clock, faking only CarbonImmutable leaves it seeing the
+        // real, still-valid time.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::now()->addMinutes(11));
+
+        $this->post('/monitor/setup/verify-code', ['code' => $code])
+            ->assertSessionHasErrors('code');
+
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    public function test_setup_store_is_blocked_without_verifying_the_code_first(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
         $this->withoutMonitorAuth();
@@ -2956,7 +3006,28 @@ class MonitorTest extends TestCase
             'email' => 'first-owner@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertRedirect('/monitor');
+        ])->assertRedirect('/monitor/setup');
+
+        $this->assertNull(\LaravelMonitor\Models\MonitorUser::where('email', 'first-owner@example.com')->first());
+    }
+
+    public function test_setup_creates_the_first_user_as_owner_and_logs_them_in(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+        \LaravelMonitor\Models\MonitorUser::query()->delete();
+
+        $code = \LaravelMonitor\Support\SetupCode::generate();
+        $this->post('/monitor/setup/verify-code', ['code' => $code]);
+
+        $previousSessionId = $this->app['session']->getId();
+
+        $this->post('/monitor/setup', [
+            'name' => 'First Owner',
+            'email' => 'first-owner@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertRedirect('/monitor/settings');
 
         $user = \LaravelMonitor\Models\MonitorUser::where('email', 'first-owner@example.com')->first();
 
@@ -2964,6 +3035,7 @@ class MonitorTest extends TestCase
         $this->assertSame('owner', $user->role);
         $this->assertTrue(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
         $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+        $this->assertNotSame($previousSessionId, $this->app['session']->getId());
     }
 
     public function test_setup_is_unreachable_once_a_user_already_exists(): void
@@ -2978,6 +3050,9 @@ class MonitorTest extends TestCase
         ]);
 
         $this->get('/monitor/setup')->assertRedirect('/monitor/login');
+
+        $this->post('/monitor/setup/verify-code', ['code' => 'anything'])
+            ->assertRedirect('/monitor/login');
 
         $this->post('/monitor/setup', [
             'name' => 'Second Owner',
@@ -3019,7 +3094,28 @@ class MonitorTest extends TestCase
         ]);
 
         $this->post('/monitor/login', [
-            'email' => 'login-success@example.com',
+            'login' => 'login-success@example.com',
+            'password' => 'correct-password',
+        ])->assertRedirect('/monitor');
+
+        $this->assertSame($user->id, \Illuminate\Support\Facades\Auth::guard('monitor')->id());
+    }
+
+    public function test_login_with_username_authenticates_and_redirects(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+        $this->withoutMonitorAuth();
+
+        $user = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Username Login',
+            'email' => 'username-login@example.com',
+            'username' => 'username_login',
+            'password' => \Illuminate\Support\Facades\Hash::make('correct-password'),
+            'role' => 'admin',
+        ]);
+
+        $this->post('/monitor/login', [
+            'login' => 'username_login',
             'password' => 'correct-password',
         ])->assertRedirect('/monitor');
 
@@ -3039,9 +3135,9 @@ class MonitorTest extends TestCase
         ]);
 
         $this->post('/monitor/login', [
-            'email' => 'login-failure@example.com',
+            'login' => 'login-failure@example.com',
             'password' => 'wrong-password',
-        ])->assertSessionHasErrors('email');
+        ])->assertSessionHasErrors('login');
 
         $this->assertFalse(\Illuminate\Support\Facades\Auth::guard('monitor')->check());
     }
@@ -3064,9 +3160,9 @@ class MonitorTest extends TestCase
         ]);
 
         $this->post('/monitor/login', [
-            'email' => 'login-failure-recorded@example.com',
+            'login' => 'login-failure-recorded@example.com',
             'password' => 'wrong-password',
-        ])->assertSessionHasErrors('email');
+        ])->assertSessionHasErrors('login');
 
         $this->assertDatabaseMissing('monitor_entries', [
             'type' => 'auth',
@@ -3357,6 +3453,64 @@ class MonitorTest extends TestCase
         $this->actingAs($viewer, 'monitor');
 
         $this->post('/monitor/settings/reset')->assertForbidden();
+    }
+
+    public function test_viewer_sees_settings_as_read_only(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-view-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->get('/monitor/settings')
+            ->assertOk()
+            ->assertSeeText('Your role can view these settings but not change them.');
+    }
+
+    public function test_owner_does_not_see_the_settings_read_only_notice(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/settings')
+            ->assertOk()
+            ->assertDontSeeText('Your role can view these settings but not change them.');
+    }
+
+    public function test_a_viewer_can_save_their_own_preferences(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $viewer = \LaravelMonitor\Models\MonitorUser::create([
+            'name' => 'Viewer',
+            'email' => 'settings-prefs-viewer@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'role' => 'viewer',
+        ]);
+        $this->actingAs($viewer, 'monitor');
+
+        $this->post('/monitor/settings/preferences', [
+            'theme' => 'dark',
+            'locale' => 'en',
+            'timezone' => 'UTC',
+        ])->assertRedirect('/monitor/settings')
+            ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
+    }
+
+    public function test_an_owner_can_still_save_their_own_preferences(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->post('/monitor/settings/preferences', [
+            'theme' => 'dark',
+            'locale' => 'en',
+            'timezone' => 'UTC',
+        ])->assertRedirect('/monitor/settings')
+            ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
     }
 
     public function test_an_admin_can_post_settings_reset(): void

@@ -78,7 +78,10 @@ return [
         'use_browser_timezone' => 'Dùng múi giờ trình duyệt',
 
         'environment_editable_hint' => 'Ghi đè giá trị mặc định trong config/monitor.php. Giá trị đã lưu sẽ được ưu tiên; mục nào chưa đổi vẫn theo file config.',
+        'viewer_read_only' => 'Vai trò của bạn chỉ có thể xem các cài đặt này, không thể thay đổi.',
         'save_system' => 'Lưu cài đặt',
+        'save_preferences' => 'Lưu tuỳ chọn',
+        'preferences_saved' => 'Đã lưu tuỳ chọn.',
         'reset' => 'Khôi phục mặc định',
         'settings_saved' => 'Đã lưu cài đặt.',
         'settings_reset' => 'Đã khôi phục về mặc định config.',
@@ -92,10 +95,15 @@ return [
         'tz_no_match' => 'Không tìm thấy múi giờ.',
         'storage_note' => 'Nâng cao — đổi nơi lưu trữ hoặc đường dẫn dashboard sẽ áp dụng từ request kế tiếp; dashboard tải lại ở URL mới. Đổi nơi lưu trữ có thể khiến dữ liệu cũ tạm không hiển thị cho tới khi bảng mới có dữ liệu.',
         'recorders_hint' => 'Bật/tắt các loại sự kiện được ghi nhận.',
+        'recorders_heavy_warning' => 'Các recorder sau có thể gây tốn hiệu năng đáng kể khi bật: :names. Các tuỳ chọn ghi chi tiết bên dưới (trace, nội dung, dữ liệu) còn tốn hơn nữa.',
+        'recorder_detail_trace' => 'Ghi lại call stack',
+        'recorder_detail_body' => 'Ghi lại nội dung',
+        'recorder_detail_data' => 'Ghi lại dữ liệu',
 
         'recording' => 'Ghi nhận',
         'storage_driver' => 'Trình lưu trữ',
-        'database_table' => 'Bảng cơ sở dữ liệu',
+        'table_prefix' => 'Tiền tố bảng',
+        'table_prefix_hint' => 'Các bảng sẽ được tạo với tiền tố này:',
         'retention' => 'Thời gian lưu',
         'dashboard_path' => 'Đường dẫn bảng điều khiển',
         'dashboard_refresh' => 'Tần suất làm mới',
@@ -113,6 +121,10 @@ return [
         'name' => 'Tên',
         'edit_name' => 'Sửa tên',
         'name_updated' => 'Tên của bạn đã được cập nhật.',
+        'username' => 'Username',
+        'username_not_set' => 'Chưa đặt',
+        'edit_username' => 'Sửa username',
+        'username_updated' => 'Username của bạn đã được cập nhật.',
 
         'email_address' => 'Địa chỉ email',
         'email_change_sent' => 'Đã gửi email xác nhận — vui lòng kiểm tra hộp thư của bạn.',
@@ -151,8 +163,8 @@ return [
 
         'recovery_codes_title' => 'Mã khôi phục — lưu lại ngay, sẽ không hiển thị lại lần nữa',
 
-        'pending_invite' => 'Lời mời đang chờ',
-        'pending_invites' => 'Lời mời đang chờ',
+        'pending_confirmation' => 'Đang chờ xác nhận',
+        'member_invited' => 'Đã gửi lời mời.',
         'expires' => 'hết hạn :time',
 
         'pending_email_change' => 'Yêu cầu đổi email đang chờ',
@@ -189,6 +201,8 @@ return [
         'leave_confirm' => 'Rời khỏi nhóm?',
 
         'error_invalid_name' => 'Vui lòng nhập tên của bạn.',
+        'error_invalid_username' => 'Username phải dài 3–50 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.',
+        'error_username_already_taken' => 'Username này đã có người dùng.',
         'error_invalid_email' => 'Vui lòng nhập một địa chỉ email hợp lệ.',
         'error_email_already_member' => 'Email này đã là thành viên.',
         'error_wrong_password' => 'Mật khẩu hiện tại không đúng.',
@@ -202,6 +216,7 @@ return [
 
     'auth' => [
         'email' => 'Email',
+        'email_or_username' => 'Email hoặc username',
         'password' => 'Mật khẩu',
         'name' => 'Tên',
         'confirm_password' => 'Xác nhận mật khẩu',
@@ -236,6 +251,12 @@ return [
 
         'set_up' => 'Thiết lập',
         'create_owner_account' => 'Tạo tài khoản chủ sở hữu',
+        'setup_hint' => 'Đây là lần đăng nhập đầu tiên — tài khoản bạn tạo ở đây sẽ trở thành chủ sở hữu.',
+        'verify_server_access' => 'Xác minh quyền truy cập server',
+        'verify_server_access_hint' => 'Chạy lệnh sau trên server để tạo mã dùng một lần, sau đó dán mã vào ô bên dưới.',
+        'setup_code' => 'Mã xác minh',
+        'verify_code_button' => 'Xác minh mã',
+        'setup_code_invalid' => 'Mã này không hợp lệ hoặc đã hết hạn.',
     ],
 
     'email' => [
@@ -258,6 +279,7 @@ return [
         'duration' => 'Thời gian',
         'connection' => 'Connection',
         'file' => 'Tệp',
+        'trace' => 'Trace',
         'key' => 'Khóa',
         'operation' => 'Thao tác',
         'store' => 'Store',
@@ -391,6 +413,8 @@ return [
         'no_calls_recorded_in_period' => 'Không có lượt gọi nào được ghi lại trong khoảng thời gian này.',
         'no_individual_requests_recorded_in_period' => 'Không có request riêng lẻ nào được ghi lại trong khoảng thời gian này.',
         'no_logins_in_period' => 'Không có lượt đăng nhập nào trong khoảng thời gian này.',
+        'period_phrase' => 'trong :duration qua',
+        'period_phrase_custom' => 'trong khoảng thời gian đã chọn',
         'command' => 'Command',
         'query' => 'Query',
         'calls' => 'Lượt gọi',
@@ -417,6 +441,8 @@ return [
         'attempt_count' => 'Số lần thử',
         'open_request' => 'Mở dòng thời gian',
         'open_mail' => 'Mở mail',
+        'open_outgoing_request' => 'Mở request',
+        'open_notification' => 'Mở thông báo',
         'user_count' => 'người dùng',
         'route_count' => 'route',
         'second_count' => 'giây',
