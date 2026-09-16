@@ -178,7 +178,7 @@
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
                             @php
-                                $status = (int) ($entry->payload['status'] ?? 0);
+                                $status = (int) ($entry->payload['response']['status'] ?? 0);
                                 $detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => KeyHash::for($entry->key), 'requestId' => $entry->request_id]) : null;
                             @endphp
                             <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
@@ -190,8 +190,8 @@
                                     @endif
                                     <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span>
                                 </td>
-                                <td class="py-2 pr-3 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($entry->payload['method'] ?? null) }}">{{ $entry->payload['method'] ?? '—' }}</td>
-                                <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['path'] ?? '—' }}</td>
+                                <td class="py-2 pr-3 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($entry->payload['request']['method'] ?? null) }}">{{ $entry->payload['request']['method'] ?? '—' }}</td>
+                                <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['request']['path'] ?? '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($entry->duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
                             </tr>

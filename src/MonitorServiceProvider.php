@@ -43,11 +43,29 @@ class MonitorServiceProvider extends ServiceProvider
             Support\Settings::apply();
             if ($this->app['config']->get('monitor.enabled', false)) {
                 $this->registerBindings();
-                $this->registerResources();
+                // Always loaded: host code may generate monitor URLs, and route:cache needs them.
+                $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+
+                $monitor = $this->app->make(Monitor::class);
+                $monitor->timestamp($this->timestamp);
+
+                // The dashboard's own request records nothing (every recorder
+                // either ignores it or would only store its own noise), so no
+                // recorder, lifecycle hook or flush is registered for it.
+                if (! $this->app->runningInConsole() && $monitor->isSelfRequest()) {
+                    $this->registerSelfHooks();
+
+                    return;
+                }
+
                 $this->registerRecorders();
+
                 if (!$this->app->runningInConsole()) {
                     $this->registerRequestHooks();
                 } else {
+                    // Console still renders views: queued monitor mail, view:cache, tests.
+                    $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+                    $this->registerViewResources();
                     $this->registerConsoleHooks();
                 }
 
@@ -60,9 +78,7 @@ class MonitorServiceProvider extends ServiceProvider
                 // above), which marks End first; flushing here too would
                 // run *before* that hook can, persisting the entry before
                 // End is ever marked.
-                $this->app->terminating(function () {
-                    $monitor = $this->app->make(Monitor::class);
-
+                $this->app->terminating(function () use ($monitor) {
                     if ($monitor->hasTrackedExecution()) {
                         return;
                     }
@@ -96,14 +112,14 @@ class MonitorServiceProvider extends ServiceProvider
 
         $config = fn ($app) => $app['config']->get('monitor.storage.database', []);
 
-        $this->app->singleton(EntryWriter::class, fn ($app) => new DatabaseEntryWriter($app['db'], $config($app)));
-        $this->app->singleton(AggregateStorage::class, fn ($app) => new DatabaseAggregateStorage($app['db'], $config($app)));
-        $this->app->singleton(TimelineStorage::class, fn ($app) => new DatabaseTimelineStorage($app['db'], $config($app)));
-        $this->app->singleton(UserStorage::class, fn ($app) => new DatabaseUserStorage($app['db'], $config($app)));
-        $this->app->singleton(CacheAndQueryStorage::class, fn ($app) => new DatabaseCacheAndQueryStorage($app['db'], $config($app)));
-        $this->app->singleton(ExceptionStorage::class, fn ($app) => new DatabaseExceptionStorage($app['db'], $config($app)));
-        $this->app->singleton(IssueStorage::class, fn ($app) => new DatabaseIssueStorage($app['db'], $config($app)));
-        $this->app->singleton(HashResolver::class, fn ($app) => new DatabaseHashResolver($app['db'], $config($app)));
+        $this->app->singleton(EntryWriter::class, static fn ($app) => new DatabaseEntryWriter($app['db'], $config($app)));
+        $this->app->singleton(AggregateStorage::class, static fn ($app) => new DatabaseAggregateStorage($app['db'], $config($app)));
+        $this->app->singleton(TimelineStorage::class, static fn ($app) => new DatabaseTimelineStorage($app['db'], $config($app)));
+        $this->app->singleton(UserStorage::class, static fn ($app) => new DatabaseUserStorage($app['db'], $config($app)));
+        $this->app->singleton(CacheAndQueryStorage::class, static fn ($app) => new DatabaseCacheAndQueryStorage($app['db'], $config($app)));
+        $this->app->singleton(ExceptionStorage::class, static fn ($app) => new DatabaseExceptionStorage($app['db'], $config($app)));
+        $this->app->singleton(IssueStorage::class, static fn ($app) => new DatabaseIssueStorage($app['db'], $config($app)));
+        $this->app->singleton(HashResolver::class, static fn ($app) => new DatabaseHashResolver($app['db'], $config($app)));
     }
 
     private function captureTimestamp(): void
@@ -120,15 +136,20 @@ class MonitorServiceProvider extends ServiceProvider
             if (!$this->app['config']->get('monitor.enabled', false)) {
                 return;
             }
-        $this->registerAppleOAuthDriver();
+            // Both only concern the dashboard itself: the Apple driver backs
+            // monitor's own OAuth login, and smart_wire_keys must stay untouched
+            // for the host app's own Livewire components.
+            if (! $this->app->runningInConsole() && $this->app->make(Monitor::class)->isSelfRequest()) {
+                $this->registerAppleOAuthDriver();
 
-        // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
-        // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
-        // certain dependency combinations that static stack gets unbalanced and array_pop() on
-        // an empty stack returns null, crashing the next loop with "Trying to access array
-        // offset on null" (hit on the dashboard's nested @for/@foreach chart component). The
-        // dashboard's lists don't need Livewire's implicit wire:key diffing, so disable it.
-        config(['livewire.smart_wire_keys' => false]);
+                // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
+                // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
+                // certain dependency combinations that static stack gets unbalanced and array_pop() on
+                // an empty stack returns null, crashing the next loop with "Trying to access array
+                // offset on null" (hit on the dashboard's nested @for/@foreach chart component). The
+                // dashboard's lists don't need Livewire's implicit wire:key diffing, so disable it.
+                config(['livewire.smart_wire_keys' => false]);
+            }
 
             if ($this->app->runningInConsole()) {
                 $this->registerPublications();
@@ -158,20 +179,18 @@ class MonitorServiceProvider extends ServiceProvider
         ], 'monitor-lang');
     }
 
-    protected function registerResources(): void
+    /** Translations, views and Blade components — only needed where monitor pages or mail render. */
+    protected function registerViewResources(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'monitor');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'monitor');
         Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'monitor');
         Blade::componentNamespace('LaravelMonitor\\View\\Components', 'monitor');
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
     }
 
     protected function registerRecorders(): void
     {
         $monitor = $this->app->make(Monitor::class);
-        $monitor->timestamp($this->timestamp);
         $events = $this->app->make(Dispatcher::class);
 
         foreach ($this->app['config']->get('monitor.recorders', []) as $recorder => $config) {
@@ -198,6 +217,7 @@ class MonitorServiceProvider extends ServiceProvider
     protected function registerRequestHooks(): void
     {
         $monitor = $this->app->make(Monitor::class);
+
         $this->app->booted($monitor->beginRequest(...));
         $events = $this->app->make(Dispatcher::class);
 
@@ -243,7 +263,11 @@ class MonitorServiceProvider extends ServiceProvider
 
             $kernel->whenRequestLifecycleIsLongerThan(-1, $this->app->make(RequestLifecycleEndHook::class));
         });
+    }
 
+    private function registerSelfHooks(): void
+    {
+        $this->registerViewResources();
         $this->registerLivewireComponents();
         $this->registerAuthorization();
         $this->registerAuth();

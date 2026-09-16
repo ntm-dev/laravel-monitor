@@ -58,7 +58,7 @@ class NestedJobDispatchTest extends TestCase
         $requestId = (string) Str::uuid();
 
         DB::table('monitor_entries')->insert([
-            $this->row('request', '2xx', 'GET /checkout', $requestId, ['status' => 200]),
+            $this->row('request', '2xx', 'GET /checkout', $requestId, ['response' => ['status' => 200]]),
             $this->row('job', Jobs::DISPATCH, 'App\\Jobs\\Child', $requestId, ['job_id' => 'j-1']),
             $this->row('query', null, 'select 1', $requestId, []),
         ]);

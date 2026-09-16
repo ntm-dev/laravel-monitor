@@ -26,12 +26,12 @@
     $general = array_filter([
         'date' => $preciseTimestamp($startEpoch),
         'duration' => \LaravelMonitor\Support\Format::duration($root->duration),
-        'status_code' => $payload['status'] ?? '—',
-        'route' => $payload['route_name'] ?? null,
-        'action' => $payload['route_action'] ?? null,
-        'domain' => $payload['route_domain'] ?? null,
+        'status_code' => $payload['response']['status'] ?? '—',
+        'route' => $payload['request']['route_name'] ?? null,
+        'action' => $payload['request']['route_action'] ?? null,
+        'domain' => $payload['request']['route_domain'] ?? null,
         'server' => $payload['server'] ?? '—',
-        'response_size' => \LaravelMonitor\Support\Number::fileSize($payload['response_size'] ?? null, '—'),
+        'response_size' => \LaravelMonitor\Support\Number::fileSize($payload['response']['size'] ?? null, '—'),
         'peak_memory' => \LaravelMonitor\Support\Number::fileSize($payload['peak_memory'] ?? null, '—'),
         'model_count' => isset($payload['model_count']) ? number_format($payload['model_count']) : null,
     ], fn ($value) => $value !== null);
@@ -51,7 +51,7 @@
 
     $user = [
         'user' => $userName ?? ($root->user_id !== null ? __('monitor::messages.common.user_number', ['id' => $root->user_id]) : __('monitor::messages.common.guest')),
-        'ip' => $payload['ip'] ?? '—',
+        'ip' => $payload['request']['ip'] ?? '—',
     ];
 
     $userLabels = [

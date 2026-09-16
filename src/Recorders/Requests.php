@@ -6,11 +6,34 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Request;
 use LaravelMonitor\Support\HttpStatusGroup;
+use LaravelMonitor\Support\Json;
 use LaravelMonitor\Support\RecordType;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderBag;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
+
+use function array_filter;
+use function defined;
+use function get_debug_type;
+use function gethostname;
+use function implode;
+use function in_array;
+use function is_array;
+use function is_int;
+use function is_numeric;
+use function is_scalar;
+use function is_string;
+use function json_last_error_msg;
+use function ltrim;
+use function mb_check_encoding;
+use function mb_strcut;
+use function memory_get_peak_usage;
+use function method_exists;
+use function microtime;
+use function round;
+use function strlen;
+use function strtolower;
 
 class Requests extends Recorder
 {
@@ -55,7 +78,7 @@ class Requests extends Recorder
     ];
 
     /** Stored bodies larger than this (encoded, in bytes) are replaced with a size marker instead. */
-    protected const MAX_BODY_BYTES = 10000;
+    protected const MAX_BODY_BYTES = 64 * 1024;
 
     public function register(Dispatcher $events): void
     {
@@ -80,7 +103,7 @@ class Requests extends Recorder
         $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : self::UNMATCHED_ROUTE;
 
         // LARAVEL_START before REQUEST_TIME_FLOAT — see Monitor::beginRequest() for why.
-        $startTime = \defined('LARAVEL_START') ? LARAVEL_START : $request->server('REQUEST_TIME_FLOAT');
+        $startTime = defined('LARAVEL_START') ? LARAVEL_START : $request->server('REQUEST_TIME_FLOAT');
         // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
         // floats, so subtracting them is a floating-point catastrophic
         // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
@@ -89,29 +112,36 @@ class Requests extends Recorder
 
         $this->monitor->record(
             type: RecordType::Request,
-            key: $request->method().' '.$uri,
+            key: "{$request->method()} {$uri}",
             payload: array_filter([
-                'method' => $request->method(),
-                'path' => '/'.ltrim($path, '/'),
-                'url' => $this->url($request),
-                'status' => $status,
-                'ip' => $request->ip(),
+                'request' => array_filter([
+                    'method' => $request->method(),
+                    'path' => '/'.ltrim($path, '/'),
+                    'url' => $this->url($request),
+                    'ip' => $request->ip(),
+                    'route_name' => $route?->getName(),
+                    'route_action' => $route ? $this->routeAction($route) : null,
+                    'route_domain' => $route?->getDomain(),
+                    'size' => strlen($request->getContent()),
+                    'headers' => $this->headers($request->headers),
+                    'body' => $this->body($request),
+                ], static fn ($value) => $value !== null),
+                'response' => array_filter([
+                    'status' => $status,
+                    'size' => $this->responseSize($event->response),
+                    'headers' => $this->headers($event->response->headers),
+                    'body' => ($this->config['details']['record_response_body'] ?? false)
+                        ? $this->responseBody($event->response)
+                        : null,
+                ], static fn ($value) => $value !== null),
                 'server' => gethostname() ?: null,
-                'route_name' => $route?->getName(),
-                'route_action' => $route ? $this->routeAction($route) : null,
-                'route_domain' => $route?->getDomain(),
-                'request_size' => strlen($request->getContent()),
-                'response_size' => $this->responseSize($event->response),
                 'peak_memory' => memory_get_peak_usage(true),
-                'request_headers' => $this->headers($request->headers),
-                'response_headers' => $this->headers($event->response->headers),
-                'body' => $this->body($request),
                 // Recorded here rather than reconstructed later from
                 // created_at - duration (see MergesJobTimelines::buildTracks(),
                 // which prefers this when present) — this is the exact
                 // moment the request actually started, not an approximation.
                 'started_at' => $startTime ?: null,
-            ], fn ($value) => $value !== null),
+            ], static fn ($value) => $value !== null),
             duration: $duration,
             subtype: HttpStatusGroup::forStatus($status)->value,
             userId: $this->monitor->lazyCurrentUserId(),
@@ -125,7 +155,7 @@ class Requests extends Recorder
         return $request->getSchemeAndHttpHost()
             .$request->getBaseUrl()
             .$request->getPathInfo()
-            .($query !== '' ? '?'.$query : '');
+            .($query !== '' ? "?{$query}" : '');
     }
 
     /**
@@ -189,8 +219,10 @@ class Requests extends Recorder
      * Best-effort request body, redacted and capped in size — skipped for
      * GET/HEAD (query params already show up in the URL, and Laravel has no
      * concept of a GET body worth capturing separately).
+     *
+     * @return array<array-key, mixed>|string|null
      */
-    protected function body(Request $request): ?array
+    protected function body(Request $request): array|string|null
     {
         if (in_array($request->getMethod(), ['GET', 'HEAD'], true)) {
             return null;
@@ -202,14 +234,58 @@ class Requests extends Recorder
             return null;
         }
 
-        $redacted = $this->redactBody($input);
-        $encoded = json_encode($redacted);
+        return $this->cappedJsonBody($input);
+    }
 
-        if (! is_string($encoded) || strlen($encoded) > self::MAX_BODY_BYTES) {
-            return ['_truncated' => true, '_size' => is_string($encoded) ? strlen($encoded) : null];
+    /**
+     * Rendered response content: redacted array for JSON, capped string for
+     * other UTF-8 text, null for binary/streamed/empty responses.
+     *
+     * @return array<array-key, mixed>|string|null
+     */
+    protected function responseBody(Response $response): array|string|null
+    {
+        $content = $response->getContent();
+
+        if (! is_string($content) || $content === '') {
+            return null;
         }
 
-        return $redacted;
+        $decoded = Json::decode($content);
+
+        if (is_array($decoded)) {
+            return $this->cappedJsonBody($decoded);
+        }
+
+        return mb_check_encoding($content, 'UTF-8') ? $this->truncate($content) : null;
+    }
+
+    /**
+     * Redacted body; once its encoded JSON exceeds MAX_BODY_BYTES, that JSON cut to size instead.
+     *
+     * @param  array<array-key, mixed>  $input
+     * @return array<array-key, mixed>|string
+     */
+    protected function cappedJsonBody(array $input): array|string
+    {
+        $redacted = $this->redactBody($input);
+        $encoded = Json::encode($redacted);
+
+        if (! is_string($encoded)) {
+            return '('.json_last_error_msg().')';
+        }
+
+        return strlen($encoded) > self::MAX_BODY_BYTES ? $this->truncate($encoded) : $redacted;
+    }
+
+    /** Cut to MAX_BODY_BYTES on a UTF-8 character boundary, with a trailing ellipsis. */
+    protected function truncate(string $value): string
+    {
+        if (strlen($value) <= self::MAX_BODY_BYTES) {
+            return $value;
+        }
+
+        return mb_strcut($value, 0, self::MAX_BODY_BYTES, 'UTF-8').'…';
     }
 
     /**

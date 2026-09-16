@@ -56,8 +56,8 @@ class UserScopeRouteTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /only-mine', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /someone-else', ['status' => 200], 50, '2xx', 'web:2');
+        Monitor::record(RecordType::Request, 'GET /only-mine', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /someone-else', ['response' => ['status' => 200]], 50, '2xx', 'web:2');
         Monitor::flush();
 
         $this->get('/monitor/requests/userId/web:1')
@@ -70,8 +70,8 @@ class UserScopeRouteTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $this->get('/monitor/requests/userId')
@@ -84,8 +84,8 @@ class UserScopeRouteTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $this->get('/monitor/requests')
@@ -96,9 +96,9 @@ class UserScopeRouteTest extends TestCase
 
     public function test_authenticated_sentinel_excludes_guests_at_the_storage_layer(): void
     {
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /also-signed-in', ['status' => 200], 50, '2xx', 'web:2');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /also-signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:2');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $storage = app(AggregateStorage::class);
@@ -111,9 +111,9 @@ class UserScopeRouteTest extends TestCase
 
     public function test_guest_sentinel_keeps_only_guests_at_the_storage_layer(): void
     {
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
-        Monitor::record(RecordType::Request, 'GET /also-anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /also-anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $storage = app(AggregateStorage::class);
@@ -128,8 +128,8 @@ class UserScopeRouteTest extends TestCase
 
     public function test_requests_tab_guest_filter_drops_signed_in_traffic(): void
     {
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $routes = Livewire::test(Requests::class)
@@ -181,8 +181,8 @@ class UserScopeRouteTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /signed-in', ['status' => 200], 50, '2xx', 'web:1');
-        Monitor::record(RecordType::Request, 'GET /anonymous', ['status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /signed-in', ['response' => ['status' => 200]], 50, '2xx', 'web:1');
+        Monitor::record(RecordType::Request, 'GET /anonymous', ['response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $this->get('/monitor/requests/userId/'.UserFilter::GUEST)

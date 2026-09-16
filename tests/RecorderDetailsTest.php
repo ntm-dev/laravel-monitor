@@ -12,6 +12,7 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use LaravelMonitor\Facades\Monitor;
 use ReflectionClass;
 use Symfony\Component\Mime\Email;
@@ -32,6 +33,7 @@ class RecorderDetailsTest extends TestCase
 
         $this->writeSettingsOverride($app, [
             'recorder_details' => [
+                'Requests' => ['record_response_body' => true],
                 'Queries' => ['trace' => true],
                 'Jobs' => ['trace' => true],
                 'OutgoingRequests' => ['trace' => true, 'record_body' => true],
@@ -76,6 +78,45 @@ class RecorderDetailsTest extends TestCase
         $this->assertStringNotContainsString('shh', $payload['request_body']);
         $this->assertStringContainsString('redacted', $payload['request_body']);
         $this->assertStringContainsString('"ok":true', $payload['response_body']);
+    }
+
+    public function test_json_response_body_is_captured_redacted_once_its_detail_toggle_is_on(): void
+    {
+        Route::get('/demo-token', static fn () => response()->json(['name' => 'demo', 'token' => 'shh']));
+
+        $this->get('/demo-token')->assertOk();
+        Monitor::flush();
+
+        $body = $this->latestPayload('request')['response']['body'];
+
+        $this->assertSame('demo', $body['name']);
+        $this->assertSame('••• redacted •••', $body['token']);
+    }
+
+    public function test_text_response_body_is_captured_as_a_string(): void
+    {
+        Route::get('/demo-text', static fn () => 'plain text reply');
+
+        $this->get('/demo-text')->assertOk();
+        Monitor::flush();
+
+        $this->assertSame('plain text reply', $this->latestPayload('request')['response']['body']);
+    }
+
+    public function test_oversized_json_response_body_is_truncated_instead_of_dropped(): void
+    {
+        Route::get('/demo-large', static fn () => response()->json(['data' => str_repeat('a', 100000)]));
+
+        $this->get('/demo-large')->assertOk();
+        Monitor::flush();
+
+        $payload = $this->latestPayload('request');
+        $body = $payload['response']['body'];
+
+        $this->assertIsString($body);
+        $this->assertStringStartsWith('{"data":"aaa', $body);
+        $this->assertStringEndsWith('…', $body);
+        $this->assertLessThan($payload['response']['size'], strlen($body));
     }
 
     public function test_mail_body_is_captured_once_its_detail_toggle_is_on(): void

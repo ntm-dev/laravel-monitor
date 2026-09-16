@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Log\Events\MessageLogged;
+use LaravelMonitor\Support\Json;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Types\Str;
 use Throwable;
@@ -43,7 +44,7 @@ class Logs extends Recorder
             key: Str::tinyText($message),
             payload: [
                 'message' => Str::text($message),
-                'context' => Str::mediumText(json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION) ?: '{}'),
+                'context' => Str::mediumText(Json::encode($context) ?: '{}'),
             ],
             subtype: $event->level,
             userId: $this->monitor->lazyCurrentUserId(),

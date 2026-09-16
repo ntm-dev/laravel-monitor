@@ -161,9 +161,8 @@ class JobTrackOrderTest extends TestCase
             'subtype' => '2xx',
             'key' => 'POST /reserve/create',
             'payload' => json_encode([
-                'method' => 'POST',
-                'path' => '/reserve/create',
-                'status' => 200,
+                'request' => ['method' => 'POST', 'path' => '/reserve/create'],
+                'response' => ['status' => 200],
                 'started_at' => (float) $requestStart->format('U.u'),
             ]),
             'duration' => $requestDuration,

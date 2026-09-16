@@ -83,9 +83,10 @@ abstract class TestCase extends Orchestra
      * PHPUnit always runs via the CLI SAPI, so Application::runningInConsole()
      * reports true even for tests simulating an HTTP request — which means
      * MonitorServiceProvider::register() never calls registerRequestHooks()
-     * (guard/OAuth/Livewire component/gate registration), since that's
-     * correctly gated behind `!runningInConsole()` for real console usage.
-     * Invoke it directly here instead of loosening that production-side
+     * (lifecycle hooks) or registerSelfHooks() (guard/OAuth/Livewire
+     * component/gate registration), since both are correctly gated behind
+     * `!runningInConsole()` for real console usage.
+     * Invoke them directly here instead of loosening that production-side
      * check: this mirrors what actually happens on a real HTTP request
      * without touching Laravel's own runningInConsole()-gated behavior
      * elsewhere (e.g. VerifyCsrfToken's test-bypass relies on the same flag
@@ -95,7 +96,10 @@ abstract class TestCase extends Orchestra
     {
         $provider = $this->app->getProvider(MonitorServiceProvider::class);
 
+        // One test app serves both dashboard and host-app requests, so it needs
+        // both sets that production registers for one or the other.
         (new \ReflectionMethod($provider, 'registerRequestHooks'))->invoke($provider);
+        (new \ReflectionMethod($provider, 'registerSelfHooks'))->invoke($provider);
 
         // registerRequestHooks() also registers Monitor::beginRequest() as an
         // app->booted() callback — since the app has already finished

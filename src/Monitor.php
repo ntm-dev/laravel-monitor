@@ -4,6 +4,7 @@ namespace LaravelMonitor;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
@@ -17,7 +18,9 @@ use LaravelMonitor\Support\Location;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Str as SupportStr;
 use Throwable;
+use WeakMap;
 
+use function implode;
 use function in_array;
 use function is_string;
 use function ltrim;
@@ -100,6 +103,14 @@ class Monitor
      * @var array{id: string, start: float, models: int}|null
      */
     protected ?array $scheduledTask = null;
+
+    /**
+     * isSelfRequest() results per request object and ignore-path set — keyed by
+     * the request itself, since this singleton outlives a single request in tests.
+     *
+     * @var WeakMap<Request, array<string, bool>>|null
+     */
+    protected ?WeakMap $selfRequestCache = null;
 
     /**
      * Context key a scheduled task's own id rides under across the process
@@ -422,7 +433,24 @@ class Monitor
         }
 
         $request = $this->app['request'];
+        $key = implode("\n", $ignorePaths);
 
+        $this->selfRequestCache ??= new WeakMap;
+        $cached = $this->selfRequestCache[$request] ?? [];
+
+        if (! isset($cached[$key])) {
+            $cached[$key] = $this->matchesSelfRequest($request, $ignorePaths);
+            $this->selfRequestCache[$request] = $cached;
+        }
+
+        return $cached[$key];
+    }
+
+    /**
+     * @param  list<string>  $ignorePaths
+     */
+    protected function matchesSelfRequest(Request $request, array $ignorePaths): bool
+    {
         $patterns = [
             ...$ignorePaths,
             trim((string) $this->app['config']->get('monitor.path', 'monitor'), '/').'*',
