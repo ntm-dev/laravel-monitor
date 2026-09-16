@@ -6,6 +6,7 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\EntryWriter;
 use LaravelMonitor\Storage\Concerns\BuildsQueries;
+use LaravelMonitor\Support\Json;
 
 class DatabaseEntryWriter implements EntryWriter
 {
@@ -16,7 +17,7 @@ class DatabaseEntryWriter implements EntryWriter
         collect($entries)
             ->map(function ($entry) {
                 $row = $entry->toArray();
-                $row['payload'] = json_encode($row['payload']);
+                $row['payload'] = Json::encode($row['payload']);
                 // format('Y-m-d H:i:s.u'), not toDateTimeString(): the latter
                 // always drops the fractional seconds CarbonImmutable::now()
                 // already captured (see Entry::__construct()) — created_at(6)

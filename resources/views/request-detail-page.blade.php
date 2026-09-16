@@ -53,11 +53,18 @@
                              rather than keep showing the request's own data
                              while a job is the page's active entity. --}}
                         @unless ($info['isJob'])
-                            <x-monitor::requests.headers-section
-                                :request-headers="$info['root']->payload['request_headers'] ?? []"
-                                :response-headers="$info['root']->payload['response_headers'] ?? []"
+                            <x-monitor::requests.message-section
+                                :title="__('monitor::messages.common.request')"
+                                :headers="$info['root']->payload['request']['headers'] ?? []"
+                                :body="$info['root']->payload['request']['body'] ?? null"
+                                :size="$info['root']->payload['request']['size'] ?? null"
                             />
-                            <x-monitor::requests.body-section :body="$info['root']->payload['body'] ?? null"/>
+                            <x-monitor::requests.message-section
+                                :title="__('monitor::messages.common.response')"
+                                :headers="$info['root']->payload['response']['headers'] ?? []"
+                                :body="$info['root']->payload['response']['body'] ?? null"
+                                :size="$info['root']->payload['response']['size'] ?? null"
+                            />
                         @endunless
 
                         <x-monitor::requests.event-summary :summary="$info['summary']"/>

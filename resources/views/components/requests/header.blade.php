@@ -7,10 +7,10 @@
 @php
     use Illuminate\Support\Str;
 
-    $method = $root->payload['method'] ?? Str::before($root->key ?? '', ' ');
-    $path = $root->payload['path'] ?? Str::after($root->key ?? '', ' ');
-    $url = $root->payload['url'] ?? null;
-    $status = (int) ($root->payload['status'] ?? 0);
+    $method = $root->payload['request']['method'] ?? Str::before($root->key ?? '', ' ');
+    $path = $root->payload['request']['path'] ?? Str::after($root->key ?? '', ' ');
+    $url = $root->payload['request']['url'] ?? null;
+    $status = (int) ($root->payload['response']['status'] ?? 0);
     $badgeClass = \LaravelMonitor\Support\Format::statusBadgeClass($status);
 
     $jobClass = $job->key ?? null;

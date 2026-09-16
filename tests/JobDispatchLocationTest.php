@@ -77,7 +77,7 @@ class JobDispatchLocationTest extends TestCase
         DB::table('monitor_entries')->insert([
             [
                 'type' => 'request', 'subtype' => '2xx', 'key' => 'POST /reserve',
-                'payload' => json_encode(['method' => 'POST', 'path' => '/reserve', 'status' => 200]),
+                'payload' => json_encode(['request' => ['method' => 'POST', 'path' => '/reserve'], 'response' => ['status' => 200]]),
                 'duration' => 50, 'request_id' => $requestId, 'created_at' => now(),
             ],
             [

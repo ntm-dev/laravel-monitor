@@ -224,6 +224,9 @@ return [
                 'pulse*',
                 'horizon*',
             ],
+            'details' => [
+                'record_response_body' => env('MONITOR_REQUESTS_RESPONSE_BODY_ENABLED', app()->isLocal()),
+            ],
         ],
 
         // Env var names keep their historical "slow query" wording even

@@ -11,7 +11,6 @@ use function is_bool;
 use function is_float;
 use function is_int;
 use function is_string;
-use function json_decode;
 use function json_last_error;
 
 /**
@@ -23,7 +22,7 @@ class JsonTree
 {
     public static function parse(string $raw): ?JsonNode
     {
-        $decoded = json_decode($raw, true);
+        $decoded = Json::decode($raw);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             return null;

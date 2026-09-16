@@ -7,6 +7,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use LaravelMonitor\ExecutionStage;
 
+use function array_filter;
+
 /**
  * Builds the ordered list of TimelineEntry rows shown on the Request Detail
  * timeline: the request root, its best-effort lifecycle phases, and every
@@ -102,10 +104,10 @@ class Timeline
             // Only requests carry an HTTP status; job/command roots leave
             // this unset, so TimelineRow's root-bar coloring falls back to
             // its neutral default for those.
-            metadata: array_filter(['status' => $root->payload['status'] ?? null], fn ($value) => $value !== null),
+            metadata: array_filter(['status' => $root->payload['response']['status'] ?? null], static fn ($value) => $value !== null),
         );
 
-        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['route_action'] ?? null, $root->type);
+        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['request']['route_action'] ?? null, $root->type);
 
         $events = self::assignLanes(
             $visibleChildren

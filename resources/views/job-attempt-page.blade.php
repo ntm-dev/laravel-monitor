@@ -2,7 +2,7 @@
      Unlike the tab-based dashboard views, this page owns its own URL and
      fetches everything it needs itself — see
      Http\Controllers\JobAttemptController. Mirrors request-detail-page.blade.php,
-     minus the HTTP-specific header/summary/headers-section (a job has no
+     minus the HTTP-specific header/summary/message-section (a job has no
      method/path/headers) — just a simple status header, the event summary
      and the shared waterfall timeline. --}}
 @php

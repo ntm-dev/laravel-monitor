@@ -188,6 +188,7 @@ class Settings
      * same recordersWarning() notice rather than named individually.
      */
     protected const RECORDER_DETAILS = [
+        'Requests' => ['record_response_body' => 'monitor::messages.settings.recorder_detail_response_body'],
         'Queries' => ['trace' => 'monitor::messages.settings.recorder_detail_trace'],
         'Jobs' => ['trace' => 'monitor::messages.settings.recorder_detail_trace'],
         'OutgoingRequests' => [

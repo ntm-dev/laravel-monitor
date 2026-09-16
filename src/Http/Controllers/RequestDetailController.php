@@ -18,6 +18,7 @@ use function array_key_exists;
 use function is_string;
 use function parse_str;
 use function parse_url;
+use function trim;
 
 /**
  * Renders the standalone Request Detail page for a single HTTP request:
@@ -179,6 +180,9 @@ class RequestDetailController
                 : null;
         }
 
+        $method = $root->payload['request']['method'] ?? '';
+        $path = $root->payload['request']['path'] ?? $root->key ?? '';
+
         return [
             'root' => $root,
             'isJob' => $isJob,
@@ -194,7 +198,7 @@ class RequestDetailController
             // — bare for the request's own info, so clicking back to it
             // from a job's drops the trailing job id entirely.
             'url' => $isJob && $jobBaseUrl !== null ? "{$jobBaseUrl}/{$job_id}" : $this->requestUrl($requestId),
-            'title' => $isJob ? class_basename($root->key ?? 'Job') : trim(($root->payload['method'] ?? '').' '.($root->payload['path'] ?? $root->key ?? '')),
+            'title' => $isJob ? class_basename($root->key ?? 'Job') : trim("{$method} {$path}"),
         ];
     }
 

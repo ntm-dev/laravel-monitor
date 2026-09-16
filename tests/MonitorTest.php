@@ -34,8 +34,8 @@ class MonitorTest extends TestCase
 
     public function test_records_entries_and_flushes_to_storage(): void
     {
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx', 1);
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 80, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 80, '2xx', 1);
         Monitor::flush();
 
         $this->assertDatabaseCount('monitor_entries', 2);
@@ -1187,7 +1187,7 @@ class MonitorTest extends TestCase
 
         $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
 
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 500], 20, '5xx');
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 500]], 20, '5xx');
         Monitor::record(RecordType::Exception, $key, [
             'class' => 'App\\Services\\Boom',
             'message' => 'Kaboom',
@@ -1272,7 +1272,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx');
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 120, '2xx');
         Monitor::flush();
 
         $this->get('/monitor')
@@ -1285,7 +1285,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 120, '2xx', 1);
         Monitor::record(RecordType::Exception, 'RuntimeException', ['class' => 'RuntimeException', 'message' => 'boom', 'file' => 'app/X.php', 'line' => 1]);
         Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 250);
         Monitor::record(RecordType::Job, 'App\\Jobs\\SendEmail', ['queue' => 'default'], 40, 'processed');
@@ -1312,13 +1312,13 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
-        Monitor::record(RecordType::Request, 'POST /users', ['status' => 201], 60, '2xx', 1);
-        Monitor::record(RecordType::Request, 'PUT /users/1', ['status' => 200], 70, '2xx', 1);
-        Monitor::record(RecordType::Request, 'PATCH /users/1', ['status' => 200], 40, '2xx', 1);
-        Monitor::record(RecordType::Request, 'DELETE /users/1', ['status' => 204], 30, '2xx', 1);
-        Monitor::record(RecordType::Request, 'GET /orders', ['status' => 404], 20, '4xx', 1);
-        Monitor::record(RecordType::Request, 'POST /payments', ['status' => 500], 90, '5xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'POST /users', ['response' => ['status' => 201]], 60, '2xx', 1);
+        Monitor::record(RecordType::Request, 'PUT /users/1', ['response' => ['status' => 200]], 70, '2xx', 1);
+        Monitor::record(RecordType::Request, 'PATCH /users/1', ['response' => ['status' => 200]], 40, '2xx', 1);
+        Monitor::record(RecordType::Request, 'DELETE /users/1', ['response' => ['status' => 204]], 30, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /orders', ['response' => ['status' => 404]], 20, '4xx', 1);
+        Monitor::record(RecordType::Request, 'POST /payments', ['response' => ['status' => 500]], 90, '5xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests')
@@ -1333,7 +1333,7 @@ class MonitorTest extends TestCase
     public function test_request_detail_individual_requests_paginate_past_the_first_page(): void
     {
         for ($i = 0; $i < 60; $i++) {
-            Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
+            Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 50, '2xx', 1);
         }
         Monitor::flush();
 
@@ -1363,7 +1363,7 @@ class MonitorTest extends TestCase
         // clamp-to-now never clips the window regardless of when this test runs.
         // 2026-01-15 04:00 UTC = 2026-01-15 11:00 in Asia/Ho_Chi_Minh (UTC+7).
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-01-15 04:00:00', 'UTC'));
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 50, '2xx', 1);
         Monitor::flush();
         CarbonImmutable::setTestNow();
 
@@ -1388,7 +1388,7 @@ class MonitorTest extends TestCase
         $monitor->markControllerStart();
         Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 25);
         $monitor->markResponseReady();
-        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]], 120, '2xx', 1);
         Monitor::flush();
 
         $storage = app(TimelineStorage::class);
@@ -1436,7 +1436,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Query, 'insert into sessions', ['sql' => 'insert into sessions'], 3);
         $monitor->markResponseReady();
         $monitor->markTerminating();
-        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]], 120, '2xx', 1);
         Monitor::flush();
 
         $storage = app(TimelineStorage::class);
@@ -1480,7 +1480,7 @@ class MonitorTest extends TestCase
         Monitor::record(RecordType::Query, 'select * from legacy', ['sql' => 'select * from legacy'], 5);
         $monitor->markResponseReady();
         $monitor->markTerminating();
-        Monitor::record(RecordType::Request, 'GET /legacy', ['method' => 'GET', 'path' => '/legacy', 'status' => 200], 60, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /legacy', ['request' => ['method' => 'GET', 'path' => '/legacy'], 'response' => ['status' => 200]], 60, '2xx', 1);
         Monitor::flush();
 
         $storage = app(TimelineStorage::class);
@@ -1513,7 +1513,7 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         Monitor::record(RecordType::Query, 'select * from posts', ['sql' => 'select * from posts'], 12.5);
-        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 100, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]], 100, '2xx', 1);
         Monitor::flush();
 
         $storage = app(TimelineStorage::class);
@@ -1580,10 +1580,11 @@ class MonitorTest extends TestCase
 
         $payload = json_decode($row->payload, true);
 
-        $this->assertSame('GET', $payload['method']);
-        $this->assertSame('/demo-users', $payload['path']);
+        $this->assertSame('GET', $payload['request']['method']);
+        $this->assertSame('/demo-users', $payload['request']['path']);
+        $this->assertSame(200, $payload['response']['status']);
         $this->assertArrayHasKey('peak_memory', $payload);
-        $this->assertArrayHasKey('request_headers', $payload);
+        $this->assertArrayHasKey('headers', $payload['request']);
         $this->assertNotEmpty($payload['phases']);
 
         $query = \Illuminate\Support\Facades\DB::table('monitor_entries')->where('type', 'query')->first();
@@ -1607,10 +1608,10 @@ class MonitorTest extends TestCase
 
         $payload = json_decode($row->payload, true);
 
-        $this->assertSame('demo.login', $payload['route_name']);
-        $this->assertNotEmpty($payload['route_action']);
-        $this->assertSame('a@b.com', $payload['body']['email']);
-        $this->assertSame('••• redacted •••', $payload['body']['password']);
+        $this->assertSame('demo.login', $payload['request']['route_name']);
+        $this->assertNotEmpty($payload['request']['route_action']);
+        $this->assertSame('a@b.com', $payload['request']['body']['email']);
+        $this->assertSame('••• redacted •••', $payload['request']['body']['password']);
     }
 
     public function test_request_recorder_does_not_capture_a_body_for_get_requests(): void
@@ -1626,7 +1627,7 @@ class MonitorTest extends TestCase
         $row = DB::table('monitor_entries')->where('type', 'request')->where('key', 'GET /demo-search')->first();
 
         $this->assertNotNull($row);
-        $this->assertArrayNotHasKey('body', json_decode($row->payload, true));
+        $this->assertArrayNotHasKey('body', json_decode($row->payload, true)['request']);
     }
 
     public function test_request_detail_page_renders(): void
@@ -1638,7 +1639,7 @@ class MonitorTest extends TestCase
         $monitor->beginRequest();
         $monitor->markControllerStart();
         Monitor::record(RecordType::Query, 'select * from users', ['sql' => 'select * from users'], 25);
-        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]], 120, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/'.$monitor->requestId())
@@ -1676,7 +1677,7 @@ class MonitorTest extends TestCase
                 'type' => 'request',
                 'subtype' => '2xx',
                 'key' => 'GET /users',
-                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'payload' => json_encode(['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]]),
                 'duration' => 50,
                 'request_id' => $requestId,
                 'created_at' => now(),
@@ -1794,7 +1795,7 @@ class MonitorTest extends TestCase
                 'type' => 'request',
                 'subtype' => '2xx',
                 'key' => 'GET /users',
-                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'payload' => json_encode(['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]]),
                 'duration' => 500,
                 'request_id' => $requestId,
                 'created_at' => now(),
@@ -1878,7 +1879,7 @@ class MonitorTest extends TestCase
                 'type' => 'request',
                 'subtype' => '2xx',
                 'key' => 'GET /users',
-                'payload' => json_encode(['method' => 'GET', 'path' => '/users', 'status' => 200]),
+                'payload' => json_encode(['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]]),
                 'duration' => 1000,
                 'request_id' => $requestId,
                 'created_at' => $requestCreatedAt->format('Y-m-d H:i:s.u'),
@@ -1987,7 +1988,7 @@ class MonitorTest extends TestCase
                 'subtype' => '2xx',
                 'key' => 'GET /users',
                 'payload' => json_encode([
-                    'method' => 'GET', 'path' => '/users', 'status' => 200,
+                    'request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200],
                     'started_at' => (float) $requestStartedAt->format('U.u'),
                 ]),
                 'duration' => 1000,
@@ -2028,7 +2029,7 @@ class MonitorTest extends TestCase
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        Monitor::record(RecordType::Request, 'GET /users', ['status' => 200], 50, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['response' => ['status' => 200]], 50, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users'))
@@ -2051,7 +2052,7 @@ class MonitorTest extends TestCase
 
         $monitor->beginRequest();
         $monitor->markControllerStart();
-        Monitor::record(RecordType::Request, 'GET /users', ['method' => 'GET', 'path' => '/users', 'status' => 200], 120, '2xx', 1);
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users'], 'response' => ['status' => 200]], 120, '2xx', 1);
         Monitor::flush();
 
         $this->get('/monitor/requests/routes/'.KeyHash::for('GET /users').'/'.$monitor->requestId())
@@ -2603,7 +2604,7 @@ class MonitorTest extends TestCase
 
         LazyLoadingFixtureModel::query()->get();
 
-        Monitor::record(RecordType::Request, 'GET /x', ['method' => 'GET', 'path' => '/x', 'status' => 200], 50, '2xx');
+        Monitor::record(RecordType::Request, 'GET /x', ['request' => ['method' => 'GET', 'path' => '/x'], 'response' => ['status' => 200]], 50, '2xx');
         Monitor::flush();
 
         $row = DB::table('monitor_entries')->where('type', 'request')->first();
