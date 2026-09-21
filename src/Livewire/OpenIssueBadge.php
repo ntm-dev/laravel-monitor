@@ -18,6 +18,11 @@ class OpenIssueBadge extends Card
     use SyncsOpenIssues;
 
     /**
+     * False on the static detail pages, which auto-refresh nothing.
+     */
+    public bool $poll = true;
+
+    /**
      * Issues::data() dispatches this on every render (explicit resolve/
      * ignore/reopen, or its own wire:poll tick) — without it this badge
      * would only catch up on its own next wire:poll (up to
