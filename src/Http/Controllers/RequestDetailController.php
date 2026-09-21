@@ -88,31 +88,32 @@ class RequestDetailController
         // $jobBaseUrl/$jobUrl.
         $jobBaseUrl = count($tracks) > 1 ? $this->requestUrl($requestId) : null;
 
-        // One "info" bundle per track this page can show at the top (see
-        // resolveInfo()) -- the request's own (always first, id 'root') and
-        // one per resolved job track, keyed the same way MergesJobTimelines
-        // already keys $tracks itself. Rendered into the page all at once
-        // (request-detail-page.blade.php), each behind its own
-        // x-show="activeInfo === '<id>'" — clicking a track's own row in
-        // the timeline (timeline-row.blade.php) just flips that one Alpine
-        // property instead of navigating here again for a root the browser
-        // already has every byte of, keeping the URL bar/breadcrumb/active
-        // nav tab in sync via history.pushState rather than a real request.
+        // One "info" bundle per track (id 'root' plus one per job track,
+        // keyed as MergesJobTimelines keys $tracks), all rendered at once so
+        // clicking a track only flips Alpine's activeInfo — no navigation.
+        // Every job's root and timeline is prefetched in one query each,
+        // not two per job.
         $infos = ['root' => $this->resolveInfo($root, $children, $requestId, null, $range)];
 
-        foreach ($tracks as $track) {
-            if (! isset($track['attempts'])) {
-                continue;
-            }
+        $outcomeIds = [];
 
-            $latestOutcomeId = end($track['attempts'])['outcomeId'];
-            $job = $this->storage->findByRequestId($latestOutcomeId, 'job');
+        foreach ($tracks as $track) {
+            if (isset($track['attempts'])) {
+                $outcomeIds[$track['id']] = end($track['attempts'])['outcomeId'];
+            }
+        }
+
+        $jobs = $this->storage->findManyByRequestId(array_values($outcomeIds), 'job');
+        $jobChildren = $this->storage->timelinesFor(array_values($outcomeIds), 'job');
+
+        foreach ($outcomeIds as $trackId => $outcomeId) {
+            $job = $jobs->get($outcomeId);
 
             if ($job === null) {
                 continue;
             }
 
-            $infos[$track['id']] = $this->resolveInfo($job, null, $requestId, $latestOutcomeId, $range, $jobBaseUrl);
+            $infos[$trackId] = $this->resolveInfo($job, $jobChildren->get($outcomeId, collect()), $requestId, $outcomeId, $range, $jobBaseUrl);
         }
 
         return view('monitor::request-detail-page', [
@@ -133,17 +134,15 @@ class RequestDetailController
     }
 
     /**
-     * One bundle of everything the page's own top section (breadcrumb,
-     * header, General/User card, Headers/Body, Event Summary, active nav
-     * tab, url/title) needs to render either the request's own info
-     * ($job === null) or one specific job's (see __invoke()'s own $infos).
+     * Everything the page's top section needs for one entity: the request
+     * itself ($job_id === null) or one job. $children is always $root's own
+     * timeline rows.
      *
      * @return array{root: object, isJob: bool, queuedAt: ?CarbonImmutable, queuedFrom: ?string, summary: array, userName: ?string, tab: string, breadcrumbLabel: ?string, breadcrumbUrl: ?string, url: string, title: string}
      */
-    protected function resolveInfo(object $root, ?Collection $children, string $requestId, ?string $job_id, array $range, ?string $jobBaseUrl = null): array
+    protected function resolveInfo(object $root, Collection $children, string $requestId, ?string $job_id, array $range, ?string $jobBaseUrl = null): array
     {
-        $job = $children === null ? $root : null;
-        $isJob = $job !== null;
+        $isJob = $job_id !== null;
 
         $userName = ! $isJob && $root->user_id !== null
             ? ($this->resolveNames([$root->user_id])[$root->user_id] ?? null)
@@ -161,7 +160,7 @@ class RequestDetailController
         }
 
         $summary = $isJob
-            ? $this->eventsSummary($this->storage->timelineFor($root->request_id, 'job'), self::SUMMARY_TYPES_JOB)
+            ? $this->eventsSummary($children, self::SUMMARY_TYPES_JOB)
             : $this->eventsSummary($children, self::SUMMARY_TYPES, $root);
 
         // Breadcrumb's middle segment: this request's own route-group label

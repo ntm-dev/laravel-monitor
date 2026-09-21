@@ -62,6 +62,14 @@ interface TimelineStorage
     public function findById(int $id, string $type): ?object;
 
     /**
+     * findByRequestId() for several roots in one query, keyed by request_id.
+     *
+     * @param  list<string>  $requestIds
+     * @return Collection<string, object>
+     */
+    public function findManyByRequestId(array $requestIds, string $rootType = 'request'): Collection;
+
+    /**
      * The first entry of $type whose payload has `correlation_id` equal to
      * $correlationId, or null when none match — links a mail-channel
      * notification's entry to the `mail` entry its send produced (and back).
@@ -76,6 +84,14 @@ interface TimelineStorage
      * timeline. Same row shape as findByRequestId().
      */
     public function timelineFor(string $requestId, string $rootType = 'request'): Collection;
+
+    /**
+     * timelineFor() for several roots in one query, keyed by request_id.
+     *
+     * @param  list<string>  $requestIds
+     * @return Collection<string, Collection<int, object>>
+     */
+    public function timelinesFor(array $requestIds, string $rootType = 'request'): Collection;
 
     /**
      * The 'queued' dispatch-time entry sharing the given job_id (the queue
