@@ -28,6 +28,7 @@ use LaravelMonitor\Storage\DatabaseHashResolver;
 use LaravelMonitor\Storage\DatabaseIssueStorage;
 use LaravelMonitor\Storage\DatabaseTimelineStorage;
 use LaravelMonitor\Storage\DatabaseUserStorage;
+use LaravelMonitor\Support\AggregateCatchUp;
 use Livewire\Livewire;
 
 class MonitorServiceProvider extends ServiceProvider
@@ -106,6 +107,7 @@ class MonitorServiceProvider extends ServiceProvider
     private function registerBindings(): void
     {
         $this->app->singleton(Monitor::class);
+        $this->app->singleton(AggregateCatchUp::class);
         $this->app->singleton(ControllerStartHook::class);
         $this->app->singleton(RequestLifecycleEndHook::class);
         $this->app->singleton(CommandLifecycleEndHook::class);
