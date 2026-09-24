@@ -4,7 +4,7 @@
 @props(['count', 'ok', 'client', 'server', 'okBuckets', 'clientBuckets', 'serverBuckets', 'since', 'until', 'height' => 'h-28', 'failed' => null, 'failedBuckets' => null])
 <x-monitor::card :class="trim('flex flex-col p-4 '.($attributes->get('class') ?? ''))" x-data="{ hidden: {} }">
     <x-monitor::metric :label="__('monitor::messages.nav.requests')" :value="number_format($count)">
-        <x-monitor::legend :label="__('monitor::messages.common.ok_status')" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($ok)" series-key="ok"/>
+        <x-monitor::legend :label="__('monitor::messages.common.ok_status')" dot="bg-emerald-500" :value="number_format($ok)" series-key="ok"/>
         <x-monitor::legend :label="__('monitor::messages.common.client_error')" dot="bg-amber-500" :value="number_format($client)" :color="$client > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-900 dark:text-neutral-100'" series-key="client"/>
         <x-monitor::legend :label="__('monitor::messages.common.server_error')" dot="bg-rose-500" :value="number_format($server)" :color="$server > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-900 dark:text-neutral-100'" series-key="server"/>
         @if ($failed !== null)
@@ -13,7 +13,7 @@
     </x-monitor::metric>
     <div class="mt-5">
         <x-monitor::bar-chart :since="$since" :until="$until" :height="$height" :series="[
-            ['key' => 'ok', 'label' => __('monitor::messages.common.ok_status'), 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $okBuckets],
+            ['key' => 'ok', 'label' => __('monitor::messages.common.ok_status'), 'dot' => 'bg-emerald-500', 'data' => $okBuckets],
             ['key' => 'client', 'label' => __('monitor::messages.common.client_error'), 'dot' => 'bg-amber-500', 'data' => $clientBuckets],
             ['key' => 'server', 'label' => __('monitor::messages.common.server_error'), 'dot' => 'bg-rose-500', 'data' => $serverBuckets],
             ...($failedBuckets !== null ? [['key' => 'failed', 'label' => __('monitor::messages.common.failed'), 'dot' => 'bg-violet-500', 'data' => $failedBuckets]] : []),

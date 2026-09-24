@@ -142,8 +142,10 @@ Route::domain(config('monitor.domain'))
                     ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}'])
                     ->defaults('tab', $groupTab)
                     ->name("monitor.{$groupTab}.show");
+                // {id} is this entry's own row id, disguised as a uuid-shaped
+                // string by Support\EntryId rather than shown raw in the URL.
                 Route::get("/{$groupTab}/{hash}/{id}", DashboardController::class)
-                    ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}', 'id' => '[0-9]+'])
+                    ->where(['tab' => $groupTab, 'hash' => '[0-9a-f]{32}', 'id' => '[0-9a-f-]{36}'])
                     ->defaults('tab', $groupTab)
                     ->name("monitor.{$groupTab}.sends.show");
             }

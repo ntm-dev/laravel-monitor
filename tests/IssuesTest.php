@@ -285,6 +285,35 @@ class IssuesTest extends TestCase
         $this->assertSame(36, strlen($status->uuid));
     }
 
+    public function test_syncing_the_same_brand_new_issue_key_twice_does_not_crash(): void
+    {
+        // Regression for a production crash: two requests syncing the same
+        // never-before-seen (type, key) at nearly the same moment can both
+        // see "no existing row" and both try to insert it, hitting
+        // monitor_issues_type_key_unique. insertNewIssue() is the only
+        // place that insert happens, so calling it twice back-to-back for
+        // the same key reproduces that race without needing real
+        // concurrent connections (this suite runs on a single sqlite
+        // connection).
+        $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);
+        $method = new \ReflectionMethod($storage, 'insertNewIssue');
+        $method->setAccessible(true);
+
+        $first = \Carbon\CarbonImmutable::now();
+        $second = $first->addMinute();
+
+        $method->invoke($storage, 'query', 'select 1', $first, $first);
+        $method->invoke($storage, 'query', 'select 1', $second, $second);
+
+        $rows = DB::table('monitor_issues')->where('type', 'query')->where('key', 'select 1')->get();
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(
+            $second->format('Y-m-d H:i:s.u'),
+            \Carbon\CarbonImmutable::parse($rows->first()->last_seen)->format('Y-m-d H:i:s.u'),
+        );
+    }
+
     public function test_delete_missing_issues_deletes_only_the_absent_open_keys(): void
     {
         $storage = app(\LaravelMonitor\Contracts\IssueStorage::class);

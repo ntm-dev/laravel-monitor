@@ -3,12 +3,13 @@
 namespace LaravelMonitor\Http\Headings;
 
 use LaravelMonitor\Contracts\TimelineStorage;
+use LaravelMonitor\Support\EntryId;
 
 /**
  * Heading for a notification detail page. $key means one of two things,
  * disambiguated by dashboard.blade.php the same way it routes the page
- * itself: a numeric database id (one specific send — NotificationDetail) or
- * the notification's FQCN (aggregate across all its sends —
+ * itself: an EntryId-encoded row id (one specific send — NotificationDetail)
+ * or the notification's FQCN (aggregate across all its sends —
  * NotificationClassDetail, same convention as JobHeading/QueryHeading).
  */
 class NotificationHeading
@@ -19,7 +20,9 @@ class NotificationHeading
 
     public function __invoke(string $key): Heading
     {
-        if (! ctype_digit($key)) {
+        $id = EntryId::decode($key);
+
+        if ($id === null) {
             return new Heading(
                 heading: $key,
                 titleAttr: $key,
@@ -27,7 +30,7 @@ class NotificationHeading
             );
         }
 
-        $entry = $this->storage->findById((int) $key, 'notification');
+        $entry = $this->storage->findById($id, 'notification');
 
         if ($entry === null) {
             return new Heading(pageTitle: 'Notification');

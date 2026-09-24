@@ -19,6 +19,7 @@ use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Facades\Monitor;
 use LaravelMonitor\Livewire\RequestDetail;
 use LaravelMonitor\Support\Fingerprint;
+use LaravelMonitor\Support\EntryId;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\RecordType;
@@ -2095,22 +2096,22 @@ class MonitorTest extends TestCase
         $notificationKey = DB::table('monitor_entries')->where('type', 'notification')->value('key');
         $mailKey = DB::table('monitor_entries')->where('type', 'mail')->value('key');
 
-        $this->get('/monitor/notifications?key='.$notificationId)
+        $this->get('/monitor/notifications?key='.EntryId::encode($notificationId))
             ->assertOk()
             ->assertSee('View sent email')
-            ->assertSee(route('monitor.mail.sends.show', ['hash' => KeyHash::for($mailKey), 'id' => $mailId]), false);
+            ->assertSee(route('monitor.mail.sends.show', ['hash' => KeyHash::for($mailKey), 'id' => EntryId::encode($mailId)]), false);
 
-        $this->get('/monitor/mail?key='.$mailId)
+        $this->get('/monitor/mail?key='.EntryId::encode($mailId))
             ->assertOk()
             ->assertSee('Sent via notification')
-            ->assertSee(route('monitor.notifications.sends.show', ['hash' => KeyHash::for($notificationKey), 'id' => $notificationId]), false);
+            ->assertSee(route('monitor.notifications.sends.show', ['hash' => KeyHash::for($notificationKey), 'id' => EntryId::encode($notificationId)]), false);
     }
 
     public function test_notification_detail_page_shows_not_found_state_for_unknown_id(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $this->get('/monitor/notifications?key=999999')
+        $this->get('/monitor/notifications?key=00000000-0000-0000-0000-000000000000')
             ->assertOk()
             ->assertSee('could not be found');
     }
@@ -2154,6 +2155,26 @@ class MonitorTest extends TestCase
         $this->get('/monitor/mail?key='.urlencode($key))
             ->assertOk()
             ->assertSeeText('2 Sends');
+    }
+
+    public function test_mail_detail_download_eml_streams_a_reconstructed_eml_file(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        Monitor::record(RecordType::Mail, 'App\\Mail\\Welcome', [
+            'subject' => 'Welcome aboard',
+            'to' => 'a@b.com',
+            'from' => 'Support <support@x.com>',
+            'body' => '<p>Hi there</p>',
+            'body_format' => 'html',
+        ], 12, 'direct');
+        Monitor::flush();
+
+        $id = DB::table('monitor_entries')->where('type', 'mail')->value('id');
+
+        Livewire::test(\LaravelMonitor\Livewire\MailDetail::class, ['key' => EntryId::encode($id)])
+            ->call('downloadEml')
+            ->assertFileDownloaded('Welcome aboard.eml', null, 'message/rfc822');
     }
 
     protected function syncJob(?string $jobId = null): \Illuminate\Queue\Jobs\SyncJob
@@ -2259,6 +2280,37 @@ class MonitorTest extends TestCase
     }
 
     /**
+     * Regression test: the 'processing' row Recorders\Jobs::recordProcessing()
+     * now persists shares its own request_id with this attempt's eventual
+     * outcome (see Monitor::beginJobAttempt()) — proves the defensive
+     * exclusions in DatabaseTimelineStorage::rootQuery()/jobExecutionsByJobId()
+     * actually keep it from being mistaken for the outcome itself.
+     */
+    public function test_processing_row_does_not_corrupt_job_root_or_execution_lookups(): void
+    {
+        $job = $this->syncJob('job-xyz');
+
+        event($this->jobQueuedEvent('sync', 'default', 'job-xyz', $job, json_encode([])));
+        event(new \Illuminate\Queue\Events\JobProcessing('sync', $job));
+        event(new \Illuminate\Queue\Events\JobProcessed('sync', $job));
+
+        Monitor::flush();
+
+        $processingRow = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processing')->first();
+        $processedRow = DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'processed')->first();
+
+        $this->assertNotNull($processingRow);
+        $this->assertSame($processedRow->request_id, $processingRow->request_id);
+
+        $root = app(TimelineStorage::class)->findByRequestId($processedRow->request_id, RecordType::Job->value);
+        $this->assertSame('processed', $root->subtype);
+
+        $executions = app(TimelineStorage::class)->jobExecutionsByJobId(['job-xyz'], CarbonImmutable::now()->subDay());
+        $this->assertCount(1, $executions->get('job-xyz'));
+        $this->assertSame('processed', $executions->get('job-xyz')->first()->outcome->subtype);
+    }
+
+    /**
      * Regression test: Illuminate\Queue\DatabaseQueue::release() deletes and
      * re-inserts the job row, so a retried attempt's getJobId() differs from
      * the dispatch's own and from every other retry — correlating on that
@@ -2286,10 +2338,13 @@ class MonitorTest extends TestCase
 
         Monitor::flush();
 
-        $jobIds = DB::table('monitor_entries')->where('type', 'job')->orderBy('id')->pluck('payload')
-            ->map(fn ($payload) => json_decode($payload, true)['job_id']);
+        $rows = DB::table('monitor_entries')->where('type', 'job')->orderBy('id')->get(['subtype', 'payload']);
+        $jobIds = $rows->pluck('payload')->map(fn ($payload) => json_decode($payload, true)['job_id']);
 
-        $this->assertCount(3, $jobIds);
+        // queued(dispatch) -> processing+released(attempt 1) -> processing+processed(attempt 2)
+        // — one 'processing' row per JobProcessing fire (see Recorders\Jobs::PROCESSING).
+        $this->assertSame(['queued', 'processing', 'released', 'processing', 'processed'], $rows->pluck('subtype')->all());
+        $this->assertCount(5, $jobIds);
         $this->assertTrue($jobIds->every(fn ($jobId) => $jobId === $uuid));
     }
 
@@ -2433,6 +2488,236 @@ class MonitorTest extends TestCase
         $payload = json_decode(DB::table('monitor_entries')->where('type', 'job')->where('subtype', 'queued')->value('payload'), true);
 
         $this->assertArrayNotHasKey('job_id', $payload);
+    }
+
+    public function test_jobs_list_reports_a_total_a_pending_and_a_processing_count_alongside_p95(): void
+    {
+        // Three dispatches of the same class:
+        // - job-1: dispatched -> processing -> processed (succeeded first try).
+        // - job-2: dispatched only, nobody has picked it up yet.
+        // - job-3: dispatched -> processing -> released (a caught exception,
+        //   back in the queue waiting for its next attempt).
+        DB::table('monitor_entries')->insert([
+            [
+                'type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-1']),
+                'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-2']),
+                'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-3']),
+                'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-1', 'attempts' => 1]),
+                'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-3', 'attempts' => 1]),
+                'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-1', 'attempts' => 1]),
+                'duration' => 100, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+            [
+                'type' => 'job', 'subtype' => 'released', 'key' => 'App\\Jobs\\SendEmail',
+                'payload' => json_encode(['connection' => 'database', 'queue' => 'default', 'job_id' => 'job-3', 'attempts' => 1]),
+                'duration' => 50, 'request_id' => (string) Str::uuid(), 'created_at' => now(),
+            ],
+        ]);
+
+        $job = Livewire::test(\LaravelMonitor\Livewire\Jobs::class)
+            ->viewData('jobs')
+            ->firstWhere('key', 'App\\Jobs\\SendEmail');
+
+        $this->assertSame(3, $job->dispatched);
+        // Both processing rows (job-1, job-3) already resolved — to
+        // processed and released respectively — so none are still running.
+        $this->assertSame(0, $job->processing);
+        $this->assertSame(1, $job->processed);
+        $this->assertSame(1, $job->released);
+        $this->assertSame(0, $job->failed);
+        // Every time this key entered the queue: 3 initial dispatches plus
+        // job-3's own release back onto it.
+        $this->assertSame(4, $job->total);
+        // Still sitting in the queue, never picked up: job-2 (never touched)
+        // and job-3 (released, waiting for its next attempt).
+        $this->assertSame(2, $job->pending);
+        $this->assertSame(100.0, $job->avg_duration);
+        $this->assertSame(100.0, $job->p95_duration);
+    }
+
+    public function test_jobs_list_last_seen_reflects_the_latest_activity_across_every_subtype(): void
+    {
+        // job-K's latest row is its 'processed' outcome; job-L has only
+        // ever been dispatched, more recently than that — last_seen must
+        // track the newest row across every subtype (including 'queued'),
+        // not just whichever column's own aggregateByKey() call runs last.
+        $latest = now()->subMinute();
+
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-K']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()->subMinutes(10)],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-K', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()->subMinutes(9)],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-K', 'attempts' => 1]), 'duration' => 80, 'request_id' => (string) Str::uuid(), 'created_at' => now()->subMinutes(8)],
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-L']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => $latest],
+        ]);
+
+        $job = Livewire::test(\LaravelMonitor\Livewire\Jobs::class)
+            ->viewData('jobs')
+            ->firstWhere('key', 'App\\Jobs\\SendEmail');
+
+        $this->assertSame($latest->timestamp, $job->last_seen->getTimestamp());
+    }
+
+    public function test_jobs_list_defaults_to_sorting_by_most_recent_last_seen(): void
+    {
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\OlderJob', 'payload' => json_encode(['job_id' => 'job-M']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()->subMinutes(50)],
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\NewerJob', 'payload' => json_encode(['job_id' => 'job-N']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()->subMinutes(5)],
+        ]);
+
+        $keys = Livewire::test(\LaravelMonitor\Livewire\Jobs::class)
+            ->viewData('jobs')
+            ->pluck('key')
+            ->all();
+
+        $this->assertSame(['App\\Jobs\\NewerJob', 'App\\Jobs\\OlderJob'], $keys);
+    }
+
+    public function test_jobs_list_pending_excludes_a_released_retry_that_later_succeeded(): void
+    {
+        // Same class, four dispatches:
+        // - job-A: dispatched -> processing -> processed (succeeded first try).
+        // - job-B: dispatched only, nobody has picked it up yet (stays pending).
+        // - job-C: dispatched -> processing(attempt 1) -> released -> processing(attempt 2) -> processed.
+        //   Its own release re-entry must NOT still count as pending once the retry runs.
+        // - job-D: dispatched -> processing -> failed (exceeded retries).
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-A']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-A', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-A', 'attempts' => 1]), 'duration' => 80, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-B']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-C']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-C', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'released', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-C', 'attempts' => 1]), 'duration' => 30, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-C', 'attempts' => 2]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-C', 'attempts' => 2]), 'duration' => 60, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-D']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-D', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'failed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-D', 'attempts' => 1]), 'duration' => 40, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+        ]);
+
+        $job = Livewire::test(\LaravelMonitor\Livewire\Jobs::class)
+            ->viewData('jobs')
+            ->firstWhere('key', 'App\\Jobs\\SendEmail');
+
+        $this->assertSame(4, $job->dispatched);
+        // All four processing rows already resolved — job-A/job-C's second
+        // attempt to processed, job-C's first attempt to released, job-D to
+        // failed — so none are still running.
+        $this->assertSame(0, $job->processing);
+        $this->assertSame(2, $job->processed);
+        $this->assertSame(1, $job->released);
+        $this->assertSame(1, $job->failed);
+        // job-A + job-C's release both re-enter the queue: 4 dispatches + 1 release.
+        $this->assertSame(5, $job->total);
+        // Only job-B was never picked up — job-C's retry already resolved.
+        $this->assertSame(1, $job->pending);
+    }
+
+    public function test_jobs_list_processing_counts_only_attempts_still_in_flight(): void
+    {
+        // Same class, two dispatches:
+        // - job-E: dispatched -> processing -> processed (already resolved).
+        // - job-F: dispatched -> processing, still running right now — its
+        //   worker hasn't reached JobProcessed/JobFailed/JobReleasedAfterException yet.
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-E']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-E', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-E', 'attempts' => 1]), 'duration' => 80, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-F']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-F', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+        ]);
+
+        $job = Livewire::test(\LaravelMonitor\Livewire\Jobs::class)
+            ->viewData('jobs')
+            ->firstWhere('key', 'App\\Jobs\\SendEmail');
+
+        $this->assertSame(1, $job->processing);
+        $this->assertSame(1, $job->processed);
+    }
+
+    public function test_job_detail_collapses_a_retried_dispatch_into_one_current_status_row(): void
+    {
+        // One dispatch, two attempts: failed once (caught exception ->
+        // released), succeeded on the retry — the exact production
+        // scenario reported: the detail page must show a single row for
+        // this job_id, not one per raw queued/processing/released/processed
+        // event, and that row's status must be the *latest* one (processed),
+        // carrying the final attempt count (2).
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-G', 'queue' => 'default']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-G', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'released', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-G', 'attempts' => 1]), 'duration' => 30, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-G', 'attempts' => 2]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-G', 'attempts' => 2]), 'duration' => 60, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+        ]);
+
+        $entries = Livewire::test(\LaravelMonitor\Livewire\JobDetail::class, ['key' => 'App\\Jobs\\SendEmail'])
+            ->viewData('entries');
+
+        $this->assertCount(1, $entries);
+        $this->assertSame('processed', $entries->first()->subtype);
+        $this->assertSame(2, $entries->first()->payload['attempts']);
+    }
+
+    public function test_job_detail_shows_a_still_in_flight_attempt_as_processing(): void
+    {
+        // Dispatched and picked up, but no outcome recorded yet — the
+        // current status shown must be 'processing', not the stale
+        // 'queued' placeholder.
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-H']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-H', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+        ]);
+
+        $entries = Livewire::test(\LaravelMonitor\Livewire\JobDetail::class, ['key' => 'App\\Jobs\\SendEmail'])
+            ->viewData('entries');
+
+        $this->assertCount(1, $entries);
+        $this->assertSame('processing', $entries->first()->subtype);
+        $this->assertSame(1, $entries->first()->payload['attempts']);
+    }
+
+    public function test_job_detail_keeps_separate_dispatches_of_the_same_key_as_separate_rows(): void
+    {
+        DB::table('monitor_entries')->insert([
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-I']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-I', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-I', 'attempts' => 1]), 'duration' => 40, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+
+            ['type' => 'job', 'subtype' => 'queued', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-J']), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processing', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-J', 'attempts' => 1]), 'duration' => null, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+            ['type' => 'job', 'subtype' => 'processed', 'key' => 'App\\Jobs\\SendEmail', 'payload' => json_encode(['job_id' => 'job-J', 'attempts' => 1]), 'duration' => 45, 'request_id' => (string) Str::uuid(), 'created_at' => now()],
+        ]);
+
+        $component = Livewire::test(\LaravelMonitor\Livewire\JobDetail::class, ['key' => 'App\\Jobs\\SendEmail']);
+
+        $this->assertCount(2, $component->viewData('entries'));
+        $this->assertSame(2, $component->viewData('totalEntries'));
     }
 
     public function test_job_recorder_captures_released_status_distinct_from_failed(): void

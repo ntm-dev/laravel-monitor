@@ -3,13 +3,15 @@
 namespace LaravelMonitor\Http\Headings;
 
 use LaravelMonitor\Contracts\TimelineStorage;
+use LaravelMonitor\Support\EntryId;
 
 /**
  * Heading for an outgoing (HTTP client) request detail page. $key means one
  * of two things, disambiguated by dashboard.blade.php the same way it routes
- * the page itself: a numeric database id (one specific call — OutgoingDetail,
- * method+url as heading) or the destination host (aggregate across all calls
- * to it — OutgoingDomainDetail, same convention as MailHeading/JobHeading).
+ * the page itself: an EntryId-encoded row id (one specific call —
+ * OutgoingDetail, method+url as heading) or the destination host (aggregate
+ * across all calls to it — OutgoingDomainDetail, same convention as
+ * MailHeading/JobHeading).
  */
 class OutgoingHeading
 {
@@ -19,7 +21,9 @@ class OutgoingHeading
 
     public function __invoke(string $key): Heading
     {
-        if (! ctype_digit($key)) {
+        $id = EntryId::decode($key);
+
+        if ($id === null) {
             return new Heading(
                 heading: $key,
                 titleAttr: $key,
@@ -27,7 +31,7 @@ class OutgoingHeading
             );
         }
 
-        $entry = $this->storage->findById((int) $key, 'outgoing_request');
+        $entry = $this->storage->findById($id, 'outgoing_request');
 
         if ($entry === null) {
             return new Heading(pageTitle: 'Outgoing Request');

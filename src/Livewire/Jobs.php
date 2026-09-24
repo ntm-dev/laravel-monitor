@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Livewire;
 
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
+use LaravelMonitor\Recorders\Jobs as JobRecorder;
 
 class Jobs extends Card
 {
@@ -10,7 +11,7 @@ class Jobs extends Card
 
     public const PER_PAGE = 25;
 
-    public const SORTABLE = ['key', 'queued', 'processed', 'released', 'failed', 'avg_duration'];
+    public const SORTABLE = ['key', 'total', 'dispatched', 'pending', 'processing', 'processed', 'released', 'failed', 'avg_duration', 'p95_duration', 'last_seen'];
 
     /**
      * Per-subtype grouped rows are capped here rather than at the previous
@@ -28,7 +29,7 @@ class Jobs extends Card
 
     public string $userId = '';
 
-    public string $sortBy = 'processed';
+    public string $sortBy = 'last_seen';
 
     public string $sortDirection = 'desc';
 
@@ -88,31 +89,74 @@ class Jobs extends Card
         $processed = $storage->aggregateByKey('job', $since, 'processed', self::MAX_KEYS, 'count', $until, $userId);
         $failed = $storage->aggregateByKey('job', $since, 'failed', self::MAX_KEYS, 'count', $until, $userId);
         $released = $storage->aggregateByKey('job', $since, 'released', self::MAX_KEYS, 'count', $until, $userId);
-        $queued = $storage->aggregateByKey('job', $since, 'queued', self::MAX_KEYS, 'count', $until, $userId);
+        // The initial add to the queue only (see Recorders\Jobs::DISPATCH) —
+        // a retry re-added by $released below isn't a second "dispatch".
+        $dispatched = $storage->aggregateByKey('job', $since, JobRecorder::DISPATCH, self::MAX_KEYS, 'count', $until, $userId);
+        $processing = $storage->aggregateByKey('job', $since, JobRecorder::PROCESSING, self::MAX_KEYS, 'count', $until, $userId);
+        // p95_duration isn't computable in SQL (see keyStats()'s own docs),
+        // so it comes from its own sampled pass rather than the aggregateByKey()
+        // calls above — scoped to 'processed' the same way avg_duration
+        // already is below, since a queued/released/failed row carries no
+        // meaningful processing duration to mix in.
+        $p95ByKey = $storage->keyStats('job', $since, $until, $userId, 'processed')->keyBy('key');
 
         $jobs = collect();
 
-        foreach ([$processed, $failed, $released, $queued] as $index => $groups) {
-            $column = ['processed', 'failed', 'released', 'queued'][$index];
+        foreach ([$processed, $failed, $released, $dispatched, $processing] as $index => $groups) {
+            $column = ['processed', 'failed', 'released', 'dispatched', 'processing'][$index];
 
             foreach ($groups as $group) {
                 $job = $jobs->get($group->key) ?? (object) [
                     'key' => $group->key,
-                    'queued' => 0,
+                    'dispatched' => 0,
+                    'processing' => 0,
                     'processed' => 0,
                     'failed' => 0,
                     'released' => 0,
                     'avg_duration' => null,
+                    'p95_duration' => null,
+                    'last_seen' => null,
                 ];
 
                 $job->{$column} = $group->count;
 
                 if ($column === 'processed') {
                     $job->avg_duration = $group->avg_duration;
+                    $job->p95_duration = $p95ByKey->get($group->key)?->p95_duration;
+                }
+
+                // Latest activity across every subtype (dispatched/processing/
+                // processed/released/failed), not just this one column's own
+                // sample — aggregateByKey() already returns each group's own
+                // max(created_at) as last_seen.
+                if ($job->last_seen === null || $group->last_seen?->greaterThan($job->last_seen)) {
+                    $job->last_seen = $group->last_seen;
                 }
 
                 $jobs->put($group->key, $job);
             }
+        }
+
+        // 'total' is every time this key entered the queue — the initial
+        // dispatch plus every retry re-added by a release (see
+        // Recorders\Jobs::DISPATCH/recordReleased()).
+        // 'pending' is whatever's still sitting in the queue, never
+        // resolved into a JobProcessing pickup (see Recorders\Jobs::PROCESSING)
+        // — a fresh dispatch nobody has picked up yet, or a released retry
+        // waiting to be picked up again — clamped rather than trusted to
+        // stay non-negative, since each count is independently sampled at
+        // high volume (see aggregateByKey()'s own docs on maxSampleRows()).
+        //
+        // $job->processing itself still holds the raw pickup count here
+        // (every JobProcessing this key ever recorded) — pending needs that
+        // raw count to know how much of $job->total has ever been picked up
+        // at all. Only once pending is settled does the loop below overwrite
+        // $job->processing down to just the attempts still in flight right
+        // now, by netting out whichever of those pickups already resolved.
+        foreach ($jobs as $job) {
+            $job->total = $job->dispatched + $job->released;
+            $job->pending = max(0, $job->total - $job->processing);
+            $job->processing = max(0, $job->processing - $job->processed - $job->released - $job->failed);
         }
 
         if ($this->search !== '') {
@@ -120,8 +164,16 @@ class Jobs extends Card
             $jobs = $jobs->filter(fn ($job) => str_contains(strtolower($job->key), $needle))->values();
         }
 
-        $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'processed';
-        $jobs = $jobs->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values();
+        $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'last_seen';
+        // last_seen sorts on its timestamp: SORT_REGULAR can't order the
+        // CarbonImmutable instances aggregateByKey() returns.
+        $jobs = $jobs
+            ->sortBy(
+                fn ($job) => $sortBy === 'last_seen' ? $job->last_seen?->getTimestamp() ?? 0 : $job->{$sortBy},
+                SORT_REGULAR,
+                $this->sortDirection === 'desc',
+            )
+            ->values();
 
         $total = $jobs->count();
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));

@@ -37,6 +37,17 @@ class Jobs extends Recorder
      */
     public const DISPATCH = 'queued';
 
+    /**
+     * An in-flight attempt, recorded on JobProcessing before handle() runs.
+     * Unlike DISPATCH, shares this attempt's own request_id with its
+     * eventual outcome (see Monitor::beginJobAttempt()) — every read path
+     * that assumes one outcome row per request_id/job_id must exclude this
+     * subtype too (see DatabaseTimelineStorage::rootQuery()/
+     * jobExecutionsByJobId(), Monitor::startOffsetFor(),
+     * JobDetail::withoutSupersededQueuedRows()).
+     */
+    public const PROCESSING = 'processing';
+
     /** @var array<string, float> */
     protected array $startedAt = [];
 
@@ -128,6 +139,31 @@ class Jobs extends Recorder
         // notifications) correlates onto this attempt's own timeline —
         // mirrors the booted-callback beginRequest() for HTTP requests.
         $this->monitor->beginJobAttempt();
+
+        $this->monitor->record(
+            type: RecordType::Job,
+            key: $event->job->resolveName(),
+            payload: array_filter([
+                'connection' => $event->connectionName,
+                'queue' => $event->job->getQueue(),
+                'job_id' => $this->correlationId($event->job),
+                'attempts' => $event->job->attempts(),
+                'server' => gethostname() ?: null,
+                // Same fields recordProcessed()'s own 'started_at'/'popped_at'
+                // carry, captured this early since nothing about the
+                // outcome (duration, model_count, peak_memory) exists yet.
+                'started_at' => $this->startedAt[$id] ?? null,
+                'popped_at' => $this->poppedAt[$id] ?? null,
+            ], fn ($value) => $value !== null),
+            subtype: self::PROCESSING,
+        );
+
+        // Durable before handle() can crash — same reasoning as
+        // recordProcessed()'s own flush(), except more so: if handle()
+        // fatals (OOM, an uncaught Error, a signal), the terminal handler
+        // that would otherwise flush this never fires at all, so this is
+        // the only chance this row gets to survive that.
+        $this->monitor->flush();
     }
 
     public function recordProcessed(JobProcessed $event): void

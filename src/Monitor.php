@@ -377,10 +377,13 @@ class Monitor
         if (($job = $this->currentJob()) !== null) {
             // Only the run's own outcome sits at zero. A 'queued' entry here
             // is a job this run dispatched — an event within it, offset like
-            // any other child (see Recorders\Jobs::DISPATCH). The request
-            // branch above needs no such check: a dispatch is RecordType::Job
-            // there, already distinct from its RecordType::Request root.
-            if ($type === RecordType::Job && $subtype !== Jobs::DISPATCH) {
+            // any other child (see Recorders\Jobs::DISPATCH) — and this same
+            // attempt's own still-in-flight 'processing' marker (Recorders\Jobs::PROCESSING)
+            // isn't the outcome either, just recorded moments before it. The
+            // request branch above needs no such check: a dispatch is
+            // RecordType::Job there, already distinct from its
+            // RecordType::Request root.
+            if ($type === RecordType::Job && ! in_array($subtype, [Jobs::DISPATCH, Jobs::PROCESSING], true)) {
                 return 0.0;
             }
 

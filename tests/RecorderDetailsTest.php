@@ -128,7 +128,25 @@ class RecorderDetailsTest extends TestCase
         event(new MessageSent($this->sentMessage($email, 'a@b.com'), ['__laravel_mailable' => 'App\\Mail\\Welcome']));
         Monitor::flush();
 
-        $this->assertStringContainsString('Hello there', $this->latestPayload('mail')['body']);
+        $payload = $this->latestPayload('mail');
+
+        $this->assertStringContainsString('Hello there', $payload['body']);
+        $this->assertSame('html', $payload['body_format']);
+    }
+
+    public function test_mail_body_format_is_text_for_a_plain_text_only_message(): void
+    {
+        $email = new Email;
+        $email->subject('Welcome')->to('a@b.com')->from('noreply@x.com')->text('Hello there');
+
+        event(new MessageSending($email, ['__laravel_mailable' => 'App\\Mail\\Welcome']));
+        event(new MessageSent($this->sentMessage($email, 'a@b.com'), ['__laravel_mailable' => 'App\\Mail\\Welcome']));
+        Monitor::flush();
+
+        $payload = $this->latestPayload('mail');
+
+        $this->assertStringContainsString('Hello there', $payload['body']);
+        $this->assertSame('text', $payload['body_format']);
     }
 
     public function test_notification_data_is_captured_once_its_detail_toggle_is_on(): void

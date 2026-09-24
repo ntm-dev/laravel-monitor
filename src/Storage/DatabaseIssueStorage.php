@@ -32,17 +32,7 @@ class DatabaseIssueStorage implements IssueStorage
             $row = $existing->get($key);
 
             if ($row === null) {
-                $this->issuesTable()->insert([
-                    'type' => $type,
-                    'key' => $key,
-                    'uuid' => Uuid::uuid7()->toString(),
-                    'status' => 'open',
-                    'first_seen' => $this->preciseTimestamp($lastSeenValue),
-                    'last_seen' => $this->preciseTimestamp($lastSeenValue),
-                    'resolved_at' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
+                $this->insertNewIssue($type, $key, $lastSeenValue, $now);
 
                 continue;
             }
@@ -60,6 +50,36 @@ class DatabaseIssueStorage implements IssueStorage
             }
 
             $this->issuesTable()->where('type', $type)->where('key', $key)->update($update);
+        }
+    }
+
+    /**
+     * The $existing lookup in syncIssues() and this insert aren't atomic
+     * together, so two requests syncing the same never-before-seen (type,
+     * key) at nearly the same moment can both see "no row" and both land
+     * here — insertOrIgnore() makes the losing insert a no-op instead of a
+     * monitor_issues_type_key_unique violation, and the fallback update
+     * still advances last_seen for that request's occurrence.
+     */
+    protected function insertNewIssue(string $type, string $key, CarbonImmutable $lastSeenValue, CarbonImmutable $now): void
+    {
+        $inserted = $this->issuesTable()->insertOrIgnore([
+            'type' => $type,
+            'key' => $key,
+            'uuid' => Uuid::uuid7()->toString(),
+            'status' => 'open',
+            'first_seen' => $this->preciseTimestamp($lastSeenValue),
+            'last_seen' => $this->preciseTimestamp($lastSeenValue),
+            'resolved_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        if ($inserted === 0) {
+            $this->issuesTable()->where('type', $type)->where('key', $key)->update([
+                'last_seen' => $this->preciseTimestamp($lastSeenValue),
+                'updated_at' => $now,
+            ]);
         }
     }
 

@@ -27,7 +27,14 @@
     <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
         @if ($detail !== null)
             <div class="min-w-0">
-                <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">{{ $tabs[$tab]['label'] }}</a>
+                <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
+                    <a href="{{ route('monitor.dashboard', ['tab' => $tab] + $range) }}" class="shrink-0 hover:text-neutral-900 dark:hover:text-neutral-100">{{ $tabs[$tab]['label'] }}</a>
+                    @if ($detail->breadcrumbLabel !== null)
+                        <span class="shrink-0">›</span>
+                        <a href="{{ route($detail->breadcrumbRouteName, $detail->breadcrumbRouteParams + $range) }}"
+                           class="min-w-0 truncate hover:text-neutral-900 dark:hover:text-neutral-100">{{ $detail->breadcrumbLabel }}</a>
+                    @endif
+                </nav>
                 @if ($detail->badge !== null || $detail->heading !== null)
                     <div class="mt-0.5 flex min-w-0 gap-2.5 {{ $detail->wrap ? 'items-start' : 'items-center' }}">
                         @if (! $detail->badgeAfter && $detail->badge !== null)
@@ -51,7 +58,7 @@
             </div>
         @endif
 
-        @if (! in_array($tab, ['settings', 'team', 'issues'], true))
+        @if (! in_array($tab, ['settings', 'team', 'issues'], true) && ($detail?->showPeriodSwitcher ?? true))
         <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
                 <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"

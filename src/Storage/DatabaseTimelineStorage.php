@@ -66,13 +66,15 @@ class DatabaseTimelineStorage implements TimelineStorage
         return $this->table()
             ->where('type', $rootType)
             // A run's root is its outcome, never one of the dispatches it
-            // made — those share its request_id AND its type (see
-            // Recorders\Jobs::DISPATCH), so without this the root could
-            // resolve to a queued placeholder that happened to be inserted
-            // first. Same rule jobExecutionsByJobId() already applies.
+            // made (share its request_id AND its type — see
+            // Recorders\Jobs::DISPATCH) or its own still-in-flight
+            // 'processing' marker (shares its request_id too, recorded
+            // before the outcome — see Recorders\Jobs::PROCESSING) — without
+            // this the root could resolve to either placeholder instead.
+            // Same rule jobExecutionsByJobId() already applies.
             ->when(
                 $rootType === RecordType::Job->value,
-                fn (Builder $query) => $query->where('subtype', '!=', Jobs::DISPATCH),
+                fn (Builder $query) => $query->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING]),
             )
             ->whereIn('request_id', $requestIds);
     }
@@ -173,7 +175,11 @@ class DatabaseTimelineStorage implements TimelineStorage
         // query per attempt.
         $outcomes = $this->table()
             ->where('type', 'job')
-            ->where('subtype', '!=', 'queued')
+            // Excludes the dispatch placeholder and the outcome's own
+            // still-in-flight 'processing' marker (see Recorders\Jobs) —
+            // neither is a real execution, just the DISPATCH/PROCESSING
+            // rootQuery() already excludes for the same reason.
+            ->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING])
             ->whereIn('payload->job_id', $jobIds)
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))

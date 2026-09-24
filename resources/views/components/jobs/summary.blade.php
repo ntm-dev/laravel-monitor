@@ -81,9 +81,13 @@
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $jobEndTime }}">{{ $value }}</dd>
                 @elseif ($key === 'queued_from')
                     {{-- rtl + text-align:left truncates the front of the
-                         absolute path, keeping file:line visible. --}}
+                         absolute path, keeping file:line visible. Leading
+                         ‎ (LRM) anchors the path's own leading "/" as
+                         LTR — same fix as timeline-script.blade.php's own
+                         truncatedPath(), without which that "/" renders at
+                         the RTL run's edge instead of in place. --}}
                     <dd class="min-w-0 truncate font-mono text-xs text-neutral-800 dark:text-neutral-200"
-                        style="direction: rtl; text-align: left;" data-tooltip="{{ $value }}">{{ $value }}</dd>
+                        style="direction: rtl; text-align: left;" data-tooltip="{{ $value }}">{{ "\u{200E}".$value }}</dd>
                 @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>
                 @endif

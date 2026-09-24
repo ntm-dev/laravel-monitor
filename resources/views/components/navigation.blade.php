@@ -1,11 +1,12 @@
 {{-- Desktop sidebar: app identity, grouped tab links and footer entries.
      All data is prepared by Http\Controllers\DashboardController. --}}
 {{-- autoRefreshes: false on the standalone, non-Livewire detail pages (Request
-     Detail's timeline, Job Attempt, Command Run, Schedule Run, Issue Detail) —
-     those own their own URL and render everything once server-side, no
-     data-monitor-poll anywhere on the page, so the active tab's refresh ring
-     would be showing a countdown to a refresh that never happens. It also
-     stops the open-issue badge polling. --}}
+     Detail's timeline, Job Attempt, Command Run, Schedule Run, Issue Detail)
+     and any page pinned to one fixed, already-past moment (e.g. a single mail
+     send) — nothing there ever polls, so the active tab's refresh ring would
+     be showing a countdown to a refresh that never happens. The open-issue
+     badge keeps polling regardless — it's a global count, not tied to
+     whatever page happens to be open. --}}
 @props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true, 'reactiveTabExpr' => null])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
@@ -82,7 +83,7 @@
                         <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                         @if ($tabKey === 'issues')
                             <span class="monitor-nav-label">
-                                @livewire('monitor.open-issue-badge', ['poll' => $autoRefreshes], key('nav-open-issue-badge'))
+                                @livewire('monitor.open-issue-badge', [], key('nav-open-issue-badge'))
                             </span>
                         @endif
                         @if ($tab === $tabKey && $autoRefreshes)
