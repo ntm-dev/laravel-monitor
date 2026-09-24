@@ -2,7 +2,6 @@
 
 namespace LaravelMonitor\Livewire;
 
-use LaravelMonitor\Livewire\Concerns\SyncsOpenIssues;
 use Livewire\Attributes\On;
 
 /**
@@ -12,11 +11,18 @@ use Livewire\Attributes\On;
  * page itself: the sidebar sits outside that page's Livewire component,
  * so a static prop computed once by DashboardController would otherwise
  * keep showing whatever count was open at the last full page load.
+ *
+ * Reads openIssueCount() only — it does NOT call syncOpenIssues() itself.
+ * That discovery pass (aggregateByKey() across every issue-tracked type,
+ * each sampling up to groupLimit() rows) is too expensive to repeat on every
+ * poll tick, on every open tab, sitewide (measured well over a second total
+ * against this package's own production-scale table). Only the Issues page
+ * itself still runs it, so a new/recurring issue reaches this badge once
+ * someone has that page open somewhere — same tradeoff already documented
+ * on Livewire\Concerns\SyncsOpenIssues.
  */
 class OpenIssueBadge extends Card
 {
-    use SyncsOpenIssues;
-
     /**
      * Issues::data() dispatches this on every render (explicit resolve/
      * ignore/reopen, or its own wire:poll tick) — without it this badge
@@ -37,18 +43,8 @@ class OpenIssueBadge extends Card
 
     protected function data(): array
     {
-        $storage = $this->issueStorage();
-
-        // syncIssues() (called from here via syncOpenIssues()) is the only
-        // thing that writes a new/recurring issue into monitor_issues — it
-        // otherwise only runs from the Issues page's own render. Without
-        // this, a new exception/slow query never reaches openIssueCount()
-        // until someone happens to have the Issues page open somewhere,
-        // so this badge would sit stale on every other tab indefinitely.
-        $this->syncOpenIssues($this->aggregateStorage(), $storage, $this->since(), $this->until());
-
         return [
-            'count' => $storage->openIssueCount(),
+            'count' => $this->issueStorage()->openIssueCount(),
         ];
     }
 }

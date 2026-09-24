@@ -11,14 +11,14 @@
         @if ($released !== null)
             <x-monitor::legend :label="__('monitor::messages.common.released')" dot="bg-orange-500" :value="number_format($released)" :color="$released > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-neutral-900 dark:text-neutral-100'" :size="$size" series-key="released"/>
         @endif
-        <x-monitor::legend :label="__('monitor::messages.common.processed')" dot="bg-neutral-300 dark:bg-neutral-600" :value="number_format($processed)" :size="$size" series-key="processed"/>
+        <x-monitor::legend :label="__('monitor::messages.common.processed')" dot="bg-emerald-500" :value="number_format($processed)" color="text-emerald-500 dark:text-emerald-400" :size="$size" series-key="processed"/>
         @if ($queued !== null)
             <x-monitor::legend :label="__('monitor::messages.common.queued')" dot="bg-amber-500" :value="number_format($queued)" :size="$size" series-key="queued"/>
         @endif
     </x-monitor::metric>
     <div class="{{ $size === 'lg' ? 'mt-5' : 'mt-4' }}">
         <x-monitor::bar-chart :since="$since" :until="$until" :height="$height" :series="[
-            ['key' => 'processed', 'label' => __('monitor::messages.common.processed'), 'dot' => 'bg-neutral-300 dark:bg-neutral-600', 'data' => $processedBuckets],
+            ['key' => 'processed', 'label' => __('monitor::messages.common.processed'), 'dot' => 'bg-emerald-500', 'data' => $processedBuckets],
             ...($queuedBuckets !== null ? [['key' => 'queued', 'label' => __('monitor::messages.common.queued'), 'dot' => 'bg-amber-500', 'data' => $queuedBuckets]] : []),
             ...($releasedBuckets !== null ? [['key' => 'released', 'label' => __('monitor::messages.common.released'), 'dot' => 'bg-orange-500', 'data' => $releasedBuckets]] : []),
             ['key' => 'failed', 'label' => __('monitor::messages.common.failed'), 'dot' => 'bg-rose-500', 'data' => $failedBuckets],

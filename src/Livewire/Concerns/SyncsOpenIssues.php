@@ -11,11 +11,11 @@ use LaravelMonitor\Contracts\IssueStorage;
 use LaravelMonitor\Livewire\Issues;
 
 /**
- * Shared by Issues (which renders the synced results) and OpenIssueBadge
- * (which only needs the side effect): syncIssues() — the only thing that
- * writes a new/recurring issue into monitor_issues — has no trigger of its
- * own, so without every "open issues" surface calling this, openIssueCount()
- * only ever advances whenever someone happens to have the Issues page open.
+ * Used by Issues, the only page that still calls this (see
+ * Livewire\OpenIssueBadge's own docblock for why it stopped) — syncIssues()
+ * is the only thing that writes a new/recurring issue into monitor_issues
+ * and has no trigger of its own, so openIssueCount() only advances whenever
+ * someone has the Issues page open somewhere.
  */
 trait SyncsOpenIssues
 {

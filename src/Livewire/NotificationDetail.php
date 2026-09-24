@@ -2,12 +2,15 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Support\EntryId;
+
 /**
  * Detail page for a single notification send (not an aggregate across many
  * sends, unlike JobDetail/QueryDetail/ExceptionDetail) — $key is the entry's
- * own database id. When it was sent over the mail channel, looks up the
- * `mail` entry the same send produced via the correlation id both recorders
- * stamp, so the page can link straight to it.
+ * own row id, disguised by EntryId as a uuid-shaped string. When it was sent
+ * over the mail channel, looks up the `mail` entry the same send produced
+ * via the correlation id both recorders stamp, so the page can link
+ * straight to it.
  */
 class NotificationDetail extends Card
 {
@@ -28,7 +31,8 @@ class NotificationDetail extends Card
     protected function data(): array
     {
         $storage = $this->timelineStorage();
-        $entry = ctype_digit($this->key) ? $storage->findById((int) $this->key, 'notification') : null;
+        $id = EntryId::decode($this->key);
+        $entry = $id !== null ? $storage->findById($id, 'notification') : null;
 
         $mail = null;
         $correlationId = $entry?->payload['correlation_id'] ?? null;

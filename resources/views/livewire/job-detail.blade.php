@@ -33,6 +33,7 @@
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.queue') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.attempts') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             <th class="w-8 pb-2"></th>
                         </tr>
@@ -56,10 +57,8 @@
                                         'border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' => $entry->subtype === 'released',
                                         'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
                                     ])>{{ $entry->subtype }}</span>
-                                    @if (($entry->payload['attempts'] ?? null) !== null)
-                                        <span class="ml-1 font-mono text-[10px] text-neutral-400 dark:text-neutral-500" data-tooltip="{{ __('monitor::messages.common.attempt_count') }}">#{{ $entry->payload['attempts'] }}</span>
-                                    @endif
                                 </td>
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ __('monitor::messages.common.attempt_count') }}">{{ $entry->payload['attempts'] ?? '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
                                 <td class="py-2 pl-2 text-right">
                                     @if ($attemptUrl)
@@ -72,7 +71,7 @@
                         @endforeach
                     </tbody>
                     <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="5" :rows="count($entries)"/>
+                        <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
                     </tbody>
                 </table>
 

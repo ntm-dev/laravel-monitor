@@ -54,11 +54,10 @@
                             {{-- $sourceUrl: whatever triggered this send, when there was one
                                  (a request/job/command/scheduled task) — clicking the source
                                  badge below jumps there. $sendUrl: this notification's own
-                                 detail page — always present, unlike $sourceUrl, so the trailing
-                                 icon column stays clickable even for a send with no source. --}}
+                                 detail page. --}}
                             @php
                                 $sourceUrl = $entry->sourceUrl;
-                                $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range);
+                                $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
                             @endphp
                             <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>

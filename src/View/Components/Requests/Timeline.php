@@ -6,6 +6,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\View\Component;
+use LaravelMonitor\Support\EntryId;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline as TimelineSupport;
@@ -463,17 +464,15 @@ class Timeline extends Component
                 'queryUrl' => $entry->type === 'query'
                     ? route('monitor.queries.show', ['hash' => KeyHash::for(Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label))])
                     : null,
-                // The entry's own database id — see NotificationDetail/MailDetail —
-                // for the full per-occurrence page (correlation link to the other
-                // one included), which this inline panel only summarises. The
-                // hash is the notification/mail *class*'s (metadata['key'], its
-                // own grouping key — see Support\Timeline::metadataFor()), not
-                // the entry's own id.
+                // EntryId::encode($entry->id): the entry's own row id,
+                // disguised as a uuid-shaped path segment — not the *class*
+                // hash (metadata['key']), which links to the full
+                // per-occurrence page instead.
                 'notificationUrl' => $entry->type === 'notification'
-                    ? route('monitor.notifications.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
+                    ? route('monitor.notifications.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
                     : null,
                 'mailUrl' => $entry->type === 'mail'
-                    ? route('monitor.mail.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
+                    ? route('monitor.mail.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
                     : null,
                 // Exceptions already group by an opaque Fingerprint hash (stored
                 // directly as the entry's own key) — no KeyHash::for() reverse
@@ -486,7 +485,7 @@ class Timeline extends Component
                 // aggregate "class" mode like notifications/mail) — see
                 // Http\Headings\OutgoingHeading / Livewire\OutgoingDetail.
                 'outgoingUrl' => $entry->type === 'http'
-                    ? route('monitor.outgoing.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => $entry->id])
+                    ? route('monitor.outgoing.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
                     : null,
             ];
         }

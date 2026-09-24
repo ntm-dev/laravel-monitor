@@ -49,38 +49,21 @@ return new class extends Migration
             $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
             $table->timestamp('created_at', 6);
 
-            // Two indexes sharing the [type, created_at] prefix, on purpose:
-            //
-            // - `[type, created_at]` (narrow) is what recent() and
-            //   exceptionGroups() need for `ORDER BY created_at DESC, id DESC
-            //   LIMIT n` — MySQL walks it backwards and stops at the limit
-            //   ("Backward index scan" in EXPLAIN) with no sort step at all.
-            //   A wider index with extra trailing columns loses that specific
-            //   optimization and falls back to a full filesort of every
-            //   matching row before the limit is applied — measured 2ms vs
-            //   9.5s for the exact same query on a multi-million-row table,
-            //   so this one has to stay narrow.
-            // - `[type, created_at, duration, key, subtype]` is a *covering*
-            //   index for the aggregate reads — stats(), routeStats(),
-            //   aggregateByKey(), durationStats() — so they're satisfied
-            //   entirely from the index instead of a row lookup back to the
-            //   clustered index for every match. That row-lookup was the
-            //   dominant cost of those queries at scale: once a WHERE type=/
-            //   created_at>= filter matches a large fraction of the table,
-            //   fetching `duration` one row at a time this way measured
-            //   4-9x slower than the equivalent covering scan.
-            //
-            // Same split for the subtype-filtered variants below, except
-            // countsPerBucket()/cacheKeyStats() (the only subtype-filtered
-            // queries that need index order) don't carry a competing ORDER
-            // BY, so one covering index serves them without the narrow/wide
-            // split the unfiltered case needed.
+            // The narrow/wide pair on the [type, created_at] prefix is
+            // deliberate:
+            // - narrow serves recent()/exceptionGroups()' `ORDER BY
+            //   created_at DESC LIMIT n` as a backward scan; trailing columns
+            //   turn it into a full filesort (2ms vs 9.5s at millions of rows).
+            // - wide covers stats()/routeStats()/aggregateByKey()/durationStats()
+            //   from the index alone, skipping a row lookup per match (4-9x).
+            // [request_id, type] leads on request_id because timelineFor()
+            // filters type only with `!=`, which no type-leading index serves.
             $table->index(['type', 'created_at']);
             $table->index(['type', 'created_at', 'duration', 'key', 'subtype']);
             $table->index(['type', 'subtype', 'created_at', 'duration', 'key']);
             $table->index(['type', 'key']);
             $table->index('user_id');
-            $table->index(['type', 'request_id']);
+            $table->index(['request_id', 'type']);
         });
 
         // Pre-computed per-bucket counts, rolled up from monitor_entries by

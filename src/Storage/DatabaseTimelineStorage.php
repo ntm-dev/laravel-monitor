@@ -41,21 +41,42 @@ class DatabaseTimelineStorage implements TimelineStorage
 
     public function findByRequestId(string $requestId, string $rootType = 'request'): ?object
     {
-        $row = $this->table()
-            ->where('type', $rootType)
-            // A run's root is its outcome, never one of the dispatches it
-            // made — those share its request_id AND its type (see
-            // Recorders\Jobs::DISPATCH), so without this the root could
-            // resolve to a queued placeholder that happened to be inserted
-            // first. Same rule jobExecutionsByJobId() already applies.
-            ->when(
-                $rootType === RecordType::Job->value,
-                fn (Builder $query) => $query->where('subtype', '!=', Jobs::DISPATCH),
-            )
-            ->where('request_id', $requestId)
-            ->first();
+        $row = $this->rootQuery([$requestId], $rootType)->first();
 
         return $row !== null ? $this->hydrate($row) : null;
+    }
+
+    public function findManyByRequestId(array $requestIds, string $rootType = 'request'): Collection
+    {
+        if ($requestIds === []) {
+            return collect();
+        }
+
+        return $this->rootQuery($requestIds, $rootType)
+            ->get()
+            ->map($this->hydrate(...))
+            ->keyBy(fn (object $row) => $row->request_id);
+    }
+
+    /**
+     * @param  list<string>  $requestIds
+     */
+    protected function rootQuery(array $requestIds, string $rootType): Builder
+    {
+        return $this->table()
+            ->where('type', $rootType)
+            // A run's root is its outcome, never one of the dispatches it
+            // made (share its request_id AND its type — see
+            // Recorders\Jobs::DISPATCH) or its own still-in-flight
+            // 'processing' marker (shares its request_id too, recorded
+            // before the outcome — see Recorders\Jobs::PROCESSING) — without
+            // this the root could resolve to either placeholder instead.
+            // Same rule jobExecutionsByJobId() already applies.
+            ->when(
+                $rootType === RecordType::Job->value,
+                fn (Builder $query) => $query->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING]),
+            )
+            ->whereIn('request_id', $requestIds);
     }
 
     public function findById(int $id, string $type): ?object
@@ -86,8 +107,30 @@ class DatabaseTimelineStorage implements TimelineStorage
 
     public function timelineFor(string $requestId, string $rootType = 'request'): Collection
     {
+        return $this->timelineQuery([$requestId], $rootType)
+            ->get()
+            ->map($this->hydrate(...));
+    }
+
+    public function timelinesFor(array $requestIds, string $rootType = 'request'): Collection
+    {
+        if ($requestIds === []) {
+            return collect();
+        }
+
+        return $this->timelineQuery($requestIds, $rootType)
+            ->get()
+            ->map($this->hydrate(...))
+            ->groupBy(fn (object $row) => $row->request_id);
+    }
+
+    /**
+     * @param  list<string>  $requestIds
+     */
+    protected function timelineQuery(array $requestIds, string $rootType): Builder
+    {
         return $this->table()
-            ->where('request_id', $requestId)
+            ->whereIn('request_id', $requestIds)
             // Excluding the root's own type drops too much for a job root:
             // the jobs this run dispatched are children of it, yet share its
             // type (see Recorders\Jobs::DISPATCH). Dropping them left a job
@@ -102,9 +145,7 @@ class DatabaseTimelineStorage implements TimelineStorage
                 fn (Builder $query) => $query->where('type', '!=', $rootType),
             )
             ->orderBy('start_offset')
-            ->orderBy('id')
-            ->get()
-            ->map($this->hydrate(...));
+            ->orderBy('id');
     }
 
     public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
@@ -128,19 +169,17 @@ class DatabaseTimelineStorage implements TimelineStorage
             return collect();
         }
 
-        // Every outcome (processed/failed/released — more than one on a
-        // retry) recorded for these job_ids, grouped back under the id they
-        // share with their own 'queued' dispatch-time placeholder — the
-        // caller already has that placeholder from its own timelineFor()
-        // call, and stitches these children onto it (see Support\Timeline).
-        // Ordered oldest-first: jobTrack() numbers attempts by this
-        // collection's own array position (index + 1), so an unordered
-        // result here — left to whatever the DB engine/index happens to
-        // return — can hand a later retry a lower attempt number than an
-        // earlier one, showing e.g. "Attempt #3" starting before "Attempt #2".
+        // Oldest first: jobTrack() numbers attempts by array position, so an
+        // unordered result can show "Attempt #3" starting before "#2".
+        // Their children come back in one timelinesFor() call below, not one
+        // query per attempt.
         $outcomes = $this->table()
             ->where('type', 'job')
-            ->where('subtype', '!=', 'queued')
+            // Excludes the dispatch placeholder and the outcome's own
+            // still-in-flight 'processing' marker (see Recorders\Jobs) —
+            // neither is a real execution, just the DISPATCH/PROCESSING
+            // rootQuery() already excludes for the same reason.
+            ->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING])
             ->whereIn('payload->job_id', $jobIds)
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
@@ -149,11 +188,13 @@ class DatabaseTimelineStorage implements TimelineStorage
             ->get()
             ->map($this->hydrate(...));
 
+        $children = $this->timelinesFor($outcomes->pluck('request_id')->all(), 'job');
+
         return $outcomes
             ->groupBy(fn (object $row) => $row->payload['job_id'] ?? '')
             ->map(fn (Collection $rows) => $rows->map(fn (object $outcome) => (object) [
                 'outcome' => $outcome,
-                'children' => $this->timelineFor($outcome->request_id, 'job'),
+                'children' => $children->get($outcome->request_id, collect()),
             ]));
     }
 

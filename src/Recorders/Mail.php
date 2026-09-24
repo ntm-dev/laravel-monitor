@@ -52,6 +52,13 @@ class Mail extends Recorder
             $toCount = count($message->getTo());
             $ccCount = count($message->getCc());
             $bccCount = count($message->getBcc());
+            // "Name <email>" per address, unlike $addresses() above (used for
+            // to/cc/bcc, where only the email itself is shown) — the sender's
+            // display name is worth surfacing here since it's usually the
+            // one address a reader actually cares to recognize by name.
+            $from = collect($message->getFrom())
+                ->map(fn ($address) => $address->getName() !== '' ? $address->getName().' <'.$address->getAddress().'>' : $address->getAddress())
+                ->implode(', ');
             $attachmentNames = collect($message->getAttachments())
                 ->map(fn ($part) => $part->getFilename())
                 ->filter()
@@ -63,6 +70,7 @@ class Mail extends Recorder
             $to = '';
             $cc = '';
             $bcc = '';
+            $from = '';
             $toCount = 0;
             $ccCount = 0;
             $bccCount = 0;
@@ -72,6 +80,7 @@ class Mail extends Recorder
 
         $notification = $event->data['__laravel_notification'] ?? null;
         $mailable = $event->data['__laravel_mailable'] ?? null;
+        $body = ($this->config['details']['record_body'] ?? false) ? $this->body($event->message) : null;
 
         // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
         // floats, so subtracting them is a floating-point catastrophic
@@ -97,6 +106,7 @@ class Mail extends Recorder
                 'to' => Str::limit($to, 250),
                 'cc' => Str::limit($cc, 250),
                 'bcc' => Str::limit($bcc, 250),
+                'from' => Str::limit($from, 250),
                 'to_count' => $toCount,
                 'cc_count' => $ccCount,
                 'bcc_count' => $bccCount,
@@ -106,7 +116,9 @@ class Mail extends Recorder
                 'attachments' => $attachments > 0 ? $attachments : null,
                 'attachment_names' => $attachmentNames !== [] ? $attachmentNames : null,
                 'correlation_id' => is_string($notification) ? $this->monitor->pendingNotificationCorrelationId() : null,
-                'body' => ($this->config['details']['record_body'] ?? false) ? $this->body($event->message) : null,
+                'body' => $body['content'] ?? null,
+                'body_format' => $body['format'] ?? null,
+                'server' => gethostname() ?: null,
             ]),
             duration: $duration,
             subtype: is_string($notification) ? 'notification' : 'direct',
@@ -115,13 +127,25 @@ class Mail extends Recorder
         $this->startedAt = null;
     }
 
-    /** Best-effort rendered body (HTML preferred, text as a fallback), capped in size. */
-    protected function body(Email $message): ?string
+    /**
+     * Best-effort rendered body (HTML preferred, text as a fallback), capped
+     * in size — alongside its format, so the dashboard can render it back the
+     * way the recipient's mail client did instead of guessing from content.
+     *
+     * @return array{format: 'html'|'text', content: string}|null
+     */
+    protected function body(Email $message): ?array
     {
         try {
-            $body = $message->getHtmlBody() ?? $message->getTextBody();
+            $html = $message->getHtmlBody();
 
-            return is_string($body) ? Str::limit($body, self::MAX_BODY_CHARS) : null;
+            if (is_string($html)) {
+                return ['format' => 'html', 'content' => Str::limit($html, self::MAX_BODY_CHARS)];
+            }
+
+            $text = $message->getTextBody();
+
+            return is_string($text) ? ['format' => 'text', 'content' => Str::limit($text, self::MAX_BODY_CHARS)] : null;
         } catch (Throwable) {
             return null;
         }

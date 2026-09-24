@@ -52,7 +52,7 @@
                                      inline-php blocks — see resources/views/CLAUDE.md's
                                      "three or more consecutive inline-php blocks" gotcha. --}}
                                 @php
-                                    $sendUrl = route('monitor.outgoing.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => $entry->id] + $range);
+                                    $sendUrl = route('monitor.outgoing.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
                                     $status = $entry->payload['status'] ?? null;
                                     $method = $entry->payload['method'] ?? null;
                                     $methodClass = match ($method) {

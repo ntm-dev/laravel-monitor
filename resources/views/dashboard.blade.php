@@ -3,7 +3,7 @@
      Http\Controllers\DashboardController. --}}
 <x-monitor::layout :title="$pageTitle">
     <div class="flex min-h-screen">
-        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial"/>
+        <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="$detail?->autoRefreshes ?? true"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
             <x-monitor::header :tab="$tab" :tabs="$tabs" :groups="$groups" :title="$title" :detail="$detail" :key="$key" :range="$range"
@@ -36,20 +36,20 @@
                     @livewire('monitor.exception-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'queries' && filled($key))
                     @livewire('monitor.query-detail', $rangeProps + ['key' => $key])
-                @elseif ($tab === 'notifications' && filled($key) && ctype_digit($key))
-                    {{-- $key is one send's own database id (per-occurrence) --}}
+                @elseif ($tab === 'notifications' && filled($key) && preg_match('/^[0-9a-f-]{36}$/i', $key))
+                    {{-- $key is one send's own request_id (per-occurrence) --}}
                     @livewire('monitor.notification-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'notifications' && filled($key))
                     {{-- $key is the notification class (aggregate across all its sends) --}}
                     @livewire('monitor.notification-class-detail', $rangeProps + ['key' => $key])
-                @elseif ($tab === 'mail' && filled($key) && ctype_digit($key))
-                    {{-- $key is one send's own database id (per-occurrence) --}}
+                @elseif ($tab === 'mail' && filled($key) && preg_match('/^[0-9a-f-]{36}$/i', $key))
+                    {{-- $key is one send's own request_id (per-occurrence) --}}
                     @livewire('monitor.mail-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'mail' && filled($key))
                     {{-- $key is the mailable/notification class (aggregate across all its sends) --}}
                     @livewire('monitor.mail-class-detail', $rangeProps + ['key' => $key])
-                @elseif ($tab === 'outgoing' && filled($key) && ctype_digit($key))
-                    {{-- $key is one call's own database id (per-occurrence) --}}
+                @elseif ($tab === 'outgoing' && filled($key) && preg_match('/^[0-9a-f-]{36}$/i', $key))
+                    {{-- $key is one call's own request_id (per-occurrence) --}}
                     @livewire('monitor.outgoing-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'outgoing' && filled($key))
                     {{-- $key is the destination host (aggregate across all calls to it) --}}

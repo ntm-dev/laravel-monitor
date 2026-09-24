@@ -2,11 +2,21 @@
 
 namespace LaravelMonitor\Livewire;
 
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 class JobDetail extends Card
 {
     public const PER_PAGE = 25;
+
+    /**
+     * Raw rows fetched per groupedRuns() call before collapsing to one row per
+     * job_id — same cap-not-a-second-query tradeoff as Livewire\Jobs::MAX_KEYS:
+     * a run whose job_id first appears past this cap is invisible to
+     * groupedRuns() (undercounts totalEntries/pending pages) rather than
+     * costing a second, unbounded query to find it.
+     */
+    protected const MAX_RAW_ENTRIES = 5000;
 
     public string $key = '';
 
@@ -46,7 +56,8 @@ class JobDetail extends Card
         // calls (queued/processed/failed/released) — see Livewire/Overview.php.
         $bySubtype = $storage->statsBySubtype('job', $since, $until, key: $key);
 
-        $totalEntries = $bySubtype->sum('count');
+        $groups = $this->groupedRuns($since, $until, $key);
+        $totalEntries = $groups->count();
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
@@ -60,9 +71,7 @@ class JobDetail extends Card
             'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', $key, $until),
             'releasedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'released', $key, $until),
             'duration' => $storage->durationStats('job', $since, $buckets, $key, null, $until),
-            'entries' => $this->withoutSupersededQueuedRows(
-                $this->timelineStorage()->recent('job', $since, self::PER_PAGE, null, $key, $until, ($page - 1) * self::PER_PAGE)
-            ),
+            'entries' => $groups->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalEntries' => $totalEntries,
             'page' => $page,
             'lastPage' => $lastPage,
@@ -72,31 +81,24 @@ class JobDetail extends Card
     }
 
     /**
-     * Drops a 'queued' row once this page also has the outcome (processed/
-     * failed/released) it was dispatch-time placeholder for — both share
-     * the job's own payload uuid (see Recorders\Jobs::recordQueued()'s
-     * `job_id` payload field; the sync connection never fires JobQueued at
-     * all, so there's no 'queued' row to drop there and this is a no-op).
-     * Without this, a job that both dispatched and finished
-     * inside the same period reads as two separate, unrelated rows instead
-     * of one attempt whose status simply hasn't landed yet — its outcome
-     * row is left untouched, since a retried job can still produce more than
-     * one of those for the same job_id (released, then eventually processed).
+     * Collapses every row belonging to the same dispatch (payload['job_id'],
+     * shared by its 'queued' placeholder and every attempt it went through —
+     * see Recorders\Jobs::recordQueued()/recordProcessing()) down to just
+     * its single most current row, instead of listing a 'processing' row and
+     * its eventual processed/released/failed outcome as two separate,
+     * unrelated runs. recent() already orders newest-first, so the first row
+     * seen for a job_id is that dispatch's current status, and its own
+     * payload['attempts'] is already the right attempt count to show
+     * alongside it — no separate counting pass needed. A row with no job_id
+     * (predates that payload field, or the sync connection, which never
+     * fires JobQueued/gets a uuid) falls back to its own row id so it never
+     * collapses into an unrelated row.
      */
-    protected function withoutSupersededQueuedRows(Collection $entries): Collection
+    protected function groupedRuns(DateTimeInterface $since, ?DateTimeInterface $until, string $key): Collection
     {
-        $jobIdsWithOutcome = $entries
-            ->filter(fn ($entry) => $entry->subtype !== 'queued')
-            ->map(fn ($entry) => $entry->payload['job_id'] ?? null)
-            ->filter()
-            ->flip();
-
-        return $entries
-            ->reject(function ($entry) use ($jobIdsWithOutcome) {
-                $jobId = $entry->payload['job_id'] ?? null;
-
-                return $entry->subtype === 'queued' && $jobId !== null && $jobIdsWithOutcome->has($jobId);
-            })
+        return $this->timelineStorage()
+            ->recent('job', $since, self::MAX_RAW_ENTRIES, null, $key, $until)
+            ->unique(fn (object $entry) => $entry->payload['job_id'] ?? 'row-'.$entry->id)
             ->values();
     }
 }
