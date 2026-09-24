@@ -97,10 +97,15 @@ Schedule::command('monitor:aggregate')->everyMinute();
 ```
 
 Charts and totals filtered to a single route/job/user still scan raw entries
-directly — aggregates only ever back the unfiltered case. Until this is
-scheduled (or for any range older than the aggregator has backfilled), those
-reads fall back to scanning raw entries directly rather than under-reporting
-— slower, but never silently wrong.
+directly — aggregates only ever back the unfiltered case. Until a range has
+been rolled up, those reads fall back to scanning raw entries directly rather
+than under-reporting — slower, but never silently wrong.
+
+Without a schedule, a page that had to fall back to a raw scan also rolls up
+up to `monitor.aggregates.catch_up_buckets` (30) of the buckets it was
+missing after the response is sent, so the range is covered within a few page
+views. Set `MONITOR_AGGREGATE_CATCH_UP=false` to leave it to the scheduler
+alone.
 
 ## Storage
 

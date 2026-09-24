@@ -186,6 +186,134 @@ class AggregatesTest extends TestCase
         $this->assertSame(1, array_sum($counts));
     }
 
+    public function test_catch_up_backfills_buckets_before_the_earliest_one(): void
+    {
+        $now = CarbonImmutable::now();
+        $anchor = $now->subMinutes(3)->setSeconds(0);
+
+        // A scheduler that only started a few minutes ago: monitor_aggregates
+        // begins at $anchor, the raw rows before it were never rolled up.
+        $this->seedAggregateBucket($anchor);
+        $this->insertEntry('request', '2xx', $now->subMinutes(10)->setSeconds(5), duration: 100.0);
+        $this->insertEntry('request', '2xx', $now->subMinutes(8)->setSeconds(5), duration: 300.0);
+        $this->insertEntry('request', '2xx', $anchor->addSeconds(65), duration: 200.0);
+
+        app(Aggregator::class)->catchUp($now->subMinutes(12), period: 60, maxBuckets: 100);
+
+        // Raw rows removed so this only passes if the older buckets really
+        // landed in monitor_aggregates and the range now counts as covered.
+        DB::table('monitor_entries')->delete();
+
+        $stats = app(AggregateStorage::class)->stats('request', $now->subMinutes(12), '2xx');
+
+        $this->assertSame(3, $stats->count);
+        $this->assertSame(200.0, $stats->avg_duration);
+    }
+
+    public function test_catch_up_backfills_at_most_max_buckets_per_run_newest_first(): void
+    {
+        $now = CarbonImmutable::now();
+        // The latest completed bucket, so the forward walk has nothing to do
+        // and the whole budget goes to the backfill.
+        $anchor = $now->subMinute()->setSeconds(0);
+
+        $this->seedAggregateBucket($anchor);
+
+        foreach ([1, 2, 3] as $minutesBeforeAnchor) {
+            $this->insertEntry('request', '2xx', $anchor->subMinutes($minutesBeforeAnchor)->addSeconds(5));
+        }
+
+        app(Aggregator::class)->catchUp($now->subMinutes(30), period: 60, maxBuckets: 2);
+
+        $buckets = DB::table('monitor_aggregates')->where('type', 'request')->pluck('bucket')->sort()->values()->all();
+
+        $this->assertSame([
+            $anchor->subMinutes(2)->getTimestamp(),
+            $anchor->subMinutes(1)->getTimestamp(),
+        ], $buckets);
+    }
+
+    public function test_catch_up_never_reaches_further_back_than_since(): void
+    {
+        $now = CarbonImmutable::now();
+        $anchor = $now->subMinutes(3)->setSeconds(0);
+
+        $this->seedAggregateBucket($anchor);
+        $this->insertEntry('request', '2xx', $now->subMinutes(20)->setSeconds(5));
+
+        app(Aggregator::class)->catchUp($now->subMinutes(10), period: 60, maxBuckets: 100);
+
+        $this->assertSame(0, DB::table('monitor_aggregates')->where('type', 'request')->count());
+    }
+
+    public function test_catch_up_skips_empty_stretches_to_reach_older_entries(): void
+    {
+        $now = CarbonImmutable::now();
+
+        // An idle install: nothing recorded for hours, so the buckets right
+        // behind "now" are all empty and leave no row to anchor the next run.
+        $this->insertEntry('request', '2xx', $now->subHours(3)->setSeconds(5), duration: 100.0);
+
+        app(Aggregator::class)->catchUp($now->subHours(4), period: 60, maxBuckets: 5);
+
+        $this->assertDatabaseHas('monitor_aggregates', [
+            'type' => 'request',
+            'aggregate' => 'count',
+            'value' => 1,
+        ]);
+    }
+
+    public function test_uncovered_range_defers_the_catch_up_until_the_request_terminates(): void
+    {
+        $now = CarbonImmutable::now();
+
+        $this->insertEntry('request', '2xx', $now->subMinutes(5)->setSeconds(5), duration: 100.0);
+
+        $stats = app(AggregateStorage::class)->stats('request', $now->subMinutes(10), '2xx');
+
+        // The page still answers from the raw scan, and nothing was rolled
+        // up inline while it rendered.
+        $this->assertSame(1, $stats->count);
+        $this->assertSame(0, DB::table('monitor_aggregates')->where('type', 'request')->count());
+
+        $this->app->terminate();
+
+        $this->assertDatabaseHas('monitor_aggregates', [
+            'type' => 'request',
+            'subtype' => '2xx',
+            'aggregate' => 'count',
+            'value' => 1,
+        ]);
+    }
+
+    public function test_catch_up_is_not_deferred_when_disabled(): void
+    {
+        config(['monitor.aggregates.catch_up' => false]);
+
+        $now = CarbonImmutable::now();
+
+        $this->insertEntry('request', '2xx', $now->subMinutes(5)->setSeconds(5), duration: 100.0);
+
+        app(AggregateStorage::class)->stats('request', $now->subMinutes(10), '2xx');
+
+        $this->app->terminate();
+
+        $this->assertSame(0, DB::table('monitor_aggregates')->count());
+    }
+
+    protected function seedAggregateBucket(CarbonImmutable $bucket): void
+    {
+        DB::table('monitor_aggregates')->insert([
+            'bucket' => $bucket->getTimestamp(),
+            'period' => 60,
+            'type' => '__seed__',
+            'subtype' => '',
+            'aggregate' => 'count',
+            'value' => 0,
+            'count' => 0,
+        ]);
+    }
+
     protected function insertEntry(string $type, ?string $subtype, CarbonImmutable $createdAt, ?string $key = null, ?float $duration = null): void
     {
         DB::table('monitor_entries')->insert([

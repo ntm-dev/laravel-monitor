@@ -165,6 +165,11 @@ return [
     'aggregates' => [
         'table' => $tablePrefix.'aggregates',
         'period' => env('MONITOR_AGGREGATE_PERIOD', 60),
+        // When a page has to scan raw entries because the range isn't rolled
+        // up yet, fill in up to `catch_up_buckets` buckets after the response
+        // is sent. Set `catch_up` to false to leave it to the scheduler.
+        'catch_up' => env('MONITOR_AGGREGATE_CATCH_UP', true),
+        'catch_up_buckets' => env('MONITOR_AGGREGATE_CATCH_UP_BUCKETS', 30),
     ],
 
     'issues' => [

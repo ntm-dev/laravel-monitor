@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
+use LaravelMonitor\Support\AggregateCatchUp;
 use LaravelMonitor\Support\StorageTime;
 
 /**
@@ -62,7 +63,15 @@ trait UsesAggregatesTable
     {
         $cacheKey = $type.'|'.$this->toTimestamp($since).'|'.($until !== null ? $this->toTimestamp($until) : 'now');
 
-        return $this->aggregatesCoverCache[$cacheKey] ??= $this->computeAggregatesCover($type, $since, $until);
+        if (! isset($this->aggregatesCoverCache[$cacheKey])) {
+            $this->aggregatesCoverCache[$cacheKey] = $this->computeAggregatesCover($type, $since, $until);
+
+            if (! $this->aggregatesCoverCache[$cacheKey]) {
+                app(AggregateCatchUp::class)->defer($since);
+            }
+        }
+
+        return $this->aggregatesCoverCache[$cacheKey];
     }
 
     protected function computeAggregatesCover(string $type, DateTimeInterface $since, ?DateTimeInterface $until): bool
@@ -76,7 +85,13 @@ trait UsesAggregatesTable
             return false;
         }
 
-        if ((int) $bounds->earliest > $this->toTimestamp($since)) {
+        // The first bucket may start after `since` simply because nothing was
+        // recorded before it: only raw rows in that gap make it incomplete.
+        if ((int) $bounds->earliest > $this->toTimestamp($since) && $this->table()
+            ->where('type', $type)
+            ->where('created_at', '>=', $since)
+            ->where('created_at', '<', StorageTime::fromTimestamp((int) $bounds->earliest))
+            ->exists()) {
             return false;
         }
 
