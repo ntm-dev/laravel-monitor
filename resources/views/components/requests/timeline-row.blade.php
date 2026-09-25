@@ -99,6 +99,9 @@
                 @if ($entry->metadata['controller'] ?? null)
                     <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
                 @endif
+                @if ($entry->metadata['render']['name'] ?? null)
+                    <span class="truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500" data-tooltip="{{ $entry->metadata['render']['name'] }}">{{ $entry->metadata['render']['name'] }}</span>
+                @endif
             @else
                 @if ($duplicateColor)
                     <span class="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-{{ $duplicateColor }}-500 pl-px text-[8px] font-bold leading-none text-{{ $duplicateColor }}-500 dark:border-{{ $duplicateColor }}-400 dark:text-{{ $duplicateColor }}-400"
@@ -153,10 +156,13 @@
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-1.5">
                     <span class="font-mono text-[11px] uppercase tracking-tight text-neutral-700 dark:text-neutral-200">{{ $entry->label }}</span>
                     @if ($durationLabel !== '')
-                        <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}</span>
+                        <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $durationLabel }}@if ($entry->metadata['percent'] ?? null) ({{ $entry->metadata['percent'] }})@endif</span>
                     @endif
                     @if ($entry->metadata['controller'] ?? null)
                         <span class="max-w-sm truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->metadata['controller'] }}">{{ $entry->metadata['controller'] }}</span>
+                    @endif
+                    @if ($entry->metadata['render']['name'] ?? null)
+                        <span class="max-w-sm truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->metadata['render']['name'] }}">{{ $entry->metadata['render']['name'] }}</span>
                     @endif
                 </div>
             @else

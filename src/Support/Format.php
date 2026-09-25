@@ -202,6 +202,25 @@ class Format
     }
 
     /**
+     * "12.5%" — one decimal, dropped when it's zero ("12%").
+     */
+    public static function percent(int|float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.').'%';
+    }
+
+    /**
+     * Same locale-aware layout as datetime(), with milliseconds after the
+     * seconds ("H:i:s" becomes "H:i:s.v").
+     */
+    public static function datetimeMs(DateTimeInterface $date): string
+    {
+        $format = self::DATETIME_LOCALES[app()->getLocale()] ?? self::DATETIME;
+
+        return self::datetime($date, str_replace('H:i:s', 'H:i:s.v', $format));
+    }
+
+    /**
      * When an entry's own work actually began. Entries are stamped when they
      * *finish* — `created_at` is the run's end, and only at second precision
      * — so a list showing created_at and a detail page showing "started at"

@@ -2,11 +2,18 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Livewire\Concerns\FiltersByDuration;
+
 class Queries extends Card
 {
+    use FiltersByDuration;
+
     public const PER_PAGE = 25;
 
-    public const SORTABLE = ['key', 'connection', 'calls', 'total', 'avg', 'p95'];
+    public const SORTABLE = ['key', 'connection', 'calls', 'total', 'avg', 'p95', 'last_seen'];
+
+    /** Duration filter tabs, same meaning as Requests::DURATION_FILTERS. */
+    public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
 
     public string $search = '';
 
@@ -82,8 +89,23 @@ class Queries extends Card
             $queries = $queries->filter(fn ($query) => str_contains(strtolower($query->key), $needle))->values();
         }
 
+        // Computed before the tabs so ≥ Avg / ≥ P95 have the period's own
+        // overall avg/p95 to compare each query against.
+        $duration = $storage->durationStats('query', $since, $buckets, null, null, $until);
+        $threshold = (int) config('monitor.thresholds.query', 500);
+
+        [$queries, $durationFilter, $durationFilterCounts] = $this->filterByDuration($queries, 'avg', 'p95', $duration->avg ?? null, $duration->p95 ?? null, $threshold);
+
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'total';
-        $queries = $queries->sortBy($sortBy, SORT_REGULAR, $this->sortDirection === 'desc')->values();
+        // last_seen sorts on its timestamp: SORT_REGULAR can't order the
+        // CarbonImmutable instances queryStats() returns.
+        $queries = $queries
+            ->sortBy(
+                fn ($query) => $sortBy === 'last_seen' ? $query->last_seen->getTimestamp() : $query->{$sortBy},
+                SORT_REGULAR,
+                $this->sortDirection === 'desc',
+            )
+            ->values();
 
         $total = $queries->count();
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
@@ -96,7 +118,10 @@ class Queries extends Card
             // a secondary UI control.
             'calls' => $storage->stats('query', $since, null, null, $until)->count,
             'callBuckets' => $storage->countsPerBucket('query', $since, $buckets, null, null, $until),
-            'duration' => $storage->durationStats('query', $since, $buckets, null, null, $until),
+            'duration' => $duration,
+            'threshold' => $threshold,
+            'durationFilter' => $durationFilter,
+            'durationFilterCounts' => $durationFilterCounts,
             'connections' => $connections,
             'queries' => $queries->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalQueries' => $total,

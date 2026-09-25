@@ -3,7 +3,7 @@
     $startedAt = function ($entry) {
         $start = \LaravelMonitor\Support\Format::startedAt($entry);
 
-        return $start !== null ? \LaravelMonitor\Support\Format::datetime($start) : '—';
+        return $start !== null ? \LaravelMonitor\Support\Format::datetimeMs($start) : '—';
     };
     $tz = \LaravelMonitor\Support\Format::timezone();
     $from = ($page - 1) * $perPage;

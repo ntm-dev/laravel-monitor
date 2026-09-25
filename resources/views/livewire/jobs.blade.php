@@ -26,6 +26,12 @@
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
+                <select wire:model.live="status" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                    <option value="">{{ __('monitor::messages.common.all_statuses') }}</option>
+                    @foreach (\LaravelMonitor\Livewire\Jobs::STATUSES as $statusKey)
+                        <option value="{{ $statusKey }}">{{ __('monitor::messages.common.'.$statusKey) }}</option>
+                    @endforeach
+                </select>
                 <x-monitor::user-filter :users="$users"/>
                 <x-monitor::refresh-button/>
             </div>
@@ -46,12 +52,15 @@
         </div>
 
         {{-- Job table --}}
-        <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalJobs) }} {{ trans_choice('monitor::messages.common.job_count', $totalJobs) }}</h3>
-            <div class="relative">
-                <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_jobs') }}"
-                       class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_jobs') }}"
+                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                </div>
+                <x-monitor::duration-filter :active="$durationFilter" :counts="$durationFilterCounts"/>
             </div>
         </div>
 
@@ -98,7 +107,7 @@
                                 <td class="py-2 text-right font-mono text-xs {{ $job->failed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-300 dark:text-neutral-600' }}">{{ number_format($job->failed) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($job->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($job->avg_duration) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($job->p95_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($job->p95_duration) }}</td>
-                                <td class="whitespace-nowrap py-2 pl-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetime($job->last_seen) }} {{ $tz }}">
+                                <td class="whitespace-nowrap py-2 pl-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetimeMs($job->last_seen) }} {{ $tz }}">
                                     <x-monitor::relative-time :at="$job->last_seen"/>
                                 </td>
                                 <td class="py-2 pl-2 text-right">

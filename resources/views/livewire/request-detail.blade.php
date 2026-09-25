@@ -25,29 +25,7 @@
                 <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.request_count', $totalEntries) }}</h2>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
-                    @foreach ([
-                        'all' => __('monitor::messages.common.view_all'),
-                        'avg' => '≥ '.__('monitor::messages.common.avg'),
-                        'p95' => '≥ '.__('monitor::messages.common.p95'),
-                        'threshold' => '≥ '.__('monitor::messages.common.threshold'),
-                    ] as $filterKey => $filterLabel)
-                        <button type="button" wire:click="setDurationFilter('{{ $filterKey }}')"
-                                wire:loading.attr="disabled" wire:target="setDurationFilter('{{ $filterKey }}')"
-                                @class([
-                                    'flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 transition-colors',
-                                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $durationFilter === $filterKey,
-                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $durationFilter !== $filterKey,
-                                ])>
-                            {{ $filterLabel }}
-                            <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[10px] text-neutral-600 dark:text-neutral-300">{{ $durationFilterCounts[$filterKey] }}</span>
-                            <svg wire:loading wire:target="setDurationFilter('{{ $filterKey }}')" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z"></path>
-                            </svg>
-                        </button>
-                    @endforeach
-                </div>
+                <x-monitor::duration-filter :active="$durationFilter" :counts="$durationFilterCounts"/>
                 <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
                     @foreach ([
                         'all' => ['label' => __('monitor::messages.common.view_all'), 'badge' => 'bg-neutral-200/80 dark:bg-neutral-500/80 text-neutral-600 dark:text-neutral-300'],
@@ -102,9 +80,9 @@
                             <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs">
                                     @if ($detailUrl)
-                                        <a href="{{ $detailUrl }}" class="text-blue-600 hover:underline dark:text-blue-400" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</a>
+                                        <a href="{{ $detailUrl }}" class="text-neutral-700 hover:underline dark:text-neutral-200" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }}</a>
                                     @else
-                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }}</span>
+                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }}</span>
                                     @endif
                                     <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span>
                                 </td>

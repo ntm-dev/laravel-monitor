@@ -60,7 +60,7 @@
                                 $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
                             @endphp
                             <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                 <td class="{{ $sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($sourceUrl) onclick="window.location='{{ $sourceUrl }}'" @endif>
                                     <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$sourceUrl"/>
                                 </td>

@@ -51,7 +51,7 @@
     <div class="flex items-stretch divide-x divide-neutral-200 dark:divide-neutral-800">
         <x-monitor::requests.timeline-tree :rows="$rows" />
         <x-monitor::requests.timeline-chart :rows="$rows" />
-        <x-monitor::requests.timeline-detail-panel />
+        <x-monitor::requests.timeline-detail-panel :has-controller="$hasController" />
     </div>
 
     {{-- Shared tree-pane tooltip, positioned in the viewport (not the row)
