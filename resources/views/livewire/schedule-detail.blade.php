@@ -52,7 +52,7 @@
                             @php($runUrl = ($entry->request_id ?? null) ? route('monitor.schedule.runs.show', $entry->request_id) : null)
                             <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                 <td class="py-2 pr-3">
                                     <span @class([
                                         'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',

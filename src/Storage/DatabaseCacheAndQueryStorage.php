@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor\Storage;
 
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -79,7 +80,7 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
-            ->get(['key', 'duration', 'payload']);
+            ->get(['key', 'duration', 'payload', 'created_at']);
 
         // Single foreach pass with plain arrays — building/re-collecting a
         // Collection per group was measurably slower at the sample cap.
@@ -91,7 +92,8 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             $groupKey = $row->key.'@@'.$connection;
 
             $group = &$groups[$groupKey];
-            $group ??= ['key' => (string) $row->key, 'connection' => $connection, 'calls' => 0, 'durations' => [], 'connectionTypes' => []];
+            // Rows arrive newest-first, so the first row seen per group is its last_seen.
+            $group ??= ['key' => (string) $row->key, 'connection' => $connection, 'calls' => 0, 'durations' => [], 'connectionTypes' => [], 'last_seen' => $row->created_at];
 
             $group['calls']++;
 
@@ -127,6 +129,7 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
                 'total' => round(array_sum($durations), 2),
                 'avg' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                 'p95' => $this->percentile($durations, 0.95),
+                'last_seen' => CarbonImmutable::parse($group['last_seen']),
             ];
         }
 

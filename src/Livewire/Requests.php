@@ -4,12 +4,14 @@ namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Str;
 use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
+use LaravelMonitor\Livewire\Concerns\FiltersByDuration;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\HttpStatusGroup;
 
 class Requests extends Card
 {
     use CombinesSubtypeStats;
+    use FiltersByDuration;
     use ResolvesUserNames;
 
     public const PER_PAGE = 25;
@@ -30,8 +32,6 @@ class Requests extends Card
 
     public string $search = '';
 
-    public string $durationFilter = 'all';
-
     public string $userId = '';
 
     public string $sortBy = 'count';
@@ -48,17 +48,6 @@ class Requests extends Card
     public function clearSearch(): void
     {
         $this->search = '';
-        $this->page = 1;
-    }
-
-    /**
-     * A real method (not wire:click="$set(...)") so the tab buttons can
-     * target it precisely by call signature for their own wire:loading
-     * spinner — $set()'s own call isn't reliably matchable that way.
-     */
-    public function setDurationFilter(string $value): void
-    {
-        $this->durationFilter = in_array($value, self::DURATION_FILTERS, true) ? $value : 'all';
         $this->page = 1;
     }
 
@@ -121,28 +110,9 @@ class Requests extends Card
             $routes = $routes->filter(fn ($route) => str_contains(strtolower($route->key), $needle))->values();
         }
 
-        $atOrAboveAvg = fn ($route) => ($route->avg_duration ?? 0) >= ($duration->avg ?? 0);
-        $atOrAboveP95 = fn ($route) => ($route->p95_duration ?? 0) >= ($duration->p95 ?? 0);
-        $atOrAboveThreshold = fn ($route) => ($route->avg_duration ?? 0) >= $threshold || ($route->p95_duration ?? 0) >= $threshold;
-
         // Tab badge counts reflect the search filter above but not the
-        // duration filter itself, so switching tabs shows every option's
-        // count against the same base set instead of just the active one.
-        $durationFilterCounts = [
-            'all' => $routes->count(),
-            'avg' => $routes->filter($atOrAboveAvg)->count(),
-            'p95' => $routes->filter($atOrAboveP95)->count(),
-            'threshold' => $routes->filter($atOrAboveThreshold)->count(),
-        ];
-
-        $durationFilter = in_array($this->durationFilter, self::DURATION_FILTERS, true) ? $this->durationFilter : 'all';
-
-        $routes = match ($durationFilter) {
-            'avg' => $routes->filter($atOrAboveAvg)->values(),
-            'p95' => $routes->filter($atOrAboveP95)->values(),
-            'threshold' => $routes->filter($atOrAboveThreshold)->values(),
-            default => $routes,
-        };
+        // duration filter itself.
+        [$routes, $durationFilter, $durationFilterCounts] = $this->filterByDuration($routes, 'avg_duration', 'p95_duration', $duration->avg ?? null, $duration->p95 ?? null, $threshold);
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'count';
         // last_seen sorts on its timestamp: SORT_REGULAR can't order the

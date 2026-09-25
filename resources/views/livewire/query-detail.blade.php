@@ -116,16 +116,24 @@
          present: unlike the timeline panel's one-entry view, this page
          already has the SQL card open above it. --}}
     @if ($trace)
-        <x-monitor::card class="mt-1.5" x-data="{ expanded: false }">
-            <button type="button" @click="expanded = ! expanded" class="flex w-full items-center justify-between gap-2 p-4 text-left">
-                <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</span>
-                <span class="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 dark:text-neutral-500">
-                    <x-monitor::chevrons-updown x-show="expanded" direction="down-up"/>
-                    <x-monitor::chevrons-updown x-show="! expanded" x-cloak direction="up-down"/>
-                </span>
-            </button>
+        <x-monitor::card class="mt-1.5" x-data="{ expanded: false, copied: false }">
+            <div class="flex items-center">
+                <button type="button" @click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center justify-between gap-2 p-4 text-left">
+                    <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</span>
+                    <span class="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 dark:text-neutral-500">
+                        <x-monitor::chevrons-updown x-show="expanded" direction="down-up"/>
+                        <x-monitor::chevrons-updown x-show="! expanded" x-cloak direction="up-down"/>
+                    </span>
+                </button>
+                <button type="button" @click="navigator.clipboard.writeText(@js($trace)); copied = true; setTimeout(() => copied = false, 1500)"
+                    :data-tooltip="copied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
+                    class="mr-4 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! copied" />
+                    <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="copied" x-cloak />
+                </button>
+            </div>
             <div x-show="expanded" x-cloak class="border-t border-neutral-100 px-4 pb-4 pt-3 dark:border-neutral-800">
-                <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">{{ $trace }}</pre>
+                <pre class="max-h-64 overflow-auto whitespace-pre font-mono text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">{{ $trace }}</pre>
             </div>
         </x-monitor::card>
     @endif
@@ -162,7 +170,7 @@
                                 @php($connection = $entry->payload['connection'] ?? null)
                                 @php($connectionType = $entry->payload['connection_type'] ?? null)
                                 <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetime($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                     <td class="{{ $entry->sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($entry->sourceUrl) onclick="window.location='{{ $entry->sourceUrl }}'" @endif>
                                         @if ($entry->sourceType)
                                             <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$entry->sourceUrl"/>

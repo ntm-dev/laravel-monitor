@@ -4,7 +4,10 @@ namespace LaravelMonitor;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
@@ -897,9 +900,32 @@ class Monitor
      * middleware pipeline (Route::run()'s Pipeline `then()` callback) —
      * before bubbling back out through any middleware's post-`$next()` code.
      */
-    public function markRenderStart(): void
+    public function markRenderStart(mixed $event = null): void
     {
+        if ($this->request !== null && $this->request->stage === ExecutionStage::Action) {
+            $this->request->render = $this->describeRender($event?->response ?? null);
+        }
+
         $this->transitionStage(ExecutionStage::Render, from: ExecutionStage::Action);
+    }
+
+    /**
+     * The view name or API resource class behind what the controller
+     * returned; reads already-resolved state only, never triggers a query.
+     *
+     * @return array{type: string, name: string}|null
+     */
+    protected function describeRender(mixed $response): ?array
+    {
+        if ($response instanceof ViewContract) {
+            return ['type' => 'view', 'name' => $response->name()];
+        }
+
+        if ($response instanceof JsonResource || $response instanceof ResourceCollection) {
+            return ['type' => 'resource', 'name' => $response::class];
+        }
+
+        return null;
     }
 
     /**
@@ -1062,6 +1088,11 @@ class Monitor
         $this->recordPhase($this->request->stage, $this->request->currentExecutionStageStartedAtMicrotime, $elapsed - $this->request->currentExecutionStageStartedAtMicrotime);
 
         $entry->payload['phases'] = $this->request->phases;
+
+        if ($this->request->render !== null) {
+            $entry->payload['render'] = $this->request->render;
+        }
+
         $entry->payload['query_count'] = $this->request->queries;
         $entry->payload['model_count'] = $this->request->hydratedModels;
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);

@@ -10,6 +10,7 @@
      No x-transition: it silently broke the very first selection after page
      load (stayed at width 0 until toggled twice) — verified by removing
      just that, everything else equal. --}}
+@props(['hasController' => false])
 <div x-show="selectedId !== null" class="w-80 shrink-0">
     <div :style="'top: ' + timelineHeaderOffset + 'px; max-height: calc(100vh - ' + timelineHeaderOffset + 'px)'"
         class="sticky divide-y divide-neutral-200 overflow-y-auto dark:divide-neutral-800">
@@ -153,8 +154,16 @@
                      of every occurrence. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
-                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
-                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                        <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
+                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <button type="button" @click="copyTrace()"
+                                :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
+                                class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! traceCopied" />
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="traceCopied" x-cloak />
+                            </button>
+                        </dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
                             x-text="selected()?.metadata?.trace"></dd>
                     </div>
                 </template>
@@ -349,8 +358,16 @@
                      — off by default, see Settings::RECORDER_DETAILS). --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
-                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
-                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                        <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
+                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <button type="button" @click="copyTrace()"
+                                :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
+                                class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! traceCopied" />
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="traceCopied" x-cloak />
+                            </button>
+                        </dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
                             x-text="selected()?.metadata?.trace"></dd>
                     </div>
                 </template>
@@ -438,8 +455,16 @@
                      above. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
-                        <dt class="mb-1.5 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</dt>
-                        <dd class="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+                        <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
+                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <button type="button" @click="copyTrace()"
+                                :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
+                                class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! traceCopied" />
+                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="traceCopied" x-cloak />
+                            </button>
+                        </dt>
+                        <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
                             x-text="selected()?.metadata?.trace"></dd>
                     </div>
                 </template>
@@ -518,10 +543,34 @@
              above instead, see the header block). --}}
         <template x-if="selected()?.kind === 'phase'">
             <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
+                {{-- start row phase action --}}
+                @if ($hasController)
+                <template x-if="selected()?.metadata?.controller">
+                    <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                        <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.action') }}</dt>
+                        <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
+                            style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.controller"
+                            x-text="selected()?.metadata?.controller"></dd>
+                    </div>
+                </template>
+                @endif
+                {{-- end row phase action --}}
+                {{-- start row phase render --}}
+                <template x-if="selected()?.metadata?.render">
+                    <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
+                        <dt class="shrink-0 text-neutral-500 dark:text-neutral-400"
+                            x-text="selected()?.metadata?.render?.type === 'view' ? @js(__('monitor::messages.common.render_view')) : @js(__('monitor::messages.common.render_resource'))"></dt>
+                        <dd class="min-w-0 truncate font-mono text-neutral-800 dark:text-neutral-200"
+                            style="direction: rtl; text-align: left;" :data-tooltip="selected()?.metadata?.render?.name"
+                            x-text="selected()?.metadata?.render?.name"></dd>
+                    </div>
+                </template>
+                {{-- end row phase render --}}
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
+                        :data-tooltip="selected()?.metadata?.ended_at"
+                        x-text="formatDuration(selected()?.duration) + (selected()?.metadata?.percent ? ' (' + selected().metadata.percent + ')' : '')"></dd>
                 </div>
             </dl>
         </template>
