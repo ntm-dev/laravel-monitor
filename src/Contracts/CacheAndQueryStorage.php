@@ -19,7 +19,7 @@ interface CacheAndQueryStorage
     /**
      * Per (query, connection) breakdown, unsorted: one row per pair exposing
      * key (the SQL), connection, connection_types (every PDO role the pair's
-     * calls ran under, possibly more than one), calls, total, avg, p95.
+     * calls ran under, possibly more than one), calls, total, avg, p95, last_seen.
      * Callers sort/paginate themselves. Sampled at high volume — `calls`/
      * `total` are exact only up to maxSampleRows() matching rows.
      */

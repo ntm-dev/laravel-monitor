@@ -2,16 +2,24 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Livewire\Concerns\FiltersByDuration;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Recorders\Jobs as JobRecorder;
 
 class Jobs extends Card
 {
+    use FiltersByDuration;
     use ResolvesUserNames;
 
     public const PER_PAGE = 25;
 
     public const SORTABLE = ['key', 'total', 'dispatched', 'pending', 'processing', 'processed', 'released', 'failed', 'avg_duration', 'p95_duration', 'last_seen'];
+
+    /** Duration filter tabs, same meaning as Requests::DURATION_FILTERS. */
+    public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
+
+    /** Status dropdown: keeps jobs with at least one attempt in that state. */
+    public const STATUSES = ['dispatched', 'pending', 'processing', 'processed', 'released', 'failed'];
 
     /**
      * Per-subtype grouped rows are capped here rather than at the previous
@@ -29,6 +37,8 @@ class Jobs extends Card
 
     public string $userId = '';
 
+    public string $status = '';
+
     public string $sortBy = 'last_seen';
 
     public string $sortDirection = 'desc';
@@ -41,6 +51,11 @@ class Jobs extends Card
     }
 
     public function updatedUserId(): void
+    {
+        $this->page = 1;
+    }
+
+    public function updatedStatus(): void
     {
         $this->page = 1;
     }
@@ -164,6 +179,15 @@ class Jobs extends Card
             $jobs = $jobs->filter(fn ($job) => str_contains(strtolower($job->key), $needle))->values();
         }
 
+        if (in_array($this->status, self::STATUSES, true)) {
+            $jobs = $jobs->filter(fn ($job) => $job->{$this->status} > 0)->values();
+        }
+
+        $duration = $storage->durationStats('job', $since, $buckets, null, null, $until, $userId);
+        $threshold = (int) config('monitor.thresholds.job', 1000);
+
+        [$jobs, $durationFilter, $durationFilterCounts] = $this->filterByDuration($jobs, 'avg_duration', 'p95_duration', $duration->avg ?? null, $duration->p95 ?? null, $threshold);
+
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'last_seen';
         // last_seen sorts on its timestamp: SORT_REGULAR can't order the
         // CarbonImmutable instances aggregateByKey() returns.
@@ -188,14 +212,16 @@ class Jobs extends Card
             'processedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'processed', null, $until, $userId),
             'failedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'failed', null, $until, $userId),
             'releasedBuckets' => $storage->countsPerBucket('job', $since, $buckets, 'released', null, $until, $userId),
-            'duration' => $storage->durationStats('job', $since, $buckets, null, null, $until, $userId),
+            'duration' => $duration,
+            'durationFilter' => $durationFilter,
+            'durationFilterCounts' => $durationFilterCounts,
             'jobs' => $jobs->slice(($page - 1) * self::PER_PAGE, self::PER_PAGE)->values(),
             'totalJobs' => $total,
             'page' => $page,
             'lastPage' => $lastPage,
             'perPage' => self::PER_PAGE,
             'users' => $this->userFilterOptions('job', $since, $until),
-            'threshold' => (int) config('monitor.thresholds.job', 1000),
+            'threshold' => $threshold,
         ];
     }
 }

@@ -64,7 +64,7 @@ trait BuildsExceptionDetail
             $sourceType = $rootTypes->get($row->request_id);
 
             return (object) [
-                'date' => \LaravelMonitor\Support\Format::datetime($row->created_at),
+                'date' => \LaravelMonitor\Support\Format::datetimeMs($row->created_at),
                 'message' => $row->payload['message'] ?? null,
                 'user' => $names[$row->user_id] ?? __('monitor::messages.common.guest'),
                 'sourceType' => $sourceType,

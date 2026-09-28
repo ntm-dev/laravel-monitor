@@ -11,9 +11,11 @@
         'total' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
         'p95' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
+        'last_seen' => ['label' => __('monitor::messages.common.last_seen'), 'align' => 'right'],
     ];
 
     $from = ($page - 1) * $perPage;
+    $tz = Format::timezone();
 @endphp
 <div data-monitor-poll>
     <x-monitor::section>
@@ -48,12 +50,15 @@
         </div>
 
         {{-- Query table --}}
-        <div class="mt-4 flex items-center justify-between gap-2 px-1 pb-3">
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalQueries) }} {{ trans_choice('monitor::messages.common.query_count', $totalQueries) }}</h3>
-            <div class="relative">
-                <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_queries') }}"
-                       class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_queries') }}"
+                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                </div>
+                <x-monitor::duration-filter :active="$durationFilter" :counts="$durationFilterCounts"/>
             </div>
         </div>
 
@@ -103,8 +108,11 @@
                                     </td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($query->calls) }}</td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($query->total) }}</td>
-                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($query->avg) }}</td>
-                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($query->p95) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs {{ ($query->avg ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($query->avg) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs {{ ($query->p95 ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($query->p95) }}</td>
+                                    <td class="whitespace-nowrap py-2 pl-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetimeMs($query->last_seen) }} {{ $tz }}">
+                                        <x-monitor::relative-time :at="$query->last_seen"/>
+                                    </td>
                                     <td class="py-2 pl-2 text-right">
                                         <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border
                                             border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200
@@ -118,7 +126,7 @@
                             @endforeach
                         </tbody>
                         <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                            <x-monitor::table-skeleton :columns="7" :rows="count($queries)"/>
+                            <x-monitor::table-skeleton :columns="8" :rows="count($queries)"/>
                         </tbody>
                     </table>
                 </div>

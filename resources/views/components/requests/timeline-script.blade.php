@@ -291,6 +291,7 @@
     heartbeatGroupTimer: null,
     tooltip: { text: '', top: 0, left: 0 },
     sqlCopied: false,
+    traceCopied: false,
     dragging: false,
     dragMoved: false,
     dragStartX: 0,
@@ -360,6 +361,13 @@
         navigator.clipboard.writeText(sql);
         this.sqlCopied = true;
         setTimeout(() => this.sqlCopied = false, 1500);
+    },
+    copyTrace() {
+        const trace = this.selected()?.metadata?.trace;
+        if (!trace) return;
+        navigator.clipboard.writeText(trace);
+        this.traceCopied = true;
+        setTimeout(() => this.traceCopied = false, 1500);
     },
     {{-- Fixed-position, not the row's own absolutely-positioned child: the
          pinned tree pane clips overflow to hold its column width steady,

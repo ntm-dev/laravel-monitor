@@ -53,6 +53,9 @@ class Timeline extends Component
     /** JSON entry map (id => type/label/start/duration/metadata) for Alpine, across every track. */
     public string $entriesJson;
 
+    /** Whether any phase carries a controller action — only a request's does, so a command page never gets the Action row's markup. */
+    public bool $hasController = false;
+
     /**
      * The fixed scale every bar/tick on the page is positioned against —
      * spans from the earliest row's start to the latest row's end, across
@@ -207,6 +210,7 @@ class Timeline extends Component
         }
 
         $this->entriesJson = Js::from($entriesById)->toHtml();
+        $this->hasController = collect($entriesById)->contains(fn (array $entry) => isset($entry['metadata']['controller']));
 
         // A zero-duration entry (an instantaneous marker, not a span) has no
         // real proportional share of the timeline to render at all — it

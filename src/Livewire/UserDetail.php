@@ -4,12 +4,14 @@ namespace LaravelMonitor\Livewire;
 
 use Illuminate\Support\Str;
 use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
+use LaravelMonitor\Livewire\Concerns\FiltersByDuration;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\HttpStatusGroup;
 
 class UserDetail extends Card
 {
     use CombinesSubtypeStats;
+    use FiltersByDuration;
     use ResolvesUserNames;
 
     public const PER_PAGE = 25;
@@ -26,19 +28,11 @@ class UserDetail extends Card
 
     public string $statusFilter = 'all';
 
-    public string $durationFilter = 'all';
-
     public int $page = 1;
 
     public function setStatusFilter(string $value): void
     {
         $this->statusFilter = in_array($value, self::STATUS_FILTERS, true) ? $value : 'all';
-        $this->page = 1;
-    }
-
-    public function setDurationFilter(string $value): void
-    {
-        $this->durationFilter = in_array($value, self::DURATION_FILTERS, true) ? $value : 'all';
         $this->page = 1;
     }
 

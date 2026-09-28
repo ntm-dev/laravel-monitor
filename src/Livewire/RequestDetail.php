@@ -3,11 +3,13 @@
 namespace LaravelMonitor\Livewire;
 
 use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
+use LaravelMonitor\Livewire\Concerns\FiltersByDuration;
 use LaravelMonitor\Support\HttpStatusGroup;
 
 class RequestDetail extends Card
 {
     use CombinesSubtypeStats;
+    use FiltersByDuration;
 
     public const PER_PAGE = 25;
 
@@ -31,8 +33,6 @@ class RequestDetail extends Card
 
     public string $statusFilter = 'all';
 
-    public string $durationFilter = 'all';
-
     public int $page = 1;
 
     public function mount(?string $period = null, ?string $from = null, ?string $to = null, ?string $key = null): void
@@ -50,12 +50,6 @@ class RequestDetail extends Card
     public function setStatusFilter(string $value): void
     {
         $this->statusFilter = in_array($value, self::STATUS_FILTERS, true) ? $value : 'all';
-        $this->page = 1;
-    }
-
-    public function setDurationFilter(string $value): void
-    {
-        $this->durationFilter = in_array($value, self::DURATION_FILTERS, true) ? $value : 'all';
         $this->page = 1;
     }
 

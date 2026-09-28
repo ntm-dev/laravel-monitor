@@ -1466,6 +1466,29 @@ class MonitorTest extends TestCase
         $this->assertNotSame($renderQuery->parentId, $unwindingQuery->parentId);
     }
 
+    public function test_render_phase_carries_the_view_name_the_controller_returned(): void
+    {
+        $monitor = app(\LaravelMonitor\Monitor::class);
+
+        $monitor->beginRequest();
+        $monitor->markControllerStart();
+        $monitor->markRenderStart(new \Illuminate\Routing\Events\PreparingResponse(request(), view('monitor::components.card')));
+        $monitor->markUnwinding();
+        $monitor->markResponseReady();
+        Monitor::record(RecordType::Request, 'GET /users', ['request' => ['method' => 'GET', 'path' => '/users', 'route_action' => 'UserController@index'], 'response' => ['status' => 200]], 120, '2xx', 1);
+        Monitor::flush();
+
+        $storage = app(TimelineStorage::class);
+        $root = $storage->findByRequestId($monitor->requestId());
+
+        $this->assertSame(['type' => 'view', 'name' => 'monitor::components.card'], $root->payload['render']);
+
+        $phases = collect(\LaravelMonitor\Support\Timeline::build($root, collect(), $root->created_at->timestamp))->keyBy('type');
+
+        $this->assertSame(['type' => 'view', 'name' => 'monitor::components.card'], $phases['render']->metadata['render']);
+        $this->assertSame('UserController@index', $phases['action']->metadata['controller']);
+    }
+
     /**
      * Rows stored before this "live" phase tag existed have no
      * `payload['phase']` key at all — Timeline must still attribute them to

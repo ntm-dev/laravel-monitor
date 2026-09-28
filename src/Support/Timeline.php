@@ -107,7 +107,13 @@ class Timeline
             metadata: array_filter(['status' => $root->payload['response']['status'] ?? null], static fn ($value) => $value !== null),
         );
 
-        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['request']['route_action'] ?? null, $root->type);
+        $phases = self::phaseEntries($root->payload['phases'] ?? [], $root->payload['request']['route_action'] ?? null, $root->type, $root->payload['render'] ?? null);
+
+        foreach ($phases as $phase) {
+            if ($requestEntry->duration > 0) {
+                $phase->metadata['percent'] = Format::percent($phase->duration / $requestEntry->duration * 100);
+            }
+        }
 
         $events = self::assignLanes(
             $visibleChildren
@@ -237,9 +243,11 @@ class Timeline
      * @param  string  $rootType  the root's own RecordType value ('request'/'command'/...) —
      *                            picks the Action phase's label, since it's shared by a
      *                            request's controller phase and a command's handle() phase.
+     * @param  array{type: string, name: string}|null  $render  the view name / resource class the
+     *                                                          controller returned, shown on the Render phase.
      * @return TimelineEntry[]
      */
-    protected static function phaseEntries(array $phases, ?string $routeAction, string $rootType): array
+    protected static function phaseEntries(array $phases, ?string $routeAction, string $rootType, ?array $render = null): array
     {
         $byName = collect($phases)->keyBy('name');
 
@@ -264,7 +272,11 @@ class Timeline
                 start: max(0.0, (float) $phase['start']),
                 duration: max(0.0, (float) $phase['duration']),
                 parentId: 'request',
-                metadata: $name === ExecutionStage::Action->value && $routeAction !== null ? ['controller' => $routeAction] : [],
+                metadata: match (true) {
+                    $name === ExecutionStage::Action->value && $routeAction !== null => ['controller' => $routeAction],
+                    $name === ExecutionStage::Render->value && $render !== null => ['render' => $render],
+                    default => [],
+                },
             );
         }
 

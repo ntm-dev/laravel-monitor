@@ -201,7 +201,7 @@
                                     <td class="w-px whitespace-nowrap px-[18px] py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($user->requests) }}</td>
                                     <td class="w-px whitespace-nowrap px-[18px] py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($user->queued_jobs) }}</td>
                                     <td class="w-px whitespace-nowrap px-[18px] py-2 text-right font-mono text-xs {{ $user->exceptions > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($user->exceptions) }}</td>
-                                    <td class="w-px whitespace-nowrap px-[18px] py-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetime($user->last_seen) }} {{ $tz }}">
+                                    <td class="w-px whitespace-nowrap px-[18px] py-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetimeMs($user->last_seen) }} {{ $tz }}">
                                         <x-monitor::relative-time :at="$user->last_seen"/>
                                     </td>
                                 </tr>

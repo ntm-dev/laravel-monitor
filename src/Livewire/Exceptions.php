@@ -162,7 +162,7 @@ class Exceptions extends Card
             'unhandled' => $group->unhandled,
             'handled' => $group->unhandled === 0,
             'last_seen_human' => $group->last_seen?->diffForHumans(short: true),
-            'last_seen_full' => $group->last_seen !== null ? Format::datetime($group->last_seen).' '.$tz : null,
+            'last_seen_full' => $group->last_seen !== null ? Format::datetimeMs($group->last_seen).' '.$tz : null,
         ];
     }
 }

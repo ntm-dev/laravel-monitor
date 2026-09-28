@@ -26,6 +26,14 @@ final class RequestState
     public array $phases = [];
 
     /**
+     * What the controller handed back to render: a view name or an API
+     * resource class. Set by Monitor::markRenderStart(); null for anything else.
+     *
+     * @var array{type: string, name: string}|null
+     */
+    public ?array $render = null;
+
+    /**
      * @param  float  $currentExecutionStageStartedAtMicrotime  ms elapsed
      *                since the request started (Monitor.php's own existing
      *                clock base), not an absolute microtime() — so it keeps
