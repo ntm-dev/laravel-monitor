@@ -15,7 +15,6 @@ use function implode;
  */
 final class Trace
 {
-    protected const DEPTH = 30;
 
     /**
      * PHP's own getTraceAsString() style ("#0 file(line): Class->method()"),
@@ -24,7 +23,7 @@ final class Trace
      */
     public static function capture(): ?string
     {
-        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, self::DEPTH + 1);
+        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
 
         // Frame 0 is always inside the recorder's own trace-building method
         // — never meaningful to show as the caller.

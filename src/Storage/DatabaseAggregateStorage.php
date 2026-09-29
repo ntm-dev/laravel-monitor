@@ -15,7 +15,9 @@ use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\StorageTime;
 
+use function in_array;
 use function is_array;
+use function func_get_args;
 
 class DatabaseAggregateStorage implements AggregateStorage
 {
@@ -30,6 +32,23 @@ class DatabaseAggregateStorage implements AggregateStorage
         string $orderBy = 'count',
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
+    ): Collection {
+        return $this->cacheRemember(
+            __FUNCTION__,
+            func_get_args(),
+            $until,
+            fn () => $this->aggregateByKeyUncached($type, $since, $subtype, $limit, $orderBy, $until, $userId),
+        );
+    }
+
+    protected function aggregateByKeyUncached(
+        string $type,
+        DateTimeInterface $since,
+        ?string $subtype,
+        int $limit,
+        string $orderBy,
+        ?DateTimeInterface $until,
+        int|string|null $userId,
     ): Collection {
         if (! in_array($orderBy, ['count', 'avg_duration', 'max_duration', 'last_seen'], true)) {
             $orderBy = 'count';
@@ -279,6 +298,20 @@ class DatabaseAggregateStorage implements AggregateStorage
         DateTimeInterface $since,
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
+    ): Collection {
+        return $this->cacheRemember(
+            __FUNCTION__,
+            func_get_args(),
+            $until,
+            fn () => $this->routeStatsUncached($type, $since, $until, $userId),
+        );
+    }
+
+    protected function routeStatsUncached(
+        string $type,
+        DateTimeInterface $since,
+        ?DateTimeInterface $until,
+        int|string|null $userId,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
             // created_at, not id, as the primary sort — see cacheKeyStats()

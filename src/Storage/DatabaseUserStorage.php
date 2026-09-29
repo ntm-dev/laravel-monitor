@@ -69,6 +69,20 @@ class DatabaseUserStorage implements UserStorage
         ?int $limit = 10,
         ?DateTimeInterface $until = null,
     ): Collection {
+        return $this->cacheRemember(
+            __FUNCTION__,
+            func_get_args(),
+            $until,
+            fn () => $this->topUsersUncached($type, $since, $limit, $until),
+        );
+    }
+
+    protected function topUsersUncached(
+        string $type,
+        DateTimeInterface $since,
+        ?int $limit,
+        ?DateTimeInterface $until,
+    ): Collection {
         // See DatabaseCacheAndQueryStorage::cacheKeyStats() for why the
         // GROUP BY runs over a capped subquery, ordered by created_at rather
         // than id, rather than the raw filtered table directly.
@@ -95,6 +109,11 @@ class DatabaseUserStorage implements UserStorage
     }
 
     public function userStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
+    {
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), $until, fn () => $this->userStatsUncached($since, $until));
+    }
+
+    protected function userStatsUncached(DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
         $rows = $this->table()
             ->whereIn('type', [RecordType::Request->value, RecordType::Job->value, RecordType::Exception->value])

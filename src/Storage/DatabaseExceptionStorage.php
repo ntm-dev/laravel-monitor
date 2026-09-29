@@ -17,6 +17,19 @@ class DatabaseExceptionStorage implements ExceptionStorage
         ?DateTimeInterface $until = null,
         int|string|null $userId = null,
     ): Collection {
+        return $this->cacheRemember(
+            __FUNCTION__,
+            func_get_args(),
+            $until,
+            fn () => $this->exceptionGroupsUncached($since, $until, $userId),
+        );
+    }
+
+    protected function exceptionGroupsUncached(
+        DateTimeInterface $since,
+        ?DateTimeInterface $until,
+        int|string|null $userId,
+    ): Collection {
         // Two narrow passes, not one wide one: `payload` is by far the
         // widest column (an exception's full class/message/file/line/trace),
         // so fetching it for every sampled row here instead of once per

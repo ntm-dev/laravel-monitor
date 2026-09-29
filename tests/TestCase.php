@@ -150,6 +150,13 @@ abstract class TestCase extends Orchestra
         // Belt-and-suspenders alongside MonitorServiceProvider::boot(): keep the dashboard
         // tests immune to Livewire's smart_wire_keys bug even if provider boot order changes.
         $app['config']->set('livewire.smart_wire_keys', false);
+
+        // Off by default in tests: a test commonly inserts rows, calls a
+        // cached raw-scan method, inserts more, then calls it again with
+        // the same window expecting fresh results — the cache would return
+        // the first call's now-stale value instead (verified: turning
+        // aggregate_cache on broke 9 unrelated tests this way).
+        $app['config']->set('monitor.aggregate_cache.enabled', false);
     }
 
     /**

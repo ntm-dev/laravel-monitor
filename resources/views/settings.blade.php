@@ -1,8 +1,12 @@
-{{-- Settings page — two separate forms:
-     - Preferences (theme/language/timezone) → cookie, own form, open to
-       any signed-in viewer — a personal display choice, not a team setting.
+{{-- Settings page — one form, one save button, posting to
+     monitor.settings.system:
+     - Preferences (theme/language/timezone) → cookie, always submitted —
+       a personal display choice, not a team setting.
      - Environment + Recorders overrides over config/monitor.php → stored
-       server-side via Support\Settings, gated to $canManageSettings.
+       server-side via Support\Settings. Its fieldset is disabled for
+       anyone $canManageSettings is false for, so the browser omits those
+       fields from the request entirely rather than the server rejecting
+       the whole submission (see SettingsController::system()).
      Data prepared by Http\Controllers\DashboardController. --}}
 @php
     $rowClass = 'flex items-center justify-between gap-4 py-2.5';
@@ -33,11 +37,12 @@
         </div>
     @endif
 
-    {{-- Preferences: own form, own submit — every viewer can save this,
-         regardless of $canManageSettings. --}}
-    <form method="POST" action="{{ route('monitor.settings.preferences') }}" x-data="{ theme: '{{ $prefs['theme'] }}' }" class="space-y-4">
+    <form method="POST" action="{{ route('monitor.settings.system') }}"
+        x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']) }" class="space-y-4">
         @csrf
 
+        {{-- Preferences: always submitted, regardless of $canManageSettings —
+             not inside the read-only <fieldset> below. --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
@@ -133,24 +138,16 @@
             </div>
         </x-monitor::section>
 
-        <div class="flex items-center justify-end gap-2">
-            <button type="submit"
-                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_preferences') }}</button>
-        </div>
-    </form>
+        @unless ($canManageSettings)
+            <div class="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300">
+                {{ __('monitor::messages.settings.viewer_read_only') }}
+            </div>
+        @endunless
 
-    @unless ($canManageSettings)
-        <div class="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300">
-            {{ __('monitor::messages.settings.viewer_read_only') }}
-        </div>
-    @endunless
-
-    {{-- Environment + Recorders + Threshold: own form, gated to
-         $canManageSettings — app-wide config, not a personal preference. --}}
-    <form method="POST" action="{{ route('monitor.settings.system') }}" x-data="{ recordingEnabled: @js($system['enabled']) }" class="space-y-4">
-        @csrf
-
-        {{-- App-wide environment (config overrides) --}}
+        {{-- Environment + Recorders + Threshold: gated to $canManageSettings
+             — app-wide config, not a personal preference. Its <fieldset>
+             below is disabled rather than this whole section left out of
+             the DOM, so a viewer can still see the current values. --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
@@ -207,7 +204,7 @@
                                                         <div>
                                                             <div class="flex items-center justify-between gap-4">
                                                                 <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $detail['label'] }}</span>
-                                                                <x-monitor::toggle name="recorder_details[{{ $recorder['name'] }}][{{ $detail['key'] }}]" :checked="$detail['enabled']" />
+                                                                <x-monitor::toggle name="recorder_details[{{ $recorder['name'] }}][{{ $detail['key'] }}]" :checked="$detail['enabled']" size="sm" />
                                                             </div>
                                                         </div>
                                                     @endforeach
@@ -267,6 +264,82 @@
                             <span class="text-xs text-neutral-400 dark:text-neutral-500">s</span>
                         </div>
                     </div>
+
+                    {{-- start aggregate cache settings --}}
+                    @php
+                        $selectedStore = old('aggregate_cache_store', $system['aggregate_cache_store']);
+                        $optionFieldLabels = [
+                            'path' => __('monitor::messages.settings.aggregate_cache_option_path'),
+                            'lock_path' => __('monitor::messages.settings.aggregate_cache_option_lock_path'),
+                            'connection' => __('monitor::messages.settings.aggregate_cache_option_connection'),
+                        ];
+                    @endphp
+                    <div class="{{ $rowClass }}">
+                        <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache') }}</span>
+                        <x-monitor::toggle name="aggregate_cache_enabled" :checked="$system['aggregate_cache_enabled']" />
+                    </div>
+
+                    <div x-data="{
+                        cacheStore: @js($selectedStore),
+                        storeDrivers: @js($system['aggregate_cache_store_drivers']),
+                        appConfigAvailable: @js($system['aggregate_cache_app_config_available']),
+                        useAppConfig: @js($system['aggregate_cache_use_app_config']),
+                    }">
+                        <div class="{{ $rowClass }}">
+                            <label for="s-cache-store"
+                                class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache_store') }}</label>
+                            <select id="s-cache-store" name="aggregate_cache_store" x-model="cacheStore" class="{{ $fieldClass }}">
+                                <option value="" @selected($selectedStore === '')>
+                                    {{ __('monitor::messages.settings.aggregate_cache_store_default', ['store' => config('cache.default')]) }}
+                                </option>
+                                @foreach ($system['aggregate_cache_stores'] as $store)
+                                    <option value="{{ $store }}" @selected($selectedStore === $store)>{{ $store }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Only shown when the host app already has its own store for the
+                             selected driver (Settings::aggregateCacheHasAppConfig()). --}}
+                        <div class="{{ $rowClass }}" x-show="appConfigAvailable[storeDrivers[cacheStore] ?? cacheStore]" x-cloak>
+                            <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache_use_app_config') }}</span>
+                            <x-monitor::toggle name="aggregate_cache_use_app_config" x-model="useAppConfig" :checked="$system['aggregate_cache_use_app_config']" />
+                        </div>
+
+                        @foreach ($system['aggregate_cache_option_fields'] as $driver => $fields)
+                            {{-- x-cloak avoids a one-frame flash of every driver's fields before Alpine
+                                 evaluates x-show on first paint. cacheStore is a store *name*, which can
+                                 differ from its driver — resolved via storeDrivers, same as the PHP side
+                                 (Settings::aggregateCacheDriver()). --}}
+                            <div x-show="(storeDrivers[cacheStore] ?? cacheStore) === '{{ $driver }}' && !useAppConfig" x-cloak
+                                class="mb-2 flex flex-col gap-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
+                                @if ($driver === 'database')
+                                    {{-- Follows table_prefix, not a free-text option — see Settings::TABLE_SUFFIXES. --}}
+                                    <div class="flex items-center justify-between gap-4">
+                                        <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.aggregate_cache_option_table') }}</span>
+                                        <input value="{{ $system['table_prefix'] }}cache" disabled class="{{ $fieldClass }} font-mono">
+                                    </div>
+                                @endif
+                                @foreach ($fields as $field)
+                                    <div class="flex items-center justify-between gap-4">
+                                        <label for="s-cache-opt-{{ $field }}"
+                                            class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $optionFieldLabels[$field] ?? $field }}</label>
+                                        <input id="s-cache-opt-{{ $field }}" name="aggregate_cache_options[{{ $field }}]"
+                                            value="{{ old("aggregate_cache_options.{$field}", $system['aggregate_cache_options'][$field] ?? '') }}"
+                                            class="{{ $fieldClass }} font-mono">
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endforeach
+
+                        @foreach ($system['aggregate_cache_sensitive_drivers'] as $driver)
+                            <div x-show="(storeDrivers[cacheStore] ?? cacheStore) === '{{ $driver }}'" x-cloak
+                                class="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+                                {{ __('monitor::messages.settings.aggregate_cache_sensitive_warning', ['driver' => $driver]) }}
+                            </div>
+                        @endforeach
+                    </div>
+                    <p class="-mt-1 pb-2.5 text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.aggregate_cache_hint') }}</p>
+                    {{-- end aggregate cache settings --}}
 
                     <div class="py-2.5" x-data="{ items: @js($periodItems) }">
                         <label
@@ -369,14 +442,14 @@
             </div>
         </x-monitor::section>
 
-        @if ($canManageSettings)
-            <div class="flex items-center justify-end gap-2">
+        <div class="flex items-center justify-end gap-2">
+            @if ($canManageSettings)
                 <button type="submit" formnovalidate formaction="{{ route('monitor.settings.reset') }}"
                     class="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">{{ __('monitor::messages.settings.reset') }}</button>
-                <button type="submit"
-                    class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
-            </div>
-        @endif
+            @endif
+            <button type="submit"
+                class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
+        </div>
     </form>
 </div>
 

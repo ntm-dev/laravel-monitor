@@ -3,12 +3,15 @@
 namespace LaravelMonitor\Storage\Concerns;
 
 use Carbon\CarbonImmutable;
+use Closure;
 use DateTimeInterface;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Builder;
 use LaravelMonitor\Recorders\Requests;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\Support\Settings;
 use LaravelMonitor\Support\UserFilter;
 
 use function is_array;
@@ -225,5 +228,101 @@ trait BuildsQueries
     protected function connection(): ConnectionInterface
     {
         return $this->db->connection($this->config['connection'] ?? null);
+    }
+
+    /**
+     * Wraps a raw-scan list query (queryStats(), routeStats(), ...) in a
+     * short cache entry keyed by every argument the caller passed. Reads/
+     * writes the cache Store directly, not Cache::remember(), so it never
+     * fires the events Recorders\CacheInteractions would record as app
+     * cache activity.
+     */
+    protected function cacheRemember(string $method, array $args, ?DateTimeInterface $until, Closure $callback): mixed
+    {
+        if (! config('monitor.aggregate_cache.enabled', true)) {
+            return $callback();
+        }
+
+        $store = $this->aggregateCacheStore();
+        $key = 'monitor:agg:'.md5(static::class.'::'.$method.':'.serialize($args));
+
+        $cached = $store->get($key);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $value = $callback();
+
+        // A closed range's result never changes once past; a live "up to
+        // now" window is only valid until the next poll picks up new rows.
+        $ttl = $until !== null
+            ? (int) config('monitor.aggregate_cache.closed_ttl', 3600)
+            : (int) (config('monitor.aggregate_cache.live_ttl') ?? config('monitor.refresh', 10));
+
+        $store->put($key, $value, $ttl);
+
+        return $value;
+    }
+
+    /**
+     * '' (not null) means "the host app's own cache.default" — the only
+     * choice allowed to share the app's own store. Every other selection
+     * gets a dedicated 'monitor_aggregate_<name>' store, never `cache.
+     * stores.<name>` verbatim — see aggregateCacheDriverConfig().
+     */
+    protected function aggregateCacheStore(): Store
+    {
+        $name = config('monitor.aggregate_cache.store') ?: null;
+
+        if ($name === null) {
+            return app('cache')->store(null)->getStore();
+        }
+
+        $registeredAs = "monitor_aggregate_{$name}";
+
+        if (config("cache.stores.{$registeredAs}") === null) {
+            config(["cache.stores.{$registeredAs}" => $this->aggregateCacheDriverConfig($name)]);
+        }
+
+        return app('cache')->store($registeredAs)->getStore();
+    }
+
+    /**
+     * 'file'/'database' (the drivers Settings exposes options for) build
+     * their own config from scratch — never `cache.stores.$name` — so they
+     * stay isolated even with no options set. Every other driver has none
+     * to expose (Settings::AGGREGATE_CACHE_SENSITIVE_DRIVERS), so it falls
+     * back to `cache.stores.$name` as-is — the dedicated store the admin
+     * was told to define, per the Settings page's own warning for these.
+     */
+    protected function aggregateCacheDriverConfig(string $name): array
+    {
+        $driver = Settings::aggregateCacheDriver($name);
+
+        // Opt-in escape hatch: the admin explicitly asked to reuse the host
+        // app's own store for this driver instead of an isolated default.
+        if (config('monitor.aggregate_cache.use_app_config') && Settings::aggregateCacheHasAppConfig($driver)) {
+            return [...config("cache.stores.{$driver}", []), 'driver' => $driver];
+        }
+
+        $options = (array) config('monitor.aggregate_cache.options', []);
+
+        return match ($driver) {
+            'file' => [
+                'driver' => 'file',
+                'path' => storage_path('framework/cache/monitor-aggregate'),
+                'lock_path' => storage_path('framework/cache/monitor-aggregate'),
+                ...$options,
+            ],
+            'database' => [
+                'driver' => 'database',
+                'table' => config('monitor.aggregate_cache.table', 'monitor_cache'),
+                'connection' => null,
+                'lock_connection' => null,
+                ...$options,
+            ],
+            default => [...config("cache.stores.{$name}", []), 'driver' => $driver],
+        };
     }
 }

@@ -91,7 +91,7 @@ class SettingsTest extends TestCase
     {
         $this->assertSame([
             'entries', 'aggregates', 'issues', 'users', 'invitations',
-            'password_resets', 'email_changes', 'webauthn_credentials', 'oauth_accounts',
+            'password_resets', 'email_changes', 'webauthn_credentials', 'oauth_accounts', 'cache',
         ], Settings::tableSuffixes());
     }
 

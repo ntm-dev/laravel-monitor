@@ -178,10 +178,20 @@ return new class extends Migration
             $table->unique(['type', 'key']);
             $table->index(['type', 'status']);
         });
+
+        // Backs the 'database' aggregate-cache driver (see
+        // Storage\Concerns\BuildsQueries::aggregateCacheStore()) — same
+        // shape as Laravel's own `cache:table` stub.
+        Schema::create($this->cacheTable(), function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists($this->cacheTable());
         Schema::dropIfExists($this->issuesTable());
         Schema::dropIfExists($this->oauthAccountsTable());
         Schema::dropIfExists($this->webauthnCredentialsTable());
@@ -236,5 +246,10 @@ return new class extends Migration
     protected function issuesTable(): string
     {
         return config('monitor.issues.table', 'monitor_issues');
+    }
+
+    protected function cacheTable(): string
+    {
+        return config('monitor.aggregate_cache.table', 'monitor_cache');
     }
 };

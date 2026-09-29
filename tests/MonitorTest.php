@@ -3734,7 +3734,7 @@ class MonitorTest extends TestCase
         $this->get('/monitor')->assertForbidden();
     }
 
-    public function test_a_viewer_cannot_post_settings_system(): void
+    public function test_a_viewer_cannot_change_system_settings_even_by_submitting_them(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
@@ -3746,7 +3746,18 @@ class MonitorTest extends TestCase
         ]);
         $this->actingAs($viewer, 'monitor');
 
-        $this->post('/monitor/settings/system', [])->assertForbidden();
+        // The browser's own disabled <fieldset> would never send this, but a
+        // crafted request could — the server must ignore it regardless, not
+        // just rely on the field being disabled client-side.
+        $this->post('/monitor/settings/system', [
+            'theme' => 'dark',
+            'locale' => 'en',
+            'timezone' => 'UTC',
+            'table_prefix' => 'hacked_',
+        ])->assertRedirect('/monitor/settings')
+            ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
+
+        $this->assertSame('monitor_', config('monitor.table_prefix'));
     }
 
     public function test_a_viewer_cannot_post_settings_reset(): void
@@ -3802,7 +3813,7 @@ class MonitorTest extends TestCase
         ]);
         $this->actingAs($viewer, 'monitor');
 
-        $this->post('/monitor/settings/preferences', [
+        $this->post('/monitor/settings/system', [
             'theme' => 'dark',
             'locale' => 'en',
             'timezone' => 'UTC',
@@ -3810,16 +3821,37 @@ class MonitorTest extends TestCase
             ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
     }
 
-    public function test_an_owner_can_still_save_their_own_preferences(): void
+    public function test_an_admin_can_save_preferences_and_system_settings_together(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
 
-        $this->post('/monitor/settings/preferences', [
-            'theme' => 'dark',
-            'locale' => 'en',
-            'timezone' => 'UTC',
-        ])->assertRedirect('/monitor/settings')
-            ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
+        // Settings::save() persists to bootstrap/cache/monitor-settings.php
+        // (real disk, shared across every test in the run) and only takes
+        // effect in config() on the *next* boot — clean up regardless of
+        // outcome so this doesn't leak into any other test.
+        try {
+            $this->post('/monitor/settings/system', [
+                'theme' => 'dark',
+                'locale' => 'en',
+                'timezone' => 'UTC',
+                'table_prefix' => 'monitor_',
+                'dashboard_path' => 'monitor',
+                'retention_hours' => 168,
+                'refresh' => 10,
+                'request_threshold' => 1000,
+                'job_threshold' => 1000,
+                'query_threshold' => 500,
+                'outgoing_request_threshold' => 1000,
+                'period_labels' => ['24h'],
+                'period_hours' => [24],
+            ])->assertRedirect('/monitor/settings')
+                ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
+
+            $this->assertSame(168, \LaravelMonitor\Support\Settings::all()['retention_hours']);
+            $this->assertSame(['24h' => 24], \LaravelMonitor\Support\Settings::all()['periods']);
+        } finally {
+            \LaravelMonitor\Support\Settings::reset();
+        }
     }
 
     public function test_an_admin_can_post_settings_reset(): void

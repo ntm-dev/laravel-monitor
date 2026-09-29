@@ -165,10 +165,12 @@
                                 {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
                                      sourceType/sourceLabel/sourceUrl (set in QueryDetail::data()) resolve it to the
                                      right detail page instead of assuming every call came from an HTTP request. --}}
-                                @php($commandName = $entry->payload['command'] ?? null)
-                                @php($location = $entry->payload['location'] ?? null)
-                                @php($connection = $entry->payload['connection'] ?? null)
-                                @php($connectionType = $entry->payload['connection_type'] ?? null)
+                                @php
+                                    $commandName = $entry->payload['command'] ?? null;
+                                    $location = $entry->payload['location'] ?? null;
+                                    $connection = $entry->connection;
+                                    $connectionType = $entry->connectionType;
+                                @endphp
                                 <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                                     <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
                                     <td class="{{ $entry->sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($entry->sourceUrl) onclick="window.location='{{ $entry->sourceUrl }}'" @endif>

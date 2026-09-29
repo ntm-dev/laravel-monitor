@@ -10,20 +10,23 @@ use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Settings;
 
 /**
- * Persists dashboard settings from two separate forms on the same page:
- *  - {@see preferences()} — per-viewer display (theme/language/timezone),
- *    into the {@see Preferences::COOKIE} cookie. Open to any signed-in
- *    monitor user — it's a personal display choice, not a team setting.
- *  - {@see system()} — app-wide Environment + Recorders overrides, stored
- *    server-side via {@see Settings} and layered over config/monitor.php.
- *    Restricted to canManageSettings() (owner/admin).
+ * Persists dashboard settings from the single Settings form:
+ *  - Preferences (theme/language/timezone) → the {@see Preferences::COOKIE}
+ *    cookie. Open to any signed-in monitor user — a personal display
+ *    choice, not a team setting — so these fields are always processed.
+ *  - Environment + Recorders overrides over config/monitor.php → stored
+ *    server-side via {@see Settings}. Restricted to canManageSettings()
+ *    (owner/admin): the form disables that whole fieldset for anyone else,
+ *    so the browser never submits those fields for them, and {@see system()}
+ *    stops right after the cookie in that case rather than validating
+ *    fields that were never sent.
  * {@see reset()} clears the app-wide overrides back to the config defaults.
  */
 class SettingsController
 {
-    public function preferences(Request $request): RedirectResponse
+    public function system(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $preferences = $request->validate([
             'theme' => ['required', 'string', 'in:'.implode(',', Preferences::THEMES)],
             'locale' => ['required', 'string', 'in:'.implode(',', Preferences::availableLocales())],
             'timezone' => ['required', 'string', 'in:'.implode(',', Preferences::timezones())],
@@ -31,18 +34,15 @@ class SettingsController
 
         $cookie = cookie(
             name: Preferences::COOKIE,
-            value: json_encode($validated),
+            value: json_encode($preferences),
             minutes: 60 * 24 * 365,
         );
 
         $path = trim((string) config('monitor.path', 'monitor'), '/');
 
-        return $this->backTo($path, 'success', __('monitor::messages.settings.preferences_saved'))->withCookie($cookie);
-    }
-
-    public function system(Request $request): RedirectResponse
-    {
-        abort_unless($request->user(MonitorUser::guardName())->canManageSettings(), 403);
+        if (! $request->user(MonitorUser::guardName())->canManageSettings()) {
+            return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'))->withCookie($cookie);
+        }
 
         $validated = $request->validate([
             'enabled' => ['nullable', 'boolean'],
@@ -54,6 +54,11 @@ class SettingsController
             'job_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'query_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'outgoing_request_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
+            'aggregate_cache_enabled' => ['nullable', 'boolean'],
+            'aggregate_cache_store' => ['nullable', 'string', 'max:255', 'in:'.implode(',', ['', ...Settings::aggregateCacheStores()])],
+            'aggregate_cache_use_app_config' => ['nullable', 'boolean'],
+            'aggregate_cache_options' => ['nullable', 'array'],
+            'aggregate_cache_options.*' => ['nullable', 'string', 'max:1000'],
             'period_labels' => ['required', 'array', 'min:1'],
             'period_labels.*' => ['nullable', 'string', 'max:50'],
             'period_hours' => ['required', 'array'],
@@ -85,6 +90,10 @@ class SettingsController
             'job_threshold' => (int) $validated['job_threshold'],
             'query_threshold' => (int) $validated['query_threshold'],
             'outgoing_request_threshold' => (int) $validated['outgoing_request_threshold'],
+            'aggregate_cache_enabled' => $request->boolean('aggregate_cache_enabled'),
+            'aggregate_cache_store' => $validated['aggregate_cache_store'] ?? '',
+            'aggregate_cache_use_app_config' => $request->boolean('aggregate_cache_use_app_config'),
+            'aggregate_cache_options' => $this->aggregateCacheOptions($request, $validated['aggregate_cache_store'] ?? ''),
             'periods' => $periods,
             'recorders' => $this->recorderToggles($request),
             'recorder_details' => $this->recorderDetailToggles($request),
@@ -92,7 +101,7 @@ class SettingsController
 
         // Redirect to the (possibly new) path so the dashboard never lands on a
         // stale URL after the prefix changes on the next boot.
-        return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'));
+        return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'))->withCookie($cookie);
     }
 
     public function reset(Request $request): RedirectResponse
@@ -168,6 +177,25 @@ class SettingsController
         }
 
         return $toggles;
+    }
+
+    /**
+     * Submitted driver options, narrowed to Settings::aggregateCacheOptionFields()
+     * for the store actually being saved — anything else submitted (a
+     * stale field left over from a previously-selected driver, or a
+     * crafted key) is dropped rather than trusted onto disk.
+     *
+     * @return array<string, string>
+     */
+    protected function aggregateCacheOptions(Request $request, string $store): array
+    {
+        $allowed = Settings::aggregateCacheOptionFields($store);
+        $submitted = (array) $request->input('aggregate_cache_options', []);
+
+        return array_filter(
+            array_intersect_key($submitted, array_flip($allowed)),
+            fn ($value) => $value !== null && $value !== '',
+        );
     }
 
     /**

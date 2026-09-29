@@ -35,6 +35,10 @@ class Settings
         'job_threshold' => 'monitor.thresholds.job',
         'query_threshold' => 'monitor.thresholds.query',
         'outgoing_request_threshold' => 'monitor.thresholds.outgoing_request',
+        'aggregate_cache_enabled' => 'monitor.aggregate_cache.enabled',
+        // null means "the host app's own cache.default" — see BuildsQueries::cacheRemember().
+        'aggregate_cache_store' => 'monitor.aggregate_cache.store',
+        'aggregate_cache_use_app_config' => 'monitor.aggregate_cache.use_app_config',
     ];
 
     /**
@@ -52,6 +56,7 @@ class Settings
         'monitor.auth.email_changes_table' => 'email_changes',
         'monitor.auth.webauthn_table' => 'webauthn_credentials',
         'monitor.auth.oauth_accounts_table' => 'oauth_accounts',
+        'monitor.aggregate_cache.table' => 'cache',
     ];
 
     /**
@@ -63,6 +68,71 @@ class Settings
     public static function tableSuffixes(): array
     {
         return array_values(self::TABLE_SUFFIXES);
+    }
+
+    /**
+     * Cache stores the host app has configured, for the aggregate cache
+     * store picker — 'file' (this package's own default) always included
+     * even if the host app's config/cache.php doesn't define one itself.
+     *
+     * @return list<string>
+     */
+    public static function aggregateCacheStores(): array
+    {
+        return array_values(array_unique([
+            'file',
+            ...array_keys((array) config('cache.stores', [])),
+        ]));
+    }
+
+    /**
+     * Editable option fields per aggregate-cache driver — only these ever
+     * reach BuildsQueries::aggregateCacheStore()'s dynamic store config, no
+     * matter what a request submits (see SettingsController::system() and
+     * apply() above). Plain values only (a path, a table name); see
+     * AGGREGATE_CACHE_SENSITIVE_DRIVERS for the ones deliberately left out.
+     */
+    protected const AGGREGATE_CACHE_OPTION_FIELDS = [
+        'file' => ['path', 'lock_path'],
+        // No 'table' here — it always follows table_prefix (TABLE_SUFFIXES).
+        'database' => ['connection'],
+    ];
+
+    /**
+     * Drivers whose own settings are connection credentials (host, password,
+     * region, ...), not plain values — this form never edits or displays
+     * them; the Settings page tells the admin to set them via .env instead
+     * (see the same env vars config/cache.php's own store entry reads).
+     */
+    protected const AGGREGATE_CACHE_SENSITIVE_DRIVERS = ['redis', 'memcached', 'dynamodb'];
+
+    /**
+     * A store's driver — from config('cache.stores'), or the store name
+     * itself for 'file' when the host app has no store of that name (see
+     * aggregateCacheStores()'s own fallback).
+     */
+    public static function aggregateCacheDriver(string $store): string
+    {
+        return (string) (config("cache.stores.{$store}.driver") ?? $store);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function aggregateCacheOptionFields(string $store): array
+    {
+        return self::AGGREGATE_CACHE_OPTION_FIELDS[static::aggregateCacheDriver($store)] ?? [];
+    }
+
+    public static function aggregateCacheIsSensitive(string $store): bool
+    {
+        return in_array(static::aggregateCacheDriver($store), self::AGGREGATE_CACHE_SENSITIVE_DRIVERS, true);
+    }
+
+    /** Whether the host app has its own `cache.stores.$driver` entry to offer reusing. */
+    public static function aggregateCacheHasAppConfig(string $driver): bool
+    {
+        return (array) config("cache.stores.{$driver}", []) !== [];
     }
 
     /** @var array<string, mixed>|null In-request cache of the decoded store. */
@@ -91,6 +161,19 @@ class Settings
             if (array_key_exists($key, $stored)) {
                 config([$path => $stored[$key]]);
             }
+        }
+
+        // Only the fields AGGREGATE_CACHE_OPTION_FIELDS declares for the
+        // saved store — same reasoning as recorder_details below: what's on
+        // disk should already be this narrow (SettingsController only ever
+        // writes it that way), but this is the layer BuildsQueries::
+        // aggregateCacheStore() actually trusts, so it's filtered again here
+        // regardless of how the value got onto disk.
+        if (isset($stored['aggregate_cache_options']) && is_array($stored['aggregate_cache_options'])) {
+            $store = $stored['aggregate_cache_store'] ?? config('monitor.aggregate_cache.store');
+            $allowed = static::aggregateCacheOptionFields((string) $store);
+
+            config(['monitor.aggregate_cache.options' => array_intersect_key($stored['aggregate_cache_options'], array_flip($allowed))]);
         }
 
         if (isset($stored['periods']) && is_array($stored['periods']) && $stored['periods'] !== []) {
@@ -158,6 +241,23 @@ class Settings
             'job_threshold' => (int) config('monitor.thresholds.job', 1000),
             'query_threshold' => (int) config('monitor.thresholds.query', 500),
             'outgoing_request_threshold' => (int) config('monitor.thresholds.outgoing_request', 1000),
+            'aggregate_cache_enabled' => (bool) config('monitor.aggregate_cache.enabled', true),
+            'aggregate_cache_store' => (string) (config('monitor.aggregate_cache.store') ?? ''),
+            'aggregate_cache_stores' => static::aggregateCacheStores(),
+            'aggregate_cache_options' => (array) config('monitor.aggregate_cache.options', []),
+            'aggregate_cache_option_fields' => self::AGGREGATE_CACHE_OPTION_FIELDS,
+            // store name => driver, so the form can tell which of the two
+            // lists above applies to whichever store is currently selected.
+            'aggregate_cache_store_drivers' => collect(static::aggregateCacheStores())
+                ->mapWithKeys(fn (string $store) => [$store => static::aggregateCacheDriver($store)])
+                ->all(),
+            'aggregate_cache_sensitive_drivers' => self::AGGREGATE_CACHE_SENSITIVE_DRIVERS,
+            'aggregate_cache_use_app_config' => (bool) config('monitor.aggregate_cache.use_app_config', false),
+            // driver => whether the host app has its own store for it, so
+            // the "use app config" checkbox only shows when there's one.
+            'aggregate_cache_app_config_available' => collect(array_keys(self::AGGREGATE_CACHE_OPTION_FIELDS))
+                ->mapWithKeys(fn (string $driver) => [$driver => static::aggregateCacheHasAppConfig($driver)])
+                ->all(),
             'recorders' => static::recorders(),
             'recorderColumns' => static::recorderColumns(),
             'recordersWarning' => static::recordersWarning(),
