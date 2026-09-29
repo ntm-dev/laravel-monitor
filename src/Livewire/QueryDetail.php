@@ -2,6 +2,8 @@
 
 namespace LaravelMonitor\Livewire;
 
+use LaravelMonitor\Support\QueryConnection;
+
 class QueryDetail extends Card
 {
     public const PER_PAGE = 25;
@@ -69,6 +71,7 @@ class QueryDetail extends Card
                 'scheduled_task' => route('monitor.schedule.runs.show', $entry->request_id),
                 default => null,
             };
+            [$entry->connection, $entry->connectionType] = QueryConnection::parse($entry->subtype);
 
             return $entry;
         });
@@ -108,15 +111,15 @@ class QueryDetail extends Card
             // under (see DatabaseCacheAndQueryStorage::queryStats() for why
             // there can be more than one).
             'connections' => $entries
-                ->pluck('payload.connection')
+                ->pluck('connection')
                 ->filter()
                 ->unique()
                 ->sort()
                 ->values()
                 ->map(function (string $connection) use ($entries) {
                     $types = $entries
-                        ->where('payload.connection', $connection)
-                        ->pluck('payload.connection_type')
+                        ->where('connection', $connection)
+                        ->pluck('connectionType')
                         ->filter()
                         ->unique()
                         ->sort()

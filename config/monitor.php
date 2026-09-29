@@ -78,6 +78,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Aggregate Cache
+    |--------------------------------------------------------------------------
+    |
+    | Caches the list-page raw-row scans (see BuildsQueries::cacheRemember())
+    | so a busy install isn't re-scanning on every poll. `live_ttl` is for an
+    | open "up to now" window (defaults to `refresh`); `closed_ttl` for a
+    | fixed range, which never changes once past. `store`/`options` build a
+    | dedicated store isolated from the host app's own (see
+    | BuildsQueries::aggregateCacheStore()) — editable from Settings.
+    |
+    */
+
+    'aggregate_cache' => [
+        'enabled' => env('MONITOR_AGGREGATE_CACHE_ENABLED', true),
+        'store' => env('MONITOR_AGGREGATE_CACHE_STORE', 'file'),
+        // The 'database' driver's table — follows $tablePrefix, not editable
+        // on its own (see Settings::TABLE_SUFFIXES).
+        'table' => $tablePrefix.'cache',
+        'options' => [],
+        'live_ttl' => env('MONITOR_AGGREGATE_CACHE_LIVE_TTL'),
+        'closed_ttl' => env('MONITOR_AGGREGATE_CACHE_CLOSED_TTL', 3600),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Storage
     |--------------------------------------------------------------------------
     |

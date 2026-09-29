@@ -8,12 +8,18 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\CacheAndQueryStorage;
 use LaravelMonitor\Storage\Concerns\BuildsQueries;
+use LaravelMonitor\Support\QueryConnection;
 
 class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
 {
     use BuildsQueries;
 
     public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
+    {
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), $until, fn () => $this->cacheKeyStatsUncached($since, $until));
+    }
+
+    protected function cacheKeyStatsUncached(DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
         // GROUP BY key over the raw table, not the sampled subquery below:
         // MySQL sees an index it can walk in key order (idx_type_key) and
@@ -69,6 +75,11 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
 
     public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection
     {
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), $until, fn () => $this->queryStatsUncached($since, $until));
+    }
+
+    protected function queryStatsUncached(DateTimeInterface $since, ?DateTimeInterface $until): Collection
+    {
         $rows = $this->table()
             ->where('type', 'query')
             ->where('created_at', '>=', $since)
@@ -80,15 +91,17 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
-            ->get(['key', 'duration', 'payload', 'created_at']);
+            // `subtype` packs connection + role (see QueryConnection) —
+            // no need to touch `payload` here at all.
+            ->get(['key', 'subtype', 'duration', 'created_at']);
 
         // Single foreach pass with plain arrays — building/re-collecting a
         // Collection per group was measurably slower at the sample cap.
         $groups = [];
 
         foreach ($rows as $row) {
-            $payload = json_decode($row->payload ?? '[]', true) ?: [];
-            $connection = $payload['connection'] ?? 'default';
+            [$connection, $connectionType] = QueryConnection::parse($row->subtype);
+            $connection ??= 'default';
             $groupKey = $row->key.'@@'.$connection;
 
             $group = &$groups[$groupKey];
@@ -101,8 +114,8 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
                 $group['durations'][] = (float) $row->duration;
             }
 
-            if (isset($payload['connection_type'])) {
-                $group['connectionTypes'][$payload['connection_type']] = true;
+            if ($connectionType !== null) {
+                $group['connectionTypes'][$connectionType] = true;
             }
             unset($group);
         }

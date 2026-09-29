@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
+use LaravelMonitor\Support\QueryConnection;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Trace;
@@ -38,21 +39,16 @@ class Queries extends Recorder
         // here at record time. A long-running worker can generate a lot of
         // rows this way; monitor.retention.hours / `monitor:prune` is the
         // backstop, not a per-query filter.
+
+        // PDO role the query ran under; only available on Laravel >= 12.45.
+        $connectionType = property_exists($event, 'readWriteType') ? $event->readWriteType : null;
+
         $this->monitor->record(
             type: RecordType::Query,
             key: Sql::normalizeKey($event->sql),
+            subtype: QueryConnection::pack($event->connectionName, $connectionType),
             payload: [
                 'sql' => $event->sql,
-                'connection' => $event->connectionName,
-                // The actual PDO connection role Laravel routed this query
-                // to ('read'/'write'/'direct'), straight from the framework
-                // — not guessed from the SQL verb, which only tells you the
-                // statement is a SELECT vs a mutation, not which physical
-                // connection (e.g. a read replica vs the write primary in a
-                // sticky/read-write split config) it ran against. Only
-                // available on Laravel >= 12.45 (readWriteType didn't exist
-                // on QueryExecuted before that); null everywhere else.
-                'connection_type' => property_exists($event, 'readWriteType') ? $event->readWriteType : null,
                 'location' => $this->location(),
                 // Only meaningful outside a request — inside one, the row
                 // already carries request_id and the Query Detail page

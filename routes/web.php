@@ -150,7 +150,6 @@ Route::domain(config('monitor.domain'))
                     ->name("monitor.{$groupTab}.sends.show");
             }
 
-            Route::post('/settings/preferences', [SettingsController::class, 'preferences'])->name('monitor.settings.preferences');
             Route::post('/settings/system', [SettingsController::class, 'system'])->name('monitor.settings.system');
             Route::post('/settings/reset', [SettingsController::class, 'reset'])->name('monitor.settings.reset');
             Route::post('/webauthn/register/options', [WebauthnController::class, 'registerOptions'])->name('monitor.webauthn.register.options');

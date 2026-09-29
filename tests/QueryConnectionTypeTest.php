@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use LaravelMonitor\Contracts\CacheAndQueryStorage;
+use LaravelMonitor\Support\QueryConnection;
 
 /**
  * The read/write badge on the Queries list. The same statement really can run
@@ -74,9 +75,9 @@ class QueryConnectionTypeTest extends TestCase
     ): void {
         DB::table('monitor_entries')->insert([
             'type' => 'query',
-            'subtype' => null,
+            'subtype' => QueryConnection::pack($connection, $connectionType),
             'key' => $sql,
-            'payload' => json_encode(['connection' => $connection, 'connection_type' => $connectionType]),
+            'payload' => json_encode([]),
             'duration' => 1.5,
             'created_at' => $createdAt->format('Y-m-d H:i:s.u'),
         ]);
