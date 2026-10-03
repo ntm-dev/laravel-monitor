@@ -4,6 +4,10 @@ namespace LaravelMonitor\Http\Headings;
 
 use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Support\EntryId;
+use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\KeyHash;
+
+use function parse_url;
 
 /**
  * Heading for an outgoing (HTTP client) request detail page. $key means one
@@ -39,13 +43,28 @@ class OutgoingHeading
 
         $method = $entry->payload['method'] ?? $entry->subtype;
         $url = $entry->payload['url'] ?? $entry->key;
+        $status = $entry->payload['status'] ?? null;
+
+        // Same order as the Request page: group (the host) › method + status
+        // badges › path, with the full URL underneath.
+        $path = parse_url($url, PHP_URL_PATH);
+        $path = $path === null || $path === false || $path === '' ? '/' : $path;
 
         return new Heading(
             badge: $method,
-            badgeClass: 'bg-neutral-200/70 text-neutral-600',
-            heading: $url,
-            titleAttr: $url,
+            badgeClass: $status !== null
+                ? Format::statusBadgeClass((int) $status)
+                : 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
+            heading: $path,
+            titleAttr: $path,
             pageTitle: $method.' '.$url,
+            breadcrumbLabel: $entry->key,
+            breadcrumbRouteName: 'monitor.outgoing.show',
+            breadcrumbRouteParams: ['hash' => KeyHash::for($entry->key)],
+            secondaryBadge: (string) ($status ?? '—'),
+            subtitle: $url,
+            showPeriodSwitcher: false,
+            autoRefreshes: false,
         );
     }
 }

@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Log\Events\MessageLogged;
+use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\Json;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Types\Str;
@@ -44,7 +45,9 @@ class Logs extends Recorder
             key: Str::tinyText($message),
             payload: [
                 'message' => Str::text($message),
-                'context' => Str::mediumText(Json::encode($context) ?: '{}'),
+                // The remaining values are plain data (objects were dropped
+                // above), so encoding can wait until the entry is stored.
+                'context' => new LazyValue(static fn () => Str::mediumText(Json::encode($context) ?: '{}')),
             ],
             subtype: $event->level,
             userId: $this->monitor->lazyCurrentUserId(),

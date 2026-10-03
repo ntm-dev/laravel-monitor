@@ -4,6 +4,7 @@ namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
+use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\QueryConnection;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Sql;
@@ -43,18 +44,22 @@ class Queries extends Recorder
         // PDO role the query ran under; only available on Laravel >= 12.45.
         $connectionType = property_exists($event, 'readWriteType') ? $event->readWriteType : null;
 
+        // With a trace stored, the location is read back from it on display.
+        $trace = ($this->config['details']['trace'] ?? false) ? Trace::capture() : null;
+
         $this->monitor->record(
             type: RecordType::Query,
-            key: Sql::normalizeKey($event->sql),
+            // Grouping key is only needed once the entry is stored.
+            key: new LazyValue(static fn () => Sql::normalizeKey($event->sql)),
             subtype: QueryConnection::pack($event->connectionName, $connectionType),
             payload: [
                 'sql' => $event->sql,
-                'location' => $this->location(),
+                'location' => $trace === null ? $this->location() : null,
                 // Only meaningful outside a request — inside one, the row
                 // already carries request_id and the Query Detail page
                 // resolves that back to "METHOD /path" itself.
                 'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
-                'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
+                'trace' => $trace,
             ],
             duration: $event->time,
         );
@@ -75,7 +80,7 @@ class Queries extends Recorder
         $sql = strtolower($sql);
 
         foreach ($this->ownTables() as $table) {
-            if ($table !== '' && str_contains($sql, strtolower($table))) {
+            if (str_contains($sql, $table)) {
                 return true;
             }
         }
@@ -83,8 +88,25 @@ class Queries extends Recorder
         return false;
     }
 
+    /**
+     * Lower-cased, non-empty table names — resolved once per recorder rather
+     * than re-read from config on every query.
+     *
+     * @var list<string>|null
+     */
+    protected ?array $ownTablesCache = null;
+
     /** @return list<string> */
     protected function ownTables(): array
+    {
+        return $this->ownTablesCache ??= array_values(array_filter(array_map(
+            static fn (string $table) => strtolower($table),
+            $this->configuredTables(),
+        ), static fn (string $table) => $table !== ''));
+    }
+
+    /** @return list<string> */
+    protected function configuredTables(): array
     {
         return [
             (string) config('monitor.storage.database.table', 'monitor_entries'),
@@ -120,10 +142,17 @@ class Queries extends Recorder
     /**
      * First application (non-vendor) frame that triggered the query.
      */
-    protected function location(): ?string
+    protected function location(): LazyValue
     {
-        [$file, $line] = $this->monitor->location->forQueryTrace(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50));
+        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
+        $location = $this->monitor->location;
 
-        return $file ? ("{$file}:".($line ?? 0)) : null;
+        // Only the backtrace itself has to be taken now; picking the frame
+        // runs at flush.
+        return new LazyValue(static function () use ($location, $frames): ?string {
+            [$file, $line] = $location->forQueryTrace($frames);
+
+            return $file ? ("{$file}:".($line ?? 0)) : null;
+        });
     }
 }

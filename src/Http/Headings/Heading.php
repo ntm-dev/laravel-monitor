@@ -27,6 +27,10 @@ class Heading
         public readonly bool $showPeriodSwitcher = true,
         /** False for the same fixed-moment pages as $showPeriodSwitcher — nothing on them ever polls, so the sidebar's refresh ring would just count down to a refresh that never happens. */
         public readonly bool $autoRefreshes = true,
+        /** A second badge right after $badge, in the same colour — e.g. the status code next to an HTTP method. */
+        public readonly ?string $secondaryBadge = null,
+        /** A muted, copyable line under the heading — e.g. the full URL under a request's path. */
+        public readonly ?string $subtitle = null,
     ) {
     }
 }

@@ -10,9 +10,9 @@ use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Event as ScheduledEvent;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 
-use function gethostname;
 use function memory_get_peak_usage;
 use function preg_replace;
 use function str_contains;
@@ -91,7 +91,7 @@ class ScheduledTasks extends Recorder
                 // Null for a skipped run: the task's own body never
                 // executed, so there's no server/memory footprint of its
                 // own to report — just the scheduler process's baseline.
-                'server' => $status !== 'skipped' ? (gethostname() ?: null) : null,
+                'server' => $status !== 'skipped' ? Host::name() : null,
                 'peak_memory' => $status !== 'skipped' ? memory_get_peak_usage(true) : null,
                 'error' => $error,
             ]),

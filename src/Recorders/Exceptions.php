@@ -6,7 +6,9 @@ use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Support\Str;
+use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\Fingerprint;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 use Throwable;
 
@@ -17,7 +19,6 @@ use function array_values;
 use function count;
 use function debug_backtrace;
 use function get_class;
-use function gethostname;
 use function is_array;
 use function is_bool;
 use function is_float;
@@ -55,28 +56,43 @@ class Exceptions extends Recorder
     {
         $class = get_class($exception);
         $message = Str::limit($exception->getMessage(), 500);
-        [$file, $line] = $this->monitor->location->forException($exception);
-        $frames = $this->frames($exception);
         $handled = $this->wasReportedDeliberately();
+
+        // Location, frames and the fingerprint built from them are worked out
+        // once, when the entry is stored — only the live backtrace check above
+        // has to happen at the throw.
+        $resolved = null;
+        $details = function () use ($exception, &$resolved): array {
+            if ($resolved === null) {
+                [$file, $line] = $this->monitor->location->forException($exception);
+                $resolved = ['file' => $file, 'line' => $line, 'frames' => $this->frames($exception)];
+            }
+
+            return $resolved;
+        };
 
         $this->monitor->record(
             type: RecordType::Exception,
-            key: Fingerprint::for($class, $exception->getMessage(), "{$file}:{$line}"),
+            key: new LazyValue(function () use ($details, $class, $exception): string {
+                $details = $details();
+
+                return Fingerprint::for($class, $exception->getMessage(), "{$details['file']}:{$details['line']}");
+            }),
             payload: [
                 'class' => $class,
                 'message' => $message,
-                'file' => $file,
-                'line' => $line,
+                'file' => new LazyValue(fn () => $details()['file']),
+                'line' => new LazyValue(fn () => $details()['line']),
                 'handled' => $handled,
                 'php_version' => PHP_VERSION,
                 'laravel_version' => $this->monitor->laravelVersion(),
-                'server' => gethostname() ?: null,
-                'frames' => $frames,
+                'server' => Host::name(),
+                'frames' => new LazyValue(fn () => $details()['frames']),
                 // Kept for backward compatibility with existing consumers.
-                'trace' => array_map(
-                    fn ($frame) => $frame['file'].':'.$frame['line'].' '.$frame['label'],
-                    $frames,
-                ),
+                'trace' => new LazyValue(fn () => array_map(
+                    static fn ($frame) => $frame['file'].':'.$frame['line'].' '.$frame['label'],
+                    $details()['frames'],
+                )),
             ],
             subtype: $handled ? 'handled' : 'unhandled',
             userId: $this->monitor->lazyCurrentUserId(),

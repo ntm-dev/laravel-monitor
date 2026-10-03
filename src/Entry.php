@@ -10,7 +10,7 @@ class Entry
 
     public function __construct(
         public string $type,
-        public ?string $key = null,
+        public string|LazyValue|null $key = null,
         public array $payload = [],
         public ?float $duration = null,
         public ?string $subtype = null,
@@ -22,13 +22,41 @@ class Entry
         $this->timestamp = $timestamp ?? CarbonImmutable::now();
     }
 
+    /**
+     * Deferred values (e.g. Support\Trace::capture()) are settled here, at
+     * flush, rather than on the recording hot path. One that resolves to
+     * null is dropped, the same as a null the recorder filtered out itself.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolvedPayload(): array
+    {
+        $payload = [];
+
+        foreach ($this->payload as $name => $value) {
+            if ($value instanceof LazyValue) {
+                $value = $value->resolve();
+
+                if ($value === null) {
+                    continue;
+                }
+            }
+
+            $payload[$name] = $value;
+        }
+
+        return $payload;
+    }
+
     public function toArray(): array
     {
+        $key = $this->key instanceof LazyValue ? $this->key->resolve() : $this->key;
+
         return [
             'type' => $this->type,
             'subtype' => $this->subtype !== null ? mb_substr($this->subtype, 0, 32) : null,
-            'key' => $this->key !== null ? mb_substr($this->key, 0, 255) : null,
-            'payload' => $this->payload,
+            'key' => $key !== null ? mb_substr($key, 0, 255) : null,
+            'payload' => $this->resolvedPayload(),
             // Unrounded: neither Monitor::elapsedMsPrecise() nor any Recorder
             // rounds duration/startOffset before constructing an Entry, so
             // the DB's own decimal(16,6) column (see the monitor_entries

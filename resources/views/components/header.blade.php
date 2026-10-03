@@ -40,6 +40,9 @@
                         @if (! $detail->badgeAfter && $detail->badge !== null)
                             <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $detail->badgeClass }}">{{ $detail->badge }}</span>
                         @endif
+                        @if ($detail->secondaryBadge !== null)
+                            <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs {{ $detail->badgeClass }}">{{ $detail->secondaryBadge }}</span>
+                        @endif
                         @if ($detail->heading !== null)
                             <h1 class="{{ $detail->wrap ? 'whitespace-pre-wrap break-words font-mono text-base font-semibold' : 'truncate text-2xl font-bold' }} tracking-tight" @if ($detail->titleAttr) data-tooltip="{{ $detail->titleAttr }}" @endif>{{ $detail->heading }}</h1>
                         @endif
@@ -47,6 +50,19 @@
                             <span class="shrink-0 rounded px-1.5 py-0.5 font-mono text-xs uppercase tracking-tight {{ $detail->badgeClass }}">{{ $detail->badge }}</span>
                         @endif
                     </div>
+                @endif
+                @if ($detail->subtitle !== null)
+                    {{-- start header subtitle --}}
+                    <div class="mt-1 flex items-center gap-1.5" x-data="{ copied: false }">
+                        <p class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $detail->subtitle }}">{{ $detail->subtitle }}</p>
+                        <button type="button"
+                                @click="navigator.clipboard.writeText(@js($detail->subtitle)); copied = true; setTimeout(() => copied = false, 1500)"
+                                class="shrink-0 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200">
+                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" :stroke="1.8" class="h-3.5 w-3.5" x-show="! copied"/>
+                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHECK" :stroke="2" class="h-3.5 w-3.5 text-emerald-500" x-show="copied" x-cloak/>
+                        </button>
+                    </div>
+                    {{-- end header subtitle --}}
                 @endif
             </div>
         @else

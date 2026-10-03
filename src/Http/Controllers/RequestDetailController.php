@@ -13,6 +13,7 @@ use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
+use LaravelMonitor\Support\Trace;
 
 use function array_key_exists;
 use function is_string;
@@ -156,7 +157,7 @@ class RequestDetailController
         if ($isJob && ($jobDispatchId = $root->payload['job_id'] ?? null) !== null) {
             $queuedEntry = $this->storage->findQueuedJobByJobId($jobDispatchId, CarbonImmutable::now()->subDays(30));
             $queuedAt = $queuedEntry?->created_at;
-            $queuedFrom = $queuedEntry?->payload['location'] ?? null;
+            $queuedFrom = $queuedEntry?->payload['location'] ?? Trace::location($queuedEntry?->payload['trace'] ?? null, absolute: true);
         }
 
         $summary = $isJob

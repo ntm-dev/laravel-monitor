@@ -14,6 +14,8 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Support\Str;
 use LaravelMonitor\Http\Controllers\Concerns\NormalizesQueue;
+use LaravelMonitor\LazyValue;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Trace;
 use ReflectionClass;
@@ -77,6 +79,8 @@ class Jobs extends Recorder
 
     public function recordQueued(JobQueued $event): void
     {
+        $trace = ($this->config['details']['trace'] ?? false) ? Trace::capture() : null;
+
         $this->monitor->record(
             type: RecordType::Job,
             key: $this->displayName($event->job),
@@ -103,8 +107,9 @@ class Jobs extends Recorder
                 // Where dispatch() was actually called — the only pointer
                 // back to the source, since a job queued by another job runs
                 // in a process with no other trace of its origin.
-                'location' => $this->dispatchLocation(),
-                'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
+                // With a trace stored, it's read back from the trace instead.
+                'location' => $trace === null ? $this->dispatchLocation() : null,
+                'trace' => $trace,
             ], fn ($value) => $value !== null),
             subtype: self::DISPATCH,
             userId: $this->monitor->lazyCurrentUserId(),
@@ -148,7 +153,7 @@ class Jobs extends Recorder
                 'queue' => $event->job->getQueue(),
                 'job_id' => $this->correlationId($event->job),
                 'attempts' => $event->job->attempts(),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 // Same fields recordProcessed()'s own 'started_at'/'popped_at'
                 // carry, captured this early since nothing about the
                 // outcome (duration, model_count, peak_memory) exists yet.
@@ -179,7 +184,7 @@ class Jobs extends Recorder
                 'job_id' => $this->correlationId($event->job),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
                 // Recorded here rather than reconstructed later from
                 // created_at - duration (see MergesJobTimelines::jobTrack(),
@@ -217,7 +222,7 @@ class Jobs extends Recorder
                 'job_id' => $this->correlationId($event->job),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
                 'exception' => get_class($event->exception),
                 'message' => Str::limit($event->exception->getMessage(), 500),
@@ -255,7 +260,7 @@ class Jobs extends Recorder
                 'job_id' => $this->correlationId($event->job),
                 'attempts' => $event->job->attempts(),
                 'model_count' => $this->monitor->modelCount(),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
                 // backoff only exists on this event from Laravel 12 onward (#58414);
                 // `??` avoids an "Undefined property" error under E_ALL on older versions.
@@ -306,15 +311,20 @@ class Jobs extends Recorder
      * query's origin, but stored full-path so it can be opened straight from
      * the dashboard rather than resolved against the project root by eye.
      */
-    protected function dispatchLocation(): ?string
+    protected function dispatchLocation(): LazyValue
     {
-        [$file, $line] = $this->monitor->location->forQueryTrace(
-            debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50)
-        );
+        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
+        $location = $this->monitor->location;
 
-        return $file !== null
-            ? $this->monitor->location->absoluteFile($file).':'.($line ?? 0)
-            : null;
+        // Only the backtrace itself has to be taken now; picking the frame
+        // runs at flush.
+        return new LazyValue(static function () use ($location, $frames): ?string {
+            [$file, $line] = $location->forQueryTrace($frames);
+
+            return $file !== null
+                ? $location->absoluteFile($file).':'.($line ?? 0)
+                : null;
+        });
     }
 
     protected function displayName(mixed $job): string

@@ -115,6 +115,9 @@ class Monitor
      */
     protected ?WeakMap $selfRequestCache = null;
 
+    /** Entries buffered before an early flush — read from config once, not on every record(). */
+    protected ?int $bufferLimit = null;
+
     /**
      * Context key a scheduled task's own id rides under across the process
      * boundary a command-based task's own `php artisan` subprocess creates,
@@ -270,7 +273,7 @@ class Monitor
      */
     public function record(
         RecordType $type,
-        ?string $key = null,
+        string|LazyValue|null $key = null,
         array $payload = [],
         ?float $duration = null,
         ?string $subtype = null,
@@ -353,7 +356,7 @@ class Monitor
             && posix_getpid() !== $this->command->pid
         ) {
             $this->flush();
-        } elseif (count($this->entries) >= (int) $this->app['config']->get('monitor.buffer', 200)) {
+        } elseif (count($this->entries) >= ($this->bufferLimit ??= (int) $this->app['config']->get('monitor.buffer', 200))) {
             $this->flush();
         }
     }

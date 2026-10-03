@@ -155,7 +155,12 @@
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
-                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <span class="flex items-center gap-2">
+                                <span>{{ __('monitor::messages.common.trace') }}</span>
+                                <button type="button" @click="showVendor = ! showVendor"
+                                    class="rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                                    x-text="showVendor ? @js(__('monitor::messages.common.hide_vendor')) : @js(__('monitor::messages.common.show_vendor'))"></button>
+                            </span>
                             <button type="button" @click="copyTrace()"
                                 :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
                                 class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
@@ -164,7 +169,7 @@
                             </button>
                         </dt>
                         <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
-                            x-text="selected()?.metadata?.trace"></dd>
+                            x-text="visibleTrace()"></dd>
                     </div>
                 </template>
             </dl>
@@ -354,12 +359,22 @@
                     <dd class="truncate font-mono text-neutral-800 dark:text-neutral-200"
                         :data-tooltip="selected()?.metadata?.url" x-text="selected()?.metadata?.url"></dd>
                 </div>
+                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
+                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
+                </div>
                 {{-- Full call stack (OutgoingRequests' 'trace' detail option
-                     — off by default, see Settings::RECORDER_DETAILS). --}}
+                     — off by default, see Settings::RECORDER_DETAILS). Last row. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
-                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <span class="flex items-center gap-2">
+                                <span>{{ __('monitor::messages.common.trace') }}</span>
+                                <button type="button" @click="showVendor = ! showVendor"
+                                    class="rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                                    x-text="showVendor ? @js(__('monitor::messages.common.hide_vendor')) : @js(__('monitor::messages.common.show_vendor'))"></button>
+                            </span>
                             <button type="button" @click="copyTrace()"
                                 :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
                                 class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
@@ -368,14 +383,9 @@
                             </button>
                         </dt>
                         <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
-                            x-text="selected()?.metadata?.trace"></dd>
+                            x-text="visibleTrace()"></dd>
                     </div>
                 </template>
-                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
-                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
-                </div>
             </dl>
         </template>
 
@@ -449,14 +459,24 @@
                             x-text="truncatedPath(selected()?.metadata?.location)"></dd>
                     </div>
                 </template>
+                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
+                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
+                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
+                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
+                </div>
                 {{-- Full call stack (Recorders\Jobs' 'trace' detail option —
                      off by default, see Settings::RECORDER_DETAILS). Only
                      ever set on the dispatch ('queued') row, same as location
-                     above. --}}
+                     above. Last row. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
-                            <span>{{ __('monitor::messages.common.trace') }}</span>
+                            <span class="flex items-center gap-2">
+                                <span>{{ __('monitor::messages.common.trace') }}</span>
+                                <button type="button" @click="showVendor = ! showVendor"
+                                    class="rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                                    x-text="showVendor ? @js(__('monitor::messages.common.hide_vendor')) : @js(__('monitor::messages.common.show_vendor'))"></button>
+                            </span>
                             <button type="button" @click="copyTrace()"
                                 :data-tooltip="traceCopied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
                                 class="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
@@ -465,14 +485,9 @@
                             </button>
                         </dt>
                         <dd class="max-h-40 overflow-auto whitespace-pre font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
-                            x-text="selected()?.metadata?.trace"></dd>
+                            x-text="visibleTrace()"></dd>
                     </div>
                 </template>
-                <div class="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
-                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
-                </div>
             </dl>
         </template>
 

@@ -6,6 +6,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 use Symfony\Component\Mime\Email;
 use Throwable;
@@ -118,7 +119,7 @@ class Mail extends Recorder
                 'correlation_id' => is_string($notification) ? $this->monitor->pendingNotificationCorrelationId() : null,
                 'body' => $body['content'] ?? null,
                 'body_format' => $body['format'] ?? null,
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
             ]),
             duration: $duration,
             subtype: is_string($notification) ? 'notification' : 'direct',

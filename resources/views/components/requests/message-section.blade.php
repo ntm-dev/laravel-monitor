@@ -1,6 +1,6 @@
 {{-- MessageSection: collapsible headers + body for one side (request or response).
      Values are already redacted server-side by Recorders\Requests. --}}
-@props(['title', 'headers' => [], 'body' => null, 'size' => null])
+@props(['title', 'headers' => [], 'body' => null, 'size' => null, 'open' => false])
 @php
     // A body cut by the recorder is stored as a string shorter than the original size.
     $isTruncated = is_string($body) && $size !== null && strlen($body) < $size;
@@ -8,7 +8,8 @@
     $bodyTree = is_array($body) ? \LaravelMonitor\Support\JsonTree::build($body) : null;
 @endphp
 {{-- start card http message --}}
-<x-monitor::card class="p-0" x-data="{ open: false, bodyCopied: false }">
+<x-monitor::card class="p-0">
+<div x-data="{ open: @js((bool) $open), bodyCopied: false }">
     <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-4 py-3 text-left">
         <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ $title }}</h2>
         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md dark:border dark:border-white/10"
@@ -51,5 +52,6 @@
             {{-- end http message body --}}
         @endif
     </div>
+</div>
 </x-monitor::card>
 {{-- end card http message --}}
