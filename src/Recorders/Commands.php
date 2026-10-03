@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 use ReflectionProperty;
 use Symfony\Component\Console\Input\ArgvInput;
@@ -111,7 +112,7 @@ class Commands extends Recorder
                 // history into an unusable pile of near-duplicates.
                 'command' => $commandLine,
                 'model_count' => $this->monitor->modelCount(),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
             ], fn ($value) => $value !== null),
             duration: $duration,

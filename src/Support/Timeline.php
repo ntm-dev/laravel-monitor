@@ -360,7 +360,15 @@ class Timeline
         // already supersede it, computed from the same start/duration that
         // positions this entry's own bar rather than the row's raw DB
         // timestamp.
-        $metadata = Arr::except($row->payload, ['phase']) + [
+        $payload = Arr::except($row->payload, ['phase']);
+
+        // Not stored when a trace was captured — read back from it. Jobs keep
+        // an absolute path, queries a project-relative one.
+        if (! isset($payload['location']) && isset($payload['trace'])) {
+            $payload['location'] = Trace::location($payload['trace'], $row->type === RecordType::Job->value);
+        }
+
+        $metadata = $payload + [
             'subtype' => $row->subtype,
             'key' => $row->key,
             'duration' => $row->duration,

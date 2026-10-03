@@ -5,6 +5,7 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Request;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\Json;
 use LaravelMonitor\Support\RecordType;
@@ -16,7 +17,6 @@ use Throwable;
 use function array_filter;
 use function defined;
 use function get_debug_type;
-use function gethostname;
 use function implode;
 use function in_array;
 use function is_array;
@@ -46,7 +46,7 @@ class Requests extends Recorder
      * Headers whose values are replaced before storing (lowercase), so
      * secrets/session tokens never land in the stored payload.
      */
-    protected const REDACT_HEADERS = [
+    public const REDACT_HEADERS = [
         'authorization',
         'cookie',
         'set-cookie',
@@ -134,7 +134,7 @@ class Requests extends Recorder
                         ? $this->responseBody($event->response)
                         : null,
                 ], static fn ($value) => $value !== null),
-                'server' => gethostname() ?: null,
+                'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
                 // Recorded here rather than reconstructed later from
                 // created_at - duration (see MergesJobTimelines::buildTracks(),

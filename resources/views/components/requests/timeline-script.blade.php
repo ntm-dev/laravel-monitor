@@ -362,8 +362,20 @@
         this.sqlCopied = true;
         setTimeout(() => this.sqlCopied = false, 1500);
     },
+    {{-- Trace lines for display; vendor frames are dropped unless toggled on. --}}
+    showVendor: false,
+    visibleTrace() {
+        const trace = this.selected()?.metadata?.trace ?? '';
+        return trace.split('\n')
+            {{-- A line with no "file(line):" part is a compact vendor frame. --}}
+            .filter(line => this.showVendor || (/^#\d+ .+\(\d+\): /.test(line) && !/^#\d+ (?:.*[\\/])?vendor[\\/]/.test(line)))
+            .map((line, index) => line
+                .replace(/^#\d+ /, '#' + index + ' ')
+                .replace(/^(#\d+) (.+)\((\d+)\): (.+)$/, (m, n, file, ln, fn) => n + ' ' + (/->|::/.test(fn) ? fn : file + ':' + ln)))
+            .join('\n');
+    },
     copyTrace() {
-        const trace = this.selected()?.metadata?.trace;
+        const trace = this.visibleTrace();
         if (!trace) return;
         navigator.clipboard.writeText(trace);
         this.traceCopied = true;

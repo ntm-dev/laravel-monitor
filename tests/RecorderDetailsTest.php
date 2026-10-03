@@ -54,6 +54,15 @@ class RecorderDetailsTest extends TestCase
         $this->assertMatchesRegularExpression('/^#0 .+\(\d+\): .+\(\)/', $trace);
     }
 
+    /** The call site is read back from the trace, not stored a second time. */
+    public function test_query_with_a_trace_stores_no_separate_location(): void
+    {
+        event(new QueryExecuted('select * from users', [], 5.0, DB::connection()));
+        Monitor::flush();
+
+        $this->assertArrayNotHasKey('location', array_filter($this->latestPayload('query'), fn ($value) => $value !== null));
+    }
+
     public function test_job_trace_is_captured_once_its_detail_toggle_is_on(): void
     {
         event($this->queuedEvent());

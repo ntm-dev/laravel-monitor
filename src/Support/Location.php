@@ -10,6 +10,7 @@ use function array_key_exists;
 use function implode;
 use function ltrim;
 use function preg_match;
+use function preg_match_all;
 use function str_starts_with;
 use function strlen;
 use function substr;
@@ -86,6 +87,28 @@ final class Location
             $nonInternalFile,
             $nonInternalLine,
         ];
+    }
+
+    /**
+     * Same pick as forQueryTrace(), read back from a stored Trace::capture()
+     * string instead of a live backtrace.
+     *
+     * @return array{ 0: string|null, 1: int|null }
+     */
+    public function forStoredTrace(string $trace): array
+    {
+        preg_match_all('/^#\d+ (.+)\((\d+)\): /m', $trace, $matches, PREG_SET_ORDER);
+
+        // forQueryTrace() skips index 0, so pad it.
+        $frames = [[]];
+
+        foreach ($matches as $match) {
+            if ($match[1] !== '[internal]') {
+                $frames[] = ['file' => $this->absoluteFile($match[1]), 'line' => (int) $match[2]];
+            }
+        }
+
+        return $this->forQueryTrace($frames);
     }
 
     /**
@@ -176,7 +199,7 @@ final class Location
         return null;
     }
 
-    private function isVendorFile(string $file): bool
+    public function isVendorFile(string $file): bool
     {
         return str_starts_with($file, $this->vendorPath) ||
             $file === $this->artisanPath ||

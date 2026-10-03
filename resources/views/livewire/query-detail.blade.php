@@ -116,7 +116,12 @@
          present: unlike the timeline panel's one-entry view, this page
          already has the SQL card open above it. --}}
     @if ($trace)
-        <x-monitor::card class="mt-1.5" x-data="{ expanded: false, copied: false }">
+        {{-- x-data sits on an inner div: a directive inside a component tag's attribute is not compiled. --}}
+        <x-monitor::card class="mt-1.5">
+        <div x-data="{
+            expanded: false, copied: false, showVendor: false, trace: @js($trace),
+            visible() { return this.trace.split('\n').filter(line => this.showVendor || (/^#\d+ .+\(\d+\): /.test(line) && !/^#\d+ (?:.*[\\/])?vendor[\\/]/.test(line))).map((line, index) => line.replace(/^#\d+ /, '#' + index + ' ').replace(/^(#\d+) (.+)\((\d+)\): (.+)$/, (m, n, file, ln, fn) => n + ' ' + (/->|::/.test(fn) ? fn : file + ':' + ln))).join('\n') },
+        }">
             <div class="flex items-center">
                 <button type="button" @click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center justify-between gap-2 p-4 text-left">
                     <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.trace') }}</span>
@@ -125,7 +130,10 @@
                         <x-monitor::chevrons-updown x-show="! expanded" x-cloak direction="up-down"/>
                     </span>
                 </button>
-                <button type="button" @click="navigator.clipboard.writeText(@js($trace)); copied = true; setTimeout(() => copied = false, 1500)"
+                <button type="button" x-show="expanded" x-cloak @click="showVendor = ! showVendor"
+                    class="mr-3 rounded border border-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    x-text="showVendor ? @js(__('monitor::messages.common.hide_vendor')) : @js(__('monitor::messages.common.show_vendor'))"></button>
+                <button type="button" @click="navigator.clipboard.writeText(visible()); copied = true; setTimeout(() => copied = false, 1500)"
                     :data-tooltip="copied ? @js(__('monitor::messages.common.copied')) : @js(__('monitor::messages.common.copy'))"
                     class="mr-4 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::COPY" class="h-3.5 w-3.5" x-show="! copied" />
@@ -133,8 +141,9 @@
                 </button>
             </div>
             <div x-show="expanded" x-cloak class="border-t border-neutral-100 px-4 pb-4 pt-3 dark:border-neutral-800">
-                <pre class="max-h-64 overflow-auto whitespace-pre font-mono text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">{{ $trace }}</pre>
+                <pre class="max-h-64 overflow-auto whitespace-pre font-mono text-xs leading-relaxed text-neutral-700 dark:text-neutral-300" x-text="visible()"></pre>
             </div>
+        </div>
         </x-monitor::card>
     @endif
 
@@ -167,7 +176,7 @@
                                      right detail page instead of assuming every call came from an HTTP request. --}}
                                 @php
                                     $commandName = $entry->payload['command'] ?? null;
-                                    $location = $entry->payload['location'] ?? null;
+                                    $location = $entry->payload['location'] ?? \LaravelMonitor\Support\Trace::location($entry->payload['trace'] ?? null);
                                     $connection = $entry->connection;
                                     $connectionType = $entry->connectionType;
                                 @endphp

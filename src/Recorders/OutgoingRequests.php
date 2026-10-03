@@ -6,18 +6,22 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Support\Str;
+use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\HttpStatusGroup;
 use LaravelMonitor\Support\RecordType;
+use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\Trace;
 use Throwable;
 
 use function array_filter;
+use function implode;
 use function in_array;
 use function is_array;
 use function is_string;
 use function json_decode;
 use function json_encode;
 use function parse_url;
+use function strlen;
 use function strtolower;
 
 class OutgoingRequests extends Recorder
@@ -49,8 +53,13 @@ class OutgoingRequests extends Recorder
                 'method' => $event->request->method(),
                 'url' => Str::limit($event->request->url(), 500),
                 'status' => $status,
-                'request_body' => $recordBody ? $this->body($event->request->body()) : null,
-                'response_body' => $recordBody ? $this->body($event->response->body()) : null,
+                'server' => Host::name(),
+                'request_headers' => $this->lazyHeaders($event->request->headers(...)),
+                'request_size' => $this->lazySize($event->request->body(...)),
+                'request_body' => $recordBody ? $this->lazyBody($event->request->body(...)) : null,
+                'response_headers' => $this->lazyHeaders($event->response->headers(...)),
+                'response_size' => $this->lazySize($event->response->body(...)),
+                'response_body' => $recordBody ? $this->lazyBody($event->response->body(...)) : null,
                 'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
             ], fn ($value) => $value !== null),
             duration: $this->duration($event),
@@ -67,7 +76,10 @@ class OutgoingRequests extends Recorder
                 'method' => $event->request->method(),
                 'url' => Str::limit($event->request->url(), 500),
                 'status' => null,
-                'request_body' => ($this->config['details']['record_body'] ?? false) ? $this->body($event->request->body()) : null,
+                'server' => Host::name(),
+                'request_headers' => $this->lazyHeaders($event->request->headers(...)),
+                'request_size' => $this->lazySize($event->request->body(...)),
+                'request_body' => ($this->config['details']['record_body'] ?? false) ? $this->lazyBody($event->request->body(...)) : null,
                 'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
             ], fn ($value) => $value !== null),
             // No HTTP status to group by — kept out of the 5xx bucket (a
@@ -77,6 +89,49 @@ class OutgoingRequests extends Recorder
             // still renders it as "Failed".
             subtype: HttpStatusGroup::NetworkError->value,
         );
+    }
+
+    /**
+     * Flattened to name => value with sensitive values redacted, same shape
+     * Recorders\Requests stores — resolved when the entry is stored.
+     *
+     * @param  callable(): array<string, mixed>  $read
+     * @return LazyValue<array<string, string>>
+     */
+    protected function lazyHeaders(callable $read): LazyValue
+    {
+        return new LazyValue(static function () use ($read): array {
+            $result = [];
+
+            foreach ($read() as $name => $values) {
+                $result[$name] = in_array(strtolower((string) $name), Requests::REDACT_HEADERS, true)
+                    ? '••• redacted •••'
+                    : implode(', ', (array) $values);
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * @param  callable(): string  $read
+     * @return LazyValue<int>
+     */
+    protected function lazySize(callable $read): LazyValue
+    {
+        return new LazyValue(static fn () => strlen($read()));
+    }
+
+    /**
+     * Reading, redacting and re-encoding the body waits until the entry is
+     * stored; an empty body resolves to null and is dropped there.
+     *
+     * @param  callable(): string  $read
+     * @return LazyValue<string|null>
+     */
+    protected function lazyBody(callable $read): LazyValue
+    {
+        return new LazyValue(fn () => $this->body($read()));
     }
 
     /**
