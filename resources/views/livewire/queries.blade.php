@@ -100,10 +100,10 @@
                                     </td>
                                     <td class="py-2 pr-3">
                                         <span class="inline-flex items-center gap-1.5 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                                            {{ $query->connection }}
                                             @foreach ($query->connection_types as $connectionType)
                                                 <span class="rounded border px-1 font-mono text-[9px] font-medium uppercase leading-tight {{ Format::CONNECTION_TYPE_BADGES[$connectionType] }}">{{ $connectionType }}</span>
                                             @endforeach
+                                            {{ $query->connection }}
                                         </span>
                                     </td>
                                     <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($query->calls) }}</td>

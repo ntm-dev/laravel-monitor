@@ -368,6 +368,11 @@ class Timeline
             $payload['location'] = Trace::location($payload['trace'], $row->type === RecordType::Job->value);
         }
 
+        // A query's connection/PDO role live packed in `subtype`, not the payload.
+        if ($row->type === RecordType::Query->value) {
+            [$payload['connection'], $payload['connection_type']] = QueryConnection::parse($row->subtype);
+        }
+
         $metadata = $payload + [
             'subtype' => $row->subtype,
             'key' => $row->key,
