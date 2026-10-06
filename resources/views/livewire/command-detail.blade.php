@@ -3,7 +3,7 @@
     $startedAt = function ($entry) {
         $start = \LaravelMonitor\Support\Format::startedAt($entry);
 
-        return $start !== null ? \LaravelMonitor\Support\Format::datetimeMs($start) : '—';
+        return $start !== null ? \LaravelMonitor\Support\Format::datetimeUs($start) : '—';
     };
     $tz = \LaravelMonitor\Support\Format::timezone();
     $from = ($page - 1) * $perPage;
@@ -44,7 +44,7 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.command') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.exit_code') }}</th>
@@ -60,7 +60,7 @@
                                 {{-- The run's start, not its created_at: entries are stamped when
                                      they finish, so showing created_at here put this row a second
                                      ahead of the "Started at" on the very run page it links to. --}}
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }}</td>
                                 {{-- Falls back to the bare command name (the key every run here
                                      shares) when payload.command is absent — a command invoked
                                      without any arguments carries nothing extra to show (see

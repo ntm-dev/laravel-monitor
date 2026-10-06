@@ -221,6 +221,16 @@ class Format
     }
 
     /**
+     * Same layout as datetimeMs(), with microseconds ("H:i:s.u").
+     */
+    public static function datetimeUs(DateTimeInterface $date): string
+    {
+        $format = self::DATETIME_LOCALES[app()->getLocale()] ?? self::DATETIME;
+
+        return self::datetime($date, str_replace('H:i:s', 'H:i:s.u', $format));
+    }
+
+    /**
      * When an entry's own work actually began. Entries are stamped when they
      * *finish* — `created_at` is the run's end, and only at second precision
      * — so a list showing created_at and a detail page showing "started at"

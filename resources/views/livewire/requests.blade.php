@@ -100,7 +100,7 @@
                             <tr wire:key="route-{{ $hash }}"
                                 class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => $hash] + $range) }}'">
-                                <td class="py-2 pr-2 font-mono text-xs uppercase tracking-tight {{ Format::httpMethodClass($route->method) }}">{{ $route->method }}</td>
+                                <td class="py-2 pr-2 font-mono text-xs font-bold uppercase tracking-tight {{ Format::httpMethodClass($route->method) }}">{{ $route->method }}</td>
                                 <td class="max-w-[14rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $route->key }}">{{ $route->path }}</td>
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->success) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ $route->client_errors > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">

@@ -99,7 +99,7 @@
                     <table class="w-full min-w-[640px] text-sm">
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.message') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.user') }}</th>
@@ -108,7 +108,7 @@
                         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($occurrences as $occurrence)
                                 <tr class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $occurrence->date }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $occurrence->date }}</td>
                                     <td class="max-w-[14rem] py-2 pr-3">
                                         <x-monitor::exception-source-badge :type="$occurrence->sourceType" :label="$occurrence->sourceLabel" :url="$occurrence->sourceUrl"/>
                                     </td>
