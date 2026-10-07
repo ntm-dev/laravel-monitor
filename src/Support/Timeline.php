@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\ExecutionStage;
 
 use function array_filter;
+use function is_string;
 
 /**
  * Builds the ordered list of TimelineEntry rows shown on the Request Detail
@@ -364,7 +365,8 @@ class Timeline
 
         // Not stored when a trace was captured — read back from it. Jobs keep
         // an absolute path, queries a project-relative one.
-        if (! isset($payload['location']) && isset($payload['trace'])) {
+        // Exception payloads carry 'trace' as a frame array, not text.
+        if (! isset($payload['location']) && isset($payload['trace']) && is_string($payload['trace'])) {
             $payload['location'] = Trace::location($payload['trace'], $row->type === RecordType::Job->value);
         }
 

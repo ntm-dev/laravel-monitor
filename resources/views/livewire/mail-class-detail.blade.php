@@ -38,7 +38,7 @@
                     <table class="w-full min-w-[860px] text-sm">
                         <thead>
                             <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                                <th class="w-px pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                                <th class="w-px pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.mailer') }}</th>
                                 <th class="pb-2 font-normal">{{ __('monitor::messages.common.subject') }}</th>
@@ -51,7 +51,7 @@
                             @foreach ($entries as $entry)
                                 @php($sendUrl = route('monitor.mail.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range))
                                 <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                    <td class="whitespace-nowrap py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeUs($entry->created_at) }}</td>
                                     <td class="{{ $entry->sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($entry->sourceUrl) onclick="window.location='{{ $entry->sourceUrl }}'" @endif>
                                         <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$entry->sourceUrl"/>
                                     </td>

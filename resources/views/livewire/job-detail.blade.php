@@ -30,7 +30,7 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.queue') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.attempts') }}</th>
@@ -47,7 +47,7 @@
                             @php($attemptUrl = ($entry->request_id ?? null) && $entry->subtype !== 'queued' ? route('monitor.jobs.attempts.show', $entry->request_id) : null)
                             <tr class="{{ $attemptUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 @if ($attemptUrl) onclick="window.location='{{ $attemptUrl }}'" @endif>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></td>
+                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</td>
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['queue'] ?? 'default' }}</td>
                                 <td class="py-2 pr-3">
                                     <span @class([

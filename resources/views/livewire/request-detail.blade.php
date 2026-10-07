@@ -58,7 +58,7 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }}</th>
+                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.method') }}</th>
                             <th class="pb-2 font-normal">{{ __('monitor::messages.common.details') }}</th>
                             <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.status') }}</th>
@@ -80,15 +80,14 @@
                             <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
                                 <td class="py-2 pr-3 font-mono text-xs">
                                     @if ($detailUrl)
-                                        <a href="{{ $detailUrl }}" class="text-neutral-700 hover:underline dark:text-neutral-200" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }}</a>
+                                        <a href="{{ $detailUrl }}" class="text-neutral-700 hover:underline dark:text-neutral-200" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</a>
                                     @else
-                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeMs($entry->created_at) }}</span>
+                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</span>
                                     @endif
-                                    <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span>
                                 </td>
-                                <td class="py-2 pr-3 font-mono text-xs uppercase tracking-tight {{ \LaravelMonitor\Support\Format::httpMethodClass($entry->payload['request']['method'] ?? null) }}">{{ $entry->payload['request']['method'] ?? '—' }}</td>
+                                <td class="py-2 pr-3 font-mono text-xs font-bold uppercase tracking-tight {{ \LaravelMonitor\Support\Format::httpMethodClass($entry->payload['request']['method'] ?? null) }}">{{ $entry->payload['request']['method'] ?? '—' }}</td>
                                 <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['request']['path'] ?? '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
+                                <td class="py-2 text-right font-mono text-xs font-bold {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($entry->duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
                             </tr>
                         @endforeach
