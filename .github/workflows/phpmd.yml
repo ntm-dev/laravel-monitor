@@ -44,14 +44,14 @@ jobs:
         uses: shivammathur/setup-php@aa1fe473f9c687b6fb896056d771232c0bc41161
         with:
           coverage: none
-          tools: phpmd
+          tools: phpmd:2.15.0
 
       - name: Run PHPMD
         run: phpmd . sarif codesize --reportfile phpmd-results.sarif
         continue-on-error: true
 
       - name: Upload analysis results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: phpmd-results.sarif
           wait-for-processing: true
