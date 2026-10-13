@@ -107,15 +107,20 @@
             <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
-                    <dd class="font-mono text-neutral-800 dark:text-neutral-200"
-                        :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
+                    {{-- "(90%)" only once the query alone takes a large share of the request. --}}
+                    <dd class="font-mono"
+                        :class="selected()?.durationShare != null ? 'font-medium text-rose-600 dark:text-rose-400' :
+                            'text-neutral-800 dark:text-neutral-200'"
+                        :data-tooltip="selected()?.metadata?.ended_at"
+                        x-text="formatDuration(selected()?.duration) + (selected()?.durationShare != null ? ' (' + selected().durationShare + ')' : '')"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.calls') }}</dt>
+                    {{-- Duplicates append the group's summed time and share: "115 (124.16ms - 60%)". --}}
                     <dd class="font-mono"
                         :class="selected()?.duplicateCount > 1 ? 'font-medium text-amber-600 dark:text-amber-400' :
                             'text-neutral-800 dark:text-neutral-200'"
-                        x-text="selected()?.duplicateCount"></dd>
+                        x-text="selected()?.duplicateCount + (selected()?.duplicateTotal != null ? ' (' + formatDuration(selected().duplicateTotal) + (selected().duplicateShare != null ? ' - ' + selected().duplicateShare : '') + ')' : '')"></dd>
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>

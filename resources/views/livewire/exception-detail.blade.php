@@ -2,7 +2,7 @@
     @if (! $exists)
         <x-monitor::card class="p-10 text-center">
             <p class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.issue.exception_not_found') }}</p>
-            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.exception.no_occurrences_in_period', ['period' => $periodPhrase]) }}</p>
+            <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.exception.no_occurrences') }}</p>
             <a href="{{ route('monitor.dashboard', ['tab' => 'exceptions'] + $range) }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">{{ __('monitor::messages.exception.back_to_exceptions') }}</a>
         </x-monitor::card>
     @else

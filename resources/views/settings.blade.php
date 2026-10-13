@@ -201,11 +201,32 @@
                                                 {{-- start recorder detail toggle row --}}
                                                 <div x-show="enabled" x-cloak class="mt-2 flex flex-col gap-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
                                                     @foreach ($recorder['details'] as $detail)
-                                                        <div>
+                                                        <div @if ($detail['bodySize'] !== null) x-data="{ bodyEnabled: {{ $detail['enabled'] ? 'true' : 'false' }} }" @endif>
                                                             <div class="flex items-center justify-between gap-4">
                                                                 <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $detail['label'] }}</span>
-                                                                <x-monitor::toggle name="recorder_details[{{ $recorder['name'] }}][{{ $detail['key'] }}]" :checked="$detail['enabled']" size="sm" />
+                                                                <x-monitor::toggle name="recorder_details[{{ $recorder['name'] }}][{{ $detail['key'] }}]" :checked="$detail['enabled']" size="sm"
+                                                                    :x-model="$detail['bodySize'] !== null ? 'bodyEnabled' : null" />
                                                             </div>
+                                                            @if ($detail['bodySize'] !== null)
+                                                                {{-- start max body size --}}
+                                                                <div x-show="bodyEnabled" x-cloak class="mt-2 flex items-center justify-between gap-4">
+                                                                    <label for="s-body-size" class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.recorder_detail_max_body_size') }}</label>
+                                                                    <div class="flex items-center gap-1.5">
+                                                                        <input id="s-body-size" name="request_body_max_size" type="number" min="1"
+                                                                            value="{{ old('request_body_max_size', $detail['bodySize']['size']) }}"
+                                                                            class="{{ $numClass }}">
+                                                                        <select name="request_body_max_unit" class="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {{ $disabledClass }}">
+                                                                            @foreach (\LaravelMonitor\Support\Settings::BODY_SIZE_UNITS as $unit => $multiplier)
+                                                                                <option value="{{ $unit }}" @selected(old('request_body_max_unit', $detail['bodySize']['unit']) === $unit)>{{ $unit }}</option>
+                                                                            @endforeach
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                @error('request_body_max_size')
+                                                                    <p class="mt-1 text-right text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                                                                @enderror
+                                                                {{-- end max body size --}}
+                                                            @endif
                                                         </div>
                                                     @endforeach
                                                 </div>
@@ -283,8 +304,14 @@
                         cacheStore: @js($selectedStore),
                         storeDrivers: @js($system['aggregate_cache_store_drivers']),
                         appConfigAvailable: @js($system['aggregate_cache_app_config_available']),
-                        useAppConfig: @js($system['aggregate_cache_use_app_config']),
-                    }">
+                        optionDrivers: @js(array_keys($system['aggregate_cache_option_fields'])),
+                        defaults: @js($system['aggregate_cache_defaults']),
+                        values: @js(old('aggregate_cache_options', $system['aggregate_cache_options'])),
+                        mode: @js(old('aggregate_cache_mode', $system['aggregate_cache_mode'])),
+                        driver() { return this.storeDrivers[this.cacheStore] ?? this.cacheStore },
+                        appAvailable() { return !! this.appConfigAvailable[this.driver()] },
+                    }"
+                    x-effect="if (mode === 'app' && ! appAvailable()) mode = 'default'">
                         <div class="{{ $rowClass }}">
                             <label for="s-cache-store"
                                 class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache_store') }}</label>
@@ -298,34 +325,68 @@
                             </select>
                         </div>
 
-                        {{-- Only shown when the host app already has its own store for the
-                             selected driver (Settings::aggregateCacheHasAppConfig()). --}}
-                        <div class="{{ $rowClass }}" x-show="appConfigAvailable[storeDrivers[cacheStore] ?? cacheStore]" x-cloak>
-                            <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache_use_app_config') }}</span>
-                            <x-monitor::toggle name="aggregate_cache_use_app_config" x-model="useAppConfig" :checked="$system['aggregate_cache_use_app_config']" />
+                        {{-- start aggregate cache config mode --}}
+                        {{-- Only drivers with editable options get a mode; "app" is disabled
+                             unless the host app has its own store for the driver
+                             (Settings::aggregateCacheHasAppConfig()). --}}
+                        <div class="{{ $rowClass }}" x-show="optionDrivers.includes(driver())" x-cloak>
+                            <label for="s-cache-mode"
+                                class="{{ $labelClass }}">{{ __('monitor::messages.settings.aggregate_cache_config') }}</label>
+                            <select id="s-cache-mode" name="aggregate_cache_mode" x-model="mode" class="{{ $fieldClass }}">
+                                <option value="app" :disabled="! appAvailable()">{{ __('monitor::messages.settings.aggregate_cache_mode_app') }}</option>
+                                <option value="default">{{ __('monitor::messages.settings.aggregate_cache_mode_default') }}</option>
+                                <option value="custom">{{ __('monitor::messages.settings.aggregate_cache_mode_custom') }}</option>
+                            </select>
                         </div>
+                        {{-- end aggregate cache config mode --}}
 
                         @foreach ($system['aggregate_cache_option_fields'] as $driver => $fields)
                             {{-- x-cloak avoids a one-frame flash of every driver's fields before Alpine
                                  evaluates x-show on first paint. cacheStore is a store *name*, which can
                                  differ from its driver — resolved via storeDrivers, same as the PHP side
                                  (Settings::aggregateCacheDriver()). --}}
-                            <div x-show="(storeDrivers[cacheStore] ?? cacheStore) === '{{ $driver }}' && !useAppConfig" x-cloak
+                            <div x-show="driver() === '{{ $driver }}' && mode !== 'app'" x-cloak
                                 class="mb-2 flex flex-col gap-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
                                 @if ($driver === 'database')
                                     {{-- Follows table_prefix, not a free-text option — see Settings::TABLE_SUFFIXES. --}}
                                     <div class="flex items-center justify-between gap-4">
                                         <span class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.aggregate_cache_option_table') }}</span>
-                                        <input value="{{ $system['table_prefix'] }}cache" disabled class="{{ $fieldClass }} font-mono">
+                                        <span class="min-w-0 break-all text-right font-mono text-xs text-neutral-700 dark:text-neutral-300">{{ $system['table_prefix'] }}cache</span>
                                     </div>
                                 @endif
                                 @foreach ($fields as $field)
+                                    <div>
                                     <div class="flex items-center justify-between gap-4">
                                         <label for="s-cache-opt-{{ $field }}"
                                             class="truncate font-mono text-xs text-neutral-500 dark:text-neutral-400">{{ $optionFieldLabels[$field] ?? $field }}</label>
-                                        <input id="s-cache-opt-{{ $field }}" name="aggregate_cache_options[{{ $field }}]"
-                                            value="{{ old("aggregate_cache_options.{$field}", $system['aggregate_cache_options'][$field] ?? '') }}"
-                                            class="{{ $fieldClass }} font-mono">
+                                        {{-- "default" shows the built-in value as text; only "custom" renders (and submits) an input. --}}
+                                        <span x-show="mode !== 'custom'" x-cloak
+                                            class="min-w-0 break-all text-right font-mono text-xs text-neutral-700 dark:text-neutral-300"
+                                            x-text="defaults['{{ $driver }}']?.['{{ $field }}'] || '—'"></span>
+                                        @if ($field === 'connection')
+                                            {{-- A connection is picked from config('database.connections'), not typed. --}}
+                                            <select id="s-cache-opt-{{ $field }}" x-show="mode === 'custom'" x-cloak x-model="values['{{ $field }}']"
+                                                :name="mode === 'custom' ? 'aggregate_cache_options[{{ $field }}]' : null"
+                                                class="{{ $fieldClass }} font-mono">
+                                                <option value="">{{ __('monitor::messages.settings.aggregate_cache_connection_default', ['connection' => $system['aggregate_cache_defaults']['database']['connection'] ?? '']) }}</option>
+                                                @foreach ($system['aggregate_cache_connections'] as $connection)
+                                                    <option value="{{ $connection }}">{{ $connection }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <input id="s-cache-opt-{{ $field }}" x-show="mode === 'custom'" x-cloak
+                                                :name="mode === 'custom' ? 'aggregate_cache_options[{{ $field }}]' : null"
+                                                :value="values['{{ $field }}'] ?? ''"
+                                                @input="values['{{ $field }}'] = $event.target.value"
+                                                class="{{ $fieldClass }} font-mono">
+                                        @endif
+                                    </div>
+                                    {{-- start empty default hint --}}
+                                    @if ($field === 'connection')
+                                        <p x-show="mode !== 'custom' && ! defaults['{{ $driver }}']?.['{{ $field }}']" x-cloak
+                                            class="mt-1 text-right text-xs text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.settings.aggregate_cache_connection_empty') }}</p>
+                                    @endif
+                                    {{-- end empty default hint --}}
                                     </div>
                                 @endforeach
                             </div>
@@ -451,6 +512,11 @@
                 class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">{{ __('monitor::messages.settings.save_system') }}</button>
         </div>
     </form>
+
+    {{-- start team settings --}}
+    {{-- Outside the settings form: the team card has forms of its own, and forms can't nest. --}}
+    @livewire('monitor.team', $rangeProps + ['limit' => 25])
+    {{-- end team settings --}}
 </div>
 
 {{-- Searchable timezone combobox: filter by name/offset, live current time per

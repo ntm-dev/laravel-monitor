@@ -1179,6 +1179,30 @@ class MonitorTest extends TestCase
             ->assertSee('Occurrences');
     }
 
+    public function test_exception_detail_page_ignores_the_period_and_shows_old_occurrences(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $key = Fingerprint::for('App\\Boom', 'Kaboom', 'app/X.php:10');
+
+        Monitor::record(RecordType::Exception, $key, [
+            'class' => 'App\\Services\\Boom',
+            'message' => 'Kaboom',
+            'file' => 'app/X.php',
+            'line' => 10,
+            'frames' => [],
+        ], null, 'unhandled', 1);
+        Monitor::flush();
+
+        DB::table('monitor_entries')->where('type', 'exception')->update(['created_at' => now()->subDays(20)]);
+
+        $this->get('/monitor/exceptions?period=1h&key='.$key)
+            ->assertOk()
+            ->assertSee('Copy as Markdown')
+            ->assertDontSee('This exception has no recorded occurrences.')
+            ->assertDontSee('>24H<', false);
+    }
+
     public function test_exception_detail_page_links_to_the_request_it_happened_during(): void
     {
         Gate::define('viewMonitor', fn ($user = null) => true);
@@ -3842,12 +3866,17 @@ class MonitorTest extends TestCase
                 'job_threshold' => 1000,
                 'query_threshold' => 500,
                 'outgoing_request_threshold' => 1000,
+                'request_body_max_size' => 128,
+                'request_body_max_unit' => 'KB',
+                'aggregate_cache_mode' => 'default',
                 'period_labels' => ['24h'],
                 'period_hours' => [24],
             ])->assertRedirect('/monitor/settings')
                 ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
 
             $this->assertSame(168, \LaravelMonitor\Support\Settings::all()['retention_hours']);
+            $this->assertSame(128 * 1024, \LaravelMonitor\Support\Settings::all()['request_body_max_bytes']);
+            $this->assertSame('default', \LaravelMonitor\Support\Settings::all()['aggregate_cache_mode']);
             $this->assertSame(['24h' => 24], \LaravelMonitor\Support\Settings::all()['periods']);
         } finally {
             \LaravelMonitor\Support\Settings::reset();
@@ -3943,12 +3972,22 @@ class MonitorTest extends TestCase
         $this->assertStringContainsString($inviter->name, $rendered);
     }
 
-    public function test_team_tab_is_registered_in_the_footer_group(): void
+    public function test_team_is_no_longer_a_tab_and_lives_on_the_settings_page(): void
     {
         [, $footer] = \LaravelMonitor\Support\Nav::grouped();
 
-        $this->assertArrayHasKey('team', $footer);
-        $this->assertSame('monitor.team', $footer['team']['component']);
+        $this->assertArrayNotHasKey('team', $footer);
+
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/settings')->assertOk()->assertSee('My account');
+    }
+
+    public function test_the_old_team_url_redirects_to_settings(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/team')->assertRedirect(route('monitor.dashboard', ['tab' => 'settings']));
     }
 
     public function test_accept_invitation_page_is_shown_for_a_valid_token(): void

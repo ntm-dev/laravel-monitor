@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Js;
 use Illuminate\View\Component;
 use LaravelMonitor\Support\EntryId;
+use LaravelMonitor\Support\Format;
 use LaravelMonitor\Support\KeyHash;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Timeline as TimelineSupport;
@@ -37,6 +38,9 @@ use LaravelMonitor\Support\TimelineEntry;
  */
 class Timeline extends Component
 {
+    /** Percent of its request's duration at which a query (group) is flagged in the detail panel. */
+    protected const SLOW_QUERY_SHARE = 20.0;
+
     /**
      * The shortest real (non-zero) duration bar on the page must still be
      * at least this many px wide at 1x zoom — see $minWidthPx.
@@ -411,9 +415,12 @@ class Timeline extends Component
         // inspector panel as "Calls". Scoped per bundle (track, or one
         // job attempt), matching Support\Timeline::assignDuplicateColors(),
         // which stamps the tree pane's coloured dot the same way.
-        $queryDuplicateCounts = collect($entries)
+        $queryGroups = collect($entries)
             ->filter(fn (TimelineEntry $entry) => $entry->type === 'query')
-            ->countBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
+            ->groupBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
+        $queryDuplicateCounts = $queryGroups->map(static fn (Collection $group) => $group->count());
+        $queryGroupTotals = $queryGroups->map(static fn (Collection $group) => (float) $group->sum('duration'));
+        $bundleDuration = (float) ($byId->get('request')?->duration ?? 0);
 
         foreach ($entries as $entry) {
             // 'root'/'attempt'/'phase'/'event' — same classification
@@ -429,6 +436,9 @@ class Timeline extends Component
                 in_array($entry->type, TimelineSupport::phases(), true) => 'phase',
                 default => 'event',
             };
+
+            $queryKey = $entry->type === 'query' ? Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label) : null;
+            $isDuplicate = $queryKey !== null && $queryDuplicateCounts[$queryKey] > 1;
 
             $entriesById[$entry->id] = [
                 'type' => $entry->type,
@@ -457,9 +467,13 @@ class Timeline extends Component
                 // colour (only 10 in the palette), which would otherwise
                 // pulse both together.
                 'duplicateGroup' => $entry->metadata['duplicateGroup'] ?? null,
-                'duplicateCount' => $entry->type === 'query'
-                    ? $queryDuplicateCounts[Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label)]
-                    : null,
+                'duplicateCount' => $queryKey !== null ? $queryDuplicateCounts[$queryKey] : null,
+                // Summed time of the duplicate group and its share of the bundle's
+                // duration; both null for a query that runs once.
+                'duplicateTotal' => $isDuplicate ? $queryGroupTotals[$queryKey] : null,
+                'duplicateShare' => $isDuplicate ? self::share($queryGroupTotals[$queryKey], $bundleDuration) : null,
+                // This query's own share, only once it reaches SLOW_QUERY_SHARE.
+                'durationShare' => $queryKey !== null ? self::share((float) $entry->duration, $bundleDuration, self::SLOW_QUERY_SHARE) : null,
                 // Only queries have their own detail page. The stored group key
                 // is the normalized SQL shape (see Recorders\Queries::record()),
                 // not the raw per-call SQL text in metadata['sql'] — normalizing
@@ -493,6 +507,21 @@ class Timeline extends Component
                     : null,
             ];
         }
+    }
+
+    /**
+     * "60%" — $part's share of $whole, or null when $whole is zero or the
+     * share is under $minimum.
+     */
+    protected static function share(float $part, float $whole, float $minimum = 0.0): ?string
+    {
+        if ($whole <= 0) {
+            return null;
+        }
+
+        $share = $part / $whole * 100;
+
+        return $share >= $minimum ? Format::percent($share) : null;
     }
 
     /**

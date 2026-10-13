@@ -300,25 +300,27 @@ trait BuildsQueries
     {
         $driver = Settings::aggregateCacheDriver($name);
 
+        $mode = config('monitor.aggregate_cache.mode');
+
         // Opt-in escape hatch: the admin explicitly asked to reuse the host
         // app's own store for this driver instead of an isolated default.
-        if (config('monitor.aggregate_cache.use_app_config') && Settings::aggregateCacheHasAppConfig($driver)) {
+        if ($mode === 'app' && Settings::aggregateCacheHasAppConfig($driver)) {
             return [...config("cache.stores.{$driver}", []), 'driver' => $driver];
         }
 
-        $options = (array) config('monitor.aggregate_cache.options', []);
+        // Saved options only count in "custom" mode; "default" ignores them.
+        $options = $mode === 'custom' ? (array) config('monitor.aggregate_cache.options', []) : [];
 
         return match ($driver) {
             'file' => [
                 'driver' => 'file',
-                'path' => storage_path('framework/cache/monitor-aggregate'),
-                'lock_path' => storage_path('framework/cache/monitor-aggregate'),
+                ...Settings::aggregateCacheDefaults('file'),
                 ...$options,
             ],
             'database' => [
                 'driver' => 'database',
                 'table' => config('monitor.aggregate_cache.table', 'monitor_cache'),
-                'connection' => null,
+                ...Settings::aggregateCacheDefaults('database'),
                 'lock_connection' => null,
                 ...$options,
             ],

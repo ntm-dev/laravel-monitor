@@ -75,7 +75,7 @@ jobs:
           coverage: none
 
       - name: Install redis-cli
-        run: sudo apt-get install -qq redis-tools
+        run: sudo apt-get update && sudo apt-get install -qq redis-tools
 
       - name: Require cachewerk/relay
         run: |
@@ -163,7 +163,7 @@ jobs:
           coverage: none
 
       - name: Install redis-cli
-        run: sudo apt-get install -qq redis-tools
+        run: sudo apt-get update && sudo apt-get install -qq redis-tools
 
       - name: Require cachewerk/relay
         run: |
@@ -240,7 +240,7 @@ jobs:
           coverage: none
 
       - name: Install redis-cli
-        run: sudo apt-get install -qq redis-tools
+        run: sudo apt-get update && sudo apt-get install -qq redis-tools
 
       - name: Require cachewerk/relay
         run: |
@@ -308,7 +308,7 @@ jobs:
           coverage: none
 
       - name: Install redis-cli
-        run: sudo apt-get install -qq redis-tools
+        run: sudo apt-get update && sudo apt-get install -qq redis-tools
 
       - name: Require cachewerk/relay
         run: |

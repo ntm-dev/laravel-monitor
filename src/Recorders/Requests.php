@@ -26,6 +26,7 @@ use function is_scalar;
 use function is_string;
 use function json_last_error_msg;
 use function ltrim;
+use function max;
 use function mb_check_encoding;
 use function mb_strcut;
 use function memory_get_peak_usage;
@@ -261,7 +262,7 @@ class Requests extends Recorder
     }
 
     /**
-     * Redacted body; once its encoded JSON exceeds MAX_BODY_BYTES, that JSON cut to size instead.
+     * Redacted body; once its encoded JSON exceeds maxBodyBytes(), that JSON cut to size instead.
      *
      * @param  array<array-key, mixed>  $input
      * @return array<array-key, mixed>|string
@@ -275,17 +276,25 @@ class Requests extends Recorder
             return '('.json_last_error_msg().')';
         }
 
-        return strlen($encoded) > self::MAX_BODY_BYTES ? $this->truncate($encoded) : $redacted;
+        return strlen($encoded) > $this->maxBodyBytes() ? $this->truncate($encoded) : $redacted;
     }
 
-    /** Cut to MAX_BODY_BYTES on a UTF-8 character boundary, with a trailing ellipsis. */
+    /** The configured size cap for a stored body, falling back to MAX_BODY_BYTES. */
+    protected function maxBodyBytes(): int
+    {
+        return max(1, (int) ($this->config['details']['max_body_bytes'] ?? self::MAX_BODY_BYTES));
+    }
+
+    /** Cut to maxBodyBytes() on a UTF-8 character boundary, with a trailing ellipsis. */
     protected function truncate(string $value): string
     {
-        if (strlen($value) <= self::MAX_BODY_BYTES) {
+        $limit = $this->maxBodyBytes();
+
+        if (strlen($value) <= $limit) {
             return $value;
         }
 
-        return mb_strcut($value, 0, self::MAX_BODY_BYTES, 'UTF-8').'…';
+        return mb_strcut($value, 0, $limit, 'UTF-8').'…';
     }
 
     /**

@@ -54,9 +54,11 @@ class SettingsController
             'job_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'query_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
             'outgoing_request_threshold' => ['required', 'integer', 'min:0', 'max:600000'],
+            'request_body_max_size' => ['required', 'integer', 'min:1'],
+            'request_body_max_unit' => ['required', 'in:'.implode(',', array_keys(Settings::BODY_SIZE_UNITS))],
             'aggregate_cache_enabled' => ['nullable', 'boolean'],
             'aggregate_cache_store' => ['nullable', 'string', 'max:255', 'in:'.implode(',', ['', ...Settings::aggregateCacheStores()])],
-            'aggregate_cache_use_app_config' => ['nullable', 'boolean'],
+            'aggregate_cache_mode' => ['required', 'in:'.implode(',', Settings::AGGREGATE_CACHE_MODES)],
             'aggregate_cache_options' => ['nullable', 'array'],
             'aggregate_cache_options.*' => ['nullable', 'string', 'max:1000'],
             'period_labels' => ['required', 'array', 'min:1'],
@@ -78,6 +80,16 @@ class SettingsController
             ]);
         }
 
+        $bodyBytes = Settings::joinBodyBytes((int) $validated['request_body_max_size'], $validated['request_body_max_unit']);
+
+        if ($bodyBytes > Settings::MAX_BODY_BYTES) {
+            ['size' => $size, 'unit' => $unit] = Settings::splitBodyBytes(Settings::MAX_BODY_BYTES);
+
+            throw ValidationException::withMessages([
+                'request_body_max_size' => __('monitor::messages.settings.body_size_too_large', ['max' => "{$size} {$unit}"]),
+            ]);
+        }
+
         $path = trim($validated['dashboard_path'], '/');
 
         Settings::save([
@@ -90,10 +102,14 @@ class SettingsController
             'job_threshold' => (int) $validated['job_threshold'],
             'query_threshold' => (int) $validated['query_threshold'],
             'outgoing_request_threshold' => (int) $validated['outgoing_request_threshold'],
+            'request_body_max_bytes' => $bodyBytes,
             'aggregate_cache_enabled' => $request->boolean('aggregate_cache_enabled'),
             'aggregate_cache_store' => $validated['aggregate_cache_store'] ?? '',
-            'aggregate_cache_use_app_config' => $request->boolean('aggregate_cache_use_app_config'),
-            'aggregate_cache_options' => $this->aggregateCacheOptions($request, $validated['aggregate_cache_store'] ?? ''),
+            'aggregate_cache_mode' => $validated['aggregate_cache_mode'],
+            // Only "custom" submits options; the other modes keep what was saved before.
+            'aggregate_cache_options' => $validated['aggregate_cache_mode'] === 'custom'
+                ? $this->aggregateCacheOptions($request, $validated['aggregate_cache_store'] ?? '')
+                : (array) (Settings::all()['aggregate_cache_options'] ?? []),
             'periods' => $periods,
             'recorders' => $this->recorderToggles($request),
             'recorder_details' => $this->recorderDetailToggles($request),
@@ -194,7 +210,9 @@ class SettingsController
 
         return array_filter(
             array_intersect_key($submitted, array_flip($allowed)),
-            fn ($value) => $value !== null && $value !== '',
+            fn ($value, $field) => $value !== null && $value !== ''
+                && ($field !== 'connection' || in_array($value, Settings::databaseConnections(), true)),
+            ARRAY_FILTER_USE_BOTH,
         );
     }
 
