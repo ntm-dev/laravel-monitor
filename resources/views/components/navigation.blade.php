@@ -108,7 +108,7 @@
                    :class="{{ $classExpr($tabKey, $linkActiveClasses, $linkInactiveClasses) }}">
                     <x-monitor::icon :path="$item['icon']" class="{{ $staticClasses($iconBaseClasses, $tabKey, $iconActiveClasses, $iconInactiveClasses) }}" x-bind:class="{{ $classExpr($tabKey, $iconActiveClasses, $iconInactiveClasses) }}"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
-                    @if ($tab === $tabKey && ! in_array($tabKey, ['settings', 'team'], true) && $autoRefreshes)
+                    @if ($tab === $tabKey && ! in_array($tabKey, ['settings'], true) && $autoRefreshes)
                         {{-- Settings/Team never poll — static config and
                              in-progress edit forms, nothing there refreshes. --}}
                         <span class="monitor-nav-label">

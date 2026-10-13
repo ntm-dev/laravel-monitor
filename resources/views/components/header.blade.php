@@ -74,7 +74,35 @@
             </div>
         @endif
 
-        @if (! in_array($tab, ['settings', 'team', 'issues'], true) && ($detail?->showPeriodSwitcher ?? true))
+        @if (! in_array($tab, ['settings', 'issues'], true) && ($detail?->showPeriodSwitcher ?? true))
+        {{-- start period session memory --}}
+        {{-- Remembers the picked period for this browser tab and restores it on a URL that carries none. --}}
+        <script>
+            (() => {
+                try {
+                    const periods = @js($periods);
+                    const url = new URL(location.href);
+                    const current = url.searchParams.get('period');
+
+                    if (current) {
+                        if (periods.includes(current)) {
+                            sessionStorage.setItem('monitor.period', current);
+                        }
+
+                        return;
+                    }
+
+                    const saved = sessionStorage.getItem('monitor.period');
+
+                    if (saved && saved !== @js(\LaravelMonitor\Livewire\Card::DEFAULT_PERIOD) && periods.includes(saved)
+                        && ! url.searchParams.has('from') && ! url.searchParams.has('to')) {
+                        url.searchParams.set('period', saved);
+                        location.replace(url);
+                    }
+                } catch (e) {}
+            })();
+        </script>
+        {{-- end period session memory --}}
         <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             @foreach ($periods as $value)
                 <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"

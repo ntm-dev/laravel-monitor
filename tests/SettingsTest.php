@@ -69,6 +69,35 @@ class SettingsTest extends TestCase
         $this->assertSame(42, config('monitor.refresh'));
     }
 
+    public function test_apply_overlays_the_aggregate_cache_mode(): void
+    {
+        Settings::save(['aggregate_cache_mode' => 'custom']);
+
+        Settings::apply();
+
+        $this->assertSame('custom', config('monitor.aggregate_cache.mode'));
+    }
+
+    public function test_apply_maps_the_legacy_use_app_config_toggle_onto_a_mode(): void
+    {
+        Settings::save(['aggregate_cache_use_app_config' => true]);
+        Settings::apply();
+        $this->assertSame('app', config('monitor.aggregate_cache.mode'));
+
+        Settings::save(['aggregate_cache_options' => ['path' => '/tmp/x']]);
+        Settings::apply();
+        $this->assertSame('custom', config('monitor.aggregate_cache.mode'));
+    }
+
+    public function test_aggregate_cache_defaults_name_the_file_driver_paths(): void
+    {
+        $this->assertSame(
+            ['path', 'lock_path'],
+            array_keys(Settings::aggregateCacheDefaults('file')),
+        );
+        $this->assertSame([], Settings::aggregateCacheDefaults('redis'));
+    }
+
     public function test_apply_overlays_a_table_prefix_onto_every_table(): void
     {
         Settings::save(['table_prefix' => 'custom_']);
@@ -102,6 +131,22 @@ class SettingsTest extends TestCase
 
         $this->assertCount(2, $columns);
         $this->assertSame($recorders, array_merge(...$columns));
+    }
+
+    public function test_body_bytes_split_into_the_largest_unit_that_divides_evenly(): void
+    {
+        $this->assertSame(['size' => 64, 'unit' => 'KB'], Settings::splitBodyBytes(64 * 1024));
+        $this->assertSame(['size' => 2, 'unit' => 'MB'], Settings::splitBodyBytes(2 * 1024 * 1024));
+        $this->assertSame(['size' => 1500, 'unit' => 'B'], Settings::splitBodyBytes(1500));
+    }
+
+    public function test_joining_body_bytes_inverts_the_split(): void
+    {
+        foreach ([1, 1500, 1024, 64 * 1024, 5 * 1024 * 1024] as $bytes) {
+            ['size' => $size, 'unit' => $unit] = Settings::splitBodyBytes($bytes);
+
+            $this->assertSame($bytes, Settings::joinBodyBytes($size, $unit));
+        }
     }
 
     public function test_recorders_warning_names_every_heavy_recorder(): void

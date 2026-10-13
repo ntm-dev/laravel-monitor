@@ -2,15 +2,20 @@
 
 namespace LaravelMonitor\Support;
 
+use LaravelMonitor\Recorders\Requests;
+
 use function array_chunk;
 use function array_key_exists;
 use function array_keys;
 use function array_map;
+use function array_reverse;
 use function array_values;
 use function ceil;
 use function count;
 use function implode;
+use function intdiv;
 use function is_array;
+use function max;
 
 /**
  * App-wide settings overrides for the values that config/monitor.php ships as
@@ -38,8 +43,18 @@ class Settings
         'aggregate_cache_enabled' => 'monitor.aggregate_cache.enabled',
         // null means "the host app's own cache.default" — see BuildsQueries::cacheRemember().
         'aggregate_cache_store' => 'monitor.aggregate_cache.store',
-        'aggregate_cache_use_app_config' => 'monitor.aggregate_cache.use_app_config',
+        'aggregate_cache_mode' => 'monitor.aggregate_cache.mode',
+        'request_body_max_bytes' => 'monitor.recorders.'.Requests::class.'.details.max_body_bytes',
     ];
+
+    /** Where the aggregate cache's driver options come from: the app's own store, this package's defaults, or the saved options. */
+    public const AGGREGATE_CACHE_MODES = ['app', 'default', 'custom'];
+
+    /** Body-size unit => bytes, smallest first (see splitBodyBytes()). */
+    public const BODY_SIZE_UNITS = ['B' => 1, 'KB' => 1024, 'MB' => 1024 * 1024];
+
+    /** Largest stored-body cap the Settings form accepts, in bytes. */
+    public const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
     /**
      * Config path (leaf table name) => suffix appended to a stored prefix
@@ -124,6 +139,34 @@ class Settings
         return self::AGGREGATE_CACHE_OPTION_FIELDS[static::aggregateCacheDriver($store)] ?? [];
     }
 
+    /**
+     * What "default" mode builds the isolated store from, per driver option.
+     *
+     * @return array<string, string|null>
+     */
+    public static function aggregateCacheDefaults(string $driver): array
+    {
+        return match ($driver) {
+            'file' => [
+                'path' => storage_path('framework/cache/monitor-aggregate'),
+                'lock_path' => storage_path('framework/cache/monitor-aggregate'),
+            ],
+            // Where the migration creates the cache table.
+            'database' => ['connection' => config('monitor.storage.database.connection') ?: config('database.default')],
+            default => [],
+        };
+    }
+
+    /**
+     * Names the 'database' cache driver's connection can be picked from.
+     *
+     * @return list<string>
+     */
+    public static function databaseConnections(): array
+    {
+        return array_map('strval', array_keys((array) config('database.connections', [])));
+    }
+
     public static function aggregateCacheIsSensitive(string $store): bool
     {
         return in_array(static::aggregateCacheDriver($store), self::AGGREGATE_CACHE_SENSITIVE_DRIVERS, true);
@@ -160,6 +203,17 @@ class Settings
         foreach (self::SCALARS as $key => $path) {
             if (array_key_exists($key, $stored)) {
                 config([$path => $stored[$key]]);
+            }
+        }
+
+        // Saved before the mode select replaced the "use app config" toggle.
+        if (! array_key_exists('aggregate_cache_mode', $stored)) {
+            $legacyMode = ($stored['aggregate_cache_use_app_config'] ?? false)
+                ? 'app'
+                : (($stored['aggregate_cache_options'] ?? []) !== [] ? 'custom' : null);
+
+            if ($legacyMode !== null) {
+                config(['monitor.aggregate_cache.mode' => $legacyMode]);
             }
         }
 
@@ -241,6 +295,7 @@ class Settings
             'job_threshold' => (int) config('monitor.thresholds.job', 1000),
             'query_threshold' => (int) config('monitor.thresholds.query', 500),
             'outgoing_request_threshold' => (int) config('monitor.thresholds.outgoing_request', 1000),
+            'request_body_max_bytes' => (int) config('monitor.recorders.'.Requests::class.'.details.max_body_bytes', 64 * 1024),
             'aggregate_cache_enabled' => (bool) config('monitor.aggregate_cache.enabled', true),
             'aggregate_cache_store' => (string) (config('monitor.aggregate_cache.store') ?? ''),
             'aggregate_cache_stores' => static::aggregateCacheStores(),
@@ -252,7 +307,11 @@ class Settings
                 ->mapWithKeys(fn (string $store) => [$store => static::aggregateCacheDriver($store)])
                 ->all(),
             'aggregate_cache_sensitive_drivers' => self::AGGREGATE_CACHE_SENSITIVE_DRIVERS,
-            'aggregate_cache_use_app_config' => (bool) config('monitor.aggregate_cache.use_app_config', false),
+            'aggregate_cache_mode' => (string) config('monitor.aggregate_cache.mode', 'default'),
+            'aggregate_cache_connections' => static::databaseConnections(),
+            'aggregate_cache_defaults' => collect(array_keys(self::AGGREGATE_CACHE_OPTION_FIELDS))
+                ->mapWithKeys(fn (string $driver) => [$driver => static::aggregateCacheDefaults($driver)])
+                ->all(),
             // driver => whether the host app has its own store for it, so
             // the "use app config" checkbox only shows when there's one.
             'aggregate_cache_app_config_available' => collect(array_keys(self::AGGREGATE_CACHE_OPTION_FIELDS))
@@ -335,6 +394,8 @@ class Settings
                     'key' => $key,
                     'label' => __($labelKey),
                     'enabled' => (bool) ($options['details'][$key] ?? false),
+                    // Body cap shown under the toggle, only for the recorder that has one.
+                    'bodySize' => $key === 'record_response_body' ? self::splitBodyBytes((int) ($options['details']['max_body_bytes'] ?? 64 * 1024)) : null,
                 ];
             }
 
@@ -347,6 +408,29 @@ class Settings
         }
 
         return $rows;
+    }
+
+    /**
+     * $bytes as the largest whole unit that divides it evenly, so the form
+     * round-trips any byte count exactly (e.g. 65536 => 64 KB, 1500 => 1500 B).
+     *
+     * @return array{size: int, unit: string}
+     */
+    public static function splitBodyBytes(int $bytes): array
+    {
+        foreach (array_reverse(self::BODY_SIZE_UNITS, true) as $unit => $multiplier) {
+            if ($bytes >= $multiplier && $bytes % $multiplier === 0) {
+                return ['size' => intdiv($bytes, $multiplier), 'unit' => $unit];
+            }
+        }
+
+        return ['size' => max(1, $bytes), 'unit' => 'B'];
+    }
+
+    /** Inverse of splitBodyBytes(); an unknown unit counts as bytes. */
+    public static function joinBodyBytes(int $size, string $unit): int
+    {
+        return $size * (self::BODY_SIZE_UNITS[$unit] ?? 1);
     }
 
     /**

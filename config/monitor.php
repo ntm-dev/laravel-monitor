@@ -96,6 +96,8 @@ return [
         // The 'database' driver's table — follows $tablePrefix, not editable
         // on its own (see Settings::TABLE_SUFFIXES).
         'table' => $tablePrefix.'cache',
+        // 'app' (the host app's own store config), 'default' or 'custom' (the saved options below).
+        'mode' => 'default',
         'options' => [],
         'live_ttl' => env('MONITOR_AGGREGATE_CACHE_LIVE_TTL'),
         'closed_ttl' => env('MONITOR_AGGREGATE_CACHE_CLOSED_TTL', 3600),
@@ -256,6 +258,8 @@ return [
             ],
             'details' => [
                 'record_response_body' => env('MONITOR_REQUESTS_RESPONSE_BODY_ENABLED', app()->isLocal()),
+                // Bytes. Stored request/response bodies larger than this are cut to size.
+                'max_body_bytes' => env('MONITOR_REQUESTS_MAX_BODY_BYTES', 64 * 1024),
             ],
         ],
 

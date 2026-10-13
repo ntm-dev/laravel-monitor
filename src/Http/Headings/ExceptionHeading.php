@@ -31,6 +31,7 @@ class ExceptionHeading
             heading: filled($message) ? $message : null,
             titleAttr: filled($message) ? $message : null,
             pageTitle: $class ? class_basename($class) : $key,
+            showPeriodSwitcher: false,
         );
     }
 }

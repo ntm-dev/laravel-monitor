@@ -54,9 +54,6 @@
             @error('name')
                 <p class="text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
-            @if ($nameUpdated)
-                <p class="text-sm text-emerald-600 dark:text-emerald-400">{{ $t('name_updated') }}</p>
-            @endif
         </div>
 
         <div class="py-4">
@@ -87,9 +84,6 @@
             @error('username')
                 <p class="text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>
             @enderror
-            @if ($usernameUpdated)
-                <p class="text-sm text-emerald-600 dark:text-emerald-400">{{ $t('username_updated') }}</p>
-            @endif
         </div>
 
         <div class="py-4">
@@ -102,7 +96,7 @@
                 </button>
 
                 <div x-show="open" x-cloak x-on:keydown.escape.window="open = false" class="{{ $popupOverlay }}">
-                    <div x-on:click.outside="open = false" class="{{ $popupCard }}">
+                    <div class="{{ $popupCard }}">
                         <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $t('edit_email') }}</h3>
                         <form x-on:submit.prevent="$wire.requestEmailChange($refs.newEmail.value, $refs.currentPassword.value)" class="mt-3 space-y-3">
                             <div>
@@ -127,9 +121,6 @@
                     </div>
                 </div>
             </div>
-            @if ($emailChangeRequested)
-                <p class="text-sm text-emerald-600 dark:text-emerald-400">{{ $t('email_change_sent') }}</p>
-            @endif
         </div>
 
         <div class="py-4" x-data="{ open: false }" x-on:password-changed.window="open = false">
@@ -139,11 +130,8 @@
                         class="h-8 rounded-md text border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('change_password') }}</button>
 
             </div>
-            @if ($passwordChanged)
-                <p class="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{{ $t('password_changed') }}</p>
-            @endif
             <div x-show="open" x-cloak x-on:keydown.escape.window="open = false" class="{{ $popupOverlay }}">
-                <div x-on:click.outside="open = false" class="{{ $popupCard }}">
+                <div class="{{ $popupCard }}">
                     <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $t('change_password') }}</h3>
                     <form x-on:submit.prevent="$wire.changePassword($refs.currentPassword.value, $refs.newPassword.value, $refs.newPasswordConfirmation.value)" class="mt-3 space-y-3">
                         <div>
@@ -189,7 +177,7 @@
                     <div x-show="open" x-cloak
                          x-on:keydown.escape.window="open = false; totpEnabled = {{ $actor->hasTotpEnabled() ? 'true' : 'false' }}; $wire.cancelEnrollingTotp()"
                          class="{{ $popupOverlay }}">
-                        <div x-on:click.outside="open = false; totpEnabled = {{ $actor->hasTotpEnabled() ? 'true' : 'false' }}; $wire.cancelEnrollingTotp()" class="{{ $popupCard }}">
+                        <div class="{{ $popupCard }}">
                             <template x-if="totpEnabled">
                                 <div>
                                     <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $t('enable_two_factor') }}</h3>
@@ -268,7 +256,7 @@
                         </button>
 
                         <div x-show="open" x-cloak x-on:keydown.escape.window="open = false" class="{{ $popupOverlay }}">
-                            <div x-on:click.outside="open = false" class="{{ $popupCard }}">
+                            <div class="{{ $popupCard }}">
                                 <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $t('add_passkey') }}</h3>
                                 <form x-on:submit.prevent="addPasskey($refs.label.value); open = false" class="mt-3 space-y-3">
                                     <div>
@@ -410,7 +398,7 @@
                     </button>
 
                     <div x-show="open" x-cloak x-on:keydown.escape.window="open = false" class="{{ $popupOverlay }}">
-                        <div x-on:click.outside="open = false" class="{{ $popupCard }}">
+                        <div class="{{ $popupCard }}">
                             <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ $t('invite_a_member') }}</h3>
                             <form x-on:submit.prevent="$wire.invite($refs.email.value, $refs.role.value)" class="mt-3 space-y-3">
                                 <div>
@@ -438,10 +426,6 @@
             @endif
             </div>
         </div>
-        @if ($memberInvited)
-            <p class="px-1 pb-3 text-sm text-emerald-600 dark:text-emerald-400">{{ $t('member_invited') }}</p>
-        @endif
-
         <x-monitor::card class="p-4">
             <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
                 @forelse ($members as $member)
@@ -559,7 +543,7 @@
             x-show="open" x-cloak
             class="{{ $popupOverlay }}"
             x-on:keydown.escape.window="cancel()">
-            <div x-on:click.outside="cancel()" class="{{ $popupCard }}">
+            <div class="{{ $popupCard }}">
                 <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100" x-text="title"></h3>
                 <p class="mt-2 text-sm text-neutral-500 dark:text-neutral-400" x-text="message"></p>
                 <div class="mt-4 flex justify-end gap-2">

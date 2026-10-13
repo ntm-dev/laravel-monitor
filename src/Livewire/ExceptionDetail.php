@@ -2,9 +2,13 @@
 
 namespace LaravelMonitor\Livewire;
 
+use Carbon\CarbonImmutable;
 use LaravelMonitor\Livewire\Concerns\BuildsExceptionDetail;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 use LaravelMonitor\Support\Format;
+use LaravelMonitor\Support\StorageTime;
+use function floor;
+use function max;
 
 class ExceptionDetail extends Card
 {
@@ -18,6 +22,35 @@ class ExceptionDetail extends Card
         parent::mount($period, $from, $to);
 
         $this->key = $key ?? (string) request('key', '');
+    }
+
+    protected ?CarbonImmutable $firstSeenCache = null;
+
+    /** This page is all-time: the header period / custom range never apply to it. */
+    protected function hasCustomRange(): bool
+    {
+        return false;
+    }
+
+    /** First occurrence, floored to the chart's bucket grid so the window spans every occurrence. */
+    protected function since(): CarbonImmutable
+    {
+        $bucketSeconds = $this->bucketSeconds();
+        $first = $this->firstSeenAt() ?? CarbonImmutable::now()->subHour();
+
+        return StorageTime::fromTimestamp((int) floor($first->getTimestamp() / $bucketSeconds) * $bucketSeconds);
+    }
+
+    protected function windowSeconds(): int
+    {
+        $first = $this->firstSeenAt();
+
+        return max(3600, $first ? (int) $first->diffInSeconds(CarbonImmutable::now()) : 0);
+    }
+
+    protected function firstSeenAt(): ?CarbonImmutable
+    {
+        return $this->firstSeenCache ??= $this->timelineStorage()->firstSeen('exception', $this->key);
     }
 
     protected function view(): string
@@ -47,7 +80,7 @@ class ExceptionDetail extends Card
         $tz = Format::timezone();
 
         $lastSeen = $group?->last_seen ?? $latest?->created_at;
-        $firstSeen = $timelineStorage->firstSeen('exception', $key) ?? $group?->first_seen;
+        $firstSeen = $this->firstSeenAt() ?? $group?->first_seen;
         $phpVersion = $payload['php_version'] ?? null;
         $laravelVersion = $payload['laravel_version'] ?? null;
         $occurrencesCount = $group?->count ?? $this->aggregateStorage()->stats('exception', $since, null, $key, $until)->count;

@@ -95,7 +95,7 @@ class TeamTest extends TestCase
 
         Livewire::test(Team::class)->call('invite', 'new-member@example.com', 'viewer')
             ->assertDispatched('member-invited')
-            ->assertSet('memberInvited', true);
+            ->assertDispatched('toast', level: 'success', message: __('monitor::messages.team.member_invited'));
 
         $this->assertDatabaseHas('monitor_invitations', ['email' => 'new-member@example.com', 'role' => 'viewer']);
         Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->invitation->email === 'new-member@example.com');
@@ -373,7 +373,8 @@ class TeamTest extends TestCase
 
         Livewire::test(Team::class)->call('changePassword', 'password', 'a-new-password', 'a-new-password')
             ->assertHasNoErrors()
-            ->assertDispatched('password-changed');
+            ->assertDispatched('password-changed')
+            ->assertDispatched('toast', level: 'success', message: __('monitor::messages.team.password_changed'));
 
         $this->assertTrue(Hash::check('a-new-password', $owner->fresh()->password));
     }

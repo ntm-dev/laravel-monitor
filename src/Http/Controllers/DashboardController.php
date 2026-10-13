@@ -3,6 +3,7 @@
 namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use LaravelMonitor\Contracts\HashResolver;
 use LaravelMonitor\Http\Headings\CommandHeading;
@@ -45,8 +46,13 @@ class DashboardController
         'outgoing' => 'outgoing_request',
     ];
 
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request): View|RedirectResponse
     {
+        // Team moved into the Settings page; keep old links working.
+        if ($request->route('tab') === 'team') {
+            return redirect()->route('monitor.dashboard', ['tab' => 'settings']);
+        }
+
         $period = $request->query('period', Card::DEFAULT_PERIOD);
 
         if (! array_key_exists($period, Card::periods())) {

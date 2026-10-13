@@ -71,11 +71,8 @@ class Team extends Card
         ];
     }
 
-    public bool $memberInvited = false;
-
     public function invite(string $email, string $role): void
     {
-        $this->memberInvited = false;
         $actor = $this->actor();
 
         if (! $actor->canManageTeam()) {
@@ -102,7 +99,7 @@ class Team extends Card
 
         Mail::to($email)->send(new TeamInvitationMail($invitation, $plainToken));
 
-        $this->memberInvited = true;
+        $this->notify('success', __('monitor::messages.team.member_invited'));
         $this->dispatch('member-invited');
     }
 
@@ -122,11 +119,8 @@ class Team extends Card
         $invitation->delete();
     }
 
-    public bool $nameUpdated = false;
-
     public function startEditingName(): void
     {
-        $this->nameUpdated = false;
         $this->resetErrorBag('name');
     }
 
@@ -142,15 +136,12 @@ class Team extends Card
 
         $this->actor()->update(['name' => $name]);
 
-        $this->nameUpdated = true;
+        $this->notify('success', __('monitor::messages.team.name_updated'));
         $this->dispatch('name-updated');
     }
 
-    public bool $usernameUpdated = false;
-
     public function startEditingUsername(): void
     {
-        $this->usernameUpdated = false;
         $this->resetErrorBag('username');
     }
 
@@ -165,7 +156,7 @@ class Team extends Card
 
         if ($username === '') {
             $actor->update(['username' => null]);
-            $this->usernameUpdated = true;
+            $this->notify('success', __('monitor::messages.team.username_updated'));
             $this->dispatch('username-updated');
 
             return;
@@ -192,15 +183,12 @@ class Team extends Card
 
         $actor->update(['username' => $username]);
 
-        $this->usernameUpdated = true;
+        $this->notify('success', __('monitor::messages.team.username_updated'));
         $this->dispatch('username-updated');
     }
 
-    public bool $emailChangeRequested = false;
-
     public function startEditingEmail(): void
     {
-        $this->emailChangeRequested = false;
         $this->resetErrorBag(['newEmail', 'emailPassword']);
     }
 
@@ -235,16 +223,13 @@ class Team extends Card
 
         Mail::to($newEmail)->send(new EmailChangeVerificationMail($plainToken));
 
-        $this->emailChangeRequested = true;
+        $this->notify('success', __('monitor::messages.team.email_change_sent'));
         $this->dispatch('email-change-requested');
     }
-
-    public bool $passwordChanged = false;
 
     public function changePassword(string $currentPassword, string $newPassword, string $newPasswordConfirmation): void
     {
         $actor = $this->actor();
-        $this->passwordChanged = false;
 
         if (! Hash::check($currentPassword, $actor->password)) {
             $this->addError('currentPassword', __('monitor::messages.team.error_wrong_password'));
@@ -266,7 +251,7 @@ class Team extends Card
 
         $actor->update(['password' => Hash::make($newPassword)]);
 
-        $this->passwordChanged = true;
+        $this->notify('success', __('monitor::messages.team.password_changed'));
         $this->dispatch('password-changed');
     }
 
