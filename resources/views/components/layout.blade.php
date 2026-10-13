@@ -165,6 +165,39 @@
             background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .12) 50%, rgba(255, 255, 255, 0) 100%);
         }
     </style>
+    {{-- Entrance wave for the sign-in card (auth/login.blade.php). --}}
+    <style>
+        @keyframes monitor-rotational-wave {
+            0% { opacity: 0; transform: translateY(calc(16px * var(--wave-dir, 1))) rotate(calc(-3deg * var(--wave-dir, 1))); }
+            40% { transform: translateY(calc(-4px * var(--wave-dir, 1))) rotate(calc(1.5deg * var(--wave-dir, 1))); }
+            70% { transform: translateY(calc(2px * var(--wave-dir, 1))) rotate(calc(-.5deg * var(--wave-dir, 1))); }
+            100% { opacity: 1; transform: translateY(0) rotate(0); }
+        }
+        .monitor-rotational-wave {
+            animation: monitor-rotational-wave 1s ease-out both;
+        }
+        .monitor-rotational-wave-reverse {
+            --wave-dir: -1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .monitor-rotational-wave { animation: none; }
+        }
+    </style>
+    {{-- One-shot bounce that starts and ends at rest (Tailwind's bounce starts displaced, so it jumps when not looped). --}}
+    <style>
+        @keyframes monitor-bounce-once {
+            0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(.2, 0, .6, 1); }
+            35% { transform: translateY(-16px); animation-timing-function: cubic-bezier(.4, 0, 1, 1); }
+            65% { transform: translateY(0); animation-timing-function: cubic-bezier(.2, 0, .6, 1); }
+            82% { transform: translateY(-5px); animation-timing-function: cubic-bezier(.4, 0, 1, 1); }
+        }
+        .monitor-bounce-once {
+            animation: monitor-bounce-once 1s both;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .monitor-bounce-once { animation: none; }
+        }
+    </style>
     {{-- Global tooltip skin: every data-tooltip="…" attribute in the app
          renders as this dark box, matching the
          one components/requests/timeline-row.blade.php already draws by
