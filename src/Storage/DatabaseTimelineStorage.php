@@ -112,6 +112,17 @@ class DatabaseTimelineStorage implements TimelineStorage
             ->map($this->hydrate(...));
     }
 
+    public function entriesOfTypeFor(string $requestId, string $type): Collection
+    {
+        return $this->table()
+            ->where('request_id', $requestId)
+            ->where('type', $type)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->map($this->hydrate(...));
+    }
+
     public function timelinesFor(array $requestIds, string $rootType = 'request'): Collection
     {
         if ($requestIds === []) {

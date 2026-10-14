@@ -65,6 +65,9 @@
                                 :body="$info['root']->payload['response']['body'] ?? null"
                                 :size="$info['root']->payload['response']['size'] ?? null"
                             />
+                            {{-- Fetched after the page loads, hidden when empty. --}}
+                            <x-monitor::requests.deferred-card :url="route('monitor.requests.exceptions', $info['root']->request_id)"/>
+                            <x-monitor::requests.deferred-card :url="route('monitor.requests.logs', $info['root']->request_id)"/>
                         @endunless
 
                         <x-monitor::requests.event-summary :summary="$info['summary']"/>

@@ -14,6 +14,7 @@ use LaravelMonitor\Http\Controllers\DashboardController;
 use LaravelMonitor\Http\Controllers\IssueController;
 use LaravelMonitor\Http\Controllers\JobAttemptController;
 use LaravelMonitor\Http\Controllers\RequestDetailController;
+use LaravelMonitor\Http\Controllers\RequestEntriesController;
 use LaravelMonitor\Http\Controllers\ScheduleRunController;
 use LaravelMonitor\Http\Controllers\SettingsController;
 use LaravelMonitor\Http\Middleware\Authorize;
@@ -58,6 +59,14 @@ Route::domain(config('monitor.domain'))
                 ->name('monitor.dashboard.user');
 
             Route::get('/requests/{requestId}', RequestDetailController::class)->name('monitor.requests.show');
+            // Deferred cards of the request page above. The uuid constraint
+            // keeps `/requests/routes/{hash}` from matching as a request id.
+            Route::get('/requests/{requestId}/exceptions', [RequestEntriesController::class, 'exceptions'])
+                ->where('requestId', '[0-9a-f-]{36}')
+                ->name('monitor.requests.exceptions');
+            Route::get('/requests/{requestId}/logs', [RequestEntriesController::class, 'logs'])
+                ->where('requestId', '[0-9a-f-]{36}')
+                ->name('monitor.requests.logs');
             Route::get('/jobs/attempts/{attemptId}', JobAttemptController::class)->name('monitor.jobs.attempts.show');
             Route::get('/commands/runs/{runId}', CommandRunController::class)->name('monitor.commands.runs.show');
             Route::get('/schedule/runs/{runId}', ScheduleRunController::class)->name('monitor.schedule.runs.show');

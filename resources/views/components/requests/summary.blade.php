@@ -67,9 +67,11 @@
                 <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ $generalLabels[$key] }}</dt>
                 <div class="h-0 flex-1 border-b-2 border-dotted border-neutral-200 dark:border-white/10"></div>
                 @if ($key === 'status_code' && is_numeric($value))
-                    <dd class="shrink-0">
-                        <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ \LaravelMonitor\Support\Format::statusBadgeClass((int) $value) }}"
-                              data-tooltip="{{ \LaravelMonitor\Support\Format::statusText((int) $value) }}">{{ $value }}</span>
+                    <dd class="flex shrink-0 items-center gap-2">
+                        <span class="rounded px-1.5 py-0.5 font-mono text-xs {{ \LaravelMonitor\Support\Format::statusBadgeClass((int) $value) }}">{{ $value }}</span>
+                        @if ($statusText = \LaravelMonitor\Support\Format::statusText((int) $value))
+                            <span class="font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $statusText }}</span>
+                        @endif
                     </dd>
                 @elseif ($key === 'duration')
                     {{-- Hovering the duration shows the precise moment this
