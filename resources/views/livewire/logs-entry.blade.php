@@ -4,7 +4,11 @@
      append/prepend/replace — #monitor-logs-list is wire:ignore'd, so Livewire
      itself never re-renders this partial's output past the first paint; the
      JS in logs.blade.php splices later batches in directly. --}}
-@php($level = $log->level)
+@php
+    $level = $log->level;
+    // $compact drops the source column (rows already scoped to one request).
+    $compact = $compact ?? false;
+@endphp
 {{-- start log entry row --}}
 <div wire:key="log-{{ $log->id }}" x-data="{ expanded: false }" class="rounded-lg rounded-md border border border-neutral-100 dark:border-white/5 bg-white dark:bg-white/5 shadow-xs text-xs">
     {{-- Grid (not flex) so the timestamp/level/source/summary
@@ -16,7 +20,7 @@
          so it keeps its own track instead of being skipped
          by grid auto-placement. --}}
     <button type="button" @click="expanded = ! expanded"
-        class="grid w-full cursor-pointer grid-cols-[1.5rem_12rem_5rem_10rem_1fr] items-center gap-3 rounded-lg pl-4 pr-2.5 text-left hover:bg-white/50 dark:hover:bg-white/5"
+        class="grid w-full cursor-pointer {{ $compact ? 'grid-cols-[1.5rem_12rem_5rem_1fr]' : 'grid-cols-[1.5rem_12rem_5rem_10rem_1fr]' }} items-center gap-3 rounded-lg pl-4 pr-2.5 text-left hover:bg-white/50 dark:hover:bg-white/5"
         :class="expanded ? 'min-h-11 py-2' : 'h-11'">
         <span
             class="flex h-6 w-6 items-center justify-center rounded-md dark:border dark:border-white/10"
@@ -44,15 +48,17 @@
             'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400' =>
                 $level === 'debug',
         ])>{{ $level }}</span>
-        <span class="min-w-0 truncate" @click.stop>
-            @if ($log->sourceUrl)
-                <x-monitor::exception-source-badge :type="$log->sourceType" :label="$log->sourceLabel"
-                    :url="$log->sourceUrl" />
-            @else
-                <x-monitor::exception-source-badge :type="'debug'" :label="'none'"
-                    :url="$log->sourceUrl" />
-            @endif
-        </span>
+        @unless ($compact)
+            <span class="min-w-0 truncate" @click.stop>
+                @if ($log->sourceUrl)
+                    <x-monitor::exception-source-badge :type="$log->sourceType" :label="$log->sourceLabel"
+                        :url="$log->sourceUrl" />
+                @else
+                    <x-monitor::exception-source-badge :type="'debug'" :label="'none'"
+                        :url="$log->sourceUrl" />
+                @endif
+            </span>
+        @endunless
         <span class="min-w-0 select-text text-neutral-700 dark:text-neutral-200"
             :class="expanded ? 'self-start whitespace-pre-wrap break-words' : 'self-center truncate'"
             data-tooltip="{{ $log->summary }}" @click.stop>{{ $log->summary }}

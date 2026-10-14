@@ -86,6 +86,12 @@ interface TimelineStorage
     public function timelineFor(string $requestId, string $rootType = 'request'): Collection;
 
     /**
+     * Just the entries of one type correlated to the given request/job
+     * attempt, oldest first. Same row shape as timelineFor().
+     */
+    public function entriesOfTypeFor(string $requestId, string $type): Collection;
+
+    /**
      * timelineFor() for several roots in one query, keyed by request_id.
      *
      * @param  list<string>  $requestIds

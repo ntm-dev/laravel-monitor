@@ -13,6 +13,7 @@
         'count' => ['label' => __('monitor::messages.common.total'), 'align' => 'right'],
         'avg_duration' => ['label' => __('monitor::messages.common.avg'), 'align' => 'right'],
         'p95_duration' => ['label' => __('monitor::messages.common.p95'), 'align' => 'right'],
+        'max_duration' => ['label' => __('monitor::messages.common.max'), 'align' => 'right'],
         'last_seen' => ['label' => __('monitor::messages.common.last_seen'), 'align' => 'right'],
     ];
 
@@ -122,6 +123,7 @@
                                 <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($route->count) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($route->avg_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($route->avg_duration) }}</td>
                                 <td class="py-2 text-right font-mono text-xs {{ ($route->p95_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($route->p95_duration) }}</td>
+                                <td class="py-2 text-right font-mono text-xs {{ ($route->max_duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($route->max_duration) }}</td>
                                 <td class="whitespace-nowrap py-2 pl-2 text-right font-mono text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ Format::datetimeMs($route->last_seen) }} {{ $tz }}">
                                     <x-monitor::relative-time :at="$route->last_seen"/>
                                 </td>
@@ -134,7 +136,7 @@
                         @endforeach
                     </tbody>
                     <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="10" :rows="count($routes)"/>
+                        <x-monitor::table-skeleton :columns="11" :rows="count($routes)"/>
                     </tbody>
                 </table>
 

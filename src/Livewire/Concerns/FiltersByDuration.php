@@ -32,13 +32,16 @@ trait FiltersByDuration
      * @param  Collection<int, object>  $rows
      * @param  float|int|null  $avg  the period's overall avg, the ≥ Avg bar
      * @param  float|int|null  $p95  the period's overall p95, the ≥ P95 bar
+     * @param  string|null  $maxField  when set, the ≥ Threshold tab matches on this field alone instead of avg/p95
      * @return array{0: Collection<int, object>, 1: string, 2: array<string, int>} rows, active tab, badge counts
      */
-    protected function filterByDuration(Collection $rows, string $avgField, string $p95Field, float|int|null $avg, float|int|null $p95, float|int $threshold): array
+    protected function filterByDuration(Collection $rows, string $avgField, string $p95Field, float|int|null $avg, float|int|null $p95, float|int $threshold, ?string $maxField = null): array
     {
         $atOrAboveAvg = fn ($row) => ($row->{$avgField} ?? 0) >= ($avg ?? 0);
         $atOrAboveP95 = fn ($row) => ($row->{$p95Field} ?? 0) >= ($p95 ?? 0);
-        $atOrAboveThreshold = fn ($row) => ($row->{$avgField} ?? 0) >= $threshold || ($row->{$p95Field} ?? 0) >= $threshold;
+        $atOrAboveThreshold = $maxField !== null
+            ? fn ($row) => ($row->{$maxField} ?? 0) >= $threshold
+            : fn ($row) => ($row->{$avgField} ?? 0) >= $threshold || ($row->{$p95Field} ?? 0) >= $threshold;
 
         $counts = [
             'all' => $rows->count(),

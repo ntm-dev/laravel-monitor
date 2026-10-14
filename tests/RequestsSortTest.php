@@ -55,14 +55,34 @@ class RequestsSortTest extends TestCase
         $this->insertRequest('GET /newest', $now->subMinutes(2));
     }
 
-    protected function insertRequest(string $key, CarbonImmutable $createdAt): void
+    /**
+     * A route with one slow outlier has a low avg/p95 but a high max — the
+     * threshold tab matches on max, so it still shows up there.
+     */
+    public function test_threshold_filter_matches_on_the_routes_max_duration(): void
+    {
+        $now = CarbonImmutable::now();
+
+        foreach (range(1, 100) as $i) {
+            $this->insertRequest('GET /spiky', $now->subMinutes(10), 10);
+        }
+        $this->insertRequest('GET /spiky', $now->subMinutes(9), 5000);
+        $this->insertRequest('GET /steady', $now->subMinutes(8), 20);
+
+        $component = Livewire::test(Requests::class)->call('setDurationFilter', 'threshold');
+
+        $this->assertSame(['GET /spiky'], $component->viewData('routes')->pluck('key')->all());
+        $this->assertSame(5000.0, (float) $component->viewData('routes')->first()->max_duration);
+    }
+
+    protected function insertRequest(string $key, CarbonImmutable $createdAt, float $duration = 10): void
     {
         DB::table('monitor_entries')->insert([
             'type' => 'request',
             'subtype' => '2xx',
             'key' => $key,
             'payload' => '[]',
-            'duration' => 10,
+            'duration' => $duration,
             'user_id' => null,
             // Microsecond precision, same as DatabaseEntryWriter::store() —
             // see UsersTabTest::insertEntry().

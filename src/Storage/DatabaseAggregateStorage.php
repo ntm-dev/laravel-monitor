@@ -18,6 +18,7 @@ use LaravelMonitor\Support\StorageTime;
 use function in_array;
 use function is_array;
 use function func_get_args;
+use function max;
 
 class DatabaseAggregateStorage implements AggregateStorage
 {
@@ -389,6 +390,7 @@ class DatabaseAggregateStorage implements AggregateStorage
                 'network_errors' => $group['network_errors'],
                 'avg_duration' => $durations === [] ? null : round(array_sum($durations) / count($durations), 2),
                 'p95_duration' => $this->percentile($durations, 0.95),
+                'max_duration' => $durations === [] ? null : max($durations),
                 'last_seen' => CarbonImmutable::parse($group['last_seen']),
             ];
         }

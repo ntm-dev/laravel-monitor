@@ -16,7 +16,7 @@ class Requests extends Card
 
     public const PER_PAGE = 25;
 
-    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration', 'last_seen'];
+    public const SORTABLE = ['key', 'count', 'success', 'client_errors', 'server_errors', 'avg_duration', 'p95_duration', 'max_duration', 'last_seen'];
 
     /** Above this many distinct methods, the merged Unmatched Route row shows "ANY" instead of listing them. */
     public const MAX_UNMATCHED_METHODS_SHOWN = 3;
@@ -25,8 +25,8 @@ class Requests extends Card
      * Duration filter tabs above the route table: 'all' shows every route;
      * the rest keep only routes whose own avg_duration/p95_duration is at
      * or above the given bar — the period's overall avg/p95 for 'avg'/'p95',
-     * or the configured monitor.thresholds.request for 'threshold' (the
-     * same bar the avg/p95 columns already highlight amber against).
+     * or the configured monitor.thresholds.request for 'threshold', matched
+     * against the route's max_duration.
      */
     public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
 
@@ -112,7 +112,7 @@ class Requests extends Card
 
         // Tab badge counts reflect the search filter above but not the
         // duration filter itself.
-        [$routes, $durationFilter, $durationFilterCounts] = $this->filterByDuration($routes, 'avg_duration', 'p95_duration', $duration->avg ?? null, $duration->p95 ?? null, $threshold);
+        [$routes, $durationFilter, $durationFilterCounts] = $this->filterByDuration($routes, 'avg_duration', 'p95_duration', $duration->avg ?? null, $duration->p95 ?? null, $threshold, 'max_duration');
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'count';
         // last_seen sorts on its timestamp: SORT_REGULAR can't order the
