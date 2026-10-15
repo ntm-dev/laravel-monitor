@@ -3,22 +3,53 @@
 namespace LaravelMonitor\Recorders;
 
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Database\Events\QueryExecuted;
 use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\QueryConnection;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Sql;
 use LaravelMonitor\Support\Trace;
+use WeakMap;
+
+use function array_splice;
+use function count;
+use function debug_backtrace;
 
 class Queries extends Recorder
 {
+    /**
+     * Statements that have started but not yet fired QueryExecuted. A
+     * statement that throws never fires it, so whatever is left at flush
+     * is a failed one.
+     *
+     * @var list<array{connection: string, sql: string, frames: array<int, array<string, mixed>>}>
+     */
+    protected array $inFlight = [];
+
+    /** @var WeakMap<Connection, true>|null */
+    protected ?WeakMap $watched = null;
+
     public function register(Dispatcher $events): void
     {
         $events->listen(QueryExecuted::class, [$this, 'record']);
+        $events->listen(ConnectionEstablished::class, fn (ConnectionEstablished $event) => $this->watch($event->connection));
+        $this->monitor->flushing($this->recordFailed(...));
+
+        if ($this->monitor->app->resolved('db')) {
+            foreach ($this->monitor->app->make('db')->getConnections() as $connection) {
+                $this->watch($connection);
+            }
+        }
     }
 
     public function record(QueryExecuted $event): void
     {
+        $this->finished($event);
+        // Covers Laravel versions that don't dispatch ConnectionEstablished.
+        $this->watch($event->connection);
+
         // Monitor's own storage writes/reads (INSERT into monitor_entries
         // when flushing, SELECT/aggregate queries when rendering the
         // dashboard) would otherwise show up as "app" queries and dominate
@@ -63,6 +94,79 @@ class Queries extends Recorder
             ],
             duration: $event->time,
         );
+    }
+
+    protected function watch(Connection $connection): void
+    {
+        $this->watched ??= new WeakMap();
+
+        if (isset($this->watched[$connection])) {
+            return;
+        }
+
+        $this->watched[$connection] = true;
+        $connection->beforeExecuting($this->started(...));
+    }
+
+    /**
+     * @param  array<mixed>  $bindings
+     */
+    protected function started(string $sql, array $bindings, Connection $connection): void
+    {
+        if (! $this->monitor->enabled() || $this->shouldIgnore()) {
+            return;
+        }
+
+        $this->inFlight[] = [
+            'connection' => $connection->getName(),
+            'sql' => $sql,
+            'frames' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50),
+        ];
+    }
+
+    /**
+     * Removes the matching started statement, newest first — a query run
+     * from inside a QueryExecuted listener finishes before the one that
+     * triggered it.
+     */
+    protected function finished(QueryExecuted $event): void
+    {
+        for ($i = count($this->inFlight) - 1; $i >= 0; $i--) {
+            if ($this->inFlight[$i]['sql'] === $event->sql && $this->inFlight[$i]['connection'] === $event->connectionName) {
+                array_splice($this->inFlight, $i, 1);
+
+                return;
+            }
+        }
+    }
+
+    protected function recordFailed(): void
+    {
+        $failed = $this->inFlight;
+        $this->inFlight = [];
+
+        foreach ($failed as $statement) {
+            $sql = $statement['sql'];
+
+            if ($this->isSelfReferential($sql)) {
+                continue;
+            }
+
+            $this->monitor->incrementQueryCount();
+
+            $this->monitor->record(
+                type: RecordType::Query,
+                key: new LazyValue(static fn () => Sql::normalizeKey($sql)),
+                subtype: QueryConnection::pack($statement['connection'], null),
+                payload: [
+                    'sql' => $sql,
+                    'location' => $this->location($statement['frames']),
+                    'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
+                    'trace' => null,
+                    'failed' => true,
+                ],
+            );
+        }
     }
 
     /**
@@ -142,9 +246,9 @@ class Queries extends Recorder
     /**
      * First application (non-vendor) frame that triggered the query.
      */
-    protected function location(): LazyValue
+    protected function location(?array $frames = null): LazyValue
     {
-        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
+        $frames ??= debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
         $location = $this->monitor->location;
 
         // Only the backtrace itself has to be taken now; picking the frame

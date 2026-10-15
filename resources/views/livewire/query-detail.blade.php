@@ -213,7 +213,13 @@
                                             @endif
                                         </span>
                                     </td>
-                                    <td class="py-2 text-right font-mono text-xs {{ $entry->duration >= $slowThreshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
+                                    @if ($entry->payload['failed'] ?? false)
+                                        <td class="py-2 text-right">
+                                            <span class="rounded border border-rose-200 bg-rose-50 px-1 font-mono text-[9px] font-medium uppercase leading-tight text-rose-600 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-400">{{ __('monitor::messages.common.failed') }}</span>
+                                        </td>
+                                    @else
+                                        <td class="py-2 text-right font-mono text-xs {{ $entry->duration >= $slowThreshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
+                                    @endif
                                     <td class="py-2 pl-2 text-right">
                                         @if ($entry->sourceUrl)
                                             <span class="inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-300 dark:text-neutral-600" data-tooltip="{{ __('monitor::messages.common.open_request') }}">
