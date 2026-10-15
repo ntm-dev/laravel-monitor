@@ -12,6 +12,8 @@ class DatabaseEntryWriter implements EntryWriter
 {
     use BuildsQueries;
 
+    protected const PURGE_BATCH_SIZE = 5000;
+
     public function store(array $entries): void
     {
         collect($entries)
@@ -32,12 +34,22 @@ class DatabaseEntryWriter implements EntryWriter
 
     public function purge(?DateTimeInterface $before = null): int
     {
-        $query = $this->table();
+        $total = 0;
 
-        if ($before !== null) {
-            $query->where('created_at', '<', $before);
-        }
+        // Batched: one DELETE over millions of rows locks every row and
+        // index record in a single transaction and fails with MySQL 1206
+        // (lock table size exceeded).
+        do {
+            $query = $this->table();
 
-        return $query->delete();
+            if ($before !== null) {
+                $query->where('created_at', '<', $before);
+            }
+
+            $deleted = $query->limit(self::PURGE_BATCH_SIZE)->delete();
+            $total += $deleted;
+        } while ($deleted >= self::PURGE_BATCH_SIZE);
+
+        return $total;
     }
 }
