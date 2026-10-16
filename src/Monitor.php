@@ -2,6 +2,7 @@
 
 namespace LaravelMonitor;
 
+use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\View as ViewContract;
@@ -117,6 +118,9 @@ class Monitor
 
     /** Entries buffered before an early flush — read from config once, not on every record(). */
     protected ?int $bufferLimit = null;
+
+    /** @var list<Closure> Run at the start of every flush(), before the buffer is read. */
+    protected array $flushingCallbacks = [];
 
     /**
      * Context key a scheduled task's own id rides under across the process
@@ -1154,6 +1158,10 @@ class Monitor
      */
     public function flush(): void
     {
+        foreach ($this->flushingCallbacks as $callback) {
+            $callback();
+        }
+
         $this->finalizePendingRequest();
         $this->finalizePendingCommand();
 
@@ -1177,6 +1185,15 @@ class Monitor
         } finally {
             $this->recording = true;
         }
+    }
+
+    /**
+     * Register a callback that runs at the start of every flush(), so a
+     * recorder can still buffer something it was holding back.
+     */
+    public function flushing(Closure $callback): void
+    {
+        $this->flushingCallbacks[] = $callback;
     }
 
     /**

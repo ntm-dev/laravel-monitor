@@ -5,12 +5,16 @@ namespace LaravelMonitor\Recorders;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Exceptions\Handler;
+use Illuminate\Foundation\Http\Events\RequestHandled;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Str;
 use LaravelMonitor\LazyValue;
 use LaravelMonitor\Support\Fingerprint;
 use LaravelMonitor\Support\Host;
 use LaravelMonitor\Support\RecordType;
 use Throwable;
+use WeakMap;
 
 use function array_map;
 use function array_slice;
@@ -26,13 +30,33 @@ use function is_int;
 use function is_null;
 use function is_object;
 use function is_resource;
+use function method_exists;
+use function spl_object_id;
 use function str_replace;
 use function str_starts_with;
 
 class Exceptions extends Recorder
 {
+    /** @var WeakMap<Throwable, true>|null */
+    protected ?WeakMap $recorded = null;
+
+    /**
+     * Exceptions the request/job lifecycle events carried, waiting to be
+     * checked against $recorded at flush.
+     *
+     * @var array<int, Throwable>
+     */
+    protected array $candidates = [];
+
     public function register(Dispatcher $events): void
     {
+        // Fallback for a handler whose report() skips the reportable()
+        // callbacks below: whatever it never recorded is picked up at flush.
+        $events->listen(JobExceptionOccurred::class, fn (JobExceptionOccurred $event) => $this->consider($event->exception));
+        $events->listen(JobFailed::class, fn (JobFailed $event) => $this->consider($event->exception));
+        $events->listen(RequestHandled::class, fn (RequestHandled $event) => $this->consider($event->response->exception ?? null));
+        $this->monitor->flushing($this->recordUnreported(...));
+
         $hook = function (ExceptionHandler $handler): void {
             if ($handler instanceof Handler) {
                 $handler->reportable($this->record(...));
@@ -52,8 +76,43 @@ class Exceptions extends Recorder
         }
     }
 
+    protected function consider(mixed $exception): void
+    {
+        if ($exception instanceof Throwable) {
+            $this->candidates[spl_object_id($exception)] = $exception;
+        }
+    }
+
+    protected function recordUnreported(): void
+    {
+        $candidates = $this->candidates;
+        $this->candidates = [];
+
+        foreach ($candidates as $exception) {
+            if (! isset($this->recorded[$exception]) && $this->shouldReport($exception)) {
+                $this->record($exception);
+            }
+        }
+    }
+
+    /** Honors the handler's own do-not-report rules (validation, 404, ...). */
+    protected function shouldReport(Throwable $exception): bool
+    {
+        $handler = $this->monitor->app->make(ExceptionHandler::class);
+
+        return ! method_exists($handler, 'shouldReport') || $handler->shouldReport($exception);
+    }
+
     public function record(Throwable $exception): void
     {
+        $this->recorded ??= new WeakMap();
+
+        if (isset($this->recorded[$exception])) {
+            return;
+        }
+
+        $this->recorded[$exception] = true;
+
         $class = get_class($exception);
         $message = Str::limit($exception->getMessage(), 500);
         $handled = $this->wasReportedDeliberately();
