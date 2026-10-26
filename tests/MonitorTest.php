@@ -87,6 +87,30 @@ class MonitorTest extends TestCase
         $this->assertSame(300.0, $groups->first()->max_duration);
     }
 
+    public function test_aggregate_cache_hit_survives_a_store_that_disallows_unserializing_objects(): void
+    {
+        // Laravel 13's default cache.php ships 'serializable_classes' => false.
+        config([
+            'cache.default' => 'array',
+            'cache.stores.array.serialize' => true,
+            'cache.serializable_classes' => false,
+            'monitor.aggregate_cache.enabled' => true,
+            'monitor.aggregate_cache.store' => '',
+        ]);
+
+        Monitor::record(RecordType::Request, 'GET /users', [], 100, '2xx');
+        Monitor::flush();
+
+        $since = CarbonImmutable::now()->subHour();
+        $until = CarbonImmutable::now()->addMinute();
+
+        app(AggregateStorage::class)->aggregateByKey('request', $since, until: $until);
+        $cached = app(AggregateStorage::class)->aggregateByKey('request', $since, until: $until);
+
+        $this->assertSame('GET /users', $cached->first()->key);
+        $this->assertInstanceOf(CarbonImmutable::class, $cached->first()->last_seen);
+    }
+
     public function test_stats_and_recent_and_purge(): void
     {
         Monitor::record(RecordType::Exception, 'RuntimeException', ['message' => 'boom']);

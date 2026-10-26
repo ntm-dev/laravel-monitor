@@ -9,12 +9,17 @@ use Illuminate\Contracts\Cache\Store;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use LaravelMonitor\Recorders\Requests;
 use LaravelMonitor\Support\RecordType;
 use LaravelMonitor\Support\Settings;
 use LaravelMonitor\Support\UserFilter;
+use stdClass;
 
 use function is_array;
+use function is_string;
+use function serialize;
+use function unserialize;
 
 /**
  * Shared low-level query/plumbing helpers every Database*Storage class builds
@@ -236,6 +241,10 @@ trait BuildsQueries
      * writes the cache Store directly, not Cache::remember(), so it never
      * fires the events Recorders\CacheInteractions would record as app
      * cache activity.
+     *
+     * Stored pre-serialized: a store honoring `cache.serializable_classes`
+     * (false by default since Laravel 13) would otherwise hand the result
+     * back as __PHP_Incomplete_Class.
      */
     protected function cacheRemember(string $method, array $args, ?DateTimeInterface $until, Closure $callback): mixed
     {
@@ -248,8 +257,12 @@ trait BuildsQueries
 
         $cached = $store->get($key);
 
-        if ($cached !== null) {
-            return $cached;
+        if (is_string($cached)) {
+            $value = unserialize($cached, ['allowed_classes' => [Collection::class, stdClass::class, CarbonImmutable::class]]);
+
+            if ($value !== false) {
+                return $value;
+            }
         }
 
         $value = $callback();
@@ -260,7 +273,7 @@ trait BuildsQueries
             ? (int) config('monitor.aggregate_cache.closed_ttl', 3600)
             : (int) (config('monitor.aggregate_cache.live_ttl') ?? config('monitor.refresh', 10));
 
-        $store->put($key, $value, $ttl);
+        $store->put($key, serialize($value), $ttl);
 
         return $value;
     }
