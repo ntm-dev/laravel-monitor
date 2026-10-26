@@ -506,9 +506,11 @@
         </x-monitor::section>
 
         {{-- start disable recording dialog --}}
-        {{-- Form-level, outside the transformed sections, so the fixed overlay covers the viewport. --}}
+        {{-- Form-level, outside the transformed sections, so the fixed overlay covers the viewport.
+             A click on the backdrop shakes the dialog instead of closing it. --}}
         @if ($canManageSettings)
             <div x-show="confirmingDisable" x-cloak x-on:keydown.escape.window="confirmingDisable = false"
+                x-on:click.self="$el.firstElementChild.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(10px)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 400, easing: 'ease-in-out' })"
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                 <div x-data="{ phrase: '', get matches() { return this.phrase.trim() === @js(\LaravelMonitor\Support\Settings::DISABLE_CONFIRMATION) } }"
                     x-init="$watch('confirmingDisable', open => { phrase = ''; open && $nextTick(() => $refs.disablePhrase.focus()) })"
