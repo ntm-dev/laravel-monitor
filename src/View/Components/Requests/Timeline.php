@@ -328,8 +328,6 @@ class Timeline extends Component
         ?string $attemptStatus,
         array &$entriesById,
     ): void {
-        $attemptLabel = $attemptNumber !== null ? __('monitor::messages.common.attempt') : null;
-
         $byId = collect($entries)->keyBy('id');
         $byParent = collect($entries)->groupBy(fn (TimelineEntry $entry) => $entry->parentId ?? 'request');
 
@@ -353,23 +351,21 @@ class Timeline extends Component
         }
 
         foreach ($rows as $row) {
-            $isAttempt = $row['kind'] === 'root' && $attemptNumber !== null;
+            $attemptFields = ['focusable' => $focusable, 'attempt' => null, 'jobStatus' => null];
 
             // `$row + [...]` keeps $row's OWN value for any key already
             // present in it (array union favours the left side) — 'kind' is
             // one of those, so overriding it to 'attempt' has to happen on
             // $row itself first, not through the union below.
-            if ($isAttempt) {
+            if ($row['kind'] === 'root' && $attemptNumber !== null) {
                 $row['kind'] = 'attempt';
+                $attemptFields = ['focusable' => false, 'attempt' => $attemptNumber, 'jobStatus' => $attemptStatus];
             }
 
-            $this->rows[] = $row + [
+            $this->rows[] = $row + $attemptFields + [
                 'track' => $trackId,
                 'rootLabel' => $rootBadge,
-                'focusable' => $isAttempt ? false : $focusable,
                 'barStart' => $barStartOffset + $row['entry']->start,
-                'attempt' => $isAttempt ? $attemptNumber : null,
-                'jobStatus' => $isAttempt ? $attemptStatus : null,
                 'attemptsDuration' => null,
                 // The primary (non-job) track's own root row gets
                 // $jobBaseUrl itself here -- the same base URL a job
@@ -385,30 +381,58 @@ class Timeline extends Component
             ];
         }
 
-        if ($orphanRows !== []) {
-            // The "Other" header only means something when there are real
-            // phases for these events to be "other than" (a request's
-            // bootstrap/middleware/controller/...) — a job attempt has no
-            // phases at all (see Support\Timeline::phases()), so *every* one
-            // of its events ends up here, and labelling the whole list
-            // "Other" is just noise.
-            if ($phases->isNotEmpty()) {
-                $this->rows[] = ['kind' => 'divider', 'entry' => null, 'track' => $trackId];
-            }
+        $this->addOrphanRows($orphanRows, $phases->isNotEmpty(), $trackId, $rootBadge, $barStartOffset);
 
-            foreach ($orphanRows as $row) {
-                $this->rows[] = $row + [
-                    'track' => $trackId,
-                    'rootLabel' => $rootBadge,
-                    'focusable' => false,
-                    'barStart' => $barStartOffset + $row['entry']->start,
-                    'attempt' => null,
-                    'jobStatus' => null,
-                    'attemptsDuration' => null,
-                    'jobUrl' => null,
-                ];
-            }
+        $this->addEntryDetails($entries, $rootBadge, $attemptNumber, (float) ($byId->get('request')?->duration ?? 0), $entriesById);
+    }
+
+    /**
+     * Appends one bundle's events that fall outside every phase, under an
+     * "Other" divider.
+     */
+    protected function addOrphanRows(array $orphanRows, bool $hasPhases, string $trackId, string $rootBadge, float $barStartOffset): void
+    {
+        if ($orphanRows === []) {
+            return;
         }
+
+        // The "Other" header only means something when there are real
+        // phases for these events to be "other than" (a request's
+        // bootstrap/middleware/controller/...) — a job attempt has no
+        // phases at all (see Support\Timeline::phases()), so *every* one
+        // of its events ends up here, and labelling the whole list
+        // "Other" is just noise.
+        if ($hasPhases) {
+            $this->rows[] = ['kind' => 'divider', 'entry' => null, 'track' => $trackId];
+        }
+
+        foreach ($orphanRows as $row) {
+            $this->rows[] = $row + [
+                'track' => $trackId,
+                'rootLabel' => $rootBadge,
+                'focusable' => false,
+                'barStart' => $barStartOffset + $row['entry']->start,
+                'attempt' => null,
+                'jobStatus' => null,
+                'attemptsDuration' => null,
+                'jobUrl' => null,
+            ];
+        }
+    }
+
+    /**
+     * The inspector panel's per-entry data for one bundle, keyed by entry id
+     * into $entriesById. Runs after addEntrySourceRows() namespaces the
+     * synthetic ids.
+     */
+    protected function addEntryDetails(
+        array $entries,
+        string $rootBadge,
+        ?int $attemptNumber,
+        float $bundleDuration,
+        array &$entriesById,
+    ): void {
+        $attemptLabel = $attemptNumber !== null ? __('monitor::messages.common.attempt') : null;
 
         // How many times each normalized SQL shape shows up among this
         // bundle's own (threshold-recorded) queries — surfaced in the
@@ -420,7 +444,6 @@ class Timeline extends Component
             ->groupBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
         $queryDuplicateCounts = $queryGroups->map(static fn (Collection $group) => $group->count());
         $queryGroupTotals = $queryGroups->map(static fn (Collection $group) => (float) $group->sum('duration'));
-        $bundleDuration = (float) ($byId->get('request')?->duration ?? 0);
 
         foreach ($entries as $entry) {
             // 'root'/'attempt'/'phase'/'event' — same classification
@@ -436,9 +459,6 @@ class Timeline extends Component
                 in_array($entry->type, TimelineSupport::phases(), true) => 'phase',
                 default => 'event',
             };
-
-            $queryKey = $entry->type === 'query' ? Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label) : null;
-            $isDuplicate = $queryKey !== null && $queryDuplicateCounts[$queryKey] > 1;
 
             $entriesById[$entry->id] = [
                 'type' => $entry->type,
@@ -467,46 +487,65 @@ class Timeline extends Component
                 // colour (only 10 in the palette), which would otherwise
                 // pulse both together.
                 'duplicateGroup' => $entry->metadata['duplicateGroup'] ?? null,
-                'duplicateCount' => $queryKey !== null ? $queryDuplicateCounts[$queryKey] : null,
-                // Summed time of the duplicate group and its share of the bundle's
-                // duration; both null for a query that runs once.
-                'duplicateTotal' => $isDuplicate ? $queryGroupTotals[$queryKey] : null,
-                'duplicateShare' => $isDuplicate ? self::share($queryGroupTotals[$queryKey], $bundleDuration) : null,
-                // This query's own share, only once it reaches SLOW_QUERY_SHARE.
-                'durationShare' => $queryKey !== null ? self::share((float) $entry->duration, $bundleDuration, self::SLOW_QUERY_SHARE) : null,
-                // Only queries have their own detail page. The stored group key
-                // is the normalized SQL shape (see Recorders\Queries::record()),
-                // not the raw per-call SQL text in metadata['sql'] — normalizing
-                // it again here the same way keeps this link matching the row
-                // QueryDetail's exact-equality lookup expects.
-                'queryUrl' => $entry->type === 'query'
-                    ? route('monitor.queries.show', ['hash' => KeyHash::for(Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label))])
-                    : null,
-                // EntryId::encode($entry->id): the entry's own row id,
-                // disguised as a uuid-shaped path segment — not the *class*
-                // hash (metadata['key']), which links to the full
-                // per-occurrence page instead.
-                'notificationUrl' => $entry->type === 'notification'
-                    ? route('monitor.notifications.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
-                    : null,
-                'mailUrl' => $entry->type === 'mail'
-                    ? route('monitor.mail.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
-                    : null,
-                // Exceptions already group by an opaque Fingerprint hash (stored
-                // directly as the entry's own key) — no KeyHash::for() reverse
-                // lookup needed, unlike the other detail links above (see
-                // DashboardController::resolveKey()).
-                'exceptionUrl' => $entry->type === 'exception'
-                    ? route('monitor.exceptions.show', ['hash' => $entry->metadata['key']])
-                    : null,
-                // Outgoing requests only have a per-occurrence detail page (no
-                // aggregate "class" mode like notifications/mail) — see
-                // Http\Headings\OutgoingHeading / Livewire\OutgoingDetail.
-                'outgoingUrl' => $entry->type === 'http'
-                    ? route('monitor.outgoing.sends.show', ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)])
-                    : null,
+                ...self::queryDetail($entry, $queryDuplicateCounts, $queryGroupTotals, $bundleDuration),
+                ...self::occurrenceUrls($entry),
             ];
         }
+    }
+
+    /**
+     * The inspector panel's call-count, share and detail-link fields — all
+     * null for a non-query entry.
+     *
+     * @param  Collection<string, int>  $duplicateCounts
+     * @param  Collection<string, float>  $groupTotals
+     * @return array<string, mixed>
+     */
+    protected static function queryDetail(TimelineEntry $entry, Collection $duplicateCounts, Collection $groupTotals, float $bundleDuration): array
+    {
+        if ($entry->type !== 'query') {
+            return ['duplicateCount' => null, 'duplicateTotal' => null, 'duplicateShare' => null, 'durationShare' => null, 'queryUrl' => null];
+        }
+
+        $queryKey = Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label);
+        $isDuplicate = $duplicateCounts[$queryKey] > 1;
+
+        return [
+            'duplicateCount' => $duplicateCounts[$queryKey],
+            // Summed time of the duplicate group and its share of the bundle's
+            // duration; both null for a query that runs once.
+            'duplicateTotal' => $isDuplicate ? $groupTotals[$queryKey] : null,
+            'duplicateShare' => $isDuplicate ? self::share($groupTotals[$queryKey], $bundleDuration) : null,
+            // This query's own share, only once it reaches SLOW_QUERY_SHARE.
+            'durationShare' => self::share((float) $entry->duration, $bundleDuration, self::SLOW_QUERY_SHARE),
+            // The stored group key is the normalized SQL shape (see
+            // Recorders\Queries::record()), not the raw SQL in metadata['sql'].
+            'queryUrl' => route('monitor.queries.show', ['hash' => KeyHash::for($queryKey)]),
+        ];
+    }
+
+    /**
+     * Per-occurrence detail page links — at most one non-null, by entry type.
+     *
+     * @return array<string, string|null>
+     */
+    protected static function occurrenceUrls(TimelineEntry $entry): array
+    {
+        $urls = ['notificationUrl' => null, 'mailUrl' => null, 'exceptionUrl' => null, 'outgoingUrl' => null];
+
+        // EntryId::encode($entry->id): the entry's own row id, not the
+        // *class* hash (metadata['key']).
+        $occurrence = static fn (string $route) => route($route, ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)]);
+
+        return match ($entry->type) {
+            'notification' => ['notificationUrl' => $occurrence('monitor.notifications.sends.show')] + $urls,
+            'mail' => ['mailUrl' => $occurrence('monitor.mail.sends.show')] + $urls,
+            // Exceptions already group by an opaque Fingerprint hash — no
+            // KeyHash::for() reverse lookup needed.
+            'exception' => ['exceptionUrl' => route('monitor.exceptions.show', ['hash' => $entry->metadata['key']])] + $urls,
+            'http' => ['outgoingUrl' => $occurrence('monitor.outgoing.sends.show')] + $urls,
+            default => $urls,
+        };
     }
 
     /**

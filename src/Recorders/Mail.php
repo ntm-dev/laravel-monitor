@@ -43,44 +43,9 @@ class Mail extends Recorder
             return;
         }
 
-        try {
-            $message = $event->message;
-            $subject = $message->getSubject() ?? '(no subject)';
-            $addresses = fn (array $recipients) => collect($recipients)->map(fn ($address) => $address->getAddress())->implode(', ');
-            $to = $addresses($message->getTo());
-            $cc = $addresses($message->getCc());
-            $bcc = $addresses($message->getBcc());
-            $toCount = count($message->getTo());
-            $ccCount = count($message->getCc());
-            $bccCount = count($message->getBcc());
-            // "Name <email>" per address, unlike $addresses() above (used for
-            // to/cc/bcc, where only the email itself is shown) — the sender's
-            // display name is worth surfacing here since it's usually the
-            // one address a reader actually cares to recognize by name.
-            $from = collect($message->getFrom())
-                ->map(fn ($address) => $address->getName() !== '' ? $address->getName().' <'.$address->getAddress().'>' : $address->getAddress())
-                ->implode(', ');
-            $attachmentNames = collect($message->getAttachments())
-                ->map(fn ($part) => $part->getFilename())
-                ->filter()
-                ->values()
-                ->all();
-            $attachments = count($message->getAttachments());
-        } catch (Throwable) {
-            $subject = '(unknown)';
-            $to = '';
-            $cc = '';
-            $bcc = '';
-            $from = '';
-            $toCount = 0;
-            $ccCount = 0;
-            $bccCount = 0;
-            $attachmentNames = [];
-            $attachments = 0;
-        }
-
-        $notification = $event->data['__laravel_notification'] ?? null;
-        $mailable = $event->data['__laravel_mailable'] ?? null;
+        $envelope = $this->envelope($event);
+        $notification = is_string($event->data['__laravel_notification'] ?? null) ? $event->data['__laravel_notification'] : null;
+        $mailable = is_string($mailableClass) ? $mailableClass : null;
         $body = ($this->config['details']['record_body'] ?? false) ? $this->body($event->message) : null;
 
         // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
@@ -97,35 +62,82 @@ class Mail extends Recorder
         // per send. Only ad-hoc mail with neither (Mail::raw(), a closure
         // view) falls back to the subject, since there's no class identity
         // to group by at all.
-        $groupKey = is_string($notification) ? $notification : (is_string($mailable) ? $mailable : Str::limit($subject, 250));
+        $groupKey = $notification ?? $mailable ?? Str::limit($envelope['subject'], 250);
 
         $this->monitor->record(
             type: RecordType::Mail,
             key: $groupKey,
             payload: array_filter([
-                'subject' => Str::limit($subject, 250),
-                'to' => Str::limit($to, 250),
-                'cc' => Str::limit($cc, 250),
-                'bcc' => Str::limit($bcc, 250),
-                'from' => Str::limit($from, 250),
-                'to_count' => $toCount,
-                'cc_count' => $ccCount,
-                'bcc_count' => $bccCount,
+                'subject' => Str::limit($envelope['subject'], 250),
+                'to' => Str::limit($envelope['to'], 250),
+                'cc' => Str::limit($envelope['cc'], 250),
+                'bcc' => Str::limit($envelope['bcc'], 250),
+                'from' => Str::limit($envelope['from'], 250),
+                'to_count' => $envelope['to_count'],
+                'cc_count' => $envelope['cc_count'],
+                'bcc_count' => $envelope['bcc_count'],
                 'mailer' => $event->data['mailer'] ?? null,
-                'mailable' => is_string($mailable) ? $mailable : null,
-                'notification' => is_string($notification) ? $notification : null,
-                'attachments' => $attachments > 0 ? $attachments : null,
-                'attachment_names' => $attachmentNames !== [] ? $attachmentNames : null,
-                'correlation_id' => is_string($notification) ? $this->monitor->pendingNotificationCorrelationId() : null,
+                'mailable' => $mailable,
+                'notification' => $notification,
+                'attachments' => $envelope['attachments'],
+                'attachment_names' => $envelope['attachment_names'],
+                'correlation_id' => $notification !== null ? $this->monitor->pendingNotificationCorrelationId() : null,
                 'body' => $body['content'] ?? null,
                 'body_format' => $body['format'] ?? null,
                 'server' => Host::name(),
             ]),
             duration: $duration,
-            subtype: is_string($notification) ? 'notification' : 'direct',
+            subtype: $notification !== null ? 'notification' : 'direct',
         );
 
         $this->startedAt = null;
+    }
+
+    /**
+     * Subject, addresses and attachment names, or placeholders when the
+     * message can't be read. Zero counts are left for array_filter() to drop.
+     *
+     * @return array{subject: string, to: string, cc: string, bcc: string, from: string, to_count: int, cc_count: int, bcc_count: int, attachments: int, attachment_names: list<string>}
+     */
+    protected function envelope(MessageSent $event): array
+    {
+        try {
+            $message = $event->message;
+            $addresses = static fn (array $recipients) => collect($recipients)->map(static fn ($address) => $address->getAddress())->implode(', ');
+
+            return [
+                'subject' => $message->getSubject() ?? '(no subject)',
+                'to' => $addresses($message->getTo()),
+                'cc' => $addresses($message->getCc()),
+                'bcc' => $addresses($message->getBcc()),
+                // "Name <email>": the sender is usually recognized by name.
+                'from' => collect($message->getFrom())
+                    ->map(static fn ($address) => $address->getName() !== '' ? $address->getName().' <'.$address->getAddress().'>' : $address->getAddress())
+                    ->implode(', '),
+                'to_count' => count($message->getTo()),
+                'cc_count' => count($message->getCc()),
+                'bcc_count' => count($message->getBcc()),
+                'attachments' => count($message->getAttachments()),
+                'attachment_names' => collect($message->getAttachments())
+                    ->map(static fn ($part) => $part->getFilename())
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ];
+        } catch (Throwable) {
+            return [
+                'subject' => '(unknown)',
+                'to' => '',
+                'cc' => '',
+                'bcc' => '',
+                'from' => '',
+                'to_count' => 0,
+                'cc_count' => 0,
+                'bcc_count' => 0,
+                'attachments' => 0,
+                'attachment_names' => [],
+            ];
+        }
     }
 
     /**
