@@ -1,6 +1,6 @@
 ---
 name: php-conventions
-description: PHP code style conventions for this repo (ntm-dev/laravel-monitor). Use whenever writing or editing PHP code here — control structures, constructors, type hints, comment style.
+description: PHP code style conventions for this repo (ntm-dev/laravel-monitor). Use whenever writing or editing PHP code here — control structures, constructors, type hints, comment style, method/class size (PHPMD).
 ---
 
 # PHP Conventions
@@ -75,3 +75,15 @@ description: PHP code style conventions for this repo (ntm-dev/laravel-monitor).
   the type level and keeps every call site in sync when a value changes — a literal `'net_err'`
   repeated across a recorder and several Livewire/Storage call sites is exactly the kind of
   duplication this avoids.
+- **Stay inside PHPMD `codesize` thresholds** — `.github/workflows/phpmd.yml` runs it on every
+  push/PR and each violation becomes a GitHub code-scanning alert. Per method: cyclomatic
+  complexity ≤ 9, NPath < 200, ≤ 100 lines, < 10 params. Per class: ≤ 25 non-getter/setter
+  methods, total complexity < 50. When a method grows past them:
+  - extract each coherent block into a `protected` helper named for what it applies/builds;
+  - move a block's guard (`isset(...) && is_array(...)`) into the helper as an early return,
+    so the caller stays a flat list of calls;
+  - fold several ternaries on the same condition into one `if` that sets a fields array.
+  Every new helper counts toward the class's 25-method budget — check it before splitting.
+  Verify locally with the same version CI uses (2.15.0 phar; the flags mute its PHP 8.4
+  deprecation noise):
+  `php -d error_reporting=0 -d display_errors=0 -d xdebug.mode=off phpmd.phar src text codesize`
