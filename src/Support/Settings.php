@@ -212,6 +212,31 @@ class Settings
             }
         }
 
+        static::applyAggregateCache($stored);
+
+        if (isset($stored['periods']) && is_array($stored['periods']) && $stored['periods'] !== []) {
+            config(['monitor.periods' => $stored['periods']]);
+        }
+
+        // One prefix override fans out to every table config/monitor.php
+        // itself derives from $tablePrefix — see TABLE_SUFFIXES.
+        if (array_key_exists('table_prefix', $stored)) {
+            config(['monitor.table_prefix' => $stored['table_prefix']]);
+
+            foreach (self::TABLE_SUFFIXES as $path => $suffix) {
+                config([$path => $stored['table_prefix'].$suffix]);
+            }
+        }
+
+        static::applyRecorders($stored);
+        static::applyRecorderDetails($stored);
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    protected static function applyAggregateCache(array $stored): void
+    {
         // Saved before the mode select replaced the "use app config" toggle.
         if (! array_key_exists('aggregate_cache_mode', $stored)) {
             $legacyMode = ($stored['aggregate_cache_use_app_config'] ?? false)
@@ -235,47 +260,49 @@ class Settings
 
             config(['monitor.aggregate_cache.options' => array_intersect_key($stored['aggregate_cache_options'], array_flip($allowed))]);
         }
+    }
 
-        if (isset($stored['periods']) && is_array($stored['periods']) && $stored['periods'] !== []) {
-            config(['monitor.periods' => $stored['periods']]);
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    protected static function applyRecorders(array $stored): void
+    {
+        if (! isset($stored['recorders']) || ! is_array($stored['recorders'])) {
+            return;
         }
 
-        // One prefix override fans out to every table config/monitor.php
-        // itself derives from $tablePrefix — see TABLE_SUFFIXES.
-        if (array_key_exists('table_prefix', $stored)) {
-            config(['monitor.table_prefix' => $stored['table_prefix']]);
+        $classes = static::recorderClasses();
 
-            foreach (self::TABLE_SUFFIXES as $path => $suffix) {
-                config([$path => $stored['table_prefix'].$suffix]);
+        foreach ($stored['recorders'] as $name => $enabled) {
+            $name = self::LEGACY_RECORDER_ALIASES[$name] ?? $name;
+
+            if (isset($classes[$name])) {
+                config(['monitor.recorders.'.$classes[$name].'.enabled' => (bool) $enabled]);
             }
         }
+    }
 
-        if (isset($stored['recorders']) && is_array($stored['recorders'])) {
-            $classes = static::recorderClasses();
-
-            foreach ($stored['recorders'] as $name => $enabled) {
-                $name = self::LEGACY_RECORDER_ALIASES[$name] ?? $name;
-
-                if (isset($classes[$name])) {
-                    config(['monitor.recorders.'.$classes[$name].'.enabled' => (bool) $enabled]);
-                }
-            }
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    protected static function applyRecorderDetails(array $stored): void
+    {
+        if (! isset($stored['recorder_details']) || ! is_array($stored['recorder_details'])) {
+            return;
         }
 
-        if (isset($stored['recorder_details']) && is_array($stored['recorder_details'])) {
-            $classes = static::recorderClasses();
+        $classes = static::recorderClasses();
 
-            foreach ($stored['recorder_details'] as $name => $details) {
-                $name = self::LEGACY_RECORDER_ALIASES[$name] ?? $name;
+        foreach ($stored['recorder_details'] as $name => $details) {
+            $name = self::LEGACY_RECORDER_ALIASES[$name] ?? $name;
 
-                if (! isset($classes[$name]) || ! is_array($details)) {
-                    continue;
-                }
+            if (! isset($classes[$name]) || ! is_array($details)) {
+                continue;
+            }
 
-                foreach ($details as $key => $enabled) {
-                    if (array_key_exists($key, self::RECORDER_DETAILS[$name] ?? [])) {
-                        config(['monitor.recorders.'.$classes[$name].'.details.'.$key => (bool) $enabled]);
-                    }
+            foreach ($details as $key => $enabled) {
+                if (array_key_exists($key, self::RECORDER_DETAILS[$name] ?? [])) {
+                    config(['monitor.recorders.'.$classes[$name].'.details.'.$key => (bool) $enabled]);
                 }
             }
         }
