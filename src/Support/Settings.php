@@ -16,6 +16,9 @@ use function implode;
 use function intdiv;
 use function is_array;
 use function max;
+use function str_starts_with;
+use function strlen;
+use function substr;
 
 /**
  * App-wide settings overrides for the values that config/monitor.php ships as
@@ -55,6 +58,9 @@ class Settings
 
     /** Largest stored-body cap the Settings form accepts, in bytes. */
     public const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+    /** Text an admin must type to switch the master switch off — that also unregisters the dashboard. */
+    public const DISABLE_CONFIRMATION = 'disable';
 
     /**
      * Config path (leaf table name) => suffix appended to a stored prefix
@@ -551,6 +557,15 @@ class Settings
     protected static function path(): string
     {
         return app()->bootstrapPath('cache/monitor-settings.php');
+    }
+
+    /** The settings file, relative to the app root — for re-enable instructions. */
+    public static function relativePath(): string
+    {
+        $path = static::path();
+        $base = base_path().DIRECTORY_SEPARATOR;
+
+        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
     }
 
     /**

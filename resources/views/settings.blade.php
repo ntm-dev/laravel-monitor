@@ -38,7 +38,7 @@
     @endif
 
     <form method="POST" action="{{ route('monitor.settings.system') }}"
-        x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']) }" class="space-y-4">
+        x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']), confirmingDisable: false }" class="space-y-4">
         @csrf
 
         {{-- Preferences: always submitted, regardless of $canManageSettings —
@@ -164,7 +164,9 @@
 
                     <div class="{{ $rowClass }}">
                         <span class="{{ $labelClass }}">{{ __('monitor::messages.settings.recording') }}</span>
-                        <x-monitor::toggle name="enabled" :checked="$system['enabled']" x-model="recordingEnabled" />
+                        {{-- Switching off is held back until the disable dialog below is confirmed. --}}
+                        <x-monitor::toggle name="enabled" :checked="$system['enabled']" x-model="recordingEnabled"
+                            x-on:change="if (! $event.target.checked) { $event.target.checked = true; recordingEnabled = true; confirmingDisable = true }" />
                     </div>
 
                     {{-- Recorders: shown right below the Recording toggle, only while recording is enabled --}}
@@ -502,6 +504,44 @@
             </fieldset>
             </div>
         </x-monitor::section>
+
+        {{-- start disable recording dialog --}}
+        {{-- Form-level, outside the transformed sections, so the fixed overlay covers the viewport. --}}
+        @if ($canManageSettings)
+            <div x-show="confirmingDisable" x-cloak x-on:keydown.escape.window="confirmingDisable = false"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                <div x-data="{ phrase: '', get matches() { return this.phrase.trim() === @js(\LaravelMonitor\Support\Settings::DISABLE_CONFIRMATION) } }"
+                    x-init="$watch('confirmingDisable', open => { phrase = ''; open && $nextTick(() => $refs.disablePhrase.focus()) })"
+                    class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+                    <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.settings.disable_title') }}</h3>
+
+                    <ul class="mt-3 list-inside list-disc space-y-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">
+                        <li>{{ __('monitor::messages.settings.disable_warning_recording') }}</li>
+                        <li class="font-semibold">{{ __('monitor::messages.settings.disable_warning_dashboard') }}</li>
+                        <li>{{ __('monitor::messages.settings.disable_warning_data') }}</li>
+                    </ul>
+
+                    <x-monitor::reenable-steps :file="$settingsFile" class="mt-4" />
+
+                    <label for="s-disable-confirmation" class="mt-4 block text-xs text-neutral-600 dark:text-neutral-300">
+                        {{ __('monitor::messages.settings.disable_confirm_label') }}
+                        <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono font-semibold text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">{{ \LaravelMonitor\Support\Settings::DISABLE_CONFIRMATION }}</code>
+                    </label>
+                    <input id="s-disable-confirmation" name="disable_confirmation" type="text" autocomplete="off" spellcheck="false"
+                        x-model="phrase" x-ref="disablePhrase" x-on:keydown.enter.prevent="matches && $refs.confirmDisable.click()"
+                        class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-2 py-1.5 font-mono text-sm text-neutral-900 focus:border-rose-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button type="button" x-on:click="confirmingDisable = false"
+                            class="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">{{ __('monitor::messages.team.cancel') }}</button>
+                        <button type="button" x-ref="confirmDisable" x-bind:disabled="! matches"
+                            x-on:click="$el.form.elements.enabled.checked = false; $el.form.requestSubmit()"
+                            class="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50">{{ __('monitor::messages.settings.disable_confirm_button') }}</button>
+                    </div>
+                </div>
+            </div>
+        @endif
+        {{-- end disable recording dialog --}}
 
         <div class="flex items-center justify-end gap-2">
             @if ($canManageSettings)

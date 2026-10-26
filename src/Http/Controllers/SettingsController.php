@@ -4,6 +4,7 @@ namespace LaravelMonitor\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\Preferences;
@@ -24,7 +25,7 @@ use LaravelMonitor\Support\Settings;
  */
 class SettingsController
 {
-    public function system(Request $request): RedirectResponse
+    public function system(Request $request): RedirectResponse|Response
     {
         $preferences = $request->validate([
             'theme' => ['required', 'string', 'in:'.implode(',', Preferences::THEMES)],
@@ -46,6 +47,7 @@ class SettingsController
 
         $validated = $request->validate([
             'enabled' => ['nullable', 'boolean'],
+            'disable_confirmation' => ['nullable', 'string', 'max:50'],
             'table_prefix' => ['required', 'string', 'max:255', 'regex:/^[A-Za-z0-9_.]+$/'],
             'dashboard_path' => ['required', 'string', 'max:255', 'regex:#^[A-Za-z0-9/_-]+$#'],
             'retention_hours' => ['required', 'integer', 'min:1', 'max:87600'],
@@ -72,6 +74,14 @@ class SettingsController
             'recorder_details.*.*' => ['in:1'],
         ]);
 
+        $disabling = ! $request->boolean('enabled');
+
+        if ($disabling && trim((string) ($validated['disable_confirmation'] ?? '')) !== Settings::DISABLE_CONFIRMATION) {
+            throw ValidationException::withMessages([
+                'disable_confirmation' => __('monitor::messages.settings.disable_confirmation_invalid', ['phrase' => Settings::DISABLE_CONFIRMATION]),
+            ]);
+        }
+
         $periods = $this->buildPeriods($validated['period_labels'], $validated['period_hours']);
 
         if ($periods === []) {
@@ -93,7 +103,7 @@ class SettingsController
         $path = trim($validated['dashboard_path'], '/');
 
         Settings::save([
-            'enabled' => $request->boolean('enabled'),
+            'enabled' => ! $disabling,
             'table_prefix' => $validated['table_prefix'],
             'dashboard_path' => $path,
             'retention_hours' => (int) $validated['retention_hours'],
@@ -114,6 +124,11 @@ class SettingsController
             'recorders' => $this->recorderToggles($request),
             'recorder_details' => $this->recorderDetailToggles($request),
         ]);
+
+        // Rendered in place: from the next request on, no dashboard route exists to redirect to.
+        if ($disabling) {
+            return response()->view('monitor::disabled', ['settingsFile' => Settings::relativePath()])->withCookie($cookie);
+        }
 
         // Redirect to the (possibly new) path so the dashboard never lands on a
         // stale URL after the prefix changes on the next boot.

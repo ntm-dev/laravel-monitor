@@ -3878,26 +3878,11 @@ class MonitorTest extends TestCase
         // effect in config() on the *next* boot — clean up regardless of
         // outcome so this doesn't leak into any other test.
         try {
-            $this->post('/monitor/settings/system', [
-                'theme' => 'dark',
-                'locale' => 'en',
-                'timezone' => 'UTC',
-                'table_prefix' => 'monitor_',
-                'dashboard_path' => 'monitor',
-                'retention_hours' => 168,
-                'refresh' => 10,
-                'request_threshold' => 1000,
-                'job_threshold' => 1000,
-                'query_threshold' => 500,
-                'outgoing_request_threshold' => 1000,
-                'request_body_max_size' => 128,
-                'request_body_max_unit' => 'KB',
-                'aggregate_cache_mode' => 'default',
-                'period_labels' => ['24h'],
-                'period_hours' => [24],
-            ])->assertRedirect('/monitor/settings')
+            $this->post('/monitor/settings/system', $this->systemSettingsPayload())
+                ->assertRedirect('/monitor/settings')
                 ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE);
 
+            $this->assertTrue(\LaravelMonitor\Support\Settings::all()['enabled']);
             $this->assertSame(168, \LaravelMonitor\Support\Settings::all()['retention_hours']);
             $this->assertSame(128 * 1024, \LaravelMonitor\Support\Settings::all()['request_body_max_bytes']);
             $this->assertSame('default', \LaravelMonitor\Support\Settings::all()['aggregate_cache_mode']);
@@ -3905,6 +3890,89 @@ class MonitorTest extends TestCase
         } finally {
             \LaravelMonitor\Support\Settings::reset();
         }
+    }
+
+    public function test_the_settings_page_offers_a_confirmation_dialog_before_disabling(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        $this->get('/monitor/settings')
+            ->assertOk()
+            ->assertSeeText('Turn off monitoring?')
+            ->assertSee('name="disable_confirmation"', false)
+            ->assertSee('bootstrap/cache/monitor-settings.php');
+    }
+
+    public function test_disabling_recording_without_the_confirmation_phrase_saves_nothing(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        try {
+            \LaravelMonitor\Support\Settings::reset();
+
+            foreach ([null, '', 'yes', 'DISABLE'] as $phrase) {
+                $this->post('/monitor/settings/system', $this->systemSettingsPayload([
+                    'enabled' => null,
+                    'disable_confirmation' => $phrase,
+                ]))->assertSessionHasErrors('disable_confirmation');
+
+                $this->assertSame([], \LaravelMonitor\Support\Settings::all());
+            }
+        } finally {
+            \LaravelMonitor\Support\Settings::reset();
+        }
+    }
+
+    public function test_disabling_recording_with_the_confirmation_phrase_shows_how_to_re_enable(): void
+    {
+        Gate::define('viewMonitor', fn ($user = null) => true);
+
+        try {
+            $this->post('/monitor/settings/system', $this->systemSettingsPayload([
+                'enabled' => null,
+                'disable_confirmation' => ' '.\LaravelMonitor\Support\Settings::DISABLE_CONFIRMATION.' ',
+            ]))->assertOk()
+                ->assertCookie(\LaravelMonitor\Support\Preferences::COOKIE)
+                ->assertSeeText('Monitoring is off')
+                ->assertSee('bootstrap/cache/monitor-settings.php')
+                ->assertSee("'enabled' => true,", false);
+
+            $this->assertFalse(\LaravelMonitor\Support\Settings::all()['enabled']);
+        } finally {
+            \LaravelMonitor\Support\Settings::reset();
+        }
+    }
+
+    /**
+     * A complete, valid admin submission of the Settings form, recording left on.
+     *
+     * @param  array<string, mixed>  $overrides  A null value drops that field, like an unchecked box.
+     * @return array<string, mixed>
+     */
+    private function systemSettingsPayload(array $overrides = []): array
+    {
+        $payload = [
+            'theme' => 'dark',
+            'locale' => 'en',
+            'timezone' => 'UTC',
+            'enabled' => 1,
+            'table_prefix' => 'monitor_',
+            'dashboard_path' => 'monitor',
+            'retention_hours' => 168,
+            'refresh' => 10,
+            'request_threshold' => 1000,
+            'job_threshold' => 1000,
+            'query_threshold' => 500,
+            'outgoing_request_threshold' => 1000,
+            'request_body_max_size' => 128,
+            'request_body_max_unit' => 'KB',
+            'aggregate_cache_mode' => 'default',
+            'period_labels' => ['24h'],
+            'period_hours' => [24],
+            ...$overrides,
+        ];
+
+        return array_filter($payload, static fn ($value) => $value !== null);
     }
 
     public function test_an_admin_can_post_settings_reset(): void

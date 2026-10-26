@@ -102,6 +102,7 @@ class DashboardController
             'rangeMax' => now(Preferences::timezone())->format(Format::RANGE),
             'system' => $tab === 'settings' ? Settings::current() : null,
             'canManageSettings' => $tab === 'settings' ? (bool) $request->user(MonitorUser::guardName())?->canManageSettings() : null,
+            'settingsFile' => $tab === 'settings' ? Settings::relativePath() : null,
             'prefs' => $tab === 'settings' ? Preferences::all() : null,
             'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
             'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,

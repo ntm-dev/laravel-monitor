@@ -15,7 +15,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Disable this to stop all recording without removing the package. The
-    | dashboard stays reachable so historical data can still be browsed.
+    | dashboard routes and commands are not registered either while it's off;
+    | recorded data is kept. A value saved from Settings takes precedence.
     |
     */
 
