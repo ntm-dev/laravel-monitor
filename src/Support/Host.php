@@ -13,10 +13,7 @@ final class Host
 
     private static bool $resolved = false;
 
-    /**
-     * gethostname() is a syscall, and the name can't change mid-process, so
-     * it's looked up once.
-     */
+    /** Looked up once per process — gethostname() is a syscall. */
     public static function name(): ?string
     {
         if (! self::$resolved) {

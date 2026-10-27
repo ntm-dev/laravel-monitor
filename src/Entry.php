@@ -23,9 +23,7 @@ class Entry
     }
 
     /**
-     * Deferred values (e.g. Support\Trace::capture()) are settled here, at
-     * flush, rather than on the recording hot path. One that resolves to
-     * null is dropped, the same as a null the recorder filtered out itself.
+     * Resolves deferred payload values at flush; one resolving to null is dropped.
      *
      * @return array<string, mixed>
      */
@@ -57,16 +55,8 @@ class Entry
             'subtype' => $this->subtype !== null ? mb_substr($this->subtype, 0, 32) : null,
             'key' => $key !== null ? mb_substr($key, 0, 255) : null,
             'payload' => $this->resolvedPayload(),
-            // Unrounded: neither Monitor::elapsedMsPrecise() nor any Recorder
-            // rounds duration/startOffset before constructing an Entry, so
-            // the DB's own decimal(16,6) column (see the monitor_entries
-            // migration) is the one and only place these get truncated to a
-            // fixed precision.
             'duration' => $this->duration,
-            // Resolved here, not when the entry was recorded: a deferred user
-            // id (see Monitor::lazyCurrentUserId()) is only settled once the
-            // whole request/job/command has run, and toArray() is reached
-            // solely from Monitor::flush() via Storage\DatabaseEntryWriter.
+            // Resolved at flush, once the whole request/job/command has run.
             'user_id' => $this->userId instanceof LazyValue ? $this->userId->resolve() : $this->userId,
             'request_id' => $this->requestId,
             'start_offset' => $this->startOffset,

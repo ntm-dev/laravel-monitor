@@ -102,10 +102,8 @@ class ExceptionDetail extends Card
             'occurrencesCount' => $occurrencesCount,
             'handledCount' => $group?->handled ?? 0,
             'unhandledCount' => $group?->unhandled ?? 0,
-            // Timeline for this exception
             'handledBuckets' => $this->aggregateStorage()->countsPerBucket('exception', $since, $buckets, 'handled', $key, $until),
             'unhandledBuckets' => $this->aggregateStorage()->countsPerBucket('exception', $since, $buckets, 'unhandled', $key, $until),
-            // Occurrences table
             'occurrences' => $this->occurrenceRows($occurrences, $names, $timelineStorage),
         ];
     }

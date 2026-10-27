@@ -10,54 +10,24 @@ use LaravelMonitor\Support\AggregateCatchUp;
 use LaravelMonitor\Support\StorageTime;
 
 /**
- * The monitor_aggregates fast-path: stats()/statsBySubtype()/countsPerBucket()
- * (in AggregatesStats) read pre-computed per-period totals from here instead
- * of scanning raw entries, whenever aggregatesCover() confirms the
- * `monitor:aggregate` command has actually been backfilling the requested
- * range.
+ * monitor_aggregates fast path for stats()/statsBySubtype()/countsPerBucket(),
+ * used only when aggregatesCover() confirms the requested range is fully aggregated.
  */
 trait UsesAggregatesTable
 {
     /**
-     * Per-instance memo for aggregatesCover(), keyed by (type, since, until).
-     * A single dashboard render asks the identical question several times
-     * over — Requests.php alone calls it once via statsBySubtype() and four
-     * more times via countsPerBucket() (2xx/3xx/4xx/5xx), all for the same
-     * type/since/until — so without this, the bounds query plus the raw-table
-     * existence check both run five times over for one page view. The
-     * DatabaseAggregateStorage instance behind the AggregateStorage contract
-     * is bound as a singleton (see MonitorServiceProvider::registerBindings()),
-     * so this cache's lifetime matches a single request and never leaks
-     * across requests. `$until === null` ("now") is
-     * cached under a fixed sentinel rather than a literal timestamp: the goal
-     * is reusing the answer for the rest of the same render, not
-     * distinguishing between two calls a few milliseconds apart.
+     * Memo for aggregatesCover() keyed by type|since|until ('now' when open-ended).
+     * One render asks the same question several times; the storage is a singleton,
+     * so this lives for one request.
      *
      * @var array<string, bool>
      */
     protected array $aggregatesCoverCache = [];
 
     /**
-     * Whether monitor_aggregates has been backfilling `$type` for the full
-     * requested range — i.e. it's safe to trust for this range instead of
-     * scanning the raw table. Without the lower-bound check,
-     * stats()/statsBySubtype()/countsPerBucket() would silently report zero
-     * for the (likely common) case of a fresh install that hasn't scheduled
-     * `monitor:aggregate` yet, or one that only started recently and hasn't
-     * caught up to cover the full requested window.
-     *
-     * The upper bound guards the opposite failure: once `monitor:aggregate`
-     * stops running (missing schedule, crashed worker), old buckets stay in
-     * place while new raw entries keep landing — a "last hour" query would
-     * otherwise read back a confidently-wrong zero instead of falling back
-     * to the raw scan. Rather than guess a staleness threshold (which would
-     * either false-positive on a slow-but-healthy schedule or false-negative
-     * on one that only just stalled), this checks for the one thing that
-     * actually matters: whether anything relevant to the requested range has
-     * been recorded since the aggregates' own last bucket. That's a single
-     * indexed existence check against the raw table — a row lookup, not a
-     * scan — so it stays cheap even though it isn't free; aggregatesCoverCache
-     * above keeps it from repeating needlessly within the same render.
+     * Whether monitor_aggregates can stand in for raw entries over the range: no raw rows
+     * of $type before its first bucket (within the range) or after its last bucket.
+     * On false, defers an aggregation catch-up via AggregateCatchUp.
      */
     protected function aggregatesCover(string $type, DateTimeInterface $since, ?DateTimeInterface $until = null): bool
     {
@@ -85,8 +55,7 @@ trait UsesAggregatesTable
             return false;
         }
 
-        // The first bucket may start after `since` simply because nothing was
-        // recorded before it: only raw rows in that gap make it incomplete.
+        // A first bucket after `since` is only a gap if raw rows exist before it.
         if ((int) $bounds->earliest > $this->toTimestamp($since) && $this->table()
             ->where('type', $type)
             ->where('created_at', '>=', $since)
@@ -163,16 +132,8 @@ trait UsesAggregatesTable
     }
 
     /**
-     * Same shape as the raw-scan path above, but reads pre-computed per-
-     * period counts from monitor_aggregates (written by the `monitor:aggregate`
-     * command) instead of pulling every matching row's timestamp into PHP.
-     * The aggregates table only carries type+subtype totals — no key/user
-     * breakdown — so this only ever serves the unfiltered case; a route/job/
-     * user-filtered chart falls back to the raw scan above. Only reached once
-     * aggregatesCover() confirms the command has actually been backfilling
-     * this type since before the requested range — buckets *within* an
-     * otherwise-covered range that the aggregator hasn't reached yet (it's
-     * still catching up, or missed a run) do simply read back as zero.
+     * countsPerBucket() from monitor_aggregates. The table holds only type+subtype
+     * totals, so key/user-filtered calls must use the raw scan instead.
      */
     protected function countsPerBucketFromAggregates(string $type, ?string $subtype, CarbonImmutable $start, float $bucketSize, int $buckets): array
     {

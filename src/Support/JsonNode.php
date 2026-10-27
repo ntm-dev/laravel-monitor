@@ -5,10 +5,8 @@ namespace LaravelMonitor\Support;
 use function count;
 
 /**
- * One node in a decoded JSON tree, built by {@see JsonTree} for the Log
- * Context viewer (resources/views/components/json-node.blade.php). A scalar
- * leaf carries $value; 'object'/'array' carry $children instead and leave
- * $value null.
+ * One node of a decoded JSON tree built by {@see JsonTree}. Scalars carry
+ * $value; 'object'/'array' carry $children and leave $value null.
  */
 class JsonNode
 {

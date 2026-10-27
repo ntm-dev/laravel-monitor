@@ -19,23 +19,14 @@ use LaravelMonitor\Support\Str;
 
 class CacheInteractions extends Recorder
 {
-    /**
-     * Subtypes counted as write/delete failures on the Cache page (only
-     * mutating operations can fail; hits and misses can't).
-     */
+    /** Subtypes counted as write/delete failures on the Cache page. */
     public const FAILURE_SUBTYPES = ['write_failed', 'forget_failed'];
 
     /**
-     * When the in-flight cache operation started, set by whichever "before"
-     * event Laravel fires just ahead of the store call and read back by the
-     * matching "after" event below. Cache events fire synchronously around a
-     * single driver call with nothing else able to interleave, so one scalar
-     * is enough; it isn't keyed by cache key. Left unset (not reset to null)
-     * after a read: a Cache::many()/putMany() batch
-     * only fires one "before" event for the whole batch, so every
-     * CacheHit/CacheMissed it produces measures elapsed-since-batch-start
-     * rather than a true per-key duration — an accepted approximation, not
-     * something worth special-casing here.
+     * Set by the "before" event, read by the matching "after" one; cache
+     * events never interleave, so one scalar suffices. Not cleared after a
+     * read: a many()/putMany() batch fires one "before" event, so each key
+     * measures time since the batch started.
      */
     protected ?float $startedAt = null;
 
@@ -47,9 +38,8 @@ class CacheInteractions extends Recorder
         $events->listen(WritingManyKeys::class, fn () => $this->startedAt = microtime(true));
         $events->listen(ForgettingKey::class, fn () => $this->startedAt = microtime(true));
 
-        // storeName was only added to these events in Laravel 11 (#49754) —
-        // `??` (not property_exists) both reads it when present and avoids
-        // an "Undefined property" error under E_ALL on Laravel 10.
+        // storeName only exists on these events from Laravel 11; `??` avoids
+        // an "Undefined property" error on Laravel 10.
         $events->listen(CacheHit::class, fn (CacheHit $event) => $this->record($event->key, 'hit', $event->storeName ?? null));
         $events->listen(CacheMissed::class, fn (CacheMissed $event) => $this->record($event->key, 'miss', $event->storeName ?? null));
         $events->listen(KeyWritten::class, fn (KeyWritten $event) => $this->record($event->key, 'write', $event->storeName ?? null, $event->seconds));
@@ -64,13 +54,9 @@ class CacheInteractions extends Recorder
             return;
         }
 
-        // Laravel versions/stores that never dispatch the "before" event
-        // (older Laravel, a custom driver) simply leave this null — falls
-        // back to today's behaviour (no duration) instead of guessing.
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // No duration when the "before" event never fired (older Laravel,
+        // custom driver). round(x, 3) strips float noise from subtracting two
+        // epoch timestamps (microsecond resolution).
         $duration = $this->startedAt !== null
             ? round((microtime(true) - $this->startedAt) * 1000, 3)
             : null;

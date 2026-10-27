@@ -29,25 +29,12 @@ class ScheduledTasks extends Recorder
         $events->listen(ScheduledTaskSkipped::class, [$this, 'recordSkipped']);
     }
 
-    /**
-     * Mints this run's own id before the task itself executes — mirrors
-     * beginJobAttempt()/beginCommandRun() — so everything it triggers
-     * correlates onto this one task's own timeline (see
-     * Monitor::beginScheduledTaskRun() for how a command-based task's own
-     * `php artisan` subprocess picks this same id back up). Skipped tasks
-     * never reach here (ScheduledTaskSkipped is dispatched directly by
-     * ScheduleRunCommand instead of via Event::run()), so recordSkipped()
-     * begins/ends its own run around the single record() call.
-     */
+    /** Starts this task's run (and timeline) before its body executes. */
     public function recordStarting(ScheduledTaskStarting $event): void
     {
         $this->monitor->beginScheduledTaskRun();
 
-        // Fires right before the task's own body runs — see ScheduleRunCommand::runEvent(),
-        // which dispatches this synchronously ahead of $event->run(). A cron-triggered
-        // `schedule:run` can run several due tasks in one PHP process, and `schedule:work`
-        // never restarts its process at all, so the peak record() reports below has to be
-        // scoped to this one task (see Recorder::resetPeakMemoryUsage()).
+        // Peak memory per task: schedule:run/schedule:work run several per process.
         $this->resetPeakMemoryUsage();
     }
 
@@ -65,9 +52,7 @@ class ScheduledTasks extends Recorder
 
     public function recordSkipped(ScheduledTaskSkipped $event): void
     {
-        // No matching ScheduledTaskStarting fires for a skipped task (see
-        // ScheduleRunCommand) — begin/end its own run right around this one
-        // entry rather than relying on recordStarting() having already done so.
+        // Skipped tasks get no ScheduledTaskStarting, so begin/end the run here.
         $this->monitor->beginScheduledTaskRun();
         $this->record($event->task, 'skipped');
         $this->monitor->endScheduledTaskRun();
@@ -88,9 +73,7 @@ class ScheduledTasks extends Recorder
                 'run_in_background' => $task->runInBackground,
                 'even_in_maintenance_mode' => $task->evenInMaintenanceMode,
                 'repeat_seconds' => $task->repeatSeconds,
-                // Null for a skipped run: the task's own body never
-                // executed, so there's no server/memory footprint of its
-                // own to report — just the scheduler process's baseline.
+                // Omitted for a skipped run: the task body never executed.
                 'server' => $status !== 'skipped' ? Host::name() : null,
                 'peak_memory' => $status !== 'skipped' ? memory_get_peak_usage(true) : null,
                 'error' => $error,
@@ -104,20 +87,9 @@ class ScheduledTasks extends Recorder
     }
 
     /**
-     * Short, stable grouping identity for the task — used as `key`, so it
-     * must stay put across runs regardless of the machine `command` was
-     * normalized on. Deliberately not `fullCommand()`: an install upgrading
-     * onto this recorder must keep matching its own already-recorded rows
-     * for the same task, and PhpExecutableFinder's answer (see
-     * `fullCommand()`) can differ from one scheduler run to the next even on
-     * the same box (a cron entry invoking a different php-cli than a
-     * `schedule:work` daemon does, say).
-     *
-     * Public and static so Livewire\Schedule can compute the same identity
-     * for the *currently* registered `Schedule::events()` (available in any
-     * process — `Schedule::events()` is normally registered from a service
-     * provider's `booted()` hook, not gated to console) and tell which
-     * historical keys are still actually scheduled.
+     * Stable grouping key for the task. Not fullCommand(): the resolved php
+     * binary can differ between runs. Public so Livewire\Schedule can match
+     * keys against the currently registered Schedule::events().
      */
     public static function name(ScheduledEvent $task): string
     {
@@ -132,26 +104,10 @@ class ScheduledTasks extends Recorder
     }
 
     /**
-     * The task's command exactly as `schedule:list` prints it — e.g.
-     * "php artisan app:sync-chain-data" — or null for a closure, which has
-     * no command string to normalize.
-     *
-     * Reimplements Illuminate\Console\Scheduling\Event::normalizeCommand()
-     * rather than calling it: that method is Laravel 11+ only (this package
-     * supports ^10.0 too, and calling it there throws — Event only extends
-     * Macroable, so a missing method surfaces as a runtime
-     * BadMethodCallException, not a compile-time error). The one-line
-     * str_replace it wraps is reproduced here instead, built from
-     * Application::phpBinary()/artisanBinary() — stable since command-based
-     * scheduling itself, long before normalizeCommand() existed.
-     *
-     * Normalizing here, inside the CLI process that just ran the task,
-     * rather than later when the dashboard renders it, is what keeps this
-     * accurate: phpBinary() swaps in whatever PhpExecutableFinder resolves
-     * to *right now*, and that can differ under the web server process
-     * rendering the dashboard from what it was under this CLI process —
-     * normalizing on the spot means the stored string is already correct
-     * and the dashboard just displays it.
+     * The command as `schedule:list` prints it ("php artisan app:sync-data"),
+     * or null for a closure. Reimplements Event::normalizeCommand() (Laravel
+     * 11+ only); done here because the php binary resolves differently in the
+     * web process.
      */
     protected function fullCommand(ScheduledEvent $task): ?string
     {

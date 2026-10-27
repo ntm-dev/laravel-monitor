@@ -15,9 +15,8 @@ class Issues extends Card
     use SyncsOpenIssues;
 
     /**
-     * Areas checked against their own configured threshold for the
-     * Performance tab, in the order rows fall back to when max durations tie.
-     * type => the monitor_entries `type`; tab => dashboard tab a row links to.
+     * Performance-tab areas, keyed by entry `type`; `tab` is the dashboard
+     * tab a row links to, `threshold` the config('monitor.thresholds') key.
      */
     public const PERFORMANCE_AREAS = [
         'request' => ['badge' => 'Request', 'tab' => 'requests', 'threshold' => 'request'],
@@ -33,11 +32,8 @@ class Issues extends Card
     protected const PRIORITY_RANK = ['none' => 0, 'low' => 1, 'medium' => 2, 'high' => 3, 'urgent' => 4];
 
     /**
-     * Columns sort() accepts — 'first_seen' only exists on exception rows
-     * and 'max_duration' only on performance rows, but sorting the other
-     * collection by a key it doesn't have is a harmless no-op (every row
-     * ties), so both tables share one $sortBy/$sortDirection pair instead
-     * of needing one each.
+     * Shared by both tabs; sorting by a key a row lacks (e.g. max_duration
+     * on exceptions) is a harmless no-op.
      */
     protected const SORTABLE = ['priority', 'id', 'label', 'count', 'users', 'first_seen', 'last_seen', 'max_duration'];
 
@@ -52,12 +48,8 @@ class Issues extends Card
     public string $sortDirection = 'desc';
 
     /**
-     * Kept in the URL (not just server-side state) so that navigating to an
-     * issue's detail page and back restores the same filtered list the
-     * search box's own text still shows — without this, a fresh mount on
-     * the way back resets $search to '' server-side while the <input>'s
-     * value survives regardless, purely via the browser's own form-field
-     * history restoration, leaving the two visibly out of sync.
+     * In the URL so returning from a detail page keeps the list in sync with
+     * the browser-restored search input.
      */
     #[Url]
     public string $search = '';
@@ -81,11 +73,6 @@ class Issues extends Card
         $this->setStatus($type, $key, 'open');
     }
 
-    /**
-     * Set an issue's priority straight from the list's own dropdown —
-     * mirrors resolve()/ignore()/reopen()'s inline pattern instead of
-     * requiring a trip to the Issue detail page for this one field.
-     */
     public function setPriority(string $type, string $key, string $priority): void
     {
         if (! array_key_exists($type, self::PERFORMANCE_AREAS) && $type !== 'exception') {
@@ -137,9 +124,7 @@ class Issues extends Card
     }
 
     /**
-     * $pairs is entirely client-owned (Alpine, see issues.blade.php) — which
-     * rows are checked never touches the server until a bulk action fires,
-     * so a plain checkbox click no longer costs a Livewire round-trip.
+     * Row selection lives in Alpine (issues.blade.php) until a bulk action sends it.
      *
      * @param  array<int, array{0: string, 1: string}>  $pairs
      */
@@ -159,11 +144,8 @@ class Issues extends Card
     }
 
     /**
-     * Resets the sort back to each tab's own natural order — newest issue
-     * first for Exceptions, worst offender first for Performance — since
-     * both tabs share the same $sortBy/$sortDirection pair, and 'id' (the
-     * other tab's default) has no relationship to a performance row's
-     * severity.
+     * Reset to the tab's natural sort: newest first for exceptions, worst
+     * first for performance.
      */
     public function updatedView(): void
     {
@@ -213,24 +195,14 @@ class Issues extends Card
 
         $openIssueCount = $storage->openIssueCount();
 
-        // syncOpenIssues() above can open a brand-new issue or reopen a
-        // recurring one on its own, with no explicit resolve/ignore/reopen
-        // call to carry the same nudge setStatus() would send — and
-        // resolve()/ignore()/etc. land here too, one render() later. Only
-        // dispatching when the count actually moved (rather than on every
-        // render) keeps the sidebar's OpenIssueBadge in sync without also
-        // firing a second request on every search keystroke, sort, or page
-        // change that doesn't touch it.
+        // Nudge the sidebar OpenIssueBadge only when the count actually moved
+        // (sync or a status action), not on every search/sort/page render.
         if ($openIssueCount !== $openIssueCountBefore) {
             $this->dispatch('issues-changed');
         }
 
-        // exceptionGroups() (not recent()'s fixed-size "most recent entries"
-        // window) so that an old-but-still-open group whose own latest entry
-        // has aged out of a small global sample still resolves its class
-        // name instead of falling back to the raw fingerprint key — see
-        // Exceptions::data(), which already relies on this for the same
-        // reason.
+        // exceptionGroups() resolves every group's class, even when its latest
+        // entry is old; falls back to the raw fingerprint key otherwise.
         $latest = $this->exceptionStorage()->exceptionGroups($since, $until)->keyBy('key');
 
         $exceptions = $exceptions->map(function ($group) use ($latest) {
@@ -278,9 +250,7 @@ class Issues extends Card
         $exceptionCount = $exceptions->count();
         $performanceCount = $performance->count();
 
-        // Paginating the currently active tab only — the other one's count
-        // above already reflects its own full filtered total for the tab
-        // button's badge, so slicing it too would serve no purpose.
+        // Only the active tab is paginated; the other only needs its count.
         $total = $this->view === 'exceptions' ? $exceptionCount : $performanceCount;
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
@@ -308,10 +278,8 @@ class Issues extends Card
     }
 
     /**
-     * Attaches each item's persisted status + first_seen (defaulting to
-     * "open"/its own last_seen for one syncIssues() hasn't recorded yet —
-     * shouldn't happen in practice since data() always syncs immediately
-     * before calling this, but keeps the view safe either way).
+     * Attach each item's persisted issue fields, defaulting to "open" and its
+     * own last_seen for a key syncIssues() hasn't recorded yet.
      */
     protected function attachIssueStatus(IssueStorage $storage, string $type, Collection $items): Collection
     {

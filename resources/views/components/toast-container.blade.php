@@ -1,31 +1,7 @@
-{{-- Shared toast/alert stack, mounted once in layout.blade.php so any page
-     can trigger one — top-right corner, newest on top, capped at 3 visible
-     (oldest gets pushed out), each auto-dismisses after 10s unless closed
-     manually first.
-
-     Two ways to trigger one:
-     - From a Livewire component: $this->dispatch('toast', level: 'success',
-       message: '...') — Livewire broadcasts that as a window CustomEvent,
-       caught by the x-on:toast.window listener below.
-     - From a plain POST+redirect controller (no Livewire involved, e.g.
-       SettingsController): session()->flash('monitor.toast', ['level' =>
-       ..., 'message' => ...]) before redirecting — read directly in
-       x-init below, on the page that redirect lands on.
-
-     $level is one of: primary, secondary, success, danger, warning, info —
-     each maps to its own solid (not translucent — a tinted-but-opaque
-     background, never a low-alpha one) colour pairing below, so a new call
-     site just picks the level that fits and inherits the right look for
-     free.
-
-     Each toast animates its own height (grid-template-rows 0fr → 1fr, not
-     just opacity) so entering/leaving is a genuine layout change — the
-     row growing in visibly pushes older toasts down underneath it, and
-     shrinking back to 0 on removal reads as that toast collapsing away
-     rather than just vanishing in place. A toast is only ever removed from
-     the `toasts` array *after* its own leave animation finishes (see
-     remove()), instead of instantly, so x-for never has to cut a
-     mid-animation element short. --}}
+{{-- Toast stack (top-right, newest first, max 3, auto-dismiss after 10s), mounted in layout.blade.php.
+     Trigger: $this->dispatch('toast', level: ..., message: ...) from Livewire, or a
+     'monitor.toast' session flash before a redirect. Levels: primary, secondary, success, danger, warning, info.
+     remove() drops a toast only after its height-collapse leave animation ends. --}}
 @php $flashed = session('monitor.toast'); @endphp
 <div x-data="{
         toasts: [],

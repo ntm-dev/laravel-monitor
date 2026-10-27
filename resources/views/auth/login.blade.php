@@ -39,9 +39,7 @@
                     </button>
                 @endif
                 <script>
-                    // Same base64url <-> ArrayBuffer bridge as Team's "Add a passkey" script
-                    // (resources/views/livewire/team.blade.php) — the server's JSON and the
-                    // browser's WebAuthn API disagree on wire format.
+                    // Same base64url <-> ArrayBuffer helpers as livewire/team.blade.php's passkey script.
                     function base64UrlToArrayBuffer(base64Url) {
                         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                         const binary = atob(base64);

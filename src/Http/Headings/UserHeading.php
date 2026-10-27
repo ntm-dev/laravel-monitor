@@ -5,8 +5,7 @@ namespace LaravelMonitor\Http\Headings;
 use LaravelMonitor\Livewire\Concerns\ResolvesUserNames;
 
 /**
- * Heading for a user detail page: the resolved display name as title, the
- * raw guard-qualified user_id (see ResolvesUserNames) as tooltip.
+ * Heading for a user detail page: display name as title, raw user_id as tooltip.
  */
 class UserHeading
 {

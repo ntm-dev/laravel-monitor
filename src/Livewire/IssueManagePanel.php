@@ -5,11 +5,8 @@ namespace LaravelMonitor\Livewire;
 use LaravelMonitor\Support\Format;
 
 /**
- * Status/Priority controls embedded in the standalone Issue Detail page
- * (see Http\Controllers\IssueController::show() / issue-detail-page.blade.php).
- * A Livewire component instead of the plain POST+redirect forms it replaced,
- * so changing either only re-renders this panel — the exception/performance
- * data alongside it on the page doesn't reload.
+ * Status/priority controls on the issue detail page (issue-detail-page.blade.php);
+ * a change re-renders only this panel.
  */
 class IssueManagePanel extends Card
 {
@@ -36,8 +33,7 @@ class IssueManagePanel extends Card
 
         $this->issueStorage()->setIssueStatus($issue->type, $issue->key, $status);
 
-        // Same nudge Issues.php's own resolve()/ignore() send, so the
-        // sidebar's OpenIssueBadge count doesn't drift behind this change.
+        // Refresh the sidebar OpenIssueBadge.
         $this->dispatch('issues-changed');
 
         [$level, $message] = match ($status) {

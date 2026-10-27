@@ -22,11 +22,8 @@ class Requests extends Card
     public const MAX_UNMATCHED_METHODS_SHOWN = 3;
 
     /**
-     * Duration filter tabs above the route table: 'all' shows every route;
-     * the rest keep only routes whose own avg_duration/p95_duration is at
-     * or above the given bar — the period's overall avg/p95 for 'avg'/'p95',
-     * or the configured monitor.thresholds.request for 'threshold', matched
-     * against the route's max_duration.
+     * Duration filter tabs: routes whose avg/p95 is at or above the period's
+     * overall avg/p95, or whose max_duration reaches monitor.thresholds.request.
      */
     public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
 
@@ -99,8 +96,7 @@ class Requests extends Card
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until, $userId);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until, $userId);
 
-        // Computed before the route list below so the >= AVG / >= P95 tabs
-        // have the period's own overall avg/p95 to compare each route against.
+        // The period's overall avg/p95, used as the duration tab bars.
         $duration = $storage->durationStats('request', $since, $buckets, null, null, $until, $userId);
 
         $routes = $storage->routeStats('request', $since, $until, $userId);
@@ -110,8 +106,7 @@ class Requests extends Card
             $routes = $routes->filter(fn ($route) => str_contains(strtolower($route->key), $needle))->values();
         }
 
-        // Tab badge counts reflect the search filter above but not the
-        // duration filter itself.
+        // Badge counts include the search filter, not the duration filter.
         [$routes, $durationFilter, $durationFilterCounts] = $this->filterByDuration($routes, 'avg_duration', 'p95_duration', $duration->avg ?? null, $duration->p95 ?? null, $threshold, 'max_duration');
 
         $sortBy = in_array($this->sortBy, self::SORTABLE, true) ? $this->sortBy : 'count';
@@ -129,8 +124,7 @@ class Requests extends Card
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        // One query grouped by subtype instead of five separate stats()
-        // calls (total + 2xx/3xx/4xx/5xx) — see Overview.php.
+        // One grouped query instead of a stats() call per status group.
         $bySubtype = $storage->statsBySubtype('request', $since, $until, $userId);
 
         return [
@@ -157,10 +151,8 @@ class Requests extends Card
     }
 
     /**
-     * Adds display-ready method/path fields so the Blade view carries no
-     * splitting logic: a plain "METHOD URI" split for an ordinary route, or
-     * the capped method list for the merged Unmatched Route row (more than
-     * MAX_UNMATCHED_METHODS_SHOWN distinct methods collapse to "ANY").
+     * Add display method/path fields: "METHOD URI" split, or the capped method
+     * list for the merged Unmatched Route row.
      */
     protected function presentRoute(object $route): object
     {
@@ -169,9 +161,7 @@ class Requests extends Card
                 'method' => count($route->methods) > self::MAX_UNMATCHED_METHODS_SHOWN
                     ? 'ANY'
                     : implode('/', $route->methods),
-                // Displayed label only — the underlying key/grouping sentinel
-                // (RequestsRecorder::UNMATCHED_ROUTE) stays a fixed English
-                // string regardless of locale, see resolveKeyHash()/query().
+                // Translated label only; the UNMATCHED_ROUTE key stays fixed.
                 'path' => __('monitor::messages.common.unmatched_route'),
             ]);
         }

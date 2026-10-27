@@ -4,15 +4,11 @@ namespace LaravelMonitor\Support;
 
 /**
  * The dashboard's user scope: '' (unfiltered), AUTHENTICATED, GUEST, or one
- * user id. A plain string throughout so a card can bind it straight to a
- * `<select>`.
+ * user id — a plain string so a card can bind it to a `<select>`.
  */
 final class UserFilter
 {
-    /**
-     * Any signed-in user. Guests are stored with a null `user_id`, so this
-     * reads as "user_id is not null", not as a value to match.
-     */
+    /** Any signed-in user: matches "user_id is not null". */
     public const AUTHENTICATED = '*';
 
     /** Nobody signed in — the null `user_id` half of AUTHENTICATED. */

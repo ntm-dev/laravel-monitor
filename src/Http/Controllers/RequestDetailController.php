@@ -22,10 +22,8 @@ use function parse_url;
 use function trim;
 
 /**
- * Renders the standalone Request Detail page for a single HTTP request:
- * header, general/user info, event summary and the lifecycle timeline.
- * Unlike the tab-based dashboard views, this page owns its own route
- * (`monitor.requests.show`) and fetches everything it needs itself.
+ * Request Detail page (`monitor.requests.show`): header, general/user info,
+ * event summary and the lifecycle timeline for one HTTP request.
  */
 class RequestDetailController
 {
@@ -46,11 +44,7 @@ class RequestDetailController
     ];
 
     /**
-     * Same as {@see SUMMARY_TYPES}, minus 'job' — once a job is the page's
-     * active entity, its own summary is scoped to just that job's own
-     * children (see eventsSummary()'s $children param), which shouldn't
-     * summarise itself the same way JobAttemptController's standalone page
-     * doesn't either.
+     * {@see SUMMARY_TYPES} minus 'job', for a job track's info: a job doesn't summarise itself.
      */
     protected const SUMMARY_TYPES_JOB = [
         'query' => 'queries',
@@ -76,24 +70,14 @@ class RequestDetailController
         [$groups, $footerTabs] = Nav::grouped();
         $tracks = $this->buildTracks($root, $children, 'REQUEST');
 
-        // Carried through every breadcrumb/back link on this page, so
-        // navigating here from a period-scoped Requests list (?period=24h)
-        // and then back out lands on that same period, not the default.
-        // Deliberately not read from *this* page's own query string — this
-        // page's own url stays period-free — but recovered from the
-        // Referer header the browser sent getting here instead.
+        // Range for breadcrumb/back links, so going back keeps the list's period.
         $range = $this->refererRange();
 
-        // Only worth resolving (an extra lookup) when there's at least one
-        // job track to actually link from — see Timeline's own
-        // $jobBaseUrl/$jobUrl.
+        // Extra lookup, only needed when there's a job track to link from.
         $jobBaseUrl = count($tracks) > 1 ? $this->requestUrl($requestId) : null;
 
-        // One "info" bundle per track (id 'root' plus one per job track,
-        // keyed as MergesJobTimelines keys $tracks), all rendered at once so
-        // clicking a track only flips Alpine's activeInfo — no navigation.
-        // Every job's root and timeline is prefetched in one query each,
-        // not two per job.
+        // One info bundle per track id, all rendered up front so switching tracks
+        // only flips Alpine's activeInfo. Jobs are prefetched in batch, not per job.
         $infos = ['root' => $this->resolveInfo($root, $children, $requestId, null, $range)];
 
         $outcomeIds = [];
@@ -135,9 +119,7 @@ class RequestDetailController
     }
 
     /**
-     * Everything the page's top section needs for one entity: the request
-     * itself ($job_id === null) or one job. $children is always $root's own
-     * timeline rows.
+     * Top-section data for the request ($job_id === null) or one job; $children are $root's timeline rows.
      *
      * @return array{root: object, isJob: bool, queuedAt: ?CarbonImmutable, queuedFrom: ?string, summary: array, userName: ?string, tab: string, breadcrumbLabel: ?string, breadcrumbUrl: ?string, url: string, title: string}
      */
@@ -150,8 +132,7 @@ class RequestDetailController
             : null;
 
         $queuedAt = null;
-        // Where dispatch() was called (see Recorders\Jobs). Only the
-        // placeholder knows — the outcome ran in another process entirely.
+        // Dispatch location; only the 'queued' entry records it.
         $queuedFrom = null;
 
         if ($isJob && ($jobDispatchId = $root->payload['job_id'] ?? null) !== null) {
@@ -164,11 +145,7 @@ class RequestDetailController
             ? $this->eventsSummary($children, self::SUMMARY_TYPES_JOB)
             : $this->eventsSummary($children, self::SUMMARY_TYPES, $root);
 
-        // Breadcrumb's middle segment: this request's own route-group label
-        // ("METHOD /uri"), linking back to that route's own grouped list —
-        // or, for a job, that job's own class name, linking back to *its*
-        // grouped list on the Jobs tab instead, matching the General/Events/
-        // tab switch alongside it.
+        // Breadcrumb middle segment: the job class or the request's route, linking to its grouped list.
         if ($isJob) {
             $breadcrumbLabel = $root->key;
             $breadcrumbUrl = route('monitor.jobs.show', ['hash' => KeyHash::for($root->key)] + $range);
@@ -193,10 +170,7 @@ class RequestDetailController
             'tab' => $isJob ? 'jobs' : 'requests',
             'breadcrumbLabel' => $breadcrumbLabel,
             'breadcrumbUrl' => $breadcrumbUrl,
-            // Same base url a job track's own row already appends its
-            // latest attempt's outcome id onto (see View\Components\Requests\Timeline)
-            // — bare for the request's own info, so clicking back to it
-            // from a job's drops the trailing job id entirely.
+            // Job: base url + outcome id, as the timeline links it; request: bare url.
             'url' => $isJob && $jobBaseUrl !== null ? "{$jobBaseUrl}/{$job_id}" : $this->requestUrl($requestId),
             'title' => $isJob ? class_basename($root->key ?? 'Job') : trim("{$method} {$path}"),
         ];
@@ -228,17 +202,9 @@ class RequestDetailController
             return $summary;
         }
 
-        // `query` rows only exist for queries at/above the configured
-        // threshold on installs still running an older version of this
-        // package's Queries recorder (it persists every query today,
-        // regardless of duration — see Recorders\Queries::record()), so
-        // counting them undercounts on those installs (or, as often
-        // happens, shows zero for a request that ran several fast
-        // queries). The request payload carries a true total incremented
-        // on every query — fall back to the raw row count only for older
-        // rows recorded before that counter existed.
         $summary['queries']['duplicates'] = Sql::duplicateCount($children->where('type', 'query'));
 
+        // Prefer the request's own query_count; the row count is the fallback.
         if ($root !== null && isset($root->payload['query_count'])) {
             $summary['queries']['count'] = (int) $root->payload['query_count'];
         }
@@ -247,11 +213,8 @@ class RequestDetailController
     }
 
     /**
-     * This request's own url, in whichever form the Requests tab itself
-     * would link to it — hashed (grouped by its route) when its key is
-     * still resolvable, falling back to the plain, non-hashed url
-     * otherwise. Used as the base a job track's own row appends its
-     * outcome id onto (see View\Components\Requests\Timeline).
+     * Route-hashed request URL when its key is known, else the plain one.
+     * Also the base job-track links append an outcome id to.
      */
     protected function requestUrl(string $requestId): string
     {
@@ -265,11 +228,8 @@ class RequestDetailController
     }
 
     /**
-     * period/from/to as they appeared on whichever page's link the visitor
-     * clicked to land here, recovered from the Referer header rather than
-     * this page's own query string (this page's own url stays period-free).
-     * Falls back to Card's own default period when there's no Referer, it's
-     * off-origin, or it carries no recognisable range at all.
+     * period/from/to from the Referer's query string (this page's url carries none);
+     * Card::DEFAULT_PERIOD when absent or invalid.
      *
      * @return array<string, string>
      */
@@ -281,9 +241,7 @@ class RequestDetailController
             parse_str((string) parse_url($referer, PHP_URL_QUERY), $refererQuery);
         }
 
-        // is_string() guards: parse_str() turns a `period[]=...` referer
-        // into an array, which array_key_exists()/normalizeRange() don't
-        // accept — untrusted input, so fall back rather than TypeError.
+        // parse_str() yields arrays for `period[]=`; is_string() avoids a TypeError.
         $period = $refererQuery['period'] ?? null;
         $period = is_string($period) && array_key_exists($period, Card::periods()) ? $period : Card::DEFAULT_PERIOD;
 

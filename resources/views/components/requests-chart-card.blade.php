@@ -1,6 +1,5 @@
 {{-- REQUESTS card: total + 1/2/3XX / 4XX / 5XX (+ optional Failed) legends over a stacked bar chart.
-     failed/failedBuckets are omitted by every caller except Outgoing Requests — a connection
-     failure never reached a server, so it's tracked as its own group rather than folded into 5XX. --}}
+     failed/failedBuckets: Outgoing Requests only (connection failures, kept apart from 5XX). --}}
 @props(['count', 'ok', 'client', 'server', 'okBuckets', 'clientBuckets', 'serverBuckets', 'since', 'until', 'height' => 'h-28', 'failed' => null, 'failedBuckets' => null])
 <x-monitor::card :class="trim('flex flex-col p-4 '.($attributes->get('class') ?? ''))" x-data="{ hidden: {} }">
     <x-monitor::metric :label="__('monitor::messages.nav.requests')" :value="number_format($count)">

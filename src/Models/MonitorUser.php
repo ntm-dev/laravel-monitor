@@ -5,10 +5,8 @@ namespace LaravelMonitor\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
- * The package's own dashboard user — completely separate from the host
- * app's own User model. One flat table (no `teams` table): this package
- * supports exactly one team per installation, so `role` alone is enough
- * to express owner/admin/viewer.
+ * A dashboard user, separate from the host app's User model. One team per
+ * installation, so `role` (owner/admin/viewer) is all the membership data.
  */
 class MonitorUser extends Authenticatable
 {

@@ -1,9 +1,5 @@
-{{-- Horizontally-scrolling chart pane. overflow-y-hidden is required, not
-     decorative: overflow-x-auto alone makes the browser treat overflow-y as
-     auto too, and each row's invisible hover-tooltip <div> (position:
-     absolute; top-full) extends past this box's edges — without it this
-     becomes a real (if invisible) vertical scroll container that traps the
-     mouse wheel instead of letting it scroll the page. --}}
+{{-- Horizontally-scrolling chart pane. overflow-y-hidden is required: without it, row tooltips
+     make this a vertical scroll container that traps the mouse wheel. --}}
 @props(['rows'])
 <div class="relative flex-1 overflow-x-auto overflow-y-hidden bg-neutral-50/50 dark:bg-transparent"
     x-ref="scrollArea" @scroll="scrollLeft = $event.target.scrollLeft" @mousemove.window="onDrag($event)"

@@ -50,27 +50,14 @@ class Queries extends Recorder
         // Covers Laravel versions that don't dispatch ConnectionEstablished.
         $this->watch($event->connection);
 
-        // Monitor's own storage writes/reads (INSERT into monitor_entries
-        // when flushing, SELECT/aggregate queries when rendering the
-        // dashboard) would otherwise show up as "app" queries and dominate
-        // the Queries page. The write side was already excluded — flush()
-        // pauses recording while it runs its own INSERT — but nothing
-        // stopped the read side, since dashboard pages render with
-        // recording enabled like any other request.
+        // Skip queries against the package's own tables and from dashboard requests.
         if ($this->isSelfReferential($event->sql) || $this->shouldIgnore()) {
             return;
         }
 
         $this->monitor->incrementQueryCount();
 
-        // Persist every query regardless of duration or execution context
-        // (request, console command, queue worker) — the dashboard decides
-        // what counts as "slow" at render time (see QueryDetail::data()'s
-        // $slowThreshold), comparing the live config threshold against
-        // each row's actual duration, rather than a fixed tag baked in
-        // here at record time. A long-running worker can generate a lot of
-        // rows this way; monitor.retention.hours / `monitor:prune` is the
-        // backstop, not a per-query filter.
+        // Every query is stored; "slow" is decided at render time against the configured threshold.
 
         // PDO role the query ran under; only available on Laravel >= 12.45.
         $connectionType = property_exists($event, 'readWriteType') ? $event->readWriteType : null;
@@ -86,9 +73,7 @@ class Queries extends Recorder
             payload: [
                 'sql' => $event->sql,
                 'location' => $trace === null ? $this->location() : null,
-                // Only meaningful outside a request — inside one, the row
-                // already carries request_id and the Query Detail page
-                // resolves that back to "METHOD /path" itself.
+                // Only outside a request; inside one, request_id already identifies the source.
                 'command' => $this->monitor->requestId() === null ? $this->monitor->commandName() : null,
                 'trace' => $trace,
             ],
@@ -170,14 +155,8 @@ class Queries extends Recorder
     }
 
     /**
-     * Whether the query touches one of Monitor's own tables — not just the
-     * entries table, but every table the package's own dashboard reads on
-     * every request (monitor_users, for the authenticated actor) or on
-     * specific pages (Team's monitor_invitations/monitor_webauthn_credentials,
-     * Issues' monitor_issues, ...). Table names are read live from config
-     * since they're user-configurable via the Settings page
-     * (Support\Settings::apply() overlays a saved override before any
-     * request is handled).
+     * Whether the query touches any of the package's own tables. Names come
+     * from config, which Support\Settings::apply() may override.
      */
     protected function isSelfReferential(string $sql): bool
     {
@@ -193,8 +172,7 @@ class Queries extends Recorder
     }
 
     /**
-     * Lower-cased, non-empty table names — resolved once per recorder rather
-     * than re-read from config on every query.
+     * Lower-cased, non-empty table names, resolved once per recorder.
      *
      * @var list<string>|null
      */
@@ -225,34 +203,21 @@ class Queries extends Recorder
         ];
     }
 
-    /**
-     * Cached shouldIgnore() result — computed once per request instead of
-     * re-decoding the Livewire snapshot payload (see below) on every single
-     * query it fires (a busy dashboard card can run dozens).
-     */
+    /** Cached shouldIgnore() result, computed once per recorder instance. */
     protected ?bool $shouldIgnoreCache = null;
 
-    /**
-     * Whether the current request is browsing the Monitor dashboard itself
-     * — every query that fires while rendering/polling a dashboard page
-     * (session lookups, cache reads, ...) would otherwise be attributed to
-     * "app" activity, same reasoning as Recorders\Logs::shouldIgnore().
-     */
+    /** Whether the current request is the dashboard itself (or matches ignore_paths). */
     protected function shouldIgnore(): bool
     {
         return $this->shouldIgnoreCache ??= $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);
     }
 
-    /**
-     * First application (non-vendor) frame that triggered the query.
-     */
+    /** First application (non-vendor) frame that triggered the query; resolved at flush. */
     protected function location(?array $frames = null): LazyValue
     {
         $frames ??= debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
         $location = $this->monitor->location;
 
-        // Only the backtrace itself has to be taken now; picking the frame
-        // runs at flush.
         return new LazyValue(static function () use ($location, $frames): ?string {
             [$file, $line] = $location->forQueryTrace($frames);
 

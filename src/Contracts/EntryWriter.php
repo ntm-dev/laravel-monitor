@@ -6,8 +6,7 @@ use DateTimeInterface;
 use LaravelMonitor\Entry;
 
 /**
- * Persists and purges raw entries — the write side every recorder/Monitor
- * flush() goes through, regardless of which page later reads them back.
+ * Write side for raw entries: persist and purge.
  */
 interface EntryWriter
 {

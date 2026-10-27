@@ -3,15 +3,9 @@
 namespace LaravelMonitor\Support;
 
 /**
- * The `monitor_entries.subtype` values Recorders\Requests and
- * Recorders\OutgoingRequests record an HTTP-status-bucketed entry under, and
- * every read-side query (DatabaseStorage::routeStats()/countsPerBucket()/
- * statsBySubtype(), the Requests/Outgoing Livewire cards) groups by.
- *
- * NetworkError has no underlying HTTP status — a connection that never got a
- * response (Recorders\OutgoingRequests::recordFailure()) — so it's kept out
- * of ServerError rather than aliased onto it, or a real 5xx and an
- * unreachable host would be indistinguishable everywhere subtype is grouped.
+ * `monitor_entries.subtype` status buckets for request and outgoing-request entries.
+ * NetworkError means no response at all (Recorders\OutgoingRequests::recordFailure()),
+ * kept apart from ServerError so an unreachable host isn't counted as a 5xx.
  */
 enum HttpStatusGroup: string
 {

@@ -1,21 +1,6 @@
-{{-- Priority bars as a click-to-change dropdown, right in the Issues list —
-     click the bars, pick a level, it saves immediately, rather than
-     requiring a trip to the Issue detail page just to change this one field.
-
-     The menu is x-teleport'd to <body> and positioned with `fixed` coords
-     read from the trigger button's own getBoundingClientRect() — kept OUT
-     of the table's DOM subtree entirely, rather than `absolute` inside the
-     <td>. An absolutely-positioned popover left inside the table still
-     inflates the nearest scrollable ancestor's painted height while open
-     (nothing here clips overflow-y), which visibly grew/shrank the whole
-     table every time the popover opened/closed.
-
-     Flips to open upward for a trigger near the bottom of the viewport
-     (e.g. the last few rows) instead of always opening downward, which
-     would otherwise render mostly off-screen/clipped there. Uses a fixed
-     menuHeight estimate (5 same-height rows, see the list below) rather
-     than measuring the real element, so the flip decision is known before
-     first paint — no visible jump from "open below" to "open above". --}}
+{{-- Click-to-change priority dropdown for the Issues list; saves immediately.
+     The menu is teleported to body with fixed coords so it never resizes the table, and opens
+     upward near the viewport bottom, using a fixed menuHeight estimate to decide before paint. --}}
 @props(['type', 'issueKey', 'priority'])
 @php
     $levels = ['none', 'low', 'medium', 'high', 'urgent'];

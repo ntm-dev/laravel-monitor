@@ -63,12 +63,8 @@ class Exceptions extends Recorder
             }
         };
 
-        // The exception handler is normally resolved lazily, the first time
-        // something actually throws — long after this recorder registers —
-        // so afterResolving() is what catches it. But recorders can register
-        // after that first resolution too (e.g. a previous exception already
-        // forced it during this same process), so also fire immediately if
-        // it's already sitting in the container.
+        // The handler is usually resolved lazily on the first throw, but may
+        // already be resolved by the time this recorder registers.
         $this->monitor->app->afterResolving(ExceptionHandler::class, $hook);
 
         if ($this->monitor->app->resolved(ExceptionHandler::class)) {
@@ -117,9 +113,8 @@ class Exceptions extends Recorder
         $message = Str::limit($exception->getMessage(), 500);
         $handled = $this->wasReportedDeliberately();
 
-        // Location, frames and the fingerprint built from them are worked out
-        // once, when the entry is stored — only the live backtrace check above
-        // has to happen at the throw.
+        // Location, frames and fingerprint are resolved once, at storage time;
+        // only the backtrace check above must run at the throw.
         $resolved = null;
         $details = function () use ($exception, &$resolved): array {
             if ($resolved === null) {
@@ -157,21 +152,15 @@ class Exceptions extends Recorder
             userId: $this->monitor->lazyCurrentUserId(),
         );
 
-        // Unhandled exceptions skip the events that normally advance the
-        // timeline's lifecycle stage — see Monitor::markUnhandledException().
+        // Unhandled exceptions skip the events that advance the lifecycle stage.
         if (! $handled) {
             $this->monitor->markUnhandledException();
         }
     }
 
     /**
-     * Distinguishes a deliberate `report($e)` call inside application code
-     * (caught, logged, request/job carries on) from the exception handler's
-     * own automatic path for something that crashed the request/job outright
-     * (an uncaught throw, a failed queue job, ...) — both end up calling the
-     * handler's report() method, but only the former passes through the
-     * global report() *function* first, which shows up as its own stack
-     * frame with no class/`->`/`::` attached to it.
+     * True when app code called the global report() helper (a caught,
+     * handled exception), detected by its class-less stack frame.
      */
     protected function wasReportedDeliberately(): bool
     {
@@ -188,20 +177,13 @@ class Exceptions extends Recorder
      * Structured, Ignition-style frames — the call stack from the throw site
      * outward, each tagged as application or vendor code.
      *
-     * @return array<int, array{file: string, line: int, function: string|null, label: string, vendor: bool}>
+     * @return array<int, array{file: string, line: int, function: string|null, label: string, vendor: bool, args: list<string>}>
      */
     protected function frames(Throwable $exception): array
     {
         $trace = $exception->getTrace();
 
-        // getTrace() never includes the throw site itself as its own entry —
-        // PHP only records *call* sites, and a `throw` isn't a call. trace[0]'s
-        // file/line is actually where trace[0]'s own function was *called
-        // from* (one level further out), not where it threw. So the throw
-        // site has to be prepended separately from $exception->getFile()/
-        // getLine(), same as Laravel's own Foundation\Exceptions\Renderer\
-        // Exception::frames() does via Symfony's FlattenException::setTrace().
-        // That synthetic frame starts with no class/function of its own.
+        // getTrace() omits the throw site itself, so prepend it.
         array_unshift($trace, [
             'file' => $exception->getFile(),
             'line' => $exception->getLine(),
@@ -210,18 +192,9 @@ class Exceptions extends Recorder
             'type' => null,
         ]);
 
-        // Every entry in getTrace() names the function that was *called*
-        // from that entry's own file/line — not the function whose body
-        // that file/line sits inside. That name belongs to the *next*
-        // entry, one level further from the throw site (verified against
-        // PHP's actual getTrace() output, not just its docs). Shifting
-        // class/type/function/args one level up the array re-labels each
-        // frame with the function actually executing at its own location:
-        // trace[0] (synthetic) borrows from the original trace[0], trace[1]
-        // (that original trace[0]) borrows from the original trace[1], and
-        // so on — Laravel's own renderer applies this correction only to
-        // the synthetic frame, which is why it shows the same mislabeling
-        // one level down for every frame after the first.
+        // Each getTrace() entry names the function *called* at its file/line;
+        // shift names up one frame so each is labelled with the function
+        // executing at that location.
         for ($i = 0, $last = count($trace) - 1; $i < $last; $i++) {
             $trace[$i]['class'] = $trace[$i + 1]['class'] ?? null;
             $trace[$i]['type'] = $trace[$i + 1]['type'] ?? null;
@@ -241,11 +214,7 @@ class Exceptions extends Recorder
                 'function' => $function !== '' ? $function : null,
                 'label' => $function !== '' ? $function : '{main}',
                 'vendor' => $this->isVendor($file),
-                // Argument *types* only (mirrors Laravel's own renderer,
-                // Foundation\Exceptions\Renderer\Frame::args() /
-                // Symfony's FlattenException::flattenArgs()) — never the
-                // actual values, so a request/model/password passed into a
-                // throwing call never ends up sitting in monitor_entries.
+                // Types only, never values, so secrets never get stored.
                 'args' => $this->argTypes($frame['args'] ?? []),
             ];
         }, $frames);

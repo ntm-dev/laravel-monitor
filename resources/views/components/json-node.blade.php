@@ -1,15 +1,5 @@
-{{-- One line (or nested block) of the Log Context JSON viewer. A scalar
-     renders as a single colour-coded line; an object/array renders its own
-     brace line with a small solid +/- toggle button right after the opening
-     brace, recursing into x-monitor::json-node for each child — each nested node gets its own
-     Alpine x-data, so containers collapse independently rather than sharing
-     one controller (mirrors the app's existing nested-accordion pattern, see
-     stack-trace.blade.php's vendor-frame groups). $node/$last are prepared
-     by Support\JsonTree / the parent x-monitor::json-node call ($loop->last).
-     $root is only ever true for x-monitor::json-viewer's own top-level call
-     — the outermost object/array is always shown fully expanded with no
-     toggle of its own, since collapsing it would just collapse the whole
-     panel back to a single "N items" line. --}}
+{{-- One line or nested block of the JSON viewer; each container has its own x-data so it
+     collapses independently. $root (json-viewer's top-level call) is always expanded, with no toggle. --}}
 @props(['node', 'last' => true, 'root' => false])
 @if ($node->isContainer())
     {{-- start json node container --}}

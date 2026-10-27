@@ -40,8 +40,7 @@ class CommandDetail extends Card
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
-        // One query grouped by subtype instead of two separate stats()
-        // calls (success/failed) — see Livewire/Overview.php.
+        // One grouped query instead of a stats() call per subtype.
         $bySubtype = $storage->statsBySubtype('command', $since, $until, key: $key);
 
         $totalEntries = $bySubtype->sum('count');

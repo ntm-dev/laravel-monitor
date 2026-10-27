@@ -9,17 +9,12 @@
         ? $exceptions->map(fn ($e) => ['exception', $e->key])->values()
         : $performance->map(fn ($item) => [$item->issue_type, $item->key])->values();
 
-    // Computed here (not passed from Issues::data()) since Card already
-    // declares a $from property of its own (the custom-range picker's start
-    // date) — a same-named 'from' key returned from data() would just get
-    // silently overridden by that unrelated property in the view.
+    // Recomputed: Issues::data()'s 'from' is shadowed in the view by
+    // Card::$from (the custom-range start date).
     $from = ($page - 1) * $perPage;
 @endphp
-{{-- Row selection lives entirely in Alpine (`selected`, keyed the same way
-     the old server-side $selected array was: selected[type][key] = true) —
-     checking a box is pure client state and shouldn't cost a Livewire
-     round-trip; only resolveSelected()/ignoreSelected() below ever send it
-     to the server, as the pairs list a bulk action applies to. --}}
+{{-- Row selection is Alpine-only (selected[type][key] = true); only the
+     resolveSelected()/ignoreSelected() bulk actions send it, as [type, key] pairs. --}}
 <div data-monitor-poll
      x-data="{
         selected: {},

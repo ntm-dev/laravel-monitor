@@ -6,10 +6,8 @@ use Illuminate\Support\Str;
 use LaravelMonitor\Recorders\Requests;
 
 /**
- * Heading for a request detail page: the HTTP method as badge, the path as title.
- * The key is stored as "METHOD /path", except for the merged Unmatched Route
- * row (see DatabaseStorage::routeStats()/resolveKeyHash()), whose bare
- * Requests::UNMATCHED_ROUTE key carries no method to split out.
+ * Heading for a request route page: method badge, path title. Keys are "METHOD /path",
+ * except the merged bare Requests::UNMATCHED_ROUTE row (DatabaseAggregateStorage::routeStats()).
  */
 class RequestHeading
 {

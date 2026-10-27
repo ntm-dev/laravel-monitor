@@ -31,22 +31,15 @@ class Jobs extends Recorder
     use NormalizesQueue;
 
     /**
-     * Subtype of a dispatch-time placeholder, as opposed to a run's own
-     * outcome ('processed'/'failed'/'released'). The distinction matters
-     * because a job that dispatches further jobs records their placeholders
-     * under its OWN request_id and type — so within one job run, `type=job`
-     * covers both the run itself and everything it queued.
+     * Dispatch-time placeholder subtype. A job that queues further jobs
+     * records these under its own request_id, alongside its own outcome row.
      */
     public const DISPATCH = 'queued';
 
     /**
-     * An in-flight attempt, recorded on JobProcessing before handle() runs.
-     * Unlike DISPATCH, shares this attempt's own request_id with its
-     * eventual outcome (see Monitor::beginJobAttempt()) — every read path
-     * that assumes one outcome row per request_id/job_id must exclude this
-     * subtype too (see DatabaseTimelineStorage::rootQuery()/
-     * jobExecutionsByJobId(), Monitor::startOffsetFor(),
-     * JobDetail::withoutSupersededQueuedRows()).
+     * In-flight attempt, recorded before handle() under the same request_id
+     * as its eventual outcome — read paths expecting one outcome row must
+     * exclude it (e.g. DatabaseTimelineStorage::rootQuery(), Monitor::startOffsetFor()).
      */
     public const PROCESSING = 'processing';
 
@@ -57,13 +50,8 @@ class Jobs extends Recorder
     protected array $poppedAt = [];
 
     /**
-     * JobPopping fires before the job is even deserialized — no id to key
-     * this by yet (see resetPeakMemory()'s own docs) — so it's captured
-     * bare here and only claimed into {@see $poppedAt}, keyed by this
-     * specific job's own id, once recordProcessing() actually has one. Safe
-     * because a worker only ever processes one job at a time: JobPopping
-     * and the JobProcessing that follows it are never interleaved with
-     * another job's own pair.
+     * JobPopping has no job id yet; recordProcessing() moves this into
+     * $poppedAt. Safe since a worker runs one job at a time.
      */
     protected ?float $lastPoppedAt = null;
 
@@ -87,27 +75,11 @@ class Jobs extends Recorder
             payload: array_filter([
                 'connection' => $event->connectionName,
                 'queue' => $this->normalizeQueue($event->connectionName, $this->resolveQueue($event)),
-                // The job's own payload uuid (Illuminate\Queue\Queue::createObjectPayload()),
-                // not $event->id (the driver-assigned row/message id) — it's
-                // the only thing both this dispatch-time entry and every
-                // eventual processed/failed/released entry share, since
-                // retries never re-fire JobQueued. $event->id can't be used
-                // for that: the database queue driver deletes and
-                // re-inserts a job on release() (Illuminate\Queue\DatabaseQueue::release()),
-                // so a retried attempt gets a brand-new row id, breaking
-                // MergesJobTimelines::jobTrack()'s correlation the moment a
-                // job retries on that connection. The payload uuid is part
-                // of the same serialized body every attempt reuses, so it
-                // survives that re-insert. Falls back to $event->id only for
-                // a payload that predates Laravel's uuid field. Kept as
-                // plain "job_id" (not "correlation_id") since, unlike the
-                // mail/notification pairing, this field already existed
-                // under that name before the uuid switch.
+                // Payload uuid, shared by every attempt; $event->id changes when
+                // the database driver re-inserts a released job. Falls back to
+                // $event->id for payloads without a uuid.
                 'job_id' => $this->jobId($event->payload()['uuid'] ?? $event->id ?? ''),
-                // Where dispatch() was actually called — the only pointer
-                // back to the source, since a job queued by another job runs
-                // in a process with no other trace of its origin.
-                // With a trace stored, it's read back from the trace instead.
+                // Where dispatch() was called; read from the trace instead when one is stored.
                 'location' => $trace === null ? $this->dispatchLocation() : null,
                 'trace' => $trace,
             ], fn ($value) => $value !== null),
@@ -116,12 +88,7 @@ class Jobs extends Recorder
         );
     }
 
-    /**
-     * Fires before the job is even popped off the queue, ahead of
-     * JobProcessing — scoping the peak reported by
-     * recordProcessed()/recordFailed()/recordReleased() to this one job
-     * (see Recorder::resetPeakMemoryUsage()).
-     */
+    /** Runs before the job is popped, scoping the reported peak memory to this one job. */
     public function resetPeakMemory(JobPopping $event): void
     {
         $this->resetPeakMemoryUsage();
@@ -140,9 +107,7 @@ class Jobs extends Recorder
             $this->lastPoppedAt = null;
         }
 
-        // Before handle() runs, so everything it triggers (queries, mail,
-        // notifications) correlates onto this attempt's own timeline —
-        // mirrors the booted-callback beginRequest() for HTTP requests.
+        // Before handle(), so everything it triggers lands on this attempt's timeline.
         $this->monitor->beginJobAttempt();
 
         $this->monitor->record(
@@ -154,20 +119,13 @@ class Jobs extends Recorder
                 'job_id' => $this->correlationId($event->job),
                 'attempts' => $event->job->attempts(),
                 'server' => Host::name(),
-                // Same fields recordProcessed()'s own 'started_at'/'popped_at'
-                // carry, captured this early since nothing about the
-                // outcome (duration, model_count, peak_memory) exists yet.
                 'started_at' => $this->startedAt[$id] ?? null,
                 'popped_at' => $this->poppedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
             subtype: self::PROCESSING,
         );
 
-        // Durable before handle() can crash — same reasoning as
-        // recordProcessed()'s own flush(), except more so: if handle()
-        // fatals (OOM, an uncaught Error, a signal), the terminal handler
-        // that would otherwise flush this never fires at all, so this is
-        // the only chance this row gets to survive that.
+        // Persist now: if handle() fatals (OOM, signal), nothing later flushes this row.
         $this->monitor->flush();
     }
 
@@ -186,17 +144,9 @@ class Jobs extends Recorder
                 'model_count' => $this->monitor->modelCount(),
                 'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
-                // Recorded here rather than reconstructed later from
-                // created_at - duration (see MergesJobTimelines::jobTrack(),
-                // which prefers this when present) — this is the exact
-                // moment JobProcessing fired, not an approximation of it.
+                // Exact JobProcessing time, preferred over created_at - duration.
                 'started_at' => $this->startedAt[$id] ?? null,
-                // The moment this attempt's own JobPopping fired, before
-                // the job was even deserialized — see resetPeakMemory()/
-                // recordProcessing()'s own docs on how this gets attributed
-                // to this specific id. Absent for a retry that never went
-                // back through the queue at all (a job released and picked
-                // straight back up in-process, if a driver ever does that).
+                // When this attempt's JobPopping fired; absent if it never fired.
                 'popped_at' => $this->poppedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
             duration: $this->duration($id),
@@ -226,8 +176,6 @@ class Jobs extends Recorder
                 'peak_memory' => memory_get_peak_usage(true),
                 'exception' => get_class($event->exception),
                 'message' => Str::limit($event->exception->getMessage(), 500),
-                // See recordProcessed()'s own 'started_at'/'popped_at' for
-                // why these are recorded here instead of reconstructed later.
                 'started_at' => $this->startedAt[$id] ?? null,
                 'popped_at' => $this->poppedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
@@ -240,13 +188,7 @@ class Jobs extends Recorder
         $this->monitor->flush();
     }
 
-    /**
-     * A job released back onto the queue after a caught exception, with
-     * attempts remaining — distinct from JobFailed, which only fires once
-     * retries are exhausted. Ends this attempt's timeline the same way
-     * processed/failed do; the next JobProcessing for the same job starts
-     * a fresh one via beginJobAttempt().
-     */
+    /** Released after an exception with attempts remaining; JobFailed fires only once retries run out. */
     public function recordReleased(JobReleasedAfterException $event): void
     {
         $id = $event->job->getJobId() ?: spl_object_hash($event->job);
@@ -262,11 +204,8 @@ class Jobs extends Recorder
                 'model_count' => $this->monitor->modelCount(),
                 'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
-                // backoff only exists on this event from Laravel 12 onward (#58414);
-                // `??` avoids an "Undefined property" error under E_ALL on older versions.
+                // backoff only exists on newer Laravel; `??` avoids an "Undefined property" error.
                 'backoff' => $event->backoff ?? null,
-                // See recordProcessed()'s own 'started_at'/'popped_at' for
-                // why these are recorded here instead of reconstructed later.
                 'started_at' => $this->startedAt[$id] ?? null,
                 'popped_at' => $this->poppedAt[$id] ?? null,
             ], fn ($value) => $value !== null),
@@ -284,40 +223,16 @@ class Jobs extends Recorder
         $startedAt = $this->startedAt[$id] ?? null;
         unset($this->startedAt[$id], $this->poppedAt[$id]);
 
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // round(x, 3) strips float noise from subtracting two epoch timestamps.
         return $startedAt !== null ? round((microtime(true) - $startedAt) * 1000, 3) : null;
     }
 
-    /**
-     * JobQueued::$job is the raw, as-dispatched job — for a job pushed via
-     * Mail::queue()/Notification::send(..., queue), that's Laravel's own
-     * Illuminate\Mail\SendQueuedMailable/SendQueuedNotifications wrapper,
-     * not the Mailable/Notification itself, so a plain get_class() here
-     * would record every queued mail as an indistinguishable "job" of that
-     * one wrapper class. Both of those (and any other job customizing
-     * displayName()) already resolve to the *wrapped* class instead once
-     * processed (see Illuminate\Queue\Jobs\Job::resolveName(), which
-     * recordProcessed()/recordFailed()/recordReleased() rely on via
-     * $event->job->resolveName()) — mirroring that same resolution here
-     * keeps this dispatch-time entry's own key consistent with its
-     * eventual outcome's.
-     */
-    /**
-     * First application (non-vendor) frame behind the dispatch, as an
-     * absolute "file:line" — same frame Recorders\Queries resolves for a
-     * query's origin, but stored full-path so it can be opened straight from
-     * the dashboard rather than resolved against the project root by eye.
-     */
+    /** First application frame behind the dispatch, as an absolute "file:line"; resolved at flush. */
     protected function dispatchLocation(): LazyValue
     {
         $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 50);
         $location = $this->monitor->location;
 
-        // Only the backtrace itself has to be taken now; picking the frame
-        // runs at flush.
         return new LazyValue(static function () use ($location, $frames): ?string {
             [$file, $line] = $location->forQueryTrace($frames);
 
@@ -327,6 +242,10 @@ class Jobs extends Recorder
         });
     }
 
+    /**
+     * Honors displayName() so queued mail/notification wrappers key by the
+     * wrapped class, matching resolveName() on the outcome entries.
+     */
     protected function displayName(mixed $job): string
     {
         if (! is_object($job)) {
@@ -336,20 +255,13 @@ class Jobs extends Recorder
         return method_exists($job, 'displayName') ? $job->displayName() : get_class($job);
     }
 
-    /** Treats '' as absent — SyncJob::getJobId() always returns '', the fallback correlationId() reaches when a payload has no uuid. */
+    /** Treats '' as absent (e.g. SyncJob::getJobId() always returns ''). */
     protected function jobId(string $id): ?string
     {
         return $id !== '' ? $id : null;
     }
 
-    /**
-     * This attempt's own correlation id for the 'job_id' payload field (see
-     * recordQueued()'s own comment on that field) — its payload uuid when
-     * present, since that's stable across every retry of the same dispatch,
-     * unlike getJobId() (some drivers, e.g. the database queue, reassign
-     * that on every attempt — see recordQueued()). Falls back to getJobId()
-     * only for a payload that predates Laravel's uuid field.
-     */
+    /** The 'job_id' value: payload uuid (stable across retries), else getJobId(). */
     protected function correlationId(QueueJob $job): ?string
     {
         return $this->jobId($job->uuid() ?? $job->getJobId());
@@ -358,11 +270,7 @@ class Jobs extends Recorder
     private function resolveQueue(JobQueued $event): string
     {
         /**
-         * This property has not always existed, and its type has not always
-         * been correct either. It was missing, added, removed, and re-added
-         * through time — `property_exists` avoids an "Undefined property"
-         * error under E_ALL on versions where it's absent, and the docblock
-         * forces the type on versions where it is.
+         * Absent on some Laravel versions, mistyped on others.
          *
          * @see https://github.com/laravel/framework/pull/55058
          *
@@ -375,11 +283,8 @@ class Jobs extends Recorder
         }
 
         if (is_object($event->job)) {
-            // get_object_vars(), called from outside the job's own class,
-            // only returns its *public* properties — unlike property_exists(),
-            // which doesn't care about visibility and would let us try to
-            // read a protected $queue (e.g. Illuminate\Queue\Jobs\Job's own)
-            // and fatal with "Cannot access protected property".
+            // get_object_vars() sees only public properties here, so a
+            // protected $queue can't trigger "Cannot access protected property".
             $jobVars = get_object_vars($event->job);
 
             if (array_key_exists('queue', $jobVars) && $jobVars['queue'] !== null) {

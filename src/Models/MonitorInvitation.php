@@ -7,16 +7,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * A pending invite — deliberately its own table, not a "pending" row in
- * monitor_users, since a person who hasn't accepted yet isn't a real
- * account (no password, shouldn't be listed as a member, shouldn't be
- * assignable settings/team permissions).
- *
- * The token is hashed with SHA-256 (not Hash::make()/bcrypt) specifically
- * because it must be *queryable by value* from a single URL parameter —
- * bcrypt is salted and can't be looked up that way, which is exactly why
- * Laravel's own API-token-style packages use the same SHA-256 pattern
- * instead of the framework's usual password hashing.
+ * A pending invite, kept apart from monitor_users until accepted. The token
+ * is SHA-256 hashed (not bcrypt) so it can be looked up by value.
  */
 class MonitorInvitation extends Model
 {

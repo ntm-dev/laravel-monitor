@@ -16,9 +16,8 @@ class OptionalAuthMethod
     }
 
     /**
-     * WebAuthn's relying-party ID must be a valid domain — browsers reject IP
-     * addresses (e.g. 127.0.0.1) with a SecurityError. An unresolvable host
-     * (no current request) is treated as valid rather than hiding the button.
+     * WebAuthn's relying-party ID must be a domain — browsers reject an IP host
+     * with a SecurityError. No current request counts as valid.
      */
     public static function webauthnDomainValid(): bool
     {

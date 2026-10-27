@@ -5,17 +5,9 @@ namespace LaravelMonitor\Support;
 use Carbon\CarbonImmutable;
 
 /**
- * Timestamp -> Carbon conversions for values that end up compared against
- * `created_at`.
- *
- * Storage writes `created_at` as wall-clock naive to config('app.timezone')
- * (see DatabaseEntryWriter::store()/BuildsQueries::hydrate()), and
- * Illuminate\Database\Connection::prepareBindings() formats a bound
- * DateTimeInterface as-is, in whatever timezone it carries. Carbon 3's
- * createFromTimestamp() returns UTC rather than the default timezone Carbon 2
- * used, so calling it directly binds a UTC wall-clock string against
- * app-timezone rows — silently shifting every window by the app's UTC offset
- * (a "last 1 hour" view reaching back 10 hours on an Asia/Tokyo app).
+ * Timestamp -> Carbon for comparisons against `created_at`, which is stored as
+ * naive wall-clock time in config('app.timezone'). Bindings keep their own timezone
+ * and Carbon 3's createFromTimestamp() defaults to UTC, so always convert here.
  */
 class StorageTime
 {

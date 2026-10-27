@@ -9,12 +9,8 @@ use function is_string;
 use function json_decode;
 
 /**
- * Decodes the `memo` object out of each Livewire component snapshot carried
- * in a request's `components` payload — the shape both a full-page mount and
- * Livewire's shared `/livewire/update` endpoint send. Shared by
- * Monitor::isSelfRequest() (needs memo.path) and
- * IsolateMonitorCookies::payloadTargetsMonitorComponent() (needs memo.name),
- * which otherwise duplicated this same decode-and-iterate loop.
+ * Reads the `memo` object of each Livewire component snapshot in a request's
+ * `components` payload.
  */
 class LivewireSnapshot
 {

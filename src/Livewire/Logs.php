@@ -17,11 +17,7 @@ class Logs extends Card
 
     protected const LOAD_MORE_STEP = 20;
 
-    /**
-     * Cap on the auto-refresh top-up fetch — bounds the (rare) burst case
-     * where more entries than this land inside a single poll interval; the
-     * surplus simply catches up on the next poll instead of blocking it.
-     */
+    /** Per-poll cap on topUp(); any surplus catches up on the next poll. */
     protected const TOP_UP_LIMIT = 200;
 
     public string $level = '';
@@ -29,16 +25,9 @@ class Logs extends Card
     public string $userId = '';
 
     /**
-     * The keyset cursor: id of the oldest/newest row currently on screen.
-     * This — not the rows themselves — is all Livewire tracks for the list,
-     * so its wire:snapshot stays a fixed, tiny size no matter how far the
-     * user has scrolled. loadMore()/data() page from these ids instead of an
-     * ever-growing limit/offset, and dispatch each new batch's rendered HTML
-     * to the browser (see logs.blade.php) rather than returning it through
-     * $logs on every request — a Livewire property holding the whole,
-     * potentially very long, accumulated list gets re-serialized on every
-     * single request (every poll, every action), which is what was driving
-     * the page progressively slower and eventually past PHP's memory limit.
+     * Keyset cursor over the rows on screen. Only these ids are component
+     * state; new batches are dispatched as rendered HTML so the snapshot
+     * stays small however far the user scrolls.
      */
     public ?int $oldestId = null;
 
@@ -47,19 +36,13 @@ class Logs extends Card
     public bool $hasMore = true;
 
     /**
-     * Whether the first batch has been fetched yet — see data(). Must stay
-     * `public`: Livewire only persists public properties across requests, and
-     * this needs to read `true` on every request after the first or data()
-     * would re-take the bootstrap branch forever and never top up.
+     * Whether data() has fetched the first batch. Public so Livewire persists it.
      */
     public bool $bootstrapped = false;
 
     /**
-     * Set by reload() for data() to pick up on that same request, so a
-     * level/userId change both re-renders the browser's list (via the
-     * dispatched replace event) and reflects the new scope in $logs, without
-     * data()'s usual top-up fetch redundantly re-querying what reload() just
-     * fetched. Never persisted — irrelevant beyond the request it's set in.
+     * Rows reload() just fetched, consumed by data() in the same request
+     * instead of a redundant topUp(). Not persisted.
      */
     protected ?Collection $pendingLogs = null;
 
@@ -85,7 +68,6 @@ class Logs extends Card
         $this->dispatch('monitor-logs-append', html: $this->renderRowsHtml($this->present($older)));
     }
 
-    /** Resets back to a fresh first page whenever the level filter changes, so switching filters doesn't carry over rows loaded under the old one. */
     public function updatedLevel(): void
     {
         $this->reload();
@@ -96,7 +78,7 @@ class Logs extends Card
         $this->reload();
     }
 
-    /** Refetches the first page under the current filters and dispatches it to replace whatever the browser has on screen. */
+    /** Refetch the first page under the current filters and replace the browser's list. */
     protected function reload(): void
     {
         $initial = $this->timelineStorage()->recent('log', $this->since(), self::DEFAULT_LIMIT, $this->level ?: null, null, $this->until(), userId: $this->scopedUserId());
@@ -130,11 +112,8 @@ class Logs extends Card
             $logs = $this->pendingLogs;
             $this->pendingLogs = null;
         } else {
-            // Every later render (mainly the data-monitor-poll auto-refresh)
-            // only tops the list up with anything inserted since — see
-            // topUp(). $logs stays empty: #monitor-logs-list is wire:ignore'd
-            // in the view, so Blade's own output for it is never applied
-            // past the very first paint above.
+            // Later renders only top up; $logs stays empty since the list is
+            // wire:ignore'd after the first paint.
             $this->topUp();
             $logs = collect();
         }
@@ -146,7 +125,7 @@ class Logs extends Card
         ];
     }
 
-    /** Fetches anything inserted since the newest row already on screen and dispatches it to prepend above the list. */
+    /** Fetch rows newer than $newestId and dispatch them for the browser to prepend. */
     protected function topUp(): void
     {
         $newer = $this->timelineStorage()->recent(
@@ -170,10 +149,8 @@ class Logs extends Card
     }
 
     /**
-     * Adds the view-ready fields (source link, level, decoded/summarized
-     * message, ...) that logs-entry.blade.php reads, batching the
-     * rootTypesFor()/rootLabelsFor() lookups across just this one batch —
-     * same pattern as QueryDetail/BuildsExceptionDetail::occurrenceRows().
+     * Add the view fields logs-entry.blade.php reads (source link, level,
+     * summary, ...), batching the source lookups per batch.
      */
     protected function present(Collection $rows): Collection
     {
@@ -206,7 +183,7 @@ class Logs extends Card
         });
     }
 
-    /** Renders an already-present()ed batch to the same markup logs-entry.blade.php's @include produces, for a monitor-logs-* dispatch. */
+    /** Render a present()ed batch with logs-entry.blade.php for a monitor-logs-* dispatch. */
     protected function renderRowsHtml(Collection $presented): string
     {
         return $presented
@@ -215,19 +192,13 @@ class Logs extends Card
     }
 
     /**
-     * Like renderRowsHtml(), but for monitor-logs-replace: an empty batch
-     * there means the new filter matched nothing, and the browser is about
-     * to overwrite #monitor-logs-list's entire content wholesale — so unlike
-     * an append/prepend, an empty result here still needs to render
-     * *something*, or the list would go visually blank instead of showing
-     * the empty-state message logs.blade.php's own @empty branch would have.
+     * renderRowsHtml() for monitor-logs-replace, which replaces the whole list,
+     * so an empty batch renders the empty state instead.
      */
     protected function renderListHtml(Collection $presented): string
     {
         if ($presented->isEmpty()) {
-            // Wrapped in the same #monitor-logs-empty id logs.blade.php's own
-            // @empty branch uses, so a later monitor-logs-prepend (a log
-            // arriving under this now-empty scope) still finds and removes it.
+            // Same #monitor-logs-empty id as logs.blade.php so a later prepend removes it.
             return '<div id="monitor-logs-empty">'.view('monitor::components.empty-state', [
                 'label' => __('monitor::messages.nav.logs'),
                 'message' => __('monitor::messages.common.no_log_entries'),

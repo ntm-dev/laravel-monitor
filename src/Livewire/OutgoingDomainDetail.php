@@ -6,12 +6,8 @@ use LaravelMonitor\Livewire\Concerns\CombinesSubtypeStats;
 use LaravelMonitor\Support\HttpStatusGroup;
 
 /**
- * Aggregate view for one outgoing-request destination host (all calls to it
- * across the selected period) — analogous to MailClassDetail/RequestDetail.
- * $key is the host (see Recorders\OutgoingRequests::key()). Each row in its
- * "individual requests" list links back to whichever request/job/command/
- * scheduled task made the call, the same rootTypesFor()/rootLabelsFor()
- * pattern QueryDetail/MailClassDetail already use.
+ * Aggregate view for one outgoing-request host ($key, see
+ * Recorders\OutgoingRequests::key()); each call links to the run that made it.
  */
 class OutgoingDomainDetail extends Card
 {

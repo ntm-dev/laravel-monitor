@@ -11,29 +11,16 @@ use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
 
 /**
- * Renders the standalone Scheduled Task Run Detail page: one scheduled task
- * execution and every event it triggered *in the scheduler's own process*,
- * on the same waterfall timeline used for requests, job attempts and command
- * runs. Owns its own route (`monitor.schedule.runs.show`), same as
- * JobAttemptController/CommandRunController.
- *
- * A command-based task (`Schedule::command()`) always runs the actual
- * artisan command in a *separate* `php artisan` subprocess, even when
- * scheduled "in the foreground" (see Illuminate\Console\Scheduling\Event::execute())
- * — everything that subprocess triggers (queries, mail, dispatched jobs, ...)
- * happened after the scheduler already finished dispatching it, so it
- * belongs on *that run's own* timeline (see Monitor::beginCommandRun()), not
- * this one. This page instead links to that command run via the
- * correlation_id its `command` entry carries — see $commandRun below.
+ * Scheduled Task Run Detail page (`monitor.schedule.runs.show`): events the
+ * task triggered in the scheduler's process. A `Schedule::command()` task's
+ * subprocess has its own command run page, linked via $commandRun.
  */
 class ScheduleRunController
 {
     use MergesJobTimelines;
 
     /**
-     * Recorder type => events-summary bucket key. No 'command' entry — a
-     * command-based task's own dispatched command run is linked to (see
-     * $commandRun), not folded into this page's own summary tile.
+     * Recorder type => events-summary bucket key. No 'command': the command run is linked, not summarised.
      */
     protected const SUMMARY_TYPES = [
         'query' => 'queries',
@@ -55,20 +42,13 @@ class ScheduleRunController
 
         abort_unless($root !== null, 404);
 
-        // Only the Event Summary's own categories (see SUMMARY_TYPES) — a
-        // command-based task's own dispatched 'command' run doesn't share
-        // this run's request_id any more (see $commandRun below), so this
-        // filter mainly guards runs recorded before that changed.
+        // Only SUMMARY_TYPES; keeps out a 'command' row sharing this run's request_id.
         $children = $this->storage
             ->timelineFor($runId, 'scheduled_task')
             ->whereIn('type', array_keys(self::SUMMARY_TYPES));
 
-        // A command-based task's own dispatched run, if any (null for a
-        // closure/`Schedule::call()` task, which has no separate subprocess
-        // to link to) — its `command` entry carries this run's own id as its
-        // correlation_id (see Monitor::finalizePendingCommand()), the same
-        // mechanism Recorders\Mail/Notifications use to pair their own two
-        // entries (see Contracts\TimelineStorage::findByCorrelationId()).
+        // The subprocess's command run (correlation_id = this run id); null for
+        // `Schedule::call()` tasks.
         $commandRun = $this->storage->findByCorrelationId('command', $runId, $root->created_at);
 
         [$groups, $footerTabs] = Nav::grouped();

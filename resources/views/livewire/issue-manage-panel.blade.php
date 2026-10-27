@@ -1,8 +1,5 @@
-{{-- Status + Priority controls for the standalone Issue detail page.
-     wire:click/wire:change straight into IssueManagePanel's own methods —
-     see issue-detail-page.blade.php — instead of a plain POST form, so a
-     change here only re-renders this panel, not the exception/performance
-     data next to it. --}}
+{{-- Status + Priority controls for issue-detail-page.blade.php. Livewire actions
+     (not a POST form), so a change re-renders only this panel. --}}
 <div class="rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
     <p class="border-b border-neutral-100 dark:border-neutral-800 px-4 py-3 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.manage') }}</p>
 

@@ -21,8 +21,7 @@ class Application extends Card
             ->filter(fn ($route) => ($route->max_duration ?? 0) >= $threshold)
             ->values();
 
-        // One query grouped by subtype instead of three separate stats()
-        // calls (queued/processed/failed) — see Livewire/Overview.php.
+        // One grouped query instead of a stats() call per subtype.
         $jobsBySubtype = $storage->statsBySubtype('job', $since, $until);
 
         return [

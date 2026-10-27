@@ -5,9 +5,7 @@ namespace LaravelMonitor\Http\Headings;
 use Illuminate\Support\Str;
 
 /**
- * Heading for a query detail page: the SQL as both title and tooltip
- * (truncated by the header's own CSS, not here — the full text stays in the
- * DOM for the title attribute and for copy/search).
+ * Heading for a query detail page: the full SQL as title (wrapped, not truncated) and tooltip.
  */
 class QueryHeading
 {

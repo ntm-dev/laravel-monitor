@@ -5,11 +5,7 @@ namespace LaravelMonitor\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
-/**
- * A one-time password-reset token. Hashed with SHA-256 (not
- * Hash::make()/bcrypt) for the same reason as MonitorInvitation::token —
- * it must be queryable by value from a single URL parameter.
- */
+/** A one-time password-reset token, SHA-256 hashed so it can be looked up by value. */
 class MonitorPasswordReset extends Model
 {
     protected $fillable = ['email', 'token'];

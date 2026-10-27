@@ -14,10 +14,7 @@ class DatabaseHashResolver implements HashResolver
 
     public function resolveKeyHash(string $type, string $hash): ?string
     {
-        // The merged Unmatched Route row (see DatabaseAggregateStorage::
-        // routeStats()) links to a hash of the bare Requests::UNMATCHED_ROUTE
-        // sentinel, which never exists as a literal stored key — resolve it
-        // directly instead of scanning for a match that will never be found.
+        // The bare UNMATCHED_ROUTE key (routeStats()' merged row) is never stored.
         if ($type === RecordType::Request->value && KeyHash::for(Requests::UNMATCHED_ROUTE) === $hash) {
             return Requests::UNMATCHED_ROUTE;
         }

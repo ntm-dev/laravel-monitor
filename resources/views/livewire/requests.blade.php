@@ -94,10 +94,8 @@
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($routes as $route)
                             @php($hash = KeyHash::for($route->key))
-                            {{-- Keyed so a re-sort or a page change moves the existing
-                                 row instead of rewriting the one in that slot: the
-                                 Last seen cell is an Alpine island, whose contents a
-                                 morph leaves alone. --}}
+                            {{-- Keyed so a re-sort or page change moves rows: the Last seen
+                                 cell is an Alpine island that a morph won't rewrite in place. --}}
                             <tr wire:key="route-{{ $hash }}"
                                 class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 onclick="window.location='{{ route('monitor.requests.routes.show', ['hash' => $hash] + $range) }}'">

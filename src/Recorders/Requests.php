@@ -38,15 +38,10 @@ use function strtolower;
 
 class Requests extends Recorder
 {
-    /**
-     * Route-list label for requests that matched no Laravel route.
-     */
+    /** Route-list label for requests that matched no Laravel route. */
     public const UNMATCHED_ROUTE = 'Unmatched Route';
 
-    /**
-     * Headers whose values are replaced before storing (lowercase), so
-     * secrets/session tokens never land in the stored payload.
-     */
+    /** Headers (lowercase) whose values are redacted before storing. */
     public const REDACT_HEADERS = [
         'authorization',
         'cookie',
@@ -58,10 +53,7 @@ class Requests extends Recorder
         'php-auth-digest',
     ];
 
-    /**
-     * Body field names (case-insensitive, any nesting depth) replaced before
-     * storing. Mirrors REDACT_HEADERS' intent for the request body.
-     */
+    /** Body field names (case-insensitive, any depth) redacted before storing. */
     protected const REDACT_BODY_FIELDS = [
         'password',
         'password_confirmation',
@@ -78,7 +70,7 @@ class Requests extends Recorder
         'cvc',
     ];
 
-    /** Stored bodies larger than this (encoded, in bytes) are replaced with a size marker instead. */
+    /** Default cap (bytes) for a stored body; larger ones are truncated (see maxBodyBytes()). */
     protected const MAX_BODY_BYTES = 64 * 1024;
 
     public function register(Dispatcher $events): void
@@ -97,18 +89,12 @@ class Requests extends Recorder
 
         $status = $event->response->getStatusCode();
         $route = $request->route();
-        // Requests with no matched Laravel route (404s, arbitrary probed
-        // paths) are grouped under one label instead of the raw path, or
-        // dynamic/unknown URLs would each fragment the route list into
-        // their own row.
+        // Unmatched requests share one label so probed paths don't fragment the route list.
         $uri = $route && method_exists($route, 'uri') ? '/'.ltrim($route->uri(), '/') : self::UNMATCHED_ROUTE;
 
-        // LARAVEL_START before REQUEST_TIME_FLOAT — see Monitor::beginRequest() for why.
+        // LARAVEL_START preferred over REQUEST_TIME_FLOAT to exclude webserver time.
         $startTime = defined('LARAVEL_START') ? LARAVEL_START : $request->server('REQUEST_TIME_FLOAT');
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // round(x, 3) strips float noise from subtracting two epoch timestamps.
         $duration = $startTime ? round((microtime(true) - $startTime) * 1000, 3) : null;
 
         $this->monitor->record(
@@ -137,10 +123,7 @@ class Requests extends Recorder
                 ], static fn ($value) => $value !== null),
                 'server' => Host::name(),
                 'peak_memory' => memory_get_peak_usage(true),
-                // Recorded here rather than reconstructed later from
-                // created_at - duration (see MergesJobTimelines::buildTracks(),
-                // which prefers this when present) — this is the exact
-                // moment the request actually started, not an approximation.
+                // Exact start time, preferred over created_at - duration.
                 'started_at' => $startTime ?: null,
             ], static fn ($value) => $value !== null),
             duration: $duration,
@@ -205,21 +188,14 @@ class Requests extends Recorder
         return $result;
     }
 
-    /**
-     * "Controller@method" for a route backed by a controller, the route's
-     * declared action name otherwise (e.g. "Closure") — whatever
-     * getActionName() already resolves, since Laravel formats both cases
-     * consistently.
-     */
+    /** "Controller@method", or e.g. "Closure" — whatever getActionName() resolves. */
     protected function routeAction(mixed $route): ?string
     {
         return method_exists($route, 'getActionName') ? $route->getActionName() : null;
     }
 
     /**
-     * Best-effort request body, redacted and capped in size — skipped for
-     * GET/HEAD (query params already show up in the URL, and Laravel has no
-     * concept of a GET body worth capturing separately).
+     * Redacted, capped request body; skipped for GET/HEAD.
      *
      * @return array<array-key, mixed>|string|null
      */
@@ -310,8 +286,7 @@ class Requests extends Recorder
                 is_array($value) => $this->redactBody($value),
                 in_array(strtolower((string) $key), self::REDACT_BODY_FIELDS, true) => '••• redacted •••',
                 is_scalar($value) || $value === null => $value,
-                // File uploads and other non-scalar values aren't meaningful
-                // to store as-is; note the type instead of failing to encode.
+                // File uploads and other non-scalars: store the type only.
                 default => '('.get_debug_type($value).')',
             };
         }

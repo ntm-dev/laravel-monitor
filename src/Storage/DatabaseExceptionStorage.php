@@ -30,13 +30,8 @@ class DatabaseExceptionStorage implements ExceptionStorage
         ?DateTimeInterface $until,
         int|string|null $userId,
     ): Collection {
-        // Two narrow passes, not one wide one: `payload` is by far the
-        // widest column (an exception's full class/message/file/line/trace),
-        // so fetching it for every sampled row here instead of once per
-        // group can exhaust PHP's memory limit well before the row cap is
-        // even reached — measured: ~3.6k sampled rows averaging ~36KB of
-        // payload each (~132MB) blew a 128MB limit on their own, well under
-        // the 50k-row cap.
+        // Sample without `payload` (it holds the trace and can exhaust memory),
+        // then fetch it only for each group's latest row.
         $groups = $this->query('exception', $since, null, null, $until, $userId)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -48,9 +43,7 @@ class DatabaseExceptionStorage implements ExceptionStorage
             return collect();
         }
 
-        // One payload per group — the latest occurrence (rows arrive
-        // newest-first, so each group's first row is it) — not one per
-        // sampled row.
+        // Rows are newest-first, so each group's first row is its latest.
         $latestIds = $groups->map(fn (Collection $rows) => $rows->first()->id);
 
         $payloads = $this->table()
@@ -60,10 +53,7 @@ class DatabaseExceptionStorage implements ExceptionStorage
             ->map(static function ($row) {
                 $payload = json_decode($row->payload ?? '[]', true) ?: [];
 
-                // Drop everything but what's actually read below — 'trace'
-                // alone (Recorders\Exceptions' own captured stack) is
-                // usually most of the payload's size, and every group here
-                // would otherwise hold one in memory at once.
+                // Keep only the fields read below; drop the large 'trace'.
                 return array_intersect_key($payload, ['class' => true, 'message' => true, 'file' => true, 'line' => true]);
             });
 

@@ -39,9 +39,7 @@ class DatabaseIssueStorage implements IssueStorage
 
             $update = ['last_seen' => $this->preciseTimestamp($lastSeenValue), 'updated_at' => $now];
 
-            // A resolved issue that keeps occurring reopens itself
-            // automatically. An ignored one stays ignored until the user
-            // manually reopens it; recurrence alone shouldn't override that.
+            // A resolved issue recurring after resolved_at reopens; ignored stays ignored.
             if ($row->status === 'resolved'
                 && $row->resolved_at !== null
                 && $lastSeenValue->greaterThan(CarbonImmutable::parse($row->resolved_at))) {
@@ -54,12 +52,8 @@ class DatabaseIssueStorage implements IssueStorage
     }
 
     /**
-     * The $existing lookup in syncIssues() and this insert aren't atomic
-     * together, so two requests syncing the same never-before-seen (type,
-     * key) at nearly the same moment can both see "no row" and both land
-     * here — insertOrIgnore() makes the losing insert a no-op instead of a
-     * monitor_issues_type_key_unique violation, and the fallback update
-     * still advances last_seen for that request's occurrence.
+     * insertOrIgnore() because a concurrent sync may insert the same [type, key] first;
+     * the losing call just updates last_seen.
      */
     protected function insertNewIssue(string $type, string $key, CarbonImmutable $lastSeenValue, CarbonImmutable $now): void
     {
@@ -130,8 +124,6 @@ class DatabaseIssueStorage implements IssueStorage
         $exists = $this->issuesTable()->where('type', $type)->where('key', $key)->exists();
 
         if (! $exists) {
-            // An action performed on an issue syncIssues() hasn't recorded
-            // yet (edge case) — insert a fresh row rather than no-op.
             $this->issuesTable()->insert([
                 'type' => $type,
                 'key' => $key,

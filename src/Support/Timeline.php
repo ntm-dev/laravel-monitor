@@ -11,22 +11,13 @@ use function array_filter;
 use function is_string;
 
 /**
- * Builds the ordered list of TimelineEntry rows shown on the Request Detail
- * timeline: the request root, its best-effort lifecycle phases, and every
- * correlated event (queries, cache, mail, notifications, jobs, outgoing
- * requests), each attributed to the phase it fell within and stacked into
- * non-overlapping lanes so concurrent events stay readable.
+ * Builds the Request Detail timeline: the root, its lifecycle phases, and every
+ * correlated event, each attributed to a phase and stacked into non-overlapping lanes.
  */
 class Timeline
 {
     /**
-     * Every displayable phase name, in ExecutionStage's own declared case
-     * order — a command root only ever has bootstrap/action/terminating/end
-     * entries, but this order still places Action correctly between the
-     * middleware phases for a request root. Derived from the enum itself
-     * (a plain array constant can't call ExecutionStage::cases() — class
-     * constant expressions can't include method calls) so a case
-     * added/renamed there can't silently drift out of sync here.
+     * Every phase name, in ExecutionStage's declared case order.
      *
      * @return list<string>
      */
@@ -36,20 +27,14 @@ class Timeline
     }
 
     /**
-     * Phase name => display label, for the few phases whose name doesn't
-     * read well through a plain ucfirst() (see phaseEntries()). Action isn't
-     * here — it's shared by a request's controller phase and a command's
-     * handle() phase, so its label is picked in phaseEntries() based on the
-     * root's own type instead of being static.
+     * Phase name => label where ucfirst() doesn't fit. Action's label depends
+     * on the root type, so phaseEntries() picks it.
      */
     protected const PHASE_LABELS = [
         'unwinding' => 'Middleware',
     ];
 
-    /**
-     * Recorder type => timeline type + fallback label. Add a row here to
-     * surface a new recorder type on the timeline — no Blade changes needed.
-     */
+    /** Recorder type => timeline type + fallback label. */
     protected const EVENT_TYPES = [
         'query' => ['type' => 'query', 'label' => 'Query'],
         'cache' => ['type' => 'cache', 'label' => 'Cache'],
@@ -58,38 +43,24 @@ class Timeline
         'job' => ['type' => 'queue', 'label' => 'Queued Job'],
         'outgoing_request' => ['type' => 'http', 'label' => 'Outgoing Request'],
         'lazy_loading' => ['type' => 'lazy_loading', 'label' => 'Lazy Load'],
-        // A command-based scheduled task's own `php artisan` subprocess
-        // reports its own 'command' entry tagged with the scheduled task's
-        // id (see Monitor::beginScheduledTaskRun()) — nesting it here as a
-        // child, exactly like 'job' above, is what makes it show up as a
-        // "HANDLE ..." row under the SCHEDULED TASK root instead of only
-        // ever rendering as its own separate root (CommandRunController).
+        // A scheduled task's artisan subprocess records a 'command' entry tagged
+        // with the task's id (see Monitor::beginScheduledTaskRun()); shown as its child.
         'command' => ['type' => 'command', 'label' => 'Command'],
     ];
 
     /**
-     * Tailwind colour names handed out to duplicate-SQL groups on the
-     * timeline dot (see TimelineRow) — excludes blue (the default dot
-     * colour) and rose (exceptions) so a duplicate group is never confused
-     * with either. One group => one colour, picked deterministically from
-     * the normalized SQL shape so it stays the same across renders/reloads
-     * instead of reshuffling every page load.
+     * Tailwind colours for duplicate-SQL groups' timeline dots; excludes blue
+     * (default dot) and rose (exceptions).
      */
     protected const DUPLICATE_COLORS = [
         'emerald', 'amber', 'fuchsia', 'cyan', 'violet', 'teal', 'orange', 'indigo', 'pink', 'lime',
     ];
 
     /**
-     * @param  object  $root  the `request`/`job`/`command`/`scheduled_task` row this
-     *                        track's own timeline is built around
-     * @param  Collection<int, object>  $children  rows from Storage::timelineFor()
-     * @param  float  $trackStart  the real wall-clock moment this track's own
-     *                             $root started (Unix epoch, microsecond
-     *                             precision — see MergesJobTimelines::startedAt()),
-     *                             i.e. what every entry's own `start` offset
-     *                             (ms, relative to this track) is measured
-     *                             from. Stamps each entry's own precise
-     *                             started_at/ended_at metadata below.
+     * @param  object  $root  the `request`/`job`/`command`/`scheduled_task` row
+     * @param  Collection<int, object>  $children  rows from TimelineStorage::timelineFor()
+     * @param  float  $trackStart  Unix epoch (µs precision) $root started; entry `start`
+     *                             offsets (ms) are relative to it
      * @return TimelineEntry[]
      */
     public static function build(object $root, Collection $children, float $trackStart): array
@@ -102,9 +73,7 @@ class Timeline
             label: $root->key ?? 'Request',
             start: 0,
             duration: self::rootDuration($root, $visibleChildren),
-            // Only requests carry an HTTP status; job/command roots leave
-            // this unset, so TimelineRow's root-bar coloring falls back to
-            // its neutral default for those.
+            // Only request roots have a status.
             metadata: array_filter(['status' => $root->payload['response']['status'] ?? null], static fn ($value) => $value !== null),
         );
 
@@ -132,25 +101,13 @@ class Timeline
     }
 
     /**
-     * Every entry's own `start`/`duration` (ms, relative to $trackStart) is
-     * already what positions its bar — reusing that same math here, instead
-     * of e.g. each event's own `created_at` (a different, less precise
-     * moment — see Recorders\Jobs::recordProcessed()'s own 'started_at'
-     * docs), keeps the inspector panel's timestamps exactly consistent with
-     * what's actually drawn. Stamped directly into $entry->metadata as
-     * ready-to-render strings (not a raw epoch) since a microsecond-precision
-     * instant round-trips through JS's own Date (millisecond-only) lossily —
-     * see Format::DATETIME_PRECISE.
+     * Stamps started_at/ended_at from the same start/duration that positions each
+     * bar, as preformatted strings (JS Date would drop the microseconds).
      *
      * @param  TimelineEntry[]  $entries
      */
     protected static function stampPreciseTimestamps(array $entries, float $trackStart): void
     {
-        // Computed once, not per entry below — same viewer-configured offset
-        // (see Preferences::timezone()) for the whole page, and appended the
-        // same way Requests\summary.blade.php's own "date" row already does,
-        // so a precise timestamp here still reads as unambiguous UTC+N as
-        // every other timestamp in this package.
         $timezone = ' '.Format::timezone();
 
         foreach ($entries as $entry) {
@@ -173,19 +130,8 @@ class Timeline
     }
 
     /**
-     * The root's own displayed duration: normally just $root->duration, but
-     * stretched to cover the latest end among its children when one of them
-     * reaches past it. A command-based scheduled task run in the background
-     * is the case this matters for: the scheduler backgrounds the whole
-     * subprocess and moves on rather than waiting on it (see
-     * Illuminate\Console\Scheduling\CommandBuilder::buildBackgroundCommand()),
-     * so ScheduledTaskFinished's own $runtime — and therefore the
-     * scheduled_task entry's own duration — only covers how long *spawning*
-     * it took, not running it; everything that subprocess goes on to trigger
-     * (queries, mail, ...) can land hundreds of ms past that. Without this,
-     * the root bar rendered as a sliver at the very start of the timeline
-     * while its real children sat stranded past its right edge, outside the
-     * visible bar entirely.
+     * $root->duration, stretched to the latest child end. A background scheduled
+     * task's duration only covers spawning the subprocess, so its children run past it.
      */
     protected static function rootDuration(object $root, Collection $children): float
     {
@@ -199,17 +145,9 @@ class Timeline
     }
 
     /**
-     * Groups this timeline's query entries by normalized SQL shape and
-     * stamps every entry in a group of 2+ with the same `duplicateColor`
-     * metadata — the EventSummary "N duplicates" badge highlights these
-     * dots with a heartbeat animation (see timeline-row.blade.php). Also
-     * stamps `duplicateGroup` with the group's own key — clicking one dot
-     * pulses every dot sharing that exact key (see selectRow() in
-     * timeline.blade.php), not every dot sharing its *colour*: the palette
-     * below only has 10 entries, picked by `crc32($key) % 10`, so two
-     * unrelated groups on a busy page can and do land on the same colour by
-     * coincidence. Matching on colour alone would pulse both groups
-     * together whenever that happens.
+     * Stamps each query in a same-shape group of 2+ with a stable `duplicateColor`
+     * (crc32 of the key) and `duplicateGroup`; highlighting matches on the group,
+     * since unrelated groups can share a colour.
      *
      * @param  TimelineEntry[]  $entries
      */
@@ -236,16 +174,10 @@ class Timeline
 
     /**
      * @param  array<int, array{name: string, start: float, duration: float}>  $phases
-     * @param  string|null  $routeAction  the request root's "Controller@method" (see
-     *                                    Recorders\Requests::routeAction()) — surfaced on the
-     *                                    Action phase row, since "Controller"/"Handle" alone
-     *                                    names nothing. Only ever non-null for a request root —
-     *                                    a command's payload has no 'route_action' key.
-     * @param  string  $rootType  the root's own RecordType value ('request'/'command'/...) —
-     *                            picks the Action phase's label, since it's shared by a
-     *                            request's controller phase and a command's handle() phase.
-     * @param  array{type: string, name: string}|null  $render  the view name / resource class the
-     *                                                          controller returned, shown on the Render phase.
+     * @param  string|null  $routeAction  a request root's "Controller@method", shown on the Action phase
+     * @param  string  $rootType  the root's RecordType value; picks the Action phase's label
+     * @param  array{type: string, name: string}|null  $render  the returned view / resource class,
+     *                                                          shown on the Render phase
      * @return TimelineEntry[]
      */
     protected static function phaseEntries(array $phases, ?string $routeAction, string $rootType, ?array $render = null): array
@@ -306,12 +238,8 @@ class Timeline
     }
 
     /**
-     * The phase this entry belongs to on the timeline. Prefers the stage it
-     * was live-tagged with at record time (`payload['phase']`, set by
-     * Monitor::record() — accurate, since it reflects what was actually
-     * executing when the entry was recorded) and only falls back to
-     * matching its stored start_offset against the stored phase intervals
-     * (containingPhase()) for rows persisted before that tag existed.
+     * The entry's phase: `payload['phase']` (tagged by Monitor::record()), else
+     * the phase interval containing its start offset.
      *
      * @param  TimelineEntry[]  $phases
      */
@@ -339,11 +267,7 @@ class Timeline
             'notification' => $row->key ?? $fallback,
             'job' => $row->key ?? $fallback,
             'exception' => $row->payload['class'] ?? $row->key ?? $fallback,
-            // $row->key is deliberately just the destination host (see
-            // Recorders\OutgoingRequests::key()), grouped on for the
-            // Outgoing Requests list — the timeline shows the full URL
-            // instead, since here each bar is one specific call, not a
-            // host-level aggregate.
+            // key is just the host (OutgoingRequests::key()); show the full URL.
             'outgoing_request' => $row->payload['url'] ?? $row->key ?? $fallback,
             'lazy_loading' => class_basename($row->payload['model'] ?? $row->key ?? $fallback).'::'.($row->payload['relation'] ?? ''),
             default => $row->key ?? $fallback,
@@ -355,17 +279,11 @@ class Timeline
      */
     protected static function metadataFor(object $row): array
     {
-        // 'phase' is internal bookkeeping for parentPhaseId() above, not
-        // something the detail panel shows. No 'created_at' here — the
-        // panel's own started_at/ended_at (see stampPreciseTimestamps())
-        // already supersede it, computed from the same start/duration that
-        // positions this entry's own bar rather than the row's raw DB
-        // timestamp.
+        // 'phase' is only for parentPhaseId().
         $payload = Arr::except($row->payload, ['phase']);
 
-        // Not stored when a trace was captured — read back from it. Jobs keep
-        // an absolute path, queries a project-relative one.
-        // Exception payloads carry 'trace' as a frame array, not text.
+        // No stored location when a text trace was captured: derive it (absolute
+        // for jobs, project-relative otherwise). Exception traces are arrays.
         if (! isset($payload['location']) && isset($payload['trace']) && is_string($payload['trace'])) {
             $payload['location'] = Trace::location($payload['trace'], $row->type === RecordType::Job->value);
         }
@@ -409,9 +327,8 @@ class Timeline
     }
 
     /**
-     * Greedy interval partitioning: each entry gets the lowest-numbered lane
-     * whose previous occupant already finished, so overlapping events stack
-     * instead of colliding.
+     * Greedy interval partitioning per parent: each entry takes the lowest lane
+     * whose previous occupant has finished.
      *
      * @param  TimelineEntry[]  $entries
      * @return TimelineEntry[]

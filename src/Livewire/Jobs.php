@@ -22,14 +22,8 @@ class Jobs extends Card
     public const STATUSES = ['dispatched', 'pending', 'processing', 'processed', 'released', 'failed'];
 
     /**
-     * Per-subtype grouped rows are capped here rather than at the previous
-     * top-10 default: unlike a route table (routeStats() samples the raw
-     * table once and groups every key it sees), aggregateByKey() applies its
-     * LIMIT in SQL per subtype, so a low cap would silently drop job classes
-     * that rank outside the top N of one subtype even though they're common
-     * overall — e.g. a class with many "queued" rows but few "processed"
-     * ones. This is comfortably above any real app's distinct job-class
-     * count while still bounded.
+     * aggregateByKey() limits per subtype, so a low cap would drop job classes
+     * that rank low in one subtype; kept well above any real class count.
      */
     protected const MAX_KEYS = 5000;
 
@@ -104,15 +98,11 @@ class Jobs extends Card
         $processed = $storage->aggregateByKey('job', $since, 'processed', self::MAX_KEYS, 'count', $until, $userId);
         $failed = $storage->aggregateByKey('job', $since, 'failed', self::MAX_KEYS, 'count', $until, $userId);
         $released = $storage->aggregateByKey('job', $since, 'released', self::MAX_KEYS, 'count', $until, $userId);
-        // The initial add to the queue only (see Recorders\Jobs::DISPATCH) —
-        // a retry re-added by $released below isn't a second "dispatch".
+        // Initial queue adds only; release retries are counted in $released.
         $dispatched = $storage->aggregateByKey('job', $since, JobRecorder::DISPATCH, self::MAX_KEYS, 'count', $until, $userId);
         $processing = $storage->aggregateByKey('job', $since, JobRecorder::PROCESSING, self::MAX_KEYS, 'count', $until, $userId);
-        // p95_duration isn't computable in SQL (see keyStats()'s own docs),
-        // so it comes from its own sampled pass rather than the aggregateByKey()
-        // calls above — scoped to 'processed' the same way avg_duration
-        // already is below, since a queued/released/failed row carries no
-        // meaningful processing duration to mix in.
+        // p95 comes from a separate sampled pass, scoped to 'processed' like
+        // avg_duration since other subtypes carry no processing duration.
         $p95ByKey = $storage->keyStats('job', $since, $until, $userId, 'processed')->keyBy('key');
 
         $jobs = collect();
@@ -140,10 +130,7 @@ class Jobs extends Card
                     $job->p95_duration = $p95ByKey->get($group->key)?->p95_duration;
                 }
 
-                // Latest activity across every subtype (dispatched/processing/
-                // processed/released/failed), not just this one column's own
-                // sample — aggregateByKey() already returns each group's own
-                // max(created_at) as last_seen.
+                // Latest activity across every subtype.
                 if ($job->last_seen === null || $group->last_seen?->greaterThan($job->last_seen)) {
                     $job->last_seen = $group->last_seen;
                 }
@@ -152,22 +139,9 @@ class Jobs extends Card
             }
         }
 
-        // 'total' is every time this key entered the queue — the initial
-        // dispatch plus every retry re-added by a release (see
-        // Recorders\Jobs::DISPATCH/recordReleased()).
-        // 'pending' is whatever's still sitting in the queue, never
-        // resolved into a JobProcessing pickup (see Recorders\Jobs::PROCESSING)
-        // — a fresh dispatch nobody has picked up yet, or a released retry
-        // waiting to be picked up again — clamped rather than trusted to
-        // stay non-negative, since each count is independently sampled at
-        // high volume (see aggregateByKey()'s own docs on maxSampleRows()).
-        //
-        // $job->processing itself still holds the raw pickup count here
-        // (every JobProcessing this key ever recorded) — pending needs that
-        // raw count to know how much of $job->total has ever been picked up
-        // at all. Only once pending is settled does the loop below overwrite
-        // $job->processing down to just the attempts still in flight right
-        // now, by netting out whichever of those pickups already resolved.
+        // total = every queue entry (dispatch + release retries); pending =
+        // total minus raw pickups, so it must run before processing is netted
+        // down to in-flight attempts. Clamped since counts are sampled separately.
         foreach ($jobs as $job) {
             $job->total = $job->dispatched + $job->released;
             $job->pending = max(0, $job->total - $job->processing);

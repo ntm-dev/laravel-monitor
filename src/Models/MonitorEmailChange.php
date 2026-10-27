@@ -8,10 +8,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * A pending "change my email" request. verified_at is null until the
- * requester proves they control the new inbox by clicking the emailed
- * link; rows with verified_at still null are never shown to an
- * approver, regardless of role.
+ * A pending email change; verified_at stays null until the emailed link is
+ * clicked, and unverified rows are never shown to an approver.
  */
 class MonitorEmailChange extends Model
 {

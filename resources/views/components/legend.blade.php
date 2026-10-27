@@ -1,8 +1,5 @@
-{{-- Right-aligned legend stat: colored pill + mono label above a big value.
-     Pass series-key to make this legend clickable, toggling that series' visibility
-     in the sibling chart via the `hidden` object on the card's own x-data
-     (see *-chart-card.blade.php / LineChart's series 'key'). Omit it (e.g. for a
-     threshold legend) to keep the legend a plain, non-interactive stat. --}}
+{{-- Legend stat: coloured pill + mono label above a big value. A series-key makes it toggle that
+     series via the card's `hidden` x-data; without one it is a plain stat. --}}
 @props(['label', 'dot', 'value', 'color' => 'text-neutral-900 dark:text-neutral-100', 'size' => 'lg', 'seriesKey' => null])
 <div class="text-right {{ $seriesKey !== null ? 'cursor-pointer select-none transition-opacity' : '' }}"
      @if ($seriesKey !== null)

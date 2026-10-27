@@ -15,10 +15,7 @@
 
     $attachmentNames = $entry !== null ? ($entry->payload['attachment_names'] ?? []) : [];
 
-    // The right-hand panel only ever holds the "sent via notification"
-    // banner now that Subject lives in the left info list below — skip it
-    // entirely rather than leave an empty bordered box when there's nothing
-    // to show there.
+    // The side panel only holds the "sent via notification" banner; skip it without one.
     $hasSidePanel = $entry !== null && ($notification !== null || filled($entry->payload['notification'] ?? null));
 @endphp
 <div>
@@ -142,15 +139,13 @@
                 @endif
             </h2>
             @if (filled($entry->payload['body'] ?? null) && ($entry->payload['body_format'] ?? null) === 'html')
-                {{-- sandbox with no `allow-*` tokens: a real HTML/CSS preview
-                     with every script/form/same-origin access blocked — the
-                     recorded body is untrusted markup, never safe via {!! !!}. --}}
+                {{-- Empty sandbox: the recorded body is untrusted HTML, so scripts,
+                     forms and same-origin access stay blocked. Never echo it raw. --}}
                 <iframe srcdoc="{{ $entry->payload['body'] }}" sandbox=""
                         class="h-[32rem] w-full rounded-md border border-neutral-100 bg-white dark:border-white/5"
                         title="{{ __('monitor::messages.common.mail_body') }}"></iframe>
             @elseif (filled($entry->payload['body'] ?? null))
-                {{-- Plain-text body, preformatted like a mail client would —
-                     {{ }} already escapes it, so this is safe as-is. --}}
+                {{-- Plain-text body; the escaped echo makes it safe as-is. --}}
                 <pre class="h-[32rem] overflow-auto rounded-md border border-neutral-100 bg-white p-3 font-mono text-[11px] leading-relaxed text-neutral-700 dark:border-white/5 dark:bg-neutral-950 dark:text-neutral-200"><code>{{ $entry->payload['body'] }}</code></pre>
             @else
                 <p class="text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.mail_body_not_recorded') }}</p>

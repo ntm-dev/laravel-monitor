@@ -50,9 +50,7 @@ class MonitorServiceProvider extends ServiceProvider
                 $monitor = $this->app->make(Monitor::class);
                 $monitor->timestamp($this->timestamp);
 
-                // The dashboard's own request records nothing (every recorder
-                // either ignores it or would only store its own noise), so no
-                // recorder, lifecycle hook or flush is registered for it.
+                // The dashboard's own requests record nothing: no recorders, hooks or flush.
                 if (! $this->app->runningInConsole() && $monitor->isSelfRequest()) {
                     $this->registerSelfHooks();
 
@@ -70,15 +68,8 @@ class MonitorServiceProvider extends ServiceProvider
                     $this->registerConsoleHooks();
                 }
 
-                // Jobs/scheduled tasks flush explicitly per-attempt/per-run
-                // (see Recorders\Jobs, Recorders\ScheduledTasks) and never
-                // reach End at all, so this remains their only flush
-                // trigger — but a tracked request/command run gets flushed
-                // by its own whenRequestLifecycleIsLongerThan/
-                // whenCommandLifecycleIsLongerThan hook instead (registered
-                // above), which marks End first; flushing here too would
-                // run *before* that hook can, persisting the entry before
-                // End is ever marked.
+                // Safety-net flush; a tracked request/command flushes later from
+                // its lifecycle-end hook, after End is marked.
                 $this->app->terminating(function () use ($monitor) {
                     if ($monitor->hasTrackedExecution()) {
                         return;
@@ -93,16 +84,8 @@ class MonitorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Each Storage sub-contract (Contracts\AggregateStorage, ::UserStorage,
-     * ...) is its own bound singleton backed by its own Database*Storage
-     * class/file, rather than one bound Contracts\Storage backed by one
-     * Database*Storage god-class the way this used to work — a page that
-     * only needs e.g. UserStorage never even autoloads
-     * DatabaseIssueStorage's file. Singleton, not bind(): a couple of these
-     * (DatabaseAggregateStorage's aggregatesCoverCache in particular) memo
-     * across calls within one request, and the old StorageManager-backed
-     * Storage binding was effectively a singleton too (Manager caches its
-     * created driver instances).
+     * Each storage contract is a separate singleton, so a page loads only the
+     * classes it uses; singletons because some memoize within a request.
      */
     private function registerBindings(): void
     {
@@ -144,12 +127,8 @@ class MonitorServiceProvider extends ServiceProvider
             if (! $this->app->runningInConsole() && $this->app->make(Monitor::class)->isSelfRequest()) {
                 $this->registerAppleOAuthDriver();
 
-                // Livewire 4's smart_wire_keys precompiler auto-instruments @foreach/@forelse/@while
-                // with static loop-tracking calls (openLoop/closeLoop) to derive wire:key values. Under
-                // certain dependency combinations that static stack gets unbalanced and array_pop() on
-                // an empty stack returns null, crashing the next loop with "Trying to access array
-                // offset on null" (hit on the dashboard's nested @for/@foreach chart component). The
-                // dashboard's lists don't need Livewire's implicit wire:key diffing, so disable it.
+                // Livewire 4's smart_wire_keys loop tracking can unbalance and crash nested
+                // loops ("Trying to access array offset on null"); the dashboard doesn't need it.
                 config(['livewire.smart_wire_keys' => false]);
             }
 
@@ -205,16 +184,8 @@ class MonitorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Hook the request-lifecycle markers used by the Request Detail
-     * timeline: `beginRequest()` fires once the app has finished booting —
-     * before any middleware (global or route) runs — so the "middleware"
-     * stage covers the *entire* middleware pipeline instead of only the
-     * portion after a middleware pushed onto the kernel's stack. The
-     * controller boundary is marked by ControllerStartHook, which attaches
-     * itself directly onto the matched route (not by pushing into a
-     * middleware *group* array) — framework events refine the
-     * render/terminating phases. All without requiring the host app to
-     * edit its HTTP kernel.
+     * Hook the request-lifecycle stage markers without the host app editing
+     * its HTTP kernel; beginRequest() runs on booted, before any middleware.
      */
     protected function registerRequestHooks(): void
     {
@@ -228,11 +199,7 @@ class MonitorServiceProvider extends ServiceProvider
             fn (RouteMatched $event) => $this->app->make(ControllerStartHook::class)->attachMiddlewareToRoute($event->route)
         );
 
-        // PreparingResponse/ResponsePrepared fire back to back, from
-        // Router::prepareResponse() — still deep inside the route's own
-        // middleware pipeline, before it bubbles back out through any
-        // middleware's post-`$next()` code. That's what lets "render" mean
-        // only the controller/view's own work.
+        // Both fire inside the route's middleware pipeline, so "render" excludes post-$next() work.
         if (class_exists(\Illuminate\Routing\Events\PreparingResponse::class)) {
             $events->listen(\Illuminate\Routing\Events\PreparingResponse::class, $monitor->markRenderStart(...));
             $events->listen(\Illuminate\Routing\Events\ResponsePrepared::class, $monitor->markUnwinding(...));
@@ -243,18 +210,9 @@ class MonitorServiceProvider extends ServiceProvider
             $events->listen(\Illuminate\Foundation\Events\Terminating::class, $monitor->markTerminating(...));
         }
 
-        // whenRequestLifecycleIsLongerThan(-1, ...) fires last of all — after
-        // every terminable middleware and the app's own terminating()
-        // callbacks — so marking End here (rather than on the Terminating
-        // event above) actually captures that trailing work instead of
-        // measuring a zero-length phase. -1 as the threshold means "always",
-        // not "only when slow": duration is never negative. Deferred behind
-        // callAfterResolving() since the kernel isn't bound yet this early
-        // in the boot cycle, and guarded by both an instanceof and a
-        // method_exists check — this method only exists on the concrete
-        // Illuminate\Foundation\Http\Kernel (not every app swaps in a
-        // custom one), and only on a late-enough Laravel 10.x point release
-        // (this package's own floor), not necessarily every 10.x install.
+        // Runs after every terminating callback, so End captures that work; -1
+        // means "always". Guarded: the method is missing on custom kernels and
+        // early Laravel 10.x releases.
         $this->callAfterResolving(\Illuminate\Contracts\Http\Kernel::class, function ($kernel) {
             if (
                 ! $kernel instanceof \Illuminate\Foundation\Http\Kernel
@@ -278,15 +236,8 @@ class MonitorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Console-side counterpart of registerRequestHooks()'s End-marking
-     * hook — see that method's own docs for why whenCommandLifecycleIsLongerThan(-1, ...)
-     * is what makes End meaningful instead of a permanently zero-length
-     * phase. Every other command-lifecycle stage (Bootstrap, Action,
-     * Terminating) is already marked directly by Recorders\Commands itself
-     * (beginCommandRun()/markCommandTerminating()), driven off
-     * CommandStarting/CommandFinished rather than a service-provider-level
-     * hook — this is the one boundary that can only be reached from outside
-     * Monitor's own request/command lifecycle.
+     * Console counterpart of registerRequestHooks()'s End hook; the other
+     * command stages are marked by Recorders\Commands.
      */
     protected function registerConsoleHooks(): void
     {
@@ -348,12 +299,7 @@ class MonitorServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Register the package's own `monitor` guard/provider pair, unless the
-     * host app already defined one under the same name — mirrors
-     * registerAuthorization()'s "don't clobber a host override" rule for
-     * the viewMonitor Gate.
-     */
+    /** Register the package's guard and `monitor_users` provider unless the host app defines them. */
     protected function registerAuth(): void
     {
         $guard = MonitorUser::guardName();
@@ -383,13 +329,7 @@ class MonitorServiceProvider extends ServiceProvider
         ]);
     }
 
-    /**
-     * Socialite reads driver config from `services.<provider>`, which this
-     * package has no business publishing into the host app's own
-     * config/services.php — mirror registerAuth()'s approach instead and
-     * merge it at runtime from this package's own `monitor.auth.oauth.*`,
-     * skipping any provider the host app already configured itself.
-     */
+    /** Fill Socialite's `services.<provider>` from `monitor.auth.oauth.*` unless the host app sets it. */
     protected function registerOAuth(): void
     {
         foreach (['google', 'apple'] as $provider) {
@@ -400,15 +340,8 @@ class MonitorServiceProvider extends ServiceProvider
     }
 
     /**
-     * Livewire serves every component's AJAX update through one single,
-     * globally-shared route (see Livewire\Mechanisms\HandleRequests) that
-     * lives outside the monitor route group registered in routes/web.php —
-     * so IsolateMonitorCookies never got a chance to run for it, leaving
-     * those requests to validate CSRF against whichever session the host
-     * app's own (unisolated) session cookie resolved to. Prepending it to
-     * the 'web' group here is what lets it also see that request; its own
-     * isMonitorRequest() check keeps this a no-op for the host app's other
-     * routes and its own Livewire components.
+     * Livewire's shared update route sits outside the monitor route group, so
+     * IsolateMonitorCookies is prepended to 'web'; it no-ops for host requests.
      */
     protected function registerLivewireUpdateCookieIsolation(): void
     {

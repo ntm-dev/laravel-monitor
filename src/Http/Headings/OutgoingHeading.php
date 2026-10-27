@@ -10,12 +10,8 @@ use LaravelMonitor\Support\KeyHash;
 use function parse_url;
 
 /**
- * Heading for an outgoing (HTTP client) request detail page. $key means one
- * of two things, disambiguated by dashboard.blade.php the same way it routes
- * the page itself: an EntryId-encoded row id (one specific call —
- * OutgoingDetail, method+url as heading) or the destination host (aggregate
- * across all calls to it — OutgoingDomainDetail, same convention as
- * MailHeading/JobHeading).
+ * Heading for an outgoing request page. $key is an EntryId (one call) or the
+ * destination host (aggregate page).
  */
 class OutgoingHeading
 {
@@ -45,8 +41,7 @@ class OutgoingHeading
         $url = $entry->payload['url'] ?? $entry->key;
         $status = $entry->payload['status'] ?? null;
 
-        // Same order as the Request page: group (the host) › method + status
-        // badges › path, with the full URL underneath.
+        // Like the Request page: host breadcrumb, method/status badges, path, full URL below.
         $path = parse_url($url, PHP_URL_PATH);
         $path = $path === null || $path === false || $path === '' ? '/' : $path;
 

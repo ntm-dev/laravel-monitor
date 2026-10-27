@@ -6,20 +6,16 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Generic per-key/per-bucket/per-subtype aggregate queries — the workhorse
- * stats behind every list/chart card (Requests, Cache, Jobs, ...) that isn't
- * specific to users, exceptions, or issues.
+ * Generic per-key/per-bucket/per-subtype aggregates behind the list and chart cards.
+ * "Sampled" below means computed from a capped set of the most recent matching rows,
+ * so counts are exact only below that cap.
  */
 interface AggregateStorage
 {
     /**
-     * Group entries by key. Each item exposes:
-     * key, count, avg_duration, max_duration, last_seen, users (distinct
-     * user_id count).
-     *
-     * $orderBy is one of: count, avg_duration, max_duration, last_seen.
-     * Sampled at high volume — see durationStats() — `count`/`users` are
-     * exact only up to maxSampleRows() matching rows.
+     * Entries grouped by key: key, count, avg_duration, max_duration, last_seen,
+     * users (distinct user_id count). $orderBy: count|avg_duration|max_duration|last_seen
+     * (anything else falls back to count). Sampled.
      */
     public function aggregateByKey(
         string $type,
@@ -32,10 +28,8 @@ interface AggregateStorage
     ): Collection;
 
     /**
-     * Totals for a type: object with count, avg_duration, max_duration,
-     * min_duration, total_duration. $subtype accepts an array the same way
-     * TimelineStorage::recent() does. $minDuration restricts to entries at or
-     * above it (a duration filter tab's own badge count).
+     * Exact totals: count, avg_duration, max_duration, min_duration, total_duration.
+     * $subtype may be an array (match any); $minDuration keeps entries at or above it.
      */
     public function stats(
         string $type,
@@ -48,11 +42,7 @@ interface AggregateStorage
     ): object;
 
     /**
-     * Same shape as stats(), but broken down by subtype in a single query —
-     * for a dashboard card that needs totals for several subtypes at once
-     * (e.g. 2xx/3xx/4xx/5xx) instead of calling stats() once per subtype.
-     * Keyed by subtype; a subtype with no matching entries is simply absent
-     * from the collection rather than present with zeroes.
+     * stats() for every subtype at once, keyed by subtype; subtypes with no entries are absent.
      *
      * @return Collection<string, object{count: int, avg_duration: ?float, max_duration: ?float, min_duration: ?float, total_duration: ?float}>
      */
@@ -65,12 +55,8 @@ interface AggregateStorage
     ): Collection;
 
     /**
-     * Entry counts split into $buckets equal time slices between $since and
-     * $until (defaults to now) — used to draw activity charts. Reads
-     * monitor_aggregates when it covers the range and no key/user filter is
-     * given; otherwise scans raw entries, sampled at high volume — see
-     * durationStats() — so counts are exact only up to
-     * maxSampleRows() matching rows.
+     * Entry counts in $buckets equal time slices from $since to $until (default now).
+     * May be sampled.
      *
      * @return int[]
      */
@@ -85,12 +71,8 @@ interface AggregateStorage
     ): array;
 
     /**
-     * Duration distribution for a type: object with min, max, avg, p95 plus
-     * avg_per_bucket / p95_per_bucket arrays (float|null per time slice).
-     * Percentiles are computed in PHP (no portable cross-driver SQL
-     * percentile), so the underlying row fetch is capped at the most recent
-     * maxSampleRows() matches — an approximation past
-     * that volume, not an exact percentile.
+     * Duration distribution: min, max, avg, p95, plus avg_per_bucket/p95_per_bucket
+     * (float|null per slice). Sampled, so an approximation at high volume.
      */
     public function durationStats(
         string $type,
@@ -103,15 +85,10 @@ interface AggregateStorage
     ): object;
 
     /**
-     * Per-route breakdown for a type: one item per key exposing
-     * key, methods, count, success, client_errors, server_errors, avg_duration, p95_duration, max_duration, last_seen.
-     * For type 'request', every entry whose key ends in " Recorders\Requests::UNMATCHED_ROUTE"
-     * (no matched Laravel route) is merged into a single row keyed by the bare
-     * Requests::UNMATCHED_ROUTE sentinel, with `methods` listing the distinct
-     * HTTP methods behind it (null for every ordinary route).
-     * Sampled at high volume — see durationStats() — so `count` and the
-     * error breakdowns are exact only up to maxSampleRows()
-     * matching rows; use stats()/aggregateByKey() for exact totals.
+     * Per-key breakdown: key, methods, count, success, client_errors, server_errors,
+     * network_errors, avg_duration, p95_duration, max_duration, last_seen. For 'request', all
+     * unmatched-route keys merge into one Requests::UNMATCHED_ROUTE row whose `methods` lists
+     * their HTTP methods (null on other rows). Sampled.
      */
     public function routeStats(
         string $type,
@@ -121,19 +98,8 @@ interface AggregateStorage
     ): Collection;
 
     /**
-     * Generic per-key breakdown for a type with no status/subtype dimension
-     * to split by (unlike routeStats()) — one item per key exposing key,
-     * count, avg_duration, p95_duration, last_seen. Used to group a list of
-     * individual occurrences (e.g. notification sends) into one row per key
-     * (e.g. notification class) with a real percentile, not just the
-     * count/avg_duration/max_duration aggregateByKey() computes in SQL.
-     * Sampled at high volume — see durationStats() — so `count` is exact
-     * only up to maxSampleRows() matching rows.
-     *
-     * `$subtype` narrows the sample to one status, for types whose duration
-     * only means something on a subset of their entries (a scheduled task's
-     * `failed`/`skipped` rows carry no duration at all, so an unfiltered p95
-     * would be diluted by them).
+     * Per-key breakdown without a status split: key, count, avg_duration, p95_duration,
+     * last_seen. $subtype narrows to one status (e.g. only entries that carry a duration). Sampled.
      */
     public function keyStats(
         string $type,
@@ -144,11 +110,8 @@ interface AggregateStorage
     ): Collection;
 
     /**
-     * The payload of the most recent entry of each key of a type, as
-     * `key => payload array`. Used where a list row needs the task/job's
-     * current *definition* (a scheduled task's cron expression, say) rather
-     * than a statistic — the aggregate methods above never return payloads.
-     * Exact, not sampled, but capped at `$limit` distinct keys.
+     * Payload of each key's most recent entry, as `key => payload array`.
+     * Not sampled, but capped at $limit keys.
      */
     public function latestPayloadByKey(
         string $type,

@@ -20,10 +20,7 @@ class DatabaseEntryWriter implements EntryWriter
             ->map(function ($entry) {
                 $row = $entry->toArray();
                 $row['payload'] = Json::encode($row['payload']);
-                // format('Y-m-d H:i:s.u'), not toDateTimeString(): the latter
-                // always drops the fractional seconds CarbonImmutable::now()
-                // already captured (see Entry::__construct()) — created_at(6)
-                // in the migration exists specifically to keep them.
+                // Keep microseconds for the timestamp(6) created_at column.
                 $row['created_at'] = $row['created_at']->format('Y-m-d H:i:s.u');
 
                 return $row;
@@ -36,9 +33,7 @@ class DatabaseEntryWriter implements EntryWriter
     {
         $total = 0;
 
-        // Batched: one DELETE over millions of rows locks every row and
-        // index record in a single transaction and fails with MySQL 1206
-        // (lock table size exceeded).
+        // Batched: one huge DELETE can fail with MySQL 1206 (lock table size exceeded).
         do {
             $query = $this->table();
 

@@ -25,10 +25,8 @@ class OAuthController
         try {
             $socialiteUser = Socialite::driver($provider)->user();
         } catch (\Throwable $e) {
-            // The state/code query params are attacker/client-controlled and can fail in ways
-            // that throw before reaching validation — e.g., InvalidStateException when state
-            // is tampered/missing, or Guzzle exceptions for network failures. Treat as
-            // validation error to show a clean error message instead of a 500.
+            // Tampered/missing state or a network failure throws here; show a
+            // validation error instead of a 500.
             throw ValidationException::withMessages([
                 'email' => 'Failed to authenticate with ' . $provider . '. Please try again.',
             ]);

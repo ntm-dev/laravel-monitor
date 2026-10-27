@@ -26,10 +26,8 @@ use LaravelMonitor\Support\Settings;
 use LaravelMonitor\Support\UserFilter;
 
 /**
- * Renders the dashboard shell: resolves the active tab and time range, then
- * hands presentation-ready data to the (logic-free) Blade views. Per-tab
- * concerns live elsewhere: detail headings in Http\Headings, navigation in
- * Support\Nav, editable settings in Support\Settings.
+ * Dashboard shell: resolves the active tab and time range and hands
+ * presentation-ready data to the Blade views.
  */
 class DashboardController
 {
@@ -83,11 +81,8 @@ class DashboardController
             'hasCustomRange' => filled($from) && filled($to),
             // Query-string state carried through every dashboard link.
             'range' => array_filter(['period' => $period, 'from' => $from, 'to' => $to]),
-            // Range passed to every Livewire card. `userId` rides along here
-            // too (harmless on cards without that property — Livewire only
-            // fills properties that actually exist) so a "Filter by: Jobs"/
-            // etc. link from the User Detail page can deep-link straight
-            // into that tab's own list, already scoped to the one user.
+            // Props for every Livewire card; `userId` scopes a tab's list to one
+            // user when linked from the User Detail page.
             'rangeProps' => ['period' => $period, 'from' => $from, 'to' => $to, 'userId' => $this->resolveUserId($request)],
             'tabs' => $tabs,
             'groups' => $groups,
@@ -106,19 +101,15 @@ class DashboardController
             'prefs' => $tab === 'settings' ? Preferences::all() : null,
             'localeOptions' => $tab === 'settings' ? Preferences::localeOptions() : null,
             'timezoneOptions' => $tab === 'settings' ? Preferences::timezoneOptions() : null,
-            // So the header's period-switcher/custom-range links can rebuild
-            // the *current* URL (whichever named route matched — plain
-            // monitor.dashboard or one of the hashed detail routes) with just
-            // the period/from/to swapped, instead of hardcoding monitor.dashboard.
+            // Lets the period/range links rebuild the current route, not just monitor.dashboard.
             'currentRouteName' => $request->route()->getName(),
             'currentRouteParams' => $request->route()->parameters(),
         ]);
     }
 
     /**
-     * The active user scope, read off the `/{tab}/userId/{userId?}` route: one
-     * user id, the "signed-in users only" sentinel when that trailing segment
-     * was dropped, or no scope at all on every other dashboard URL.
+     * User scope from the `/{tab}/userId/{userId?}` route: the id, UserFilter::AUTHENTICATED
+     * when the segment is omitted, or '' on any other route.
      */
     protected function resolveUserId(Request $request): string
     {
@@ -130,13 +121,8 @@ class DashboardController
     }
 
     /**
-     * The active tab's grouping key, resolved from whichever URL shape
-     * matched: a numeric `{id}` (one specific occurrence — notifications/
-     * mail's dual mode), a hashed `{hash}` (see Support\KeyHash), or the
-     * legacy `?key=` query string for anything not behind a hashed route.
-     * 404s when a hash was given but doesn't resolve to anything (a stale or
-     * invalid link) — mirrors RequestDetailController et al.'s own
-     * abort_unless(..., 404) for an unknown id.
+     * The active tab's grouping key from a numeric `{id}`, a `{hash}` (Support\KeyHash)
+     * or `?key=`. 404s when a hash doesn't resolve.
      */
     protected function resolveKey(Request $request, string $tab): ?string
     {
@@ -150,14 +136,12 @@ class DashboardController
             return $request->query('key');
         }
 
-        // Exceptions already group by an opaque Fingerprint hash (stored
-        // directly as the entry's own key) — no reverse lookup needed.
+        // Exception keys are already a fingerprint hash; no reverse lookup.
         if ($tab === 'exceptions') {
             return $hash;
         }
 
-        // 'users' resolves against the user_id column, not a per-type
-        // grouping key — see HashResolver::resolveUserIdHash()'s own docs.
+        // 'users' hashes the user_id column, not a grouping key.
         $key = $tab === 'users'
             ? app(HashResolver::class)->resolveUserIdHash($hash)
             : app(HashResolver::class)->resolveKeyHash(self::ENTRY_TYPES[$tab] ?? $tab, $hash);
@@ -167,9 +151,6 @@ class DashboardController
         return $key;
     }
 
-    /**
-     * Resolve the detail-page heading for tabs that have one.
-     */
     protected function heading(string $tab, ?string $key): ?Heading
     {
         if (! filled($key)) {

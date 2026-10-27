@@ -12,19 +12,15 @@ use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Sql;
 
 /**
- * Renders the standalone Command Run Detail page: one artisan command
- * execution and every event it triggered (queries, mail, notifications,
- * cache, dispatched jobs), on the same waterfall timeline used for requests
- * and job attempts. Owns its own route (`monitor.commands.runs.show`), same
- * as RequestDetailController/JobAttemptController.
+ * Command Run Detail page (`monitor.commands.runs.show`): one artisan run and
+ * every event it triggered, on the shared waterfall timeline.
  */
 class CommandRunController
 {
     use MergesJobTimelines;
 
     /**
-     * Recorder type => events-summary bucket key. No 'command' entry —
-     * a command run's own timeline shouldn't summarise itself.
+     * Recorder type => events-summary bucket key. No 'command': a run doesn't summarise itself.
      */
     protected const SUMMARY_TYPES = [
         'query' => 'queries',
@@ -50,29 +46,15 @@ class CommandRunController
 
         $children = $this->storage->timelineFor($runId, 'command');
 
-        // A command-based scheduled task's own subprocess mints its own
-        // fresh id (see Monitor::beginCommandRun()) and stamps which task
-        // dispatched it into its own payload instead (see
-        // Monitor::finalizePendingCommand()) — looked up here via the same
-        // correlation_id mechanism Recorders\Mail/Notifications use to pair
-        // their own two entries (see Contracts\TimelineStorage::findByCorrelationId())
-        // to link back to it from the General card, rather than sharing a
-        // timeline with it: everything on this page happened after the
-        // scheduler already finished dispatching this run, so it belongs on
-        // this run's own clock, not the scheduler's.
+        // A scheduled task's subprocess stores the dispatching task's run id as
+        // correlation_id (see Monitor::finalizePendingCommand()); link-only, timelines stay separate.
         $scheduledTaskRunId = $root->payload['correlation_id'] ?? null;
         $scheduledTask = $scheduledTaskRunId !== null
             ? $this->storage->findByRequestId($scheduledTaskRunId, 'scheduled_task')
             : null;
 
-        // A run recorded before the correlation_id link above existed shared
-        // its request_id with the scheduled_task row outright instead (see
-        // Monitor::beginCommandRun()'s old $inheritedId behavior) — filtered
-        // out of $children rather than drawn as its own bar: it is this
-        // run's *parent*, recorded back in the scheduler's process against
-        // that process's own clock, so it drew a bar at offset 0 while being
-        // filed under whichever phase it was tagged with, i.e. a 20ms
-        // "SCHEDULED TASK" sitting inside BOOTSTRAP but listed under ACTION.
+        // Runs without correlation_id may share their request_id with the parent
+        // scheduled_task row; link it but keep it off this run's timeline (different clock).
         if ($scheduledTask === null) {
             $scheduledTask = $children->firstWhere('type', 'scheduled_task');
         }

@@ -6,11 +6,8 @@ use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Support\EntryId;
 
 /**
- * Heading for a notification detail page. $key means one of two things,
- * disambiguated by dashboard.blade.php the same way it routes the page
- * itself: an EntryId-encoded row id (one specific send — NotificationDetail)
- * or the notification's FQCN (aggregate across all its sends —
- * NotificationClassDetail, same convention as JobHeading/QueryHeading).
+ * Heading for a notification page. $key is an EntryId (one send) or the
+ * notification class (aggregate page).
  */
 class NotificationHeading
 {

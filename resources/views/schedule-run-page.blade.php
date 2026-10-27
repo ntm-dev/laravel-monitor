@@ -1,9 +1,6 @@
-{{-- Standalone Scheduled Task Run Detail page (route: monitor.schedule.runs.show).
-     Unlike the tab-based dashboard views, this page owns its own URL and
-     fetches everything it needs itself — see
-     Http\Controllers\ScheduleRunController. Mirrors job-attempt-page.blade.php/
-     command-run-page.blade.php: a simple status header, the event summary
-     and the shared waterfall timeline, with no HTTP-specific sections. --}}
+{{-- Standalone Scheduled Task Run Detail page (route: monitor.schedule.runs.show,
+     see Http\Controllers\ScheduleRunController). Same layout as
+     command-run-page.blade.php: status header, event summary, shared timeline. --}}
 @php
     use LaravelMonitor\Support\Cron;
     use LaravelMonitor\Support\Format;
@@ -18,13 +15,10 @@
         default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     };
 
-    // Same cadence phrase as the badge on the schedule-show page's own
-    // header (see Http\Headings\ScheduleHeading) — badged after the
-    // command here too, for the same reason: it annotates the command
-    // rather than classifying it the way the (now-removed) status badge did.
+    // Cadence badge after the command, same as Http\Headings\ScheduleHeading.
     $schedule = Cron::describe($root->payload['expression'] ?? null, $root->payload['repeat_seconds'] ?? null);
 
-    // Same B/KB/MB/... scaling as requests/summary.blade.php's own $bytes.
+    // Same B/KB/MB/... scaling as Support\Number::fileSize().
     $bytes = function (?int $value): string {
         if ($value === null) {
             return '—';
@@ -86,10 +80,8 @@
                             {{ __('monitor::messages.nav.schedule') }}
                         </a>
                         <span class="shrink-0">›</span>
-                        {{-- The task's *key*, not this run's own full command: it
-                             links back to that task's own list of runs, which is
-                             keyed by the short grouping key (see
-                             Recorders\ScheduledTasks::name()). --}}
+                        {{-- The task's key, not this run's full command: the runs list is
+                             keyed by it (see Recorders\ScheduledTasks::name()). --}}
                         <a href="{{ route('monitor.schedule.show', ['hash' => KeyHash::for($key)] + $range) }}"
                            data-tooltip="{{ $key }}"
                            class="min-w-0 truncate font-mono hover:text-neutral-900 dark:hover:text-neutral-100">

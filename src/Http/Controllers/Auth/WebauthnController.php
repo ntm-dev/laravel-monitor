@@ -38,12 +38,7 @@ class WebauthnController
             pubKeyCredParams: [PublicKeyCredentialParameters::createPk(ES256::ID)],
         );
 
-        // The library's normalizers base64url-encode the challenge/user id/etc. into the
-        // wire shape a browser's navigator.credentials.create() expects — json_encode()ing
-        // the options object directly would fail (its challenge/id properties are raw
-        // binary, not valid UTF-8), so we serialize via the library's own serializer and
-        // hand PHP's json_encode entirely to it (JsonResponse::fromJsonString avoids
-        // re-encoding an already-JSON string).
+        // Challenge/ids are raw binary: use the library serializer (base64url), not json_encode().
         $json = $repository->serializer()->serialize($options, 'json');
 
         $request->session()->put('monitor_webauthn_creation_options', $json);
@@ -61,9 +56,7 @@ class WebauthnController
 
         $storedOptions = $request->session()->get('monitor_webauthn_creation_options');
 
-        // Session expired (or was never populated) between fetching registration
-        // options and submitting the response — deserialize() would otherwise be
-        // handed null and throw a TypeError before any validation runs.
+        // Session expired or never populated; deserialize(null) would throw a TypeError.
         abort_if($storedOptions === null, 422);
 
         $options = $serializer->deserialize(
@@ -75,11 +68,7 @@ class WebauthnController
         try {
             $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
         } catch (\Throwable $e) {
-            // The "response" payload is attacker/client-controlled and can be malformed
-            // in ways that throw before we ever reach a validation guard — e.g.
-            // Symfony\Component\Serializer\Exception\* for the wrong shape, or
-            // Webauthn\Exception\InvalidDataException for a mismatched id/rawId. Treat
-            // any deserialization failure as a plain 422, same as the guard below.
+            // Client-controlled payload: any deserialization failure is a 422.
             abort(422);
         }
 
@@ -103,10 +92,7 @@ class WebauthnController
             userVerification: PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
         );
 
-        // Same reasoning as registerOptions(): $options->challenge is raw binary, so
-        // json_encode()ing the object directly (response()->json($options)) would choke on
-        // invalid UTF-8 — serialize via the library's own serializer instead and hand PHP's
-        // json_encode entirely to it.
+        // Raw binary challenge: see registerOptions().
         $json = $this->repository()->serializer()->serialize($options, 'json');
 
         $request->session()->put('monitor_webauthn_request_options', $json);
@@ -124,8 +110,7 @@ class WebauthnController
 
         $storedOptions = $request->session()->get('monitor_webauthn_request_options');
 
-        // Same "session expired/never populated" guard as register() — deserialize()
-        // would otherwise be handed null and throw a TypeError before any validation runs.
+        // Session expired or never populated; see register().
         abort_if($storedOptions === null, 422);
 
         $options = $serializer->deserialize(
@@ -137,9 +122,7 @@ class WebauthnController
         try {
             $credential = $serializer->deserialize(json_encode($validated['response']), PublicKeyCredential::class, 'json');
         } catch (\Throwable $e) {
-            // Same rationale as register()'s catch: the "response" payload is
-            // attacker/client-controlled and can be malformed in ways that throw
-            // before we ever reach a validation guard.
+            // Client-controlled payload: any deserialization failure is a 422.
             abort(422);
         }
 
@@ -156,9 +139,7 @@ class WebauthnController
 
         $user = MonitorUser::query()->findOrFail($credentialRecord->userHandle);
 
-        // Standalone/passwordless login — deliberately does not route through the
-        // TOTP challenge (see TwoFactorChallengeController): possessing a
-        // previously-registered passkey is itself the second factor.
+        // Passkey login skips the TOTP challenge; the passkey is the second factor.
         Auth::guard(MonitorUser::guardName())->login($user);
         $request->session()->regenerate();
 

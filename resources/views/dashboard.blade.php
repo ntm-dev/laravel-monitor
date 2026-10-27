@@ -1,6 +1,5 @@
-{{-- Dashboard page: composes the layout, sidebar and header components and
-     mounts the Livewire card for the active tab. All data is prepared by
-     Http\Controllers\DashboardController. --}}
+{{-- Dashboard page: layout, sidebar and header plus the Livewire card for the
+     active tab. Data prepared by Http\Controllers\DashboardController. --}}
 <x-monitor::layout :title="$pageTitle">
     <div class="flex min-h-screen">
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="$detail?->autoRefreshes ?? true"/>
@@ -55,10 +54,8 @@
                     {{-- $key is the destination host (aggregate across all calls to it) --}}
                     @livewire('monitor.outgoing-domain-detail', $rangeProps + ['key' => $key])
                 @elseif ($tab === 'users' && filled($key))
-                    {{-- $key is the resolved user_id; rangeProps already carries an (empty)
-                         'userId' from the query string, so spreading it first (not the usual
-                         "$rangeProps + [...]") is needed to actually override it with the one
-                         this page resolved. --}}
+                    {{-- $key is the resolved user_id. $rangeProps already has a 'userId'
+                         (from the route), so spread it first: `+` would keep the old one. --}}
                     @livewire('monitor.user-detail', [...$rangeProps, 'userId' => $key])
                 @else
                     @livewire($tabs[$tab]['component'], $rangeProps + ['limit' => 25])

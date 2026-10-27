@@ -14,33 +14,16 @@ use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Sql;
 
 /**
- * Renders the standalone Job Attempt Detail page: one queued job execution
- * and every event it triggered (queries, mail, notifications, cache,
- * outgoing requests), on the same waterfall timeline used for requests —
- * notification/mail rows link here (rather than to a standalone
- * notification/mail page) because both sides of a mail-channel
- * notification already show up side by side on this one timeline. Owns its
- * own route (`monitor.jobs.attempts.show`), same as RequestDetailController.
- *
- * When this job was itself dispatched from a tracked request/command/
- * scheduled task (or another job), this redirects to THAT root's own page
- * instead of rendering here — its own merged timeline (see
- * Http\Controllers\Concerns\MergesJobTimelines) already splices this job's
- * execution in, so this page would otherwise just be a strictly smaller,
- * duplicate view of the same data. Only a job with no resolvable dispatcher
- * (no job_id at all — the sync connection never fires JobQueued, so it
- * never gets a 'queued' placeholder to walk back to — or dispatched
- * outside any tracked context) renders its own standalone timeline here,
- * same as before this existed.
+ * Job Attempt Detail page (`monitor.jobs.attempts.show`). Redirects to the
+ * dispatching root's page when one is tracked, since that timeline already
+ * includes this job; otherwise renders the attempt's own timeline.
  */
 class JobAttemptController
 {
     use MergesJobTimelines;
 
     /**
-     * Recorder type => events-summary bucket key. No 'job' entry — unlike a
-     * request, whose children include jobs it queued, a job attempt's own
-     * timeline shouldn't summarise itself.
+     * Recorder type => events-summary bucket key. No 'job': an attempt doesn't summarise itself.
      */
     protected const SUMMARY_TYPES = [
         'query' => 'queries',
@@ -62,17 +45,8 @@ class JobAttemptController
         abort_unless($root !== null, 404);
 
         if (($ancestorUrl = $this->ancestorUrl($root)) !== null) {
-            // A trailing <uuid> segment (not a ?job= query string, and no
-            // "/job" literal in between — shorter, and doesn't leak an
-            // otherwise-guessable query key) tells the landing page to
-            // expand (and scale its whole timeline around) *this* job's own
-            // track instead of its default root — see
-            // MergesJobTimelines::defaultTrackId() and the matching unnamed
-            // route registered right after each named show route in
-            // routes/web.php. Its request_id (the uuid this very route was
-            // reached with as $attemptId), not the int primary key, matching
-            // the uuid every other cross-page link in this package already
-            // uses.
+            // Trailing request_id segment expands this job's track on the landing
+            // page (see MergesJobTimelines::defaultTrackId()).
             return redirect("{$ancestorUrl}/{$root->request_id}");
         }
 
@@ -125,18 +99,9 @@ class JobAttemptController
     }
 
     /**
-     * Walks up from this job attempt to whatever dispatched it — its own
-     * 'queued' placeholder (found via the job_id they share, see
-     * Recorders\Jobs), then that placeholder's own request_id/type. A
-     * request/command/scheduled task root ends the walk immediately; a job
-     * root means it was dispatched by *another* job attempt, so the walk
-     * keeps climbing (that attempt's own job_id, if it has one) until it
-     * either reaches a non-job root or runs out of ancestry — capped at a
-     * handful of levels as a guard against bad/circular data, not because
-     * job-dispatches-job chains are expected to run deeper than that in
-     * practice. Returns null when there's nothing tracked to redirect to
-     * (no job_id at all, or the trail goes cold), meaning this job attempt
-     * should render its own standalone timeline instead.
+     * Page URL of the topmost tracked dispatcher, found via each job's 'queued'
+     * entry (shared job_id) and climbing through job-dispatched jobs, capped at
+     * 5 levels. Null when nothing tracked dispatched it.
      */
     protected function ancestorUrl(object $root): ?string
     {
@@ -168,9 +133,7 @@ class JobAttemptController
                 return null; // Unresolvable dispatcher type — nothing to link to.
             }
 
-            // Dispatched from another job attempt — that attempt is itself
-            // the topmost tracked ancestor unless IT was also dispatched by
-            // something (i.e. has its own job_id to keep climbing with).
+            // Dispatched by another job attempt: keep climbing if it has a job_id.
             $dispatcherRoot = $this->storage->findByRequestId($dispatcherId, 'job');
             $jobId = $dispatcherRoot->payload['job_id'] ?? null;
 
@@ -183,11 +146,7 @@ class JobAttemptController
     }
 
     /**
-     * The dispatching request's own url, in whichever form the Requests tab
-     * itself would link to that same instance — hashed (grouped by its
-     * route, see Nav/DashboardController) when its key is still resolvable,
-     * falling back to the plain, non-hashed url otherwise (a pruned/missing
-     * key, or any other lookup miss).
+     * Route-hashed request URL when the request's key is known, else the plain one.
      */
     protected function requestUrl(string $requestId): string
     {

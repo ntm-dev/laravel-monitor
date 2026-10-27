@@ -1,17 +1,7 @@
-{{-- Standalone Request Detail page (route: monitor.requests.show). Unlike
-     the tab-based dashboard views, this page owns its own URL and fetches
-     everything it needs itself — see Http\Controllers\RequestDetailController.
-
-     $infos holds one bundle per track this page can show at the top (the
-     request's own, id 'root', plus one per resolved job track) — every
-     bundle's own breadcrumb/header/general-info/headers/body/event-summary
-     renders up front, each behind its own x-show, so switching between them
-     (clicking a track's own row in the timeline below, see
-     timeline-row.blade.php's $navigateClick) is a plain Alpine toggle
-     instead of a real navigation — the browser already has every byte of
-     whichever one it switches to. The timeline itself sits outside this
-     toggle entirely: its own fixed scale/expand state never depends on
-     which info bundle is active. --}}
+{{-- Standalone Request Detail page (route: monitor.requests.show, see
+     Http\Controllers\RequestDetailController). $infos has one bundle per track
+     ('root' plus one per job track), all rendered behind x-show; a track row's
+     $navigateClick (timeline-row.blade.php) toggles them. The timeline sits outside. --}}
 @php
     $activeInfo = $infos[$activeInfoId];
 @endphp
@@ -24,13 +14,8 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$activeInfo['tab']" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false" reactive-tab-expr="(activeInfo === 'root' ? 'requests' : 'jobs')"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            {{-- `contents` (not a plain block): a `sticky` element only
-                 travels within its own parent's box, so wrapping the header in
-                 an ordinary div sized to exactly the header would give it zero
-                 room to stick. Taking the toggle wrapper out of the box tree
-                 leaves the header a direct child of this page column, the same
-                 place the other detail pages put theirs. x-show still works —
-                 hiding sets an inline `display: none` over this class. --}}
+            {{-- `contents` keeps the sticky header's containing block the page column;
+                 a plain wrapper div would leave it no room to stick. --}}
             @foreach ($infos as $id => $info)
                 <div class="contents" x-show="activeInfo === {{ \Illuminate\Support\Js::from($id) }}">
                     <x-monitor::requests.header :root="$info['root']" :range="$range" :job="$info['isJob'] ? $info['root'] : null" :breadcrumb-tab="$info['tab']" :breadcrumb-label="$info['breadcrumbLabel']" :breadcrumb-url="$info['breadcrumbUrl']"/>
@@ -47,11 +32,7 @@
                             <x-monitor::requests.summary :root="$info['root']" :user-name="$info['userName']" :timezone="$timezone"/>
                         @endif
                         {{-- end card general info --}}
-                        {{-- Headers/Body are HTTP-specific — a job has
-                             neither, same as the standalone Job Attempt page
-                             (job-attempt-page.blade.php), so both hide
-                             rather than keep showing the request's own data
-                             while a job is the page's active entity. --}}
+                        {{-- HTTP-only sections: hidden while a job track is active. --}}
                         @unless ($info['isJob'])
                             <x-monitor::requests.message-section
                                 :title="__('monitor::messages.common.request')"

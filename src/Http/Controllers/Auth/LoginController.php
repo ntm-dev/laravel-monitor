@@ -25,8 +25,7 @@ class LoginController
             'password' => ['required', 'string'],
         ]);
 
-        // A single "email or username" field: username is optional per
-        // MonitorUser, so most accounts only ever match on email.
+        // One "email or username" field; username is optional on MonitorUser.
         $user = MonitorUser::query()
             ->where('email', $credentials['login'])
             ->orWhere('username', $credentials['login'])

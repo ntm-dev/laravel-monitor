@@ -10,12 +10,8 @@ use function round;
 use function sort;
 
 /**
- * Nearest-rank percentile over a plain array of values — shared by
- * Storage\DatabaseStorage (SQL can't compute a percentile portably across
- * MySQL/Postgres/SQLite, so it's always derived from a sampled/fetched set
- * of raw values instead) and any other caller doing its own in-PHP
- * aggregation over rows it already pulled (see Livewire\Schedule, which
- * groups scheduled_task rows by cadence rather than by key alone).
+ * Nearest-rank percentile over fetched values, computed in PHP because SQL
+ * has no portable percentile across MySQL/Postgres/SQLite.
  */
 class Percentile
 {

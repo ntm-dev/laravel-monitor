@@ -51,10 +51,7 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            {{-- $sourceUrl: whatever triggered this send, when there was one
-                                 (a request/job/command/scheduled task) — clicking the source
-                                 badge below jumps there. $sendUrl: this notification's own
-                                 detail page. --}}
+                            {{-- $sourceUrl: whatever triggered this send, if any; $sendUrl: this send's detail page. --}}
                             @php
                                 $sourceUrl = $entry->sourceUrl;
                                 $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);

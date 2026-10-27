@@ -10,23 +10,9 @@ use Illuminate\Database\DatabaseManager;
 use function max;
 
 /**
- * Rolls raw `monitor_entries` rows up into fixed-width `monitor_aggregates`
- * buckets — count, plus sum/max/min of `duration` — per type+subtype,
- * mirroring Laravel Pulse's ingest/rollup split: dashboard trend charts and
- * totals that don't need a route/user breakdown then read the much smaller
- * aggregates table instead of pulling every matching row into PHP, or
- * scanning every matching row for a SQL aggregate, on every page load (see
- * DatabaseStorage::countsPerBucket(), stats(), statsBySubtype()). Driven by
- * the `monitor:aggregate` command, expected to run about once per `period`
- * seconds — each run picks up from wherever the last one left off, so
- * occasional missed runs just get caught up on the next one (capped by
- * $maxBuckets so a long outage can't trigger an unbounded catch-up burst).
- *
- * sum/max/min are exactly mergeable across buckets (unlike a percentile),
- * so reassembling them into a stats()-shaped total for an arbitrary range
- * loses no precision — only avg needs deriving from sum/count rather than
- * being stored directly, since averaging averages isn't the same as
- * averaging the underlying values.
+ * Rolls `monitor_entries` up into fixed-width `monitor_aggregates` buckets (count,
+ * plus sum/max/min of `duration`) per type+subtype, read by DatabaseAggregateStorage.
+ * Each `monitor:aggregate` run resumes after the last stored bucket, up to $maxBuckets.
  */
 class Aggregator
 {
@@ -54,11 +40,8 @@ class Aggregator
     }
 
     /**
-     * Same forward walk as run(), then spends the rest of `$maxBuckets`
-     * filling buckets before the earliest one already rolled up — newest
-     * first, never further back than `$since` or the retention window — so
-     * a range the schedule hasn't covered yet gets covered without waiting
-     * for it. Returns the number of buckets processed.
+     * run(), then spends the rest of `$maxBuckets` backfilling before the earliest
+     * stored bucket, newest first, down to `$since` or the retention window.
      */
     public function catchUp(DateTimeInterface $since, int $period, int $maxBuckets = 30): int
     {
@@ -85,8 +68,7 @@ class Aggregator
                 continue;
             }
 
-            // An empty bucket leaves no row to anchor the next run on, so
-            // jump straight to the newest entry before it.
+            // Empty bucket: jump straight to the newest entry before it.
             $newest = $this->newestEntryBefore($connection, StorageTime::fromTimestamp($cursor));
 
             if ($newest === null) {
@@ -123,18 +105,14 @@ class Aggregator
         $start = StorageTime::fromTimestamp($bucket);
         $end = StorageTime::fromTimestamp($bucket + $period);
 
-        // One query per type: no index leads on created_at alone, so a
-        // single `created_at` range without `type` scans the whole index.
+        // One query per type: no index leads on created_at alone.
         $rows = [];
 
         foreach (RecordType::cases() as $type) {
             $typeRows = $this->entriesTable($connection)
                 ->select('subtype')
                 ->selectRaw('count(*) as aggregate_count')
-                // count(duration), not count(*): entries whose type never
-                // carries a duration (e.g. cache misses before a value existed,
-                // or a type that just doesn't track timing) shouldn't drag the
-                // average down as if they were zero-duration.
+                // Rows without a duration must not count as zero in the average.
                 ->selectRaw('count(duration) as duration_count')
                 ->selectRaw('sum(duration) as duration_sum')
                 ->selectRaw('max(duration) as duration_max')

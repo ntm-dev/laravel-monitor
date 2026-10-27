@@ -18,15 +18,8 @@
         $tz = Format::timezone();
     }
 @endphp
-{{-- A single, unconditional root element — Livewire finds its component root
-     by scanning the rendered HTML for the first tag, so two alternate
-     top-level poll roots (one per embedded/standalone branch) left it unable
-     to reliably identify either: it silently fell back to wrapping
-     <x-monitor::section>'s own inner div as the "root" instead, which carries
-     no poll marker at all — the standalone Users tab never
-     polled, no matter how long you waited on the page. Keeping the branch
-     entirely inside one fixed wrapper is what every other card in this
-     package already does. --}}
+{{-- One unconditional root carrying the poll marker: branching at the top level
+     lets Livewire pick a different root, and the card stops polling. --}}
 <div data-monitor-poll>
     @if ($embedded)
         <x-monitor::section :icon="Icons::USER" :title="__('monitor::messages.nav.users')">

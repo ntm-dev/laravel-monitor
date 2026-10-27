@@ -17,12 +17,9 @@ class Schedule extends Card
     ];
 
     /**
-     * Every scheduled_task row within the selected period gets pulled
-     * (payload included) to group by (key, cadence) rather than by key
-     * alone — see data(). Unlike Requests/Queries, scheduled-task volume is
-     * bounded by how many cron jobs a human configured, so even at a
-     * pathological everySecond() this stays well short of the cap within
-     * any period this dashboard offers.
+     * Cap on the raw rows data() pulls to group by (key, cadence). Volume is
+     * bounded by configured tasks, though sub-minute tasks can hit it on
+     * long periods.
      */
     protected const MAX_SAMPLE_ROWS = 20000;
 
@@ -79,31 +76,15 @@ class Schedule extends Card
 
         $bySubtype = $storage->statsBySubtype('scheduled_task', $since, $until);
 
-        // `Schedule::events()` reflects whatever the *currently running* app
-        // code actually registers — available in this web request the same
-        // as in a console one, since scheduled tasks are normally registered
-        // from a service provider's `booted()` hook, not gated to console
-        // (see Recorders\ScheduledTasks::name()'s own docblock). Keyed by
-        // command, expression, *and* repeat_seconds: a task whose cadence
-        // changed needs its own row for the cadence no longer live, not
-        // just one whose command was removed outright. repeat_seconds
-        // matters on its own — everySecond()/everyFiveSeconds()/... all
-        // reduce to the same 5-field `* * * * *` expression as everyMinute()
-        // (see Illuminate\Console\Scheduling\ManagesFrequencies::repeatEvery()),
-        // distinguished only by this separate property.
+        // The currently registered schedule, by task => expression + repeat
+        // seconds (sub-minute tasks share the `* * * * *` expression).
         $liveCadences = collect(app(ConsoleSchedule::class)->events())
             ->mapWithKeys(static fn ($event) => [
                 ScheduledTasks::name($event) => "{$event->expression}\0{$event->repeatSeconds}",
             ]);
 
-        // Grouped by (key, cadence) rather than by key alone — a task whose
-        // cadence changed shows as two rows, its old cadence's own history
-        // staying put (and marked inactive below) instead of quietly
-        // merging into whatever the *latest* run happens to be scheduled
-        // under. AggregateStorage::aggregateByKey()/latestPayloadByKey() only
-        // group by the raw `key` column and can't make that split, so this pulls
-        // every row (payload included) instead — see self::MAX_SAMPLE_ROWS
-        // for why that stays cheap for this type.
+        // Grouped by (key, cadence) in PHP, which aggregateByKey() can't do,
+        // so a changed cadence keeps its old history as a separate inactive row.
         $groups = [];
 
         foreach ($this->timelineStorage()->recent('scheduled_task', $since, self::MAX_SAMPLE_ROWS, null, null, $until) as $row) {
@@ -137,9 +118,7 @@ class Schedule extends Card
         foreach ($groups as $group) {
             $durations = $group->durations;
             $cadence = "{$group->expression}\0{$group->repeat_seconds}";
-            // has() first: a key absent from the live schedule and a group
-            // with no recorded expression (pre-dating that payload field)
-            // would otherwise both read as null and compare equal.
+            // has() first, or a missing key would match a row with no recorded cadence.
             $isActive = $liveCadences->has($group->key) && $liveCadences->get($group->key) === $cadence;
 
             $tasks->push((object) [
@@ -155,9 +134,6 @@ class Schedule extends Card
                 'p95_duration' => Percentile::of($durations, 0.95),
                 'isActive' => $isActive,
                 'schedule' => Cron::describe($group->expression, $group->repeat_seconds),
-                // No next run to count down to when this cadence isn't the
-                // live one any more — countdown.blade.php already renders
-                // its own fallback for null.
                 'next_run_at' => $isActive ? Cron::nextRunAt($group->expression, $group->timezone, $group->repeat_seconds) : null,
             ]);
         }

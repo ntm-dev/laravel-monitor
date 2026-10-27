@@ -45,8 +45,7 @@ class Logs extends Recorder
             key: Str::tinyText($message),
             payload: [
                 'message' => Str::text($message),
-                // The remaining values are plain data (objects were dropped
-                // above), so encoding can wait until the entry is stored.
+                // Plain data only (objects dropped above), so encoding can wait until storage.
                 'context' => new LazyValue(static fn () => Str::mediumText(Json::encode($context) ?: '{}')),
             ],
             subtype: $event->level,
@@ -54,12 +53,7 @@ class Logs extends Recorder
         );
     }
 
-    /**
-     * MessageLogged carries no request of its own (it fires from console/
-     * queue contexts too) — otherwise a log emitted while merely browsing
-     * the monitor dashboard itself gets recorded as if it were the app's
-     * own.
-     */
+    /** Skips logs emitted while serving the dashboard itself (or ignore_paths). */
     protected function shouldIgnore(): bool
     {
         return $this->monitor->isSelfRequest($this->config['ignore_paths'] ?? []);

@@ -7,30 +7,15 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Single-entry and correlation lookups: one row (or one root's timeline) by
- * id/request_id/correlation_id/job_id, the raw "recent entries" list every
- * detail/list page reads from, and the batched label/type lookups used to
- * render a list of such references without one query per row.
+ * Raw entry lists and lookups by id/request_id/correlation_id/job_id,
+ * plus batched label/type lookups for rendering lists of references.
  */
 interface TimelineStorage
 {
     /**
-     * Latest entries of a type, newest first. Each item exposes:
-     * key, subtype, payload (array), duration, user_id, created_at (Carbon).
-     * $subtype accepts an array to match any of several subtypes at once
-     * (e.g. every "ok" status group for a status filter tab). $minDuration
-     * keeps only entries whose own duration is at or above it (a duration
-     * filter tab).
-     *
-     * $beforeId/$afterId are a keyset cursor (the id of an already-fetched
-     * row), for callers paging an infinite-scroll list instead of a numbered
-     * $offset — a growing $offset re-scans and re-transfers every row already
-     * shown each time the list grows, where an id cursor only touches the
-     * rows on the new side of it. $beforeId keeps only entries older than
-     * that row (paging further down); $afterId keeps only entries newer than
-     * it (topping the list up with anything inserted since). id order is a
-     * safe cursor here: it's an auto-increment PK on an insert-only table, so
-     * it tracks created_at (this method's own sort key) exactly.
+     * Latest entries, newest first: key, subtype, payload (array), duration, user_id,
+     * created_at (Carbon). $subtype may be an array (match any); $minDuration keeps entries
+     * at or above it. $beforeId/$afterId are a keyset cursor: only entries older/newer than that id.
      */
     public function recent(
         string $type,
@@ -47,17 +32,14 @@ interface TimelineStorage
     ): Collection;
 
     /**
-     * The root entry (type $rootType — 'request' or 'job') recorded with the
-     * given correlation id, or null when unknown. Exposes the same fields as
-     * recent() rows plus request_id and start_offset.
+     * The root entry of type $rootType (request/job/command/scheduled_task) for a request_id,
+     * or null. For 'job', the outcome row, never its dispatch or processing marker.
+     * Same fields as recent() plus request_id and start_offset.
      */
     public function findByRequestId(string $requestId, string $rootType = 'request'): ?object;
 
     /**
-     * A single entry by its own primary key, scoped to $type, or null when
-     * unknown — for a detail page about one specific occurrence (e.g. one
-     * notification send) rather than an aggregate across many. Same row
-     * shape as recent().
+     * One entry by id, scoped to $type, or null. Same row shape as recent().
      */
     public function findById(int $id, string $type): ?object;
 
@@ -70,24 +52,19 @@ interface TimelineStorage
     public function findManyByRequestId(array $requestIds, string $rootType = 'request'): Collection;
 
     /**
-     * The first entry of $type whose payload has `correlation_id` equal to
-     * $correlationId, or null when none match — links a mail-channel
-     * notification's entry to the `mail` entry its send produced (and back).
-     * Scans only entries of $type within $since/$until, since a correlated
-     * pair is always recorded moments apart.
+     * First entry of $type within $since/$until whose payload correlation_id matches, or null.
+     * Links a mail notification to its `mail` entry (and back); pass a tight window.
      */
     public function findByCorrelationId(string $type, string $correlationId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object;
 
     /**
-     * Every entry correlated to the given request/job attempt (excluding the
-     * root entry itself, type $rootType), ordered by where it started on the
-     * timeline. Same row shape as findByRequestId().
+     * Every entry sharing the request_id except the root itself, ordered by start_offset.
+     * For a 'job' root, jobs it dispatched are included. Same row shape as findByRequestId().
      */
     public function timelineFor(string $requestId, string $rootType = 'request'): Collection;
 
     /**
-     * Just the entries of one type correlated to the given request/job
-     * attempt, oldest first. Same row shape as timelineFor().
+     * Entries of one type sharing the request_id, oldest first. Same row shape as timelineFor().
      */
     public function entriesOfTypeFor(string $requestId, string $type): Collection;
 
@@ -100,28 +77,15 @@ interface TimelineStorage
     public function timelinesFor(array $requestIds, string $rootType = 'request'): Collection;
 
     /**
-     * The 'queued' dispatch-time entry sharing the given job_id (the queue
-     * driver's own id — see Recorders\Jobs), or null when none match within
-     * the window — the reverse of jobExecutionsByJobId(): given a job
-     * attempt's own outcome (which carries the same job_id in its payload),
-     * find what dispatched it. That entry's own request_id/type (via
-     * rootTypesFor()) identifies the request/command/scheduled task it came
-     * from, if any.
+     * The 'queued' dispatch entry with this payload job_id (see Recorders\Jobs::jobId()) within
+     * the window, or null. Reverse of jobExecutionsByJobId(): finds what dispatched an attempt.
      */
     public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object;
 
     /**
-     * For each given job_id, every outcome entry (processed/failed/released
-     * — more than one on a retry) recorded for it, each paired with its own
-     * children (queries/mail/... it triggered while running) — the data
-     * needed to splice a dispatched job's own execution into the timeline of
-     * whatever request/command/scheduled task dispatched it, producing a
-     * single merged trace view instead of a bare, dead-end
-     * "queued" placeholder. Keyed by job_id; a job_id with no matching
-     * outcome yet is simply absent. Each job_id's own outcomes are ordered
-     * oldest-first — MergesJobTimelines::jobTrack() numbers "Attempt #N"
-     * purely by position in this collection, so an unordered implementation
-     * would risk mislabeling which retry is which.
+     * Per job_id, every outcome entry (processed/failed/released) paired with its children,
+     * keyed by job_id; job_ids with no outcome yet are absent. Outcomes must be oldest-first:
+     * MergesJobTimelines::jobTrack() numbers attempts by position.
      *
      * @param  string[]  $jobIds
      * @return Collection<string, Collection<int, object{outcome: object, children: Collection}>>
@@ -129,9 +93,7 @@ interface TimelineStorage
     public function jobExecutionsByJobId(array $jobIds, DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 
     /**
-     * "METHOD /path" label for each of the given request ids, keyed by
-     * request_id, in a single query — batches what would otherwise be one
-     * findByRequestId() call per row (e.g. a Query Detail page's calls table).
+     * "METHOD /path" label of each request root, keyed by request_id.
      *
      * @param  string[]  $requestIds
      * @return Collection<string, string>
@@ -139,11 +101,7 @@ interface TimelineStorage
     public function requestLabels(array $requestIds): Collection;
 
     /**
-     * Which root type ('request', 'job', or 'command') each of the given
-     * correlation ids belongs to, keyed by request_id, in a single query —
-     * batches what would otherwise be one findByRequestId() probe per row
-     * (e.g. deciding whether a list row should link to the Request, Job
-     * Attempt, or Command Run timeline).
+     * Root type (request/job/command/scheduled_task) of each request_id, keyed by request_id.
      *
      * @param  string[]  $requestIds
      * @return Collection<string, string>
@@ -151,12 +109,8 @@ interface TimelineStorage
     public function rootTypesFor(array $requestIds): Collection;
 
     /**
-     * The root entry's own key ("METHOD /path" for a request, the job class
-     * name, or the artisan command string) for each of the given correlation
-     * ids, keyed by request_id, in a single query — the generic counterpart
-     * to requestLabels() that doesn't assume the root is a request. Pair
-     * with rootTypesFor() to know which of the three it is before deciding
-     * which detail-page route to link to.
+     * Root entry's key (request "METHOD /path", job class, command, scheduled task) of each
+     * request_id, keyed by request_id. Pair with rootTypesFor() to pick the link target.
      *
      * @param  string[]  $requestIds
      * @return Collection<string, string>
@@ -164,8 +118,7 @@ interface TimelineStorage
     public function rootLabelsFor(array $requestIds): Collection;
 
     /**
-     * Earliest occurrence (across all retained data, ignoring the range) of a
-     * given key, or null when it has never been seen.
+     * Earliest retained occurrence of a key (ignores any range), or null.
      */
     public function firstSeen(string $type, string $key): ?CarbonImmutable;
 }

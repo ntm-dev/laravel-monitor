@@ -7,16 +7,13 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Per-user activity: the Users tab's own charts/list, and the User Detail
- * page's "last seen".
+ * Per-user activity. "Sampled" means computed from a capped set of the most
+ * recent matching rows, so counts are exact only below that cap.
  */
 interface UserStorage
 {
     /**
-     * Distinct authenticated user_id count per time bucket, requests only —
-     * the "Authenticated Users" chart on the Users tab. Sampled at high
-     * volume — exact only up to maxSampleRows()
-     * matching rows.
+     * Distinct authenticated user_id count per time bucket, requests only. Sampled.
      *
      * @return int[]
      */
@@ -27,10 +24,7 @@ interface UserStorage
     ): array;
 
     /**
-     * Request counts per time bucket split by whether the request carried a
-     * user_id — the "Requests" chart on the Users tab (Authenticated vs
-     * Guest). Sampled at high volume — exact only up to
-     * maxSampleRows() matching rows.
+     * Request counts per time bucket, split by whether a user_id was set. Sampled.
      *
      * @return array{authenticated: int[], guest: int[]}
      */
@@ -41,9 +35,7 @@ interface UserStorage
     ): array;
 
     /**
-     * Users generating the most entries of a type. Each item exposes:
-     * user_id, count. Sampled at high volume — `count` is exact only up to
-     * maxSampleRows() matching rows.
+     * Users with the most entries of a type: user_id, count (null $limit = no limit). Sampled.
      */
     public function topUsers(
         string $type,
@@ -53,21 +45,13 @@ interface UserStorage
     ): Collection;
 
     /**
-     * Per-user activity for the Users tab list: one row per identified
-     * user_id exposing user_id, success (1/2/3xx request count),
-     * client_errors (4xx), server_errors (5xx), requests (total request
-     * count), queued_jobs, exceptions, last_seen. Unsorted — callers sort/
-     * paginate themselves. Sampled at high volume — so the counts are exact
-     * only up to maxSampleRows() matching rows
-     * across request + job + exception combined.
+     * One unsorted row per user_id: success (1/2/3xx), client_errors (4xx), server_errors (5xx),
+     * requests, queued_jobs, exceptions, last_seen. Sampled across requests, jobs and exceptions combined.
      */
     public function userStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 
     /**
-     * Most recent activity timestamp for a user across every entry type —
-     * the User Detail page's own "last seen", not scoped to one type the way
-     * topUsers()/userStats() are. Null when the user has no recorded
-     * activity at all.
+     * Latest entry timestamp for a user across all types, or null.
      */
     public function lastSeenForUser(string $userId): ?CarbonImmutable;
 }

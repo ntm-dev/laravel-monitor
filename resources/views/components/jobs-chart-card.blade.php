@@ -1,8 +1,5 @@
 {{-- JOBS card: total + FAILED / PROCESSED / QUEUED (/ RELEASED, where tracked) legends over a stacked bar chart.
-     $queued/$queuedBuckets are optional (default null): the Jobs tab's own "Attempts" chart (jobs.blade.php,
-     job-detail.blade.php) omits them on purpose — a queued-but-not-yet-attempted job isn't an attempt outcome,
-     only failed/processed/released are — while the Overview page's smaller Application widget still passes them,
-     unchanged. --}}
+     $queued/$queuedBuckets are optional: the Jobs "Attempts" charts omit them, the Application widget passes them. --}}
 @props(['queued' => null, 'processed', 'failed', 'released' => null, 'queuedBuckets' => null, 'processedBuckets', 'failedBuckets', 'releasedBuckets' => null, 'since', 'until', 'size' => 'lg', 'height' => 'h-28', 'footer' => true, 'label' => null])
 @php($label ??= __('monitor::messages.nav.jobs'))
 <x-monitor::card :class="trim('flex flex-col p-4 '.($attributes->get('class') ?? ''))" x-data="{ hidden: {} }">

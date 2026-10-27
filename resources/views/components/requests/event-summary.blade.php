@@ -1,13 +1,9 @@
-{{-- EventSummary: one card per recorder type with a count + total duration.
-     Data-driven off $summary (built by RequestDetailController) — add a
-     recorder here to surface it, no other changes needed. --}}
+{{-- One card per recorder type with a count + total duration, from $summary. --}}
 @props(['summary'])
 @php
     use LaravelMonitor\Support\Icons;
 
-    // 'type' matches the corresponding LaravelMonitor\Support\TimelineEntry::$type value
-    // (see Support\Timeline::EVENT_TYPES) — used below to scroll the timeline to the
-    // nearest matching row when a non-query card is clicked.
+    // 'type' is the TimelineEntry::$type a click scrolls the timeline to.
     $cards = [
         'queries' => ['label' => __('monitor::messages.nav.queries'), 'icon' => Icons::QUERIES],
         'cache' => ['label' => __('monitor::messages.nav.cache'), 'icon' => Icons::CACHE, 'type' => 'cache'],
@@ -25,10 +21,8 @@
     @foreach ($cards as $key => $card)
         @php($stats = $summary[$key] ?? ['count' => 0, 'duration' => 0])
         @php($clickable = $key !== 'queries' && $stats['count'] > 0)
-        {{-- :onclick as a dynamic (not literal) attribute so it's omitted entirely when null.
-             Built as its own plain variable (rather than inline in the attribute expression)
-             because the component tag compiler parses a tag's attributes via regex, and an
-             inline expression with nested quotes/braces breaks that parse silently. --}}
+        {{-- Bound :onclick is omitted when null; kept in a variable since nested quotes inline
+             break the component tag's attribute parsing. --}}
         @php($onclick = $clickable ? "window.dispatchEvent(new CustomEvent('monitor-scroll-to-timeline-event', { detail: { type: '{$card['type']}' } }))" : null)
         <x-monitor::card
             class="p-3 {{ $clickable ? 'cursor-pointer transition hover:border-neutral-300 dark:hover:border-neutral-700' : '' }}"
@@ -42,9 +36,7 @@
             <div class="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                 <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ $stats['duration'] > 0 ? $fmt($stats['duration']) : '—' }}</span>
                 @if ($key === 'queries' && ($stats['duplicates'] ?? 0) > 0)
-                    {{-- Pulses every duplicate-SQL dot on the timeline below
-                         (see timeline.blade.php's monitor-duplicates-heartbeat
-                         listener) rather than navigating anywhere. --}}
+                    {{-- Pulses the timeline's duplicate-SQL dots (monitor-duplicates-heartbeat event). --}}
                     <span class="cursor-pointer font-mono text-[11px] text-amber-600 hover:underline dark:text-amber-400"
                           onclick="window.dispatchEvent(new CustomEvent('monitor-duplicates-heartbeat'))">{{ $stats['duplicates'] }} {{ trans_choice('monitor::messages.common.duplicate_count', $stats['duplicates']) }}</span>
                 @endif

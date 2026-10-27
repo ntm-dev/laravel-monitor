@@ -8,7 +8,7 @@ class Commands extends Card
 
     public const SORTABLE = ['key', 'success', 'failed', 'total', 'avg_duration', 'p95_duration'];
 
-    /** See Jobs::MAX_KEYS for why this replaces the previous top-10 cap. */
+    /** Same per-subtype cap as Jobs::MAX_KEYS. */
     protected const MAX_KEYS = 5000;
 
     public string $search = '';
@@ -64,20 +64,13 @@ class Commands extends Card
 
         $bySubtype = $storage->statsBySubtype('command', $since, $until);
 
-        // keyStats() rather than a second aggregateByKey(): the whole-command
-        // figures (total runs, avg, p95) have to come from one pass over the
-        // actual duration values, because a percentile isn't computable in
-        // portable SQL — aggregateByKey(), which groups in the database, has
-        // no p95 to offer. It carries no subtype dimension of its own, so the
-        // failed count still comes from an aggregateByKey() call and success
-        // is the remainder.
+        // keyStats() for totals/avg/p95 (p95 isn't computable in SQL); failed
+        // comes from aggregateByKey() and success is the remainder.
         $groups = $storage->keyStats('command', $since, $until);
         $failed = $storage->aggregateByKey('command', $since, 'failed', self::MAX_KEYS, 'count', $until)->keyBy('key');
 
         $commands = $groups->map(function (object $group) use ($failed) {
-            // Both sides are independently sampled at high volume (see
-            // maxSampleRows()), so clamp rather than trust
-            // the subtraction to stay non-negative.
+            // Clamped: both counts are sampled independently.
             $failedCount = (int) ($failed->get($group->key)?->count ?? 0);
 
             return (object) [

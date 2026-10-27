@@ -1,7 +1,4 @@
-{{-- Generic Cache metric card: total headline + per-series legends over a
-     stacked bar chart. Reused for both the Events breakdown
-     (hits/misses/writes/deletes) and the Failures breakdown
-     (write/delete failures) on the Cache page.
+{{-- Cache metric card (Events and Failures): total + per-series legends over a stacked bar chart.
      $series = [['label', 'dot', 'total' => int, 'data' => int[]], ...] --}}
 @props(['label', 'total', 'series', 'since', 'until', 'height' => 'h-28'])
 <x-monitor::card {{ $attributes->merge(['class' => 'flex flex-col p-4']) }} x-data="{ hidden: {} }">

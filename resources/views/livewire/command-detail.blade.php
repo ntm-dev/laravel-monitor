@@ -57,14 +57,9 @@
                             @php($runUrl = ($entry->request_id ?? null) ? route('monitor.commands.runs.show', $entry->request_id) : null)
                             <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
-                                {{-- The run's start, not its created_at: entries are stamped when
-                                     they finish, so showing created_at here put this row a second
-                                     ahead of the "Started at" on the very run page it links to. --}}
+                                {{-- The run's start, not created_at (stamped when it finishes). --}}
                                 <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }}</td>
-                                {{-- Falls back to the bare command name (the key every run here
-                                     shares) when payload.command is absent — a command invoked
-                                     without any arguments carries nothing extra to show (see
-                                     Recorders\Commands::commandLine()), same fallback as
+                                {{-- Bare command name when no arguments were captured, same as
                                      command-run-page.blade.php's $invocation. --}}
                                 <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['command'] ?? $entry->key }}">{{ $entry->payload['command'] ?? $entry->key }}</td>
                                 <td class="py-2 pr-3">

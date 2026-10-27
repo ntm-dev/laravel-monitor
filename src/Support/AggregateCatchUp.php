@@ -10,11 +10,8 @@ use Illuminate\Contracts\Foundation\Application;
 use Throwable;
 
 /**
- * Rolls monitor_aggregates up to the range a dashboard page just had to
- * scan raw, once the response has been sent — so an app that never
- * scheduled `monitor:aggregate` still ends up on the fast path without the
- * viewer waiting on it. Registered at most once per request, for the
- * oldest `since` asked for.
+ * After the response is sent, rolls monitor_aggregates up over the range a
+ * dashboard page had to scan raw. Runs once per request, from the oldest `since` deferred.
  */
 class AggregateCatchUp
 {

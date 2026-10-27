@@ -1,62 +1,22 @@
-{{-- TimelineRow: renders either the pinned tree-column label (part="label")
-     or the horizontally-scrolling chart bar (part="bar") for one waterfall
-     row -- request root, phase header, or event. timeline.blade.php renders
-     each row twice, once into each pane, from the same $rows list: the tree
-     pane is a plain flex sibling that never joins the chart's horizontal
-     scroll, so it needs no
-     sticky-positioning tricks and can't be pushed in front of the page's own
-     header the way a shared-scroll-container hack previously could.
-     Hover highlighting is kept in sync across both panes via the shared
-     Alpine `hoveredId` state from timeline.blade.php; the blue "selected"
-     highlight only applies to {@see $detailable} rows, since only those can
-     actually be selected.
-
-     Label rows draw their own indentation as literal vertical guide lines
-     (one per ancestor level: phases hang one level off Request, events hang
-     one level off their phase) instead of plain padding, so the tree reads
-     like a file-explorer tree rather than a flat indented list.
-
-     Only query/cache events open the inspector panel (see
-     TimelineRow::DETAILABLE_TYPES) -- root, phases, and every other event
-     type just show their hover tooltip and aren't clickable. --}}
+{{-- One waterfall row, rendered once per pane: the tree label (part="label") or the chart bar (part="bar").
+     Hover syncs across panes via `hoveredId`; only detailable rows get the selected highlight.
+     Label indentation is drawn as one vertical guide line per depth level. --}}
 @php
     $depth = match ($kind) { 'phase', 'attempt' => 1, 'event' => 2, default => 0 };
     $highlightClass = $detailable
         ? "selectedId === '{$entry->id}' ? 'bg-blue-50/60 dark:bg-blue-500/5' : (hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : '')"
         : "hoveredId === '{$entry->id}' ? 'bg-neutral-50 dark:bg-neutral-800/60' : ''";
-    // Full text for the tree pane's hover tooltip — only the root row and
-    // events actually have a truncated label worth expanding; empty skips
-    // showTooltip() below (see timeline.blade.php).
+    // Tree-pane hover tooltip text (root and events only); empty skips showTooltip().
     $tooltipText = match (true) {
         $kind === 'root' => $entry->label,
         $kind === 'event' => $tooltipDetail,
         default => '',
     };
-    // A root row always stays visible (it's the track's own summary bar,
-    // doubling as the affordance to expand/collapse it) — same for its own
-    // 'attempt' row directly underneath (see Timeline::__construct()): that
-    // pair is the at-a-glance summary for the whole track, so both stay
-    // visible collapsed or not. Every other row in this track only renders
-    // while its own track is expanded (see timeline.blade.php's
-    // `expandedTracks` state). Expanding one track never collapses another —
-    // each track's own expand state is independent.
+    // Root and attempt rows always show; the rest only while their track is expanded.
     $visible = in_array($kind, ['root', 'attempt'], true) ? 'true' : "expandedTracks['{$trackId}']";
     $toggleClick = "toggleTrack('{$trackId}')";
-    // A job track's own root row's *body* (everything except the chevron,
-    // see below) still switches the page's General/Headers/Body/Events
-    // sections and active nav tab to that job's own — request-detail-page.blade.php
-    // already rendered every track's own bundle up front (see its own
-    // $infos), so this is a plain Alpine toggle (`activeInfo`, defined on
-    // that page's own outer x-data, an ancestor scope this reaches into the
-    // same way it already reaches `expandedTracks`/`toggleTrack` below) —
-    // not a real navigation the way this used to be, guarded against
-    // relanding on the track already showing. history.pushState keeps the
-    // url bar/back-button/bookmarking in sync without paying for a reload;
-    // document.title mirrors components/layout.blade.php's own "$title —
-    // Monitor" format since nothing server-rendered is left to update it.
-    // Every other page this component renders on (job/command/schedule
-    // detail) has no such per-track bundle to switch to at all — $jobUrl
-    // (and so $navigateClick) is always null there instead.
+    // Clicking a root row's body switches request-detail-page's `activeInfo` to this track
+    // and updates the URL and title (layout's format) without a reload. Null when $jobUrl is.
     $navigateClick = $jobUrl !== null
         ? sprintf(
             "if (activeInfo !== %1\$s) { activeInfo = %1\$s; history.pushState(null, '', %2\$s); document.title = (infoTitles[%1\$s] || '') + ' — Monitor'; }",
@@ -80,11 +40,8 @@
         <div class="flex min-w-0 translate-y-px items-center gap-1.5 {{ $depth > 0 ? 'pl-2' : 'pl-3' }}">
             @if ($kind === 'root')
                 @if ($focusable)
-                    {{-- The ONLY thing that expands/collapses a track --
-                         the rest of the row (see $navigateClick above) is
-                         its own separate click target, navigating to that
-                         job's own page instead. @click.stop keeps a chevron
-                         click from also reaching that handler. --}}
+                    {{-- The chevron alone toggles the track; stopping propagation keeps the
+                         row's own $navigateClick handler from also firing. --}}
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::CHEVRON_DOWN" :stroke="2"
                                       class="h-3 w-3 shrink-0 cursor-pointer text-neutral-400 transition-transform dark:text-neutral-500"
                                       x-bind:class="expandedTracks['{{ $trackId }}'] ? '' : '-rotate-90'"
@@ -117,9 +74,7 @@
         </div>
     </div>
 @else
-    {{-- data-duplicate-group marks the first-in-DOM-order match for the
-         EventSummary "N duplicates" click handler's scrollIntoView() (see
-         timeline.blade.php) — first in the timeline == first chronologically. --}}
+    {{-- data-duplicate-group: the heartbeat handler in timeline.blade.php scrolls to the first match. --}}
     <div x-show="{{ $visible }}" class="relative flex h-9 items-center" :class="{{ $highlightClass }}" @if ($duplicateColor) data-duplicate-group @endif>
         <div @class(['relative flex h-full items-center', 'cursor-pointer' => $detailable || $navigateClick || $scrollable, 'scroll-mt-[169px]' => $kind === 'root'])
              style="margin-left: {{ $left }}%; width: {{ $width }}%; min-width: 3px" data-row-id="{{ $entry->id }}"
@@ -139,10 +94,7 @@
                     <span class="max-w-lg truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{{ $entry->label }}</span>
                 </div>
             @elseif ($kind === 'attempt')
-                {{-- Same bar position/width as the root row directly above it
-                     (same underlying entry, see Timeline::__construct()) —
-                     just recoloured to the attempt's own outcome status,
-                     which the root deliberately leaves neutral. --}}
+                {{-- Coloured by the attempt's outcome; the job root stays neutral. --}}
                 <span class="absolute left-0 top-1/2 h-7 w-full -translate-y-1/2 rounded {{ $rootColor }}"></span>
                 <div class="sticky left-0 z-10 flex h-6 translate-y-px items-center gap-1.5 whitespace-nowrap px-2">
                     <span class="font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.attempt') }} #{{ $attempt }}</span>

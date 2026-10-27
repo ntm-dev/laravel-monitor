@@ -20,9 +20,7 @@
     $secondaryButton = 'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50';
     $primaryButton = 'rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500';
 @endphp
-{{-- No data-monitor-poll here, unlike the other dashboard cards: this page
-     is full of in-progress inline-edit forms (name/username/email/password/
-     TOTP) an auto-refresh would blow away mid-edit. --}}
+{{-- No data-monitor-poll: an auto-refresh would wipe the inline-edit forms mid-edit. --}}
 <div>
     <x-monitor::section :icon="Icons::PROFILE" title="{{ __('monitor::messages.team.my_account') }}">
         <x-monitor::card class="p-4">
@@ -273,10 +271,8 @@
                     </div>
 
                     <script>
-                        // The server's JSON (registerOptions()) and the browser's WebAuthn API disagree
-                        // on wire format: the API wants ArrayBuffers for challenge/user.id/credential ids,
-                        // while the JSON we fetch (and the JSON we POST back) carries base64url strings.
-                        // These two helpers bridge that gap in both directions.
+                        // WebAuthn wants ArrayBuffers where the server's JSON (registerOptions())
+                        // carries base64url strings; these helpers convert both ways.
                         function base64UrlToArrayBuffer(base64Url) {
                             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                             const binary = atob(base64);
@@ -500,9 +496,7 @@
                 @empty
                     <p class="py-3 text-sm text-neutral-400 dark:text-neutral-500">{{ $t('no_members_match') }}</p>
                 @endforelse
-                {{-- Pending invites, right below the real members — not a
-                     separate block, so this is one list of "who's on the
-                     team or about to be". --}}
+                {{-- Pending invites share the members list. --}}
                 @foreach ($pendingInvitations as $invitation)
                     <div class="flex items-center gap-3 py-2.5">
                         <div class="min-w-0 flex-1">

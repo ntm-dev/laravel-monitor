@@ -9,18 +9,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class Format
 {
-    /**
-     * Timestamp format used across charts and detail tables, for a locale
-     * with no entry in DATETIME_LOCALES below.
-     */
+    /** Default timestamp format, for a locale with no DATETIME_LOCALES entry. */
     public const DATETIME = 'M j, Y, H:i:s';
 
     /**
-     * Locale => timestamp format override. Date order/punctuation is a
-     * locale convention, not just word translation — Vietnamese reads
-     * day-first ("21/08/2026"), not the US month-first layout DATETIME
-     * above uses — so translatedFormat() alone (which only swaps the
-     * month/day *names* a format string references) isn't enough.
+     * Locale => timestamp format, for locales whose date order differs from
+     * DATETIME (translatedFormat() only translates names, not order).
      *
      * @var array<string, string>
      */
@@ -28,25 +22,16 @@ class Format
         'vi' => 'd-m-Y H:i:s',
     ];
 
-    /**
-     * Microsecond-precision timestamp format — only meaningful for a
-     * `created_at` column stored with fractional seconds (`timestamp(6)`,
-     * see the migration); parsing an older second-precision value just
-     * prints a `.000000` suffix.
-     */
+    /** Microsecond-precision format, matching `created_at`'s timestamp(6) column. */
     public const DATETIME_PRECISE = 'Y-m-d H:i:s.u';
 
-    /**
-     * Minute-precision format used by the custom range picker
-     * (matches <input type="datetime-local">).
-     */
+    /** Custom range picker format (matches <input type="datetime-local">). */
     public const RANGE = 'Y-m-d\TH:i';
 
     /**
-     * Manual issue-priority levels, value => fallback English label. Only
-     * the keys are canonical (validated against in IssueController and
-     * DatabaseStorage::setIssuePriority()) — displayed text always goes
-     * through priorityLabel()/priorityOptions() instead, so it's translated.
+     * Issue priority levels, value => fallback English label. Only the keys are
+     * used (validated by IssueManagePanel and DatabaseIssueStorage::setIssuePriority());
+     * displayed text goes through priorityLabel().
      */
     public const PRIORITIES = [
         'none' => 'No priority',
@@ -56,17 +41,7 @@ class Format
         'urgent' => 'Urgent',
     ];
 
-    /**
-     * Badge classes for a query's actual PDO connection role — keyed by
-     * Illuminate\Database\Events\QueryExecuted::$readWriteType (null when
-     * running under a Laravel version that doesn't report it, or when it's
-     * ambiguous across a sampled group; see Recorders\Queries).
-     */
-    /**
-     * Text color for an HTTP method badge, keyed by the verb — shared by the
-     * route list (Livewire\Requests) and a single route's request list
-     * (Livewire\RequestDetail) so a method reads the same color in both.
-     */
+    /** Text color for an HTTP method badge, keyed by the verb. */
     public const HTTP_METHOD_CLASSES = [
         'POST' => 'text-emerald-600',
         'PUT' => 'text-blue-500',
@@ -74,6 +49,7 @@ class Format
         'DELETE' => 'text-rose-600',
     ];
 
+    /** Badge classes for a query's PDO connection role (QueryExecuted::$readWriteType). */
     public const CONNECTION_TYPE_BADGES = [
         'write' => 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
         'read' => 'border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -81,7 +57,7 @@ class Format
     ];
 
     /**
-     * Memoized durationUnits() results, keyed by locale.
+     * durationUnits() results, keyed by locale.
      *
      * @var array<string, array<string, string>>
      */
@@ -96,10 +72,8 @@ class Format
     ];
 
     /**
-     * Render a millisecond duration in the largest whole unit it reaches:
-     * "918ms", "1.73s". Walks the unit ladder (h, m, s, ms) largest-first
-     * and uses the first one the value reaches 1 of; anything under 1ms
-     * drops to μs so it doesn't round away to "0ms".
+     * A millisecond duration in the largest unit it reaches: "918ms", "1.73s".
+     * Under 1ms drops to μs so it doesn't round to "0ms".
      */
     public static function duration(int|float|null $milliseconds, string $fallback = '—'): string
     {
@@ -121,11 +95,8 @@ class Format
     }
 
     /**
-     * Text color class for an HTTP method badge (see HTTP_METHOD_CLASSES).
-     * Also covers the merged Unmatched Route row's method column
-     * (Livewire\Requests::presentRoute()): "ANY" above its method cap, or
-     * several methods joined with "/" below it, both get a distinct color
-     * since they don't represent a single verb.
+     * Text color for an HTTP method badge. "ANY" and "GET/POST"-style values
+     * (the merged Unmatched Route row, see Livewire\Requests::presentRoute()) get their own color.
      */
     public static function httpMethodClass(?string $method): string
     {
@@ -137,23 +108,9 @@ class Format
     }
 
     /**
-     * `:count`-templated suffix per duration unit, keyed by the letter a
-     * caller groups by: `[':countd', ':counth', ...]` in English,
-     * `[':count ngày', ':count giờ', ...]` in Vietnamese. Read out of Carbon
-     * rather than hardcoded, so a locale the package itself doesn't ship
-     * still gets its own units.
-     *
-     * Laravel never syncs Carbon's locale to the app's — nothing listens for
-     * LocaleUpdated — so it is set per interval here rather than assumed.
-     * The template is recovered by rendering a probe count and putting the
-     * placeholder back, because only the rendered form has been through
-     * Carbon's own plural selection.
-     *
-     * Keyed off the app locale, not Preferences::locale(), so these always
-     * agree with the __() strings beside them; the middleware has already
-     * pushed the preference onto the app. Memoized because a table renders
-     * one countdown per row and Preferences::availableLocales() globs the
-     * lang directory on every call.
+     * `:count`-templated short suffix per unit (d/h/m/s), e.g. ':countd', read
+     * from Carbon by rendering a probe count. Carbon's locale isn't synced to
+     * the app's, so it's set per interval. Memoized per app locale.
      *
      * @return array<string, string>
      */
@@ -191,10 +148,8 @@ class Format
     {
         $locale = app()->getLocale();
 
-        // translatedFormat(), not format(): Carbon's own locale is never
-        // synced to the app's (see durationUnits() for why), so plain
-        // format() renders 'M'/'D'/'l'/'F' month/day names in English
-        // regardless of the active locale unless set explicitly here.
+        // translatedFormat() with an explicit locale: plain format() renders
+        // month/day names in English.
         return Carbon::instance($date)
             ->setTimezone(Preferences::timezone())
             ->locale($locale)
@@ -231,15 +186,8 @@ class Format
     }
 
     /**
-     * When an entry's own work actually began. Entries are stamped when they
-     * *finish* — `created_at` is the run's end, and only at second precision
-     * — so a list showing created_at and a detail page showing "started at"
-     * disagree by a full second on anything slower than that. Prefers the
-     * exact `started_at` the recorder captured at the moment the run began
-     * (see Recorders\Requests/Jobs and Monitor::finalizePendingCommand()),
-     * falling back to walking the duration back off created_at for rows
-     * persisted before that field existed. Float-timestamp twin of
-     * Http\Controllers\Concerns\MergesJobTimelines::startedAt().
+     * When an entry's run began: payload `started_at`, else created_at (the
+     * run's end) minus the duration. Carbon twin of MergesJobTimelines::startedAt().
      */
     public static function startedAt(object $entry): ?Carbon
     {
@@ -256,12 +204,7 @@ class Format
         return Carbon::instance($entry->created_at)->subMilliseconds((int) round((float) ($entry->duration ?? 0)));
     }
 
-    /**
-     * The suffix shown next to every timestamp on the dashboard: the bare
-     * "UTC" label for the default zone, otherwise a numeric offset like
-     * "+07:00" rather than the raw identifier (e.g. "Asia/Ho_Chi_Minh"),
-     * which is wide, mixed-case, and pushes neighbouring table columns out.
-     */
+    /** Timestamp suffix for the viewer's timezone: "UTC", or an offset like "+07:00". */
     public static function timezone(): string
     {
         $tz = Preferences::timezone();
@@ -277,8 +220,7 @@ class Format
     }
 
     /**
-     * Every priority level as value => translated label, for the priority
-     * <select> on the Issue detail page.
+     * Every priority level as value => translated label.
      *
      * @return array<string, string>
      */
@@ -289,11 +231,7 @@ class Format
             ->all();
     }
 
-    /**
-     * Badge colour classes for an HTTP status code: light tint matching its
-     * severity (5xx rose, 4xx amber, otherwise green) — shared by every
-     * status badge on the Request Detail page (header, General summary).
-     */
+    /** Badge classes for an HTTP status code: 5xx rose, 4xx amber, otherwise green. */
     public static function statusBadgeClass(int $status): string
     {
         return match (true) {

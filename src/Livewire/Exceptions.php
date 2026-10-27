@@ -121,8 +121,7 @@ class Exceptions extends Card
 
         $tz = Format::timezone();
 
-        // One query grouped by subtype instead of three separate stats()
-        // calls (total + handled + unhandled) — see Livewire/Overview.php.
+        // One grouped query instead of a stats() call per subtype.
         $bySubtype = $storage->statsBySubtype('exception', $since, $until, $userId);
 
         return [
@@ -145,10 +144,7 @@ class Exceptions extends Card
         ];
     }
 
-    /**
-     * Shape a grouped-exception row into a display-ready object so the Blade
-     * view carries no formatting logic.
-     */
+    /** Shape a grouped-exception row for display. */
     protected function presentGroup(object $group, string $tz): object
     {
         return (object) [
