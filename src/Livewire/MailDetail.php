@@ -7,11 +7,8 @@ use LaravelMonitor\Support\EntryId;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Detail page for a single mail send (one specific message, not an aggregate
- * across many) — $key is the entry's own row id, disguised by EntryId as a
- * uuid-shaped string, matching NotificationDetail. When this mail was
- * triggered by a notification, looks up that notification's entry via the
- * shared correlation id so the page can link back to it.
+ * A single mail send; $key is the EntryId-encoded row id. Links to the
+ * notification that sent it via the shared correlation id.
  */
 class MailDetail extends Card
 {
@@ -25,9 +22,8 @@ class MailDetail extends Card
     }
 
     /**
-     * Best-effort .eml reconstruction from this send's own recorded fields —
-     * not the exact original bytes (attachment content was never captured,
-     * only names/counts), but enough for a real mail client to open and read.
+     * Best-effort .eml rebuilt from the recorded fields; attachment content
+     * isn't recorded.
      */
     public function downloadEml(): StreamedResponse
     {
@@ -53,9 +49,7 @@ class MailDetail extends Card
         $eml = collect($headers)->map(fn ($value, $name) => "{$name}: {$value}")->implode("\r\n")
             ."\r\n\r\n".($payload['body'] ?? '');
 
-        // Filenames illegal on Windows/most filesystems stripped, everything
-        // else (including non-ASCII subjects) kept as-is — response()->
-        // streamDownload() already RFC-5987-encodes the header for those.
+        // Strip filesystem-illegal characters; streamDownload() encodes non-ASCII.
         $filename = trim((string) preg_replace('/[\/\\\\:*?"<>|\x00-\x1F]/', '_', $subject));
 
         return response()->streamDownload(

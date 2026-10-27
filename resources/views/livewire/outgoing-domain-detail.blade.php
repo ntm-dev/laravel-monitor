@@ -45,12 +45,9 @@
                         </thead>
                         <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($entries as $entry)
-                                {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
-                                     sourceType/sourceLabel/sourceUrl (set in OutgoingDomainDetail::data()) resolve it
-                                     to the right detail page instead of assuming every call came from an HTTP request. --}}
-                                {{-- Merged into one php block, not four stacked
-                                     inline-php blocks — see resources/views/CLAUDE.md's
-                                     "three or more consecutive inline-php blocks" gotcha. --}}
+                                {{-- request_id may belong to any request/job/command/task; OutgoingDomainDetail::data()
+                                     sets sourceType/sourceLabel/sourceUrl. Keep this as one php block
+                                     (3+ stacked inline ones corrupt, see resources/views/CLAUDE.md). --}}
                                 @php
                                     $sendUrl = route('monitor.outgoing.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
                                     $status = $entry->payload['status'] ?? null;

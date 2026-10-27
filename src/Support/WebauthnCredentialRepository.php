@@ -29,10 +29,8 @@ class WebauthnCredentialRepository
 
     public function saveNewCredentialRecord(CredentialRecord $credentialRecord, string $label): void
     {
-        // updateOrCreate() keyed on the unique credential_id (rather than create()) so a
-        // replayed/duplicate registration for the same authenticator (e.g. a double-click
-        // or network retry re-submitting the same attestation) updates the existing row
-        // instead of throwing an uncaught unique-constraint QueryException.
+        // Upsert on the unique credential_id: a duplicate registration (double-click,
+        // retry) updates the row instead of hitting a unique-constraint error.
         $attributes = ['credential_id' => base64_encode($credentialRecord->publicKeyCredentialId)];
 
         $values = [
@@ -42,10 +40,8 @@ class WebauthnCredentialRepository
             'label' => $label,
         ];
 
-        // `created_at` has no DB default and the model has $timestamps = false, so
-        // updateOrCreate()'s save() won't populate it automatically — set it explicitly
-        // in $values, but only for a genuinely new row, so a duplicate registration
-        // doesn't reset an existing credential's created_at.
+        // No DB default and $timestamps = false: set created_at only for a new row,
+        // so a duplicate registration keeps the original.
         if (! MonitorWebauthnCredential::query()->where($attributes)->exists()) {
             $values['created_at'] = now();
         }

@@ -21,22 +21,9 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
 
     protected function cacheKeyStatsUncached(DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
-        // GROUP BY key over the raw table, not the sampled subquery below:
-        // MySQL sees an index it can walk in key order (idx_type_key) and
-        // prefers that over a covering index that's actually filtered by
-        // created_at first, to avoid a sort step for the GROUP BY — cheap
-        // when the date filter matches most of the table, ruinous when it
-        // doesn't, since every matching row then needs a lookup just to
-        // check created_at. Capping the input via a LIMITed subquery keeps
-        // the group-by's input bounded regardless of which index MySQL
-        // picks for it. Ordered by created_at, not id: id isn't part of any
-        // index here, so sorting by it forces a full sort of every matching
-        // row before the LIMIT can apply — created_at is the index's
-        // leading range column, so MySQL can walk it backwards and stop at
-        // the limit instead (measured 85x faster). Ties on the same
-        // created_at second come back in whatever order the storage engine
-        // hands them over, which is fine — nothing here depends on their
-        // relative order.
+        // GROUP BY over a LIMITed subquery: a direct GROUP BY may make MySQL walk the
+        // [type, key] index and look up every row to check created_at. Ordered by
+        // created_at (index-walkable), not id, which would force a full sort before the LIMIT.
         $sample = $this->table()
             ->where('type', 'cache')
             ->where('created_at', '>=', $since)
@@ -84,19 +71,14 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             ->where('type', 'query')
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
-            // created_at, not id, as the primary sort — see cacheKeyStats()
-            // for why — but this sample's duration values feed avg/p95
-            // directly (unlike cacheKeyStats' count-only aggregates), so a
-            // tied created_at second needs a deterministic secondary sort.
+            // `id` tiebreak: see DatabaseAggregateStorage::sampleDurationsAcrossBuckets().
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
-            // `subtype` packs connection + role (see QueryConnection) —
-            // no need to touch `payload` here at all.
+            // `subtype` packs connection + role (see QueryConnection), so no payload needed.
             ->get(['key', 'subtype', 'duration', 'created_at']);
 
-        // Single foreach pass with plain arrays — building/re-collecting a
-        // Collection per group was measurably slower at the sample cap.
+        // Plain arrays, not a Collection per group: too slow at the sample cap.
         $groups = [];
 
         foreach ($rows as $row) {
@@ -105,7 +87,7 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             $groupKey = $row->key.'@@'.$connection;
 
             $group = &$groups[$groupKey];
-            // Rows arrive newest-first, so the first row seen per group is its last_seen.
+            // Rows arrive newest-first, so the first row seen is last_seen.
             $group ??= ['key' => (string) $row->key, 'connection' => $connection, 'calls' => 0, 'durations' => [], 'connectionTypes' => [], 'last_seen' => $row->created_at];
 
             $group['calls']++;
@@ -130,13 +112,7 @@ class DatabaseCacheAndQueryStorage implements CacheAndQueryStorage
             $result[] = (object) [
                 'key' => $group['key'],
                 'connection' => $group['connection'],
-                // Every PDO role the sampled calls actually ran under, not
-                // one picked from them: the same statement legitimately hits
-                // both sides of a read/write split (a SELECT inside a
-                // transaction, or after a write while sticky, is routed to
-                // the write connection). Collapsing that to a single role
-                // would be guesswork; collapsing it to nothing made a mixed
-                // query indistinguishable from one with no role recorded.
+                // All roles seen: one statement can hit both sides of a read/write split.
                 'connection_types' => array_keys($group['connectionTypes']),
                 'calls' => $group['calls'],
                 'total' => round(array_sum($durations), 2),

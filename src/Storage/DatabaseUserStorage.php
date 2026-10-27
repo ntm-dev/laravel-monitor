@@ -83,9 +83,7 @@ class DatabaseUserStorage implements UserStorage
         ?int $limit,
         ?DateTimeInterface $until,
     ): Collection {
-        // See DatabaseCacheAndQueryStorage::cacheKeyStats() for why the
-        // GROUP BY runs over a capped subquery, ordered by created_at rather
-        // than id, rather than the raw filtered table directly.
+        // Capped subquery: see DatabaseCacheAndQueryStorage::cacheKeyStatsUncached().
         $sample = $this->query($type, $since, null, null, $until)
             ->whereNotNull('user_id')
             ->select('user_id')
@@ -124,8 +122,7 @@ class DatabaseUserStorage implements UserStorage
                 ->orWhere(fn (Builder $q2) => $q2->where('type', RecordType::Job->value)->where('subtype', 'queued')))
             ->where('created_at', '>=', $since)
             ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
-            // Rows arrive newest-first, so the first row seen per user_id is
-            // its last_seen.
+            // Newest-first, so the first row per user_id is last_seen.
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())

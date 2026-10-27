@@ -1,22 +1,12 @@
 {{-- Desktop sidebar: app identity, grouped tab links and footer entries.
      All data is prepared by Http\Controllers\DashboardController. --}}
-{{-- autoRefreshes: false on the standalone, non-Livewire detail pages (Request
-     Detail's timeline, Job Attempt, Command Run, Schedule Run, Issue Detail)
-     and any page pinned to one fixed, already-past moment (e.g. a single mail
-     send) — nothing there ever polls, so the active tab's refresh ring would
-     be showing a countdown to a refresh that never happens. The open-issue
-     badge keeps polling regardless — it's a global count, not tied to
-     whatever page happens to be open. --}}
+{{-- autoRefreshes: false on pages that never poll, which hides the active tab's refresh ring.
+     The open-issue badge polls regardless. --}}
 @props(['groups', 'footerTabs', 'tab', 'range', 'refresh', 'appInitial', 'autoRefreshes' => true, 'reactiveTabExpr' => null])
 @php
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
 
-    // The link/icon classes below are identical whichever tab this is --
-    // only *which* tab currently gets them differs, either $tab === $tabKey
-    // (baked in once, server-side, the same for every page but Request
-    // Detail) or, there, an Alpine expression (see $reactiveTabExpr) so a
-    // request/job toggle there can flip the active tab without a real
-    // navigation -- see request-detail-page.blade.php's own $infos.
+    // Active tab is $tab === $tabKey, or the Alpine $reactiveTabExpr when set (Request Detail).
     $linkActiveClasses = 'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
     $linkInactiveClasses = 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100';
     $iconActiveClasses = 'text-blue-600 dark:text-blue-400';
@@ -40,16 +30,12 @@
         return '{ '.\Illuminate\Support\Js::from($activeClasses).": {$isActive}, ".\Illuminate\Support\Js::from($inactiveClasses).": ! ({$isActive}) }";
     };
 @endphp
-{{-- collapsed mirrors the localStorage key the pre-paint script in
-     components/layout.blade.php reads, so the initial Alpine state always
-     matches what was already rendered before hydration — no flash. --}}
+{{-- Same localStorage key layout.blade.php's pre-paint script reads, so hydration doesn't flash. --}}
 <aside x-data="{ collapsed: localStorage.getItem('monitor-nav-collapsed') === '1' }"
        :class="{ 'monitor-nav-collapsed': collapsed }"
        class="monitor-nav-aside sticky top-0 hidden h-screen shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
     <div class="p-2 shadow-lg dark:shadow-md dark:shadow-white/5">
-        {{-- Collapsed: name hides (.monitor-nav-label), leaving just the app
-             icon and the toggle button — flex-col stacks them instead of
-             the row overflowing the narrow rail. --}}
+        {{-- Collapsed: the label hides and flex-col stacks icon and toggle in the narrow rail. --}}
         <div class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5" :class="{ 'flex-col': collapsed }">
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-sm font-semibold text-white dark:bg-neutral-700">{{ $appInitial }}</span>
             <span class="monitor-nav-label min-w-0 flex-1">
@@ -87,8 +73,7 @@
                             </span>
                         @endif
                         @if ($tab === $tabKey && $autoRefreshes)
-                            {{-- Only the active tab is actually polling — the others are
-                                 plain links, nothing there is really refreshing. --}}
+                            {{-- Only the active tab polls. --}}
                             <span class="monitor-nav-label">
                                 <x-monitor::refresh-ring :refresh="$refresh"/>
                             </span>
@@ -109,8 +94,7 @@
                     <x-monitor::icon :path="$item['icon']" class="{{ $staticClasses($iconBaseClasses, $tabKey, $iconActiveClasses, $iconInactiveClasses) }}" x-bind:class="{{ $classExpr($tabKey, $iconActiveClasses, $iconInactiveClasses) }}"/>
                     <span class="monitor-nav-label flex-1 truncate">{{ $item['label'] }}</span>
                     @if ($tab === $tabKey && ! in_array($tabKey, ['settings'], true) && $autoRefreshes)
-                        {{-- Settings/Team never poll — static config and
-                             in-progress edit forms, nothing there refreshes. --}}
+                        {{-- Settings never polls. --}}
                         <span class="monitor-nav-label">
                             <x-monitor::refresh-ring :refresh="$refresh"/>
                         </span>
@@ -130,9 +114,7 @@
             <span class="monitor-nav-label ml-auto flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500" data-tooltip="{{ __('monitor::messages.nav.live_refresh', ['seconds' => $refresh, 'unit' => trans_choice('monitor::messages.common.second_count', $refresh)]) }}">
                 <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
             </span>
-            {{-- Always visible, even collapsed — sign out is a functional
-                 action, not identity chrome, so it doesn't hide with the rest
-                 of this row. --}}
+            {{-- Sign out stays visible when collapsed. --}}
             <form method="POST" action="{{ route('monitor.logout') }}">
                 @csrf
                 <button type="submit" data-tooltip="{{ __('monitor::messages.nav.sign_out') }}"
@@ -144,10 +126,7 @@
         </div>
     </div>
 
-    {{-- Same dark-mode scrollbar fix as the Request Detail timeline (see
-         components/requests/timeline.blade.php's .monitor-timeline-scrollbar)
-         — without it this vertical scrollbar stays the light native OS
-         colour even inside a dark-mode page. --}}
+    {{-- Themed scrollbar, so it doesn't stay the light native colour in dark mode. --}}
     <style>
         .monitor-nav-scrollbar {
             scrollbar-color: rgb(212 212 212) transparent;

@@ -12,14 +12,9 @@ use LaravelMonitor\Support\Timeline;
 use function usort;
 
 /**
- * Shared by RequestDetailController/JobAttemptController/CommandRunController/
- * ScheduleRunController: splits a root's own timeline into one "track" per
- * root/dispatched-job, instead of leaving a dispatched job a dead-end
- * "Queued Job" placeholder — each becomes its own collapsible per-job
- * track, not a single merged/proportional timeline (see buildTracks()'s own
- * docs for why: a queue worker can pick a job up long after dispatch, far
- * outside the dispatching root's own — often sub-second — duration, so
- * there's no single time scale both could stay legible on at once).
+ * Splits a root's timeline into one collapsible track for the root plus one per
+ * dispatched job: a worker may run a job long after dispatch, so a single shared
+ * scale wouldn't stay legible.
  */
 trait MergesJobTimelines
 {
@@ -28,14 +23,8 @@ trait MergesJobTimelines
      */
     protected function buildTracks(object $root, Collection $children, string $rootBadge): array
     {
-        // Wall clock, not proportional — see this trait's own docblock.
-        // Computed up front, not just for this track's own offsets below:
-        // it's also the correct lower bound for finding a dispatched job's
-        // own outcomes — $root->created_at is stamped at the request's own
-        // END (see startedAt()'s own docblock), so a worker that finishes a
-        // job before the dispatching request itself completes (common — see
-        // jobTrack()'s docblock) would otherwise fall outside a window
-        // floored at that later timestamp and never resolve to a track.
+        // Root start (not created_at, which marks its end) also floors the job
+        // lookup: a worker can finish a job before the dispatching root ends.
         $rootStart = $this->startedAt($root);
         $since = CarbonImmutable::createFromFormat('U.u', number_format($rootStart, 6, '.', ''));
 
@@ -50,20 +39,15 @@ trait MergesJobTimelines
 
         $jobTracks = $this->jobTracksBelow($children, $rootStart, $since);
 
-        // By when each job ran, not when it was dispatched: 'start' already
-        // positions every bar that way, so dispatch order let a later bar sit
-        // above an earlier one. Stable sort keeps ties in dispatch order.
+        // Order by when each job ran; stable sort keeps ties in dispatch order.
         usort($jobTracks, static fn (array $a, array $b) => $a['start'] <=> $b['start']);
 
         return [$rootTrack, ...$jobTracks];
     }
 
     /**
-     * One track per job reachable by following dispatches, at any depth — a
-     * job that dispatches further jobs keeps their placeholders among its own
-     * children, so stopping at one level left those a dead-end marker with no
-     * sign they had run. Breadth-first: one storage round trip per level.
-     * $seen guarantees termination if dispatches ever form a cycle.
+     * One track per job reachable through dispatches at any depth. Breadth-first,
+     * one storage round trip per level; $seen guards against cycles.
      *
      * @param  Collection<int, object>  $children
      * @return list<array<string, mixed>>
@@ -115,12 +99,7 @@ trait MergesJobTimelines
     }
 
     /**
-     * One track per *dispatched job* (job_id), not per execution — every
-     * retry of the same dispatch (its 'attempts', ordered oldest first)
-     * nests under the one track instead of each becoming its own top-level
-     * "JOB" entry (see View\Components\Requests\Timeline, which turns each
-     * of these into its own coloured 'attempt' row underneath this track's
-     * single, deliberately neutral root — see TimelineRow).
+     * One track per dispatched job (job_id); its retries nest as 'attempts', oldest first.
      *
      * @param  Collection<int, object>  $executions
      * @return array{id: string, badge: string, label: string, start: float, duration: float, entries: array, attempts: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: array}>, totalAttemptsDuration: float}
@@ -132,44 +111,19 @@ trait MergesJobTimelines
             $processingStartedAt = $this->startedAt($outcome);
             $entries = Timeline::build($outcome, $execution->children, $processingStartedAt);
 
-            // entries[0] is always this attempt's own request-shaped root
-            // entry (see Timeline::build()) — its duration is already
-            // stretched past $outcome->duration when a child (query/cache/...)
-            // ends later than the outcome's own raw recorded duration (see
-            // Timeline::rootDuration()). Reusing that same value here, rather
-            // than $outcome->duration directly, keeps this attempt's own
-            // bounding box — and therefore the parent job track's, computed
-            // from these below — from ending up shorter than what
-            // View\Components\Requests\Timeline actually renders for it.
+            // The root entry's duration, already stretched to cover late children
+            // (Timeline::rootDuration()), so the bounding box matches what renders.
             $duration = (float) ($entries[0]->duration ?? 0);
 
-            // round(..., 3): not a display concern (see
-            // View\Components\Requests\Timeline, which renders this
-            // unrounded) — startedAt() returns a raw Unix-epoch-scale float
-            // (~1.7 billion), and subtracting two such floats to get a small
-            // millisecond-range result is a textbook case of floating-point
-            // catastrophic cancellation: the ~10 integer digits already
-            // consume most of a double's ~15-17 significant digits, so what
-            // should be an exact "400" can come out as
-            // "400.00009536743164062500". Rounding to 3 decimals (matching
-            // microtime()'s own microsecond resolution — the true precision
-            // ceiling of every value startedAt() can return) snaps it back
-            // to the value it actually represents, before this noise
-            // propagates into the bounding-box math below and the
-            // percentage math in View\Components\Requests\Timeline.
+            // round(..., 3) strips float cancellation noise from subtracting two
+            // epoch-scale timestamps; microsecond precision is all there is.
             $start = round(max(0.0, ($processingStartedAt - $rootStart) * 1000), 3);
 
             return [
                 'attempt' => $index + 1,
-                // 'processed'/'failed'/'released' — surfaced on this
-                // attempt's own row/bar the same way an HTTP status colours
-                // a request root (see View\Components\Requests\TimelineRow).
+                // 'processed'/'failed'/'released'.
                 'status' => $outcome->subtype,
-                // The specific outcome row this attempt came from — lets
-                // defaultTrackId() find this track from a `?job=<uuid>` that
-                // names any one of its attempts, not just the first. Its
-                // request_id (not the int primary key), matching the uuid
-                // every other cross-page link in this package already uses.
+                // Outcome request_id, matched by defaultTrackId().
                 'outcomeId' => $outcome->request_id,
                 'start' => $start,
                 'duration' => max(0.0, $duration),
@@ -185,34 +139,20 @@ trait MergesJobTimelines
             'id' => "job-{$first->id}",
             'badge' => 'JOB',
             'label' => $first->key ?? 'Job',
-            // Bounding box spanning every attempt (including the gap
-            // between retries) — this track's own bar visually contains all
-            // of its attempts' bars, same as any other parent/child pair on
-            // the timeline.
+            // Bounding box over every attempt, gaps between retries included.
             'start' => $earliestStart,
             'duration' => max(0.0, $latestEnd - $earliestStart),
-            // No entries of its own — every event belongs to one specific
-            // attempt (see 'attempts' below), never to the track as a whole.
+            // Events belong to attempts, never to the track itself.
             'entries' => [],
             'attempts' => $attempts,
-            // Sum of each attempt's own duration, deliberately different
-            // from the bounding-box 'duration' above (which includes idle
-            // time between retries) — this is "how long the job actually
-            // ran for", shown on the track's own root row instead of that
-            // wall-clock span.
+            // Actual run time, excluding idle gaps between retries.
             'totalAttemptsDuration' => max(0.0, array_sum(array_column($attempts, 'duration'))),
         ];
     }
 
     /**
-     * The real wall-clock moment an entry (root or job outcome) actually
-     * started, as a Unix timestamp with microsecond precision. Prefers the
-     * 'started_at' payload field recorded directly at that moment (see
-     * Recorders\Requests/Jobs) over reconstructing it from created_at -
-     * duration — created_at is stamped when the entry is recorded
-     * (RequestHandled/JobProcessed et al.), i.e. at its own END, not its
-     * start. The subtraction fallback below only exists for rows persisted
-     * before 'started_at' existed.
+     * Unix timestamp (microseconds) an entry started: payload 'started_at', else
+     * created_at - duration (created_at marks the end, at second precision).
      */
     protected function startedAt(object $entry): float
     {
@@ -237,19 +177,9 @@ trait MergesJobTimelines
     }
 
     /**
-     * Which track starts expanded (and doubles as the fixed scale every bar
-     * on the page is positioned against — see View\Components\Requests\Timeline).
-     * Defaults to the root ('root') unless $requestedOutcomeId names one of
-     * this page's own job tracks — the route's own trailing {jobId} segment
-     * (see routes/web.php's unnamed twin of this page's own named route),
-     * forwarded by the calling controller, set by JobAttemptController when
-     * it redirects a directly-visited, already-tracked job attempt here, so
-     * landing on this page from that job's own link expands (and
-     * scales around) *that* job instead of the root. It's a specific
-     * outcome's own request_id, not the track id — a retried job's track
-     * holds several attempts (see jobTrack()), so this matches against every
-     * attempt's own 'outcomeId' rather than assuming the linked attempt is
-     * the track's first one.
+     * Track that starts expanded (and sets the page's scale): the one holding the
+     * attempt whose outcome request_id is $requestedOutcomeId (the route's trailing
+     * {jobId}), else the root.
      */
     protected function defaultTrackId(array $tracks, ?string $requestedOutcomeId = null): string
     {

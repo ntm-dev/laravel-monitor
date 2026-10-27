@@ -11,8 +11,7 @@ class Authorize
 {
     public function handle(Request $request, Closure $next)
     {
-        // Applied before the gate check (and before any label/heading is resolved)
-        // so unauthenticated auth-flow pages (login, invitations, ...) translate too.
+        // Before the gate check, so unauthenticated auth pages are translated too.
         app()->setLocale(Preferences::locale());
 
         abort_unless(Gate::allows('viewMonitor', [$request->user()]), 403);

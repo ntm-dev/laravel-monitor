@@ -1,16 +1,12 @@
-{{-- Standalone Command Run Detail page (route: monitor.commands.runs.show).
-     Unlike the tab-based dashboard views, this page owns its own URL and
-     fetches everything it needs itself — see
-     Http\Controllers\CommandRunController. Mirrors job-attempt-page.blade.php:
-     a simple status header, the event summary and the shared waterfall
-     timeline, with no HTTP-specific sections. --}}
+{{-- Standalone Command Run Detail page (route: monitor.commands.runs.show,
+     see Http\Controllers\CommandRunController). Same layout as
+     job-attempt-page.blade.php: status header, event summary, shared timeline. --}}
 @php
     use LaravelMonitor\Support\KeyHash;
 
     $command = $root->key ?? 'Command';
-    // The command line as invoked, arguments included — falls back to the
-    // bare name for runs recorded before it was captured, and for commands
-    // invoked without any (see Recorders\Commands::commandLine()).
+    // Full command line as invoked; the bare name when no arguments were
+    // captured (see Recorders\Commands::commandLine()).
     $invocation = $root->payload['command'] ?? $command;
     $status = $root->subtype ?? 'success';
     $badgeClass = match ($status) {
@@ -32,9 +28,7 @@
                             {{ __('monitor::messages.nav.commands') }}
                         </a>
                         <span class="shrink-0">›</span>
-                        {{-- The command's *name*, not this run's own invocation: it
-                             links back to that command's own list of runs, which is
-                             keyed by name (arguments live in the payload). --}}
+                        {{-- The command's name, not this run's invocation: the runs list is keyed by name. --}}
                         <a href="{{ route('monitor.commands.show', ['hash' => KeyHash::for($command)] + $range) }}"
                            data-tooltip="{{ $command }}"
                            class="min-w-0 truncate font-mono hover:text-neutral-900 dark:hover:text-neutral-100">

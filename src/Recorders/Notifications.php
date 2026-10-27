@@ -18,11 +18,7 @@ class Notifications extends Recorder
     /** Stored data larger than this (encoded, in bytes) is dropped in favor of a size marker. */
     protected const MAX_DATA_BYTES = 10000;
 
-    /**
-     * When the current channel's send started, set by NotificationSending
-     * and read back by NotificationSent — same technique as
-     * CacheInteractions' before/after timing.
-     */
+    /** Set by NotificationSending, read by NotificationSent. */
     protected ?float $startedAt = null;
 
     public function register(Dispatcher $events): void
@@ -35,10 +31,7 @@ class Notifications extends Recorder
     {
         $this->startedAt = microtime(true);
 
-        // A mail-channel send fires its own MessageSending/MessageSent
-        // around this one; stamping a correlation id here (read back by
-        // both this recorder and Mail's) is how the two entries end up
-        // linkable on the dashboard despite being recorded independently.
+        // Correlation id shared with the Mail recorder's entry for this send.
         if ($event->channel === 'mail') {
             $this->monitor->beginNotificationDispatch();
         }
@@ -53,10 +46,7 @@ class Notifications extends Recorder
             $notifiable = null;
         }
 
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // round(x, 3) strips float noise from subtracting two epoch timestamps.
         $duration = $this->startedAt !== null
             ? round((microtime(true) - $this->startedAt) * 1000, 3)
             : null;
@@ -83,11 +73,8 @@ class Notifications extends Recorder
     }
 
     /**
-     * Best-effort generic representation of what was sent — toArray() is
-     * what the 'database' channel itself renders to, so it's the closest
-     * thing to a channel-agnostic payload every notification already
-     * exposes. Not every notification implements it; capped in size like
-     * Recorders\Requests::body().
+     * The notification's toArray(), if it has one, as a channel-agnostic
+     * payload. Over MAX_DATA_BYTES it becomes a size marker.
      */
     protected function data(NotificationSent $event): mixed
     {

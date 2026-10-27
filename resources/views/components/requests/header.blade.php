@@ -1,8 +1,5 @@
-{{-- RequestHeader: back link, then either the request's own method + status
-     badges/path/URL, or -- once a job is the page's active entity (see
-     $job) -- that job's own status badge and class name instead, same swap
-     job-attempt-page.blade.php's standalone header makes (a job has neither
-     an HTTP status, a path, nor a URL). --}}
+{{-- Request header: back link, then the request's method/status/path/URL,
+     or the job's status badge and class name when $job is set. --}}
 @props(['root', 'range', 'job' => null, 'breadcrumbTab' => 'requests', 'breadcrumbLabel' => null, 'breadcrumbUrl' => null])
 @php
     use Illuminate\Support\Str;

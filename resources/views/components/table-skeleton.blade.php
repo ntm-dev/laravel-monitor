@@ -1,12 +1,5 @@
-{{-- Placeholder <tr> rows shown in place of a table's real rows while a
-     user-initiated round trip — paging, sorting, a filter, the refresh
-     button — is in flight. The silent auto-refresh is excluded at the call
-     site via wire:target.except="$refresh". Meant to sit in
-     its own <tbody> alongside the real one (a <table> may have more than
-     one) so the placeholder bars share the real header's column widths
-     instead of drifting out of alignment. `columns` should match the
-     table's actual rendered column count; `rows` should match the real
-     tbody's current row count so nothing shifts vertically on swap. --}}
+{{-- Placeholder rows shown during a user-initiated round trip (the call site excludes $refresh).
+     Put it in its own tbody beside the real one; match `columns` and `rows` to the real table. --}}
 @props(['columns', 'rows' => 6])
 @for ($i = 0; $i < $rows; $i++)
     <tr>

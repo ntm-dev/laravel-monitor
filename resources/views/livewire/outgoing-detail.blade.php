@@ -38,8 +38,7 @@
             'response_size' => __('monitor::messages.common.response_size'),
         ];
 
-        // Bodies are stored as (redacted) JSON text; a complete one is shown
-        // as a tree, anything cut off or non-JSON stays as plain text.
+        // Valid JSON bodies render as a tree; truncated or non-JSON ones as plain text.
         $decodeBody = function (?string $body) {
             if ($body === null) {
                 return null;

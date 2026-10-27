@@ -8,20 +8,14 @@ use Illuminate\Support\Collection;
 interface CacheAndQueryStorage
 {
     /**
-     * Per-key cache breakdown, unsorted: one row per key exposing key,
-     * hit_ratio, hits, misses, writes, deletes, failures, total. Callers
-     * sort/paginate themselves. Sampled at high volume — `total` and the
-     * hit/miss/write/delete/failure tallies are exact only up to
-     * maxSampleRows() matching rows.
+     * One unsorted row per cache key: key, hit_ratio, hits, misses, writes, deletes, failures, total.
+     * Computed from a capped set of the most recent rows, so exact only below that cap.
      */
     public function cacheKeyStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 
     /**
-     * Per (query, connection) breakdown, unsorted: one row per pair exposing
-     * key (the SQL), connection, connection_types (every PDO role the pair's
-     * calls ran under, possibly more than one), calls, total, avg, p95, last_seen.
-     * Callers sort/paginate themselves. Sampled at high volume — `calls`/
-     * `total` are exact only up to maxSampleRows() matching rows.
+     * One unsorted row per (SQL, connection): key, connection, connection_types (every PDO role
+     * seen), calls, total, avg, p95, last_seen. Sampled the same way as cacheKeyStats().
      */
     public function queryStats(DateTimeInterface $since, ?DateTimeInterface $until = null): Collection;
 }

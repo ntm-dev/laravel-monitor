@@ -1,9 +1,5 @@
-{{-- One row of the Logs list. Rendered two ways: inline via @include() for
-     the very first paint (logs.blade.php's own @forelse), and rendered to an
-     HTML string server-side (Logs::renderRowsHtml()) for every later
-     append/prepend/replace — #monitor-logs-list is wire:ignore'd, so Livewire
-     itself never re-renders this partial's output past the first paint; the
-     JS in logs.blade.php splices later batches in directly. --}}
+{{-- One row of the Logs list: included by logs.blade.php for the first paint,
+     then rendered to HTML via Logs::renderRowsHtml() for every later batch. --}}
 @php
     $level = $log->level;
     // $compact drops the source column (rows already scoped to one request).
@@ -11,14 +7,8 @@
 @endphp
 {{-- start log entry row --}}
 <div wire:key="log-{{ $log->id }}" x-data="{ expanded: false }" class="rounded-lg rounded-md border border border-neutral-100 dark:border-white/5 bg-white dark:bg-white/5 shadow-xs text-xs">
-    {{-- Grid (not flex) so the timestamp/level/source/summary
-         columns line up across every row regardless of each
-         cell's own content width — a variable-length level
-         word ("info" vs "emergency") or an absent source
-         badge no longer shifts the summary's left edge.
-         The source-badge cell always renders (even empty)
-         so it keeps its own track instead of being skipped
-         by grid auto-placement. --}}
+    {{-- Grid (not flex) so columns line up across rows whatever each cell's width.
+         Outside compact mode the source cell always renders, keeping its track. --}}
     <button type="button" @click="expanded = ! expanded"
         class="grid w-full cursor-pointer {{ $compact ? 'grid-cols-[1.5rem_12rem_5rem_1fr]' : 'grid-cols-[1.5rem_12rem_5rem_10rem_1fr]' }} items-center gap-3 rounded-lg pl-4 pr-2.5 text-left hover:bg-white/50 dark:hover:bg-white/5"
         :class="expanded ? 'min-h-11 py-2' : 'h-11'">

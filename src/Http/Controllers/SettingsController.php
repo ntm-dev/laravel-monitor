@@ -11,17 +11,9 @@ use LaravelMonitor\Support\Preferences;
 use LaravelMonitor\Support\Settings;
 
 /**
- * Persists dashboard settings from the single Settings form:
- *  - Preferences (theme/language/timezone) → the {@see Preferences::COOKIE}
- *    cookie. Open to any signed-in monitor user — a personal display
- *    choice, not a team setting — so these fields are always processed.
- *  - Environment + Recorders overrides over config/monitor.php → stored
- *    server-side via {@see Settings}. Restricted to canManageSettings()
- *    (owner/admin): the form disables that whole fieldset for anyone else,
- *    so the browser never submits those fields for them, and {@see system()}
- *    stops right after the cookie in that case rather than validating
- *    fields that were never sent.
- * {@see reset()} clears the app-wide overrides back to the config defaults.
+ * Saves the Settings form: personal preferences go to the {@see Preferences::COOKIE}
+ * cookie for any user; app-wide overrides go to {@see Settings} and require
+ * canManageSettings() (other users' forms don't submit those fields).
  */
 class SettingsController
 {
@@ -130,8 +122,7 @@ class SettingsController
             return response()->view('monitor::disabled', ['settingsFile' => Settings::relativePath()])->withCookie($cookie);
         }
 
-        // Redirect to the (possibly new) path so the dashboard never lands on a
-        // stale URL after the prefix changes on the next boot.
+        // Redirect to the possibly new path; the prefix changes on the next boot.
         return $this->backTo($path, 'success', __('monitor::messages.settings.settings_saved'))->withCookie($cookie);
     }
 
@@ -146,8 +137,7 @@ class SettingsController
     }
 
     /**
-     * Build the periods map from the parallel label/hours arrays submitted by
-     * the repeatable rows, keeping the row order and skipping incomplete rows.
+     * Label => hours from the parallel row arrays, in row order, skipping incomplete rows.
      *
      * @param  array<int, string|null>  $labels
      * @param  array<int, int|string|null>  $hours
@@ -170,8 +160,7 @@ class SettingsController
     }
 
     /**
-     * The full recorder-enabled map: every known recorder, true when its
-     * checkbox was submitted.
+     * Every known recorder => whether its checkbox was submitted.
      *
      * @return array<string, bool>
      */
@@ -188,9 +177,7 @@ class SettingsController
     }
 
     /**
-     * Every recorder's detail-option toggles: only the keys Settings::
-     * recorderDetailKeys() actually declares, true when that checkbox was
-     * submitted.
+     * Detail toggles limited to Settings::recorderDetailKeys(), true when submitted.
      *
      * @return array<string, array<string, bool>>
      */
@@ -211,10 +198,7 @@ class SettingsController
     }
 
     /**
-     * Submitted driver options, narrowed to Settings::aggregateCacheOptionFields()
-     * for the store actually being saved — anything else submitted (a
-     * stale field left over from a previously-selected driver, or a
-     * crafted key) is dropped rather than trusted onto disk.
+     * Submitted driver options, limited to Settings::aggregateCacheOptionFields() for $store.
      *
      * @return array<string, string>
      */
@@ -232,10 +216,8 @@ class SettingsController
     }
 
     /**
-     * Redirect to the settings tab at the given dashboard path (built by
-     * hand, not via the route name, because the prefix may change on the
-     * next boot), flashing a toast the shared toast-container picks up on
-     * the page it lands on (see components/toast-container.blade.php).
+     * Redirect to settings under $path (not a route name: the prefix may change)
+     * with a toast for components/toast-container.blade.php.
      */
     protected function backTo(string $path, string $level, string $message): RedirectResponse
     {

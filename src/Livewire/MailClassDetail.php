@@ -3,14 +3,9 @@
 namespace LaravelMonitor\Livewire;
 
 /**
- * Aggregate view for one mail class (all its sends across the selected
- * period) — analogous to NotificationClassDetail. $key is the mailable/
- * notification FQCN (or, for ad-hoc mail with neither, the subject — see
- * Recorders\Mail's $groupKey), unlike MailDetail where $key is one send's
- * own database id. Its "recent sends" list is where a specific occurrence
- * gets picked: each row links to the request/job attempt timeline that
- * triggered it, falling back to MailDetail's own standalone page only when
- * no such correlation exists.
+ * Aggregate view for one mail group; $key is the notification/mailable FQCN
+ * or, failing both, the subject (Recorders\Mail's $groupKey). Each send links
+ * to the run that triggered it.
  */
 class MailClassDetail extends Card
 {

@@ -16,12 +16,8 @@ class Users extends Card
     public const SORTABLE = ['name', 'success', 'client_errors', 'server_errors', 'requests', 'queued_jobs', 'exceptions', 'last_seen'];
 
     /**
-     * True when rendered as one of several summary cards on the Overview
-     * tab; false when this is the entire body of the standalone Users tab
-     * (whose header already shows the icon/title, so the section shouldn't
-     * repeat them). The charts and the sortable user list below are only
-     * built in the standalone case — they're too heavy for a compact
-     * Overview widget refreshed alongside every other card.
+     * True when rendered as a summary card on the Overview tab; charts and the
+     * sortable user list are only built for the standalone Users tab.
      */
     public bool $embedded = false;
 
@@ -111,10 +107,7 @@ class Users extends Card
         ];
     }
 
-    /**
-     * The compact 3-card summary shown alongside the other Overview cards —
-     * unchanged by the standalone Users tab's new charts/table below.
-     */
+    /** The compact summary shown on the Overview tab. */
     protected function embeddedData(UserStorage $storage, TimelineStorage $timelineStorage, CarbonImmutable $since, ?CarbonImmutable $until): array
     {
         $topUsers = $storage->topUsers('request', $since, $this->limit, $until);

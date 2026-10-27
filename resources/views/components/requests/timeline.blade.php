@@ -1,34 +1,7 @@
-{{-- Timeline: waterfall view of the request lifecycle. Two-pane layout — a
-     pinned tree pane (timeline-tree.blade.php) and an independently
-     horizontally-scrolling chart pane (timeline-chart.blade.php), as
-     separate flex siblings so the tree never joins the chart's own scroll.
-     The header (timeline-header.blade.php) mirrors the same width split:
-     title + zoom slider over the tree pane, ruler ticks over the chart
-     pane, kept in sync with panning/zooming via a manual transform since
-     the ruler lives outside the scrolling pane. Every row/tick position is
-     precomputed by View\Components\Requests\Timeline against one fixed
-     scale for the whole page — expanding/collapsing a track only toggles
-     visibility, it never moves the scale.
-
-     Alpine state/behavior lives in timeline-script.blade.php, rendered
-     directly into `x-data` below via `{!! view(...)->render() !!}` — NOT
-     `@include(...)`: <x-monitor::card> is a Blade *component* tag, and the
-     component-tag compiler only evaluates `{{ }}`/`{!! !!}` inside an
-     attribute value, leaving any `@directive(...)` there as inert literal
-     text (verified via Blade::compileString() — `@include` came out
-     untouched in the compiled attribute array, which broke Alpine's own
-     x-data parsing at runtime). The four included sub-views below aren't
-     standalone reusable components — they're this one view split across
-     files for readability, relying on Alpine's DOM-scoped reactivity (not
-     Blade variable scope) to still see zoom/selectedId/etc.
-
-     `isolate`: the chart pane's sticky bar labels are z-10, and without
-     their own stacking context they'd tie with (and paint over) the
-     dashboard's own sticky page header, also z-10. `clip-path`, not
-     `overflow-hidden`, rounds the corners: the detail panel further down
-     is `sticky` and a *descendant* of this card — `overflow` on an
-     ancestor would silently turn that `sticky` into a no-op by becoming
-     the tracked scroll container instead of the window. --}}
+{{-- Request lifecycle waterfall: pinned tree pane + horizontally scrolling chart pane, as flex siblings.
+     Alpine state comes from timeline-script.blade.php rendered into x-data (a component tag's attributes
+     don't compile directives); the sub-views share that Alpine scope. `isolate` keeps sticky labels under
+     the page header; clip-path (not overflow) rounds corners so the sticky detail panel still works. --}}
 <x-monitor::card id="timeline" class="isolate p-0 [clip-path:inset(0_round_0.5rem)]"
     @monitor-duplicates-heartbeat.window="
          heartbeatActive = true;
@@ -54,16 +27,13 @@
         <x-monitor::requests.timeline-detail-panel :has-controller="$hasController" />
     </div>
 
-    {{-- Shared tree-pane tooltip, positioned in the viewport (not the row)
-         -- see showTooltip()/hideTooltip() in timeline-script.blade.php. --}}
+    {{-- Shared tree-pane tooltip, fixed to the viewport (see showTooltip()/hideTooltip()). --}}
     <div x-show="tooltip.text !== ''" x-cloak
         class="pointer-events-none fixed z-50 max-w-md whitespace-pre-wrap break-words rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-neutral-100 shadow-lg"
         :style="'top: ' + tooltip.top + 'px; left: ' + tooltip.left + 'px'" x-text="tooltip.text"></div>
 
-    {{-- Duplicate-SQL dot "heartbeat": two staggered rings expanding from
-         the dot and fading out, via currentColor so one rule covers every
-         group's colour (see TimelineRow::$duplicateColor). Toggled by
-         heartbeatActive/heartbeatGroup in timeline-script.blade.php. --}}
+    {{-- Duplicate-SQL dot "heartbeat" rings, using currentColor so one rule fits every group colour.
+         Toggled by heartbeatActive/heartbeatGroup. --}}
     <style>
         @keyframes monitor-heartbeat-ring {
             from {

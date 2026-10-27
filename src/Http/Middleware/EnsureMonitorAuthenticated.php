@@ -8,9 +8,8 @@ use Illuminate\Support\Facades\Auth;
 use LaravelMonitor\Models\MonitorUser;
 
 /**
- * Runs inside the existing Authorize (viewMonitor Gate) check, on every
- * route except setup/login/logout — those have to stay reachable while
- * unauthenticated, since they're how a visitor becomes authenticated.
+ * Guards every dashboard route except the auth flow (setup, login, 2FA,
+ * invitations, password reset, ...), which must stay reachable signed out.
  */
 class EnsureMonitorAuthenticated
 {

@@ -1,8 +1,4 @@
-{{-- JobSummary: General info (status/queued/end time/connection/queue/peak
-     memory/server) for a single job execution — the request-detail-page's
-     equivalent of requests/summary.blade.php, shown instead of it when the
-     page was reached via a job's own <request_url>/<job_id> link (see
-     Http\Controllers\RequestDetailController). --}}
+{{-- General info card for a single job execution. --}}
 @props(['root', 'queuedAt' => null, 'queuedFrom' => null])
 @php
     $payload = $root->payload ?? [];
@@ -12,26 +8,15 @@
         default => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     };
 
-    // Microsecond precision + explicit UTC offset, same as
-    // requests/summary.blade.php's own "date" row (Format::timezone()
-    // itself already applies Preferences::timezone() before formatting —
-    // this suffix is just making that already-converted offset explicit).
     $timezoneSuffix = ' '.\LaravelMonitor\Support\Format::timezone();
 
-    // 'popped_at'/'started_at' are raw microtime(true) epoch floats (see
-    // Recorders\Jobs), not the DateTimeInterface Format::datetime() expects
-    // — same round-trip Support\Timeline::preciseTimestamp() already uses
-    // elsewhere to turn one back into a precise, timezone-aware instant.
+    // 'popped_at'/'started_at' are microtime(true) epoch floats.
     $preciseTimestamp = fn (float $epoch) => \LaravelMonitor\Support\Format::datetime(
         \Carbon\CarbonImmutable::createFromFormat('U.u', number_format($epoch, 6, '.', '')),
         \LaravelMonitor\Support\Format::DATETIME_PRECISE,
     ).$timezoneSuffix;
 
-    // Duration's own tooltip shows the precise moment this job actually
-    // ended -- reconstructed from started_at + duration where available
-    // (both microsecond-precise), falling back to created_at (recorded at
-    // job-finish time, see Recorders\Jobs) for older entries that predate
-    // started_at being captured.
+    // Duration tooltip: started_at + duration, else created_at (job finish time).
     $jobEndTime = isset($payload['started_at'])
         ? $preciseTimestamp((float) $payload['started_at'] + ((float) $root->duration / 1000))
         : \LaravelMonitor\Support\Format::datetime($root->created_at, \LaravelMonitor\Support\Format::DATETIME_PRECISE).$timezoneSuffix;
@@ -41,8 +26,7 @@
         'queued_at' => $queuedAt !== null
             ? \LaravelMonitor\Support\Format::datetime($queuedAt, \LaravelMonitor\Support\Format::DATETIME_PRECISE).$timezoneSuffix
             : null,
-        // Absolute path already (see Recorders\Jobs::dispatchLocation()).
-        // Null for entries recorded before it was captured.
+        // Absolute path from Recorders\Jobs::dispatchLocation(); may be null.
         'queued_from' => $queuedFrom,
         'popped_at' => isset($payload['popped_at']) ? $preciseTimestamp((float) $payload['popped_at']) : null,
         'started_processing_at' => isset($payload['started_at']) ? $preciseTimestamp((float) $payload['started_at']) : null,
@@ -80,12 +64,8 @@
                 @elseif ($key === 'duration')
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $jobEndTime }}">{{ $value }}</dd>
                 @elseif ($key === 'queued_from')
-                    {{-- rtl + text-align:left truncates the front of the
-                         absolute path, keeping file:line visible. Leading
-                         ‎ (LRM) anchors the path's own leading "/" as
-                         LTR — same fix as timeline-script.blade.php's own
-                         truncatedPath(), without which that "/" renders at
-                         the RTL run's edge instead of in place. --}}
+                    {{-- rtl truncates the path's front, keeping file:line visible; the leading LRM
+                         keeps the path's "/" in place. --}}
                     <dd class="min-w-0 truncate font-mono text-xs text-neutral-800 dark:text-neutral-200"
                         style="direction: rtl; text-align: left;" data-tooltip="{{ $value }}">{{ "\u{200E}".$value }}</dd>
                 @else

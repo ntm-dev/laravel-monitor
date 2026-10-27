@@ -21,15 +21,9 @@ use function strlen;
 use function substr;
 
 /**
- * App-wide settings overrides for the values that config/monitor.php ships as
- * defaults (the Environment + Recorders sections of the dashboard).
- *
- * Unlike {@see Preferences} (per-viewer, cookie), these are shared by the whole
- * application and affect recording behaviour, so they are persisted server-side
- * as a PHP array-returning file — see {@see write()} for why. {@see apply()}
- * overlays whatever is stored onto the live
- * config at boot — a stored value wins, and anything not stored keeps its
- * config/monitor.php default ("nếu chưa cài đặt thì lấy mặc định").
+ * App-wide overrides of config/monitor.php, saved from the Settings page as a
+ * PHP file (see all()). {@see apply()} overlays them onto config at boot;
+ * anything not stored keeps its config default.
  */
 class Settings
 {
@@ -63,9 +57,8 @@ class Settings
     public const DISABLE_CONFIRMATION = 'disable';
 
     /**
-     * Config path (leaf table name) => suffix appended to a stored prefix
-     * override (see apply()) — mirrors every table config/monitor.php
-     * itself derives from $tablePrefix there.
+     * Table config path => suffix appended to a stored `table_prefix` override;
+     * mirrors the tables config/monitor.php derives from $tablePrefix.
      */
     protected const TABLE_SUFFIXES = [
         'monitor.storage.database.table' => 'entries',
@@ -81,8 +74,7 @@ class Settings
     ];
 
     /**
-     * Every TABLE_SUFFIXES value, for the Settings form to preview the full
-     * table name (prefix + suffix) live as the prefix field is typed into.
+     * Every TABLE_SUFFIXES value, for the Settings form's live table-name preview.
      *
      * @return list<string>
      */
@@ -92,9 +84,7 @@ class Settings
     }
 
     /**
-     * Cache stores the host app has configured, for the aggregate cache
-     * store picker — 'file' (this package's own default) always included
-     * even if the host app's config/cache.php doesn't define one itself.
+     * The host app's cache stores for the aggregate cache picker, always including 'file'.
      *
      * @return list<string>
      */
@@ -107,11 +97,8 @@ class Settings
     }
 
     /**
-     * Editable option fields per aggregate-cache driver — only these ever
-     * reach BuildsQueries::aggregateCacheStore()'s dynamic store config, no
-     * matter what a request submits (see SettingsController::system() and
-     * apply() above). Plain values only (a path, a table name); see
-     * AGGREGATE_CACHE_SENSITIVE_DRIVERS for the ones deliberately left out.
+     * Editable option fields per aggregate-cache driver: the only options that
+     * reach BuildsQueries::aggregateCacheStore() (filtered again in applyAggregateCache()).
      */
     protected const AGGREGATE_CACHE_OPTION_FIELDS = [
         'file' => ['path', 'lock_path'],
@@ -119,19 +106,10 @@ class Settings
         'database' => ['connection'],
     ];
 
-    /**
-     * Drivers whose own settings are connection credentials (host, password,
-     * region, ...), not plain values — this form never edits or displays
-     * them; the Settings page tells the admin to set them via .env instead
-     * (see the same env vars config/cache.php's own store entry reads).
-     */
+    /** Drivers configured by credentials, never edited or shown by the form — set via .env instead. */
     protected const AGGREGATE_CACHE_SENSITIVE_DRIVERS = ['redis', 'memcached', 'dynamodb'];
 
-    /**
-     * A store's driver — from config('cache.stores'), or the store name
-     * itself for 'file' when the host app has no store of that name (see
-     * aggregateCacheStores()'s own fallback).
-     */
+    /** A store's driver from config('cache.stores'), falling back to the store name. */
     public static function aggregateCacheDriver(string $store): string
     {
         return (string) (config("cache.stores.{$store}.driver") ?? $store);
@@ -196,8 +174,7 @@ class Settings
      */
     public static function apply(): void
     {
-        // Snapshot the config-file default path before overriding it, so a save
-        // or reset can redirect to the correct URL instead of a stale one.
+        // Snapshot the config-file path before overriding it, for defaultPath().
         static::$defaultPath = (string) config('monitor.path', 'monitor');
 
         $stored = static::all();
@@ -218,8 +195,7 @@ class Settings
             config(['monitor.periods' => $stored['periods']]);
         }
 
-        // One prefix override fans out to every table config/monitor.php
-        // itself derives from $tablePrefix — see TABLE_SUFFIXES.
+        // One prefix override fans out to every TABLE_SUFFIXES table.
         if (array_key_exists('table_prefix', $stored)) {
             config(['monitor.table_prefix' => $stored['table_prefix']]);
 
@@ -237,7 +213,7 @@ class Settings
      */
     protected static function applyAggregateCache(array $stored): void
     {
-        // Saved before the mode select replaced the "use app config" toggle.
+        // Legacy file without a mode: derive it from the old "use app config" toggle.
         if (! array_key_exists('aggregate_cache_mode', $stored)) {
             $legacyMode = ($stored['aggregate_cache_use_app_config'] ?? false)
                 ? 'app'
@@ -248,12 +224,8 @@ class Settings
             }
         }
 
-        // Only the fields AGGREGATE_CACHE_OPTION_FIELDS declares for the
-        // saved store — same reasoning as recorder_details below: what's on
-        // disk should already be this narrow (SettingsController only ever
-        // writes it that way), but this is the layer BuildsQueries::
-        // aggregateCacheStore() actually trusts, so it's filtered again here
-        // regardless of how the value got onto disk.
+        // Re-filter to AGGREGATE_CACHE_OPTION_FIELDS regardless of what's on disk:
+        // this is the layer BuildsQueries::aggregateCacheStore() trusts.
         if (isset($stored['aggregate_cache_options']) && is_array($stored['aggregate_cache_options'])) {
             $store = $stored['aggregate_cache_store'] ?? config('monitor.aggregate_cache.store');
             $allowed = static::aggregateCacheOptionFields((string) $store);
@@ -309,8 +281,7 @@ class Settings
     }
 
     /**
-     * The effective values shown in the settings form. Reads live config, so it
-     * already reflects any applied overrides layered over the defaults.
+     * The effective values for the settings form, read from live (overridden) config.
      *
      * @return array<string, mixed>
      */
@@ -334,8 +305,7 @@ class Settings
             'aggregate_cache_stores' => static::aggregateCacheStores(),
             'aggregate_cache_options' => (array) config('monitor.aggregate_cache.options', []),
             'aggregate_cache_option_fields' => self::AGGREGATE_CACHE_OPTION_FIELDS,
-            // store name => driver, so the form can tell which of the two
-            // lists above applies to whichever store is currently selected.
+            // store name => driver, for the form to look up the selected store's lists above.
             'aggregate_cache_store_drivers' => collect(static::aggregateCacheStores())
                 ->mapWithKeys(fn (string $store) => [$store => static::aggregateCacheDriver($store)])
                 ->all(),
@@ -345,8 +315,7 @@ class Settings
             'aggregate_cache_defaults' => collect(array_keys(self::AGGREGATE_CACHE_OPTION_FIELDS))
                 ->mapWithKeys(fn (string $driver) => [$driver => static::aggregateCacheDefaults($driver)])
                 ->all(),
-            // driver => whether the host app has its own store for it, so
-            // the "use app config" checkbox only shows when there's one.
+            // driver => whether the host app has its own store for it.
             'aggregate_cache_app_config_available' => collect(array_keys(self::AGGREGATE_CACHE_OPTION_FIELDS))
                 ->mapWithKeys(fn (string $driver) => [$driver => static::aggregateCacheHasAppConfig($driver)])
                 ->all(),
@@ -357,27 +326,17 @@ class Settings
         ];
     }
 
-    /**
-     * Old recorder basename => current one, so a settings file saved before
-     * a class rename still resolves instead of silently losing the toggle.
-     */
+    /** Old recorder basename => current one, so older settings files still resolve. */
     protected const LEGACY_RECORDER_ALIASES = [
         'SlowQueries' => 'Queries',
     ];
 
-    /**
-     * Highest-volume recorders — default disabled outside local (see
-     * config/monitor.php) and named in recordersWarning(), the one notice
-     * at the top of the Settings form's Recorders section.
-     */
+    /** Highest-volume recorders (off by default outside local), named in recordersWarning(). */
     protected const HEAVY_RECORDERS = ['Queries', 'Models', 'CacheInteractions'];
 
     /**
-     * Detail sub-options per recorder: basename => [config key => translated
-     * label key]. Each one gets its own toggle nested under that recorder's
-     * row in Settings, shown only while the recorder itself is enabled —
-     * off by default outside local like HEAVY_RECORDERS, covered by the
-     * same recordersWarning() notice rather than named individually.
+     * Detail sub-options per recorder: basename => [config key => label translation key].
+     * Each is a toggle nested under its recorder's row; off by default outside local.
      */
     protected const RECORDER_DETAILS = [
         'Requests' => ['record_response_body' => 'monitor::messages.settings.recorder_detail_response_body'],
@@ -407,10 +366,7 @@ class Settings
     ];
 
     /**
-     * Recorder rows for the form: display name, icon, enabled state, and its
-     * own nested detail toggles (see RECORDER_DETAILS). The performance cost
-     * HEAVY_RECORDERS/RECORDER_DETAILS entries carry isn't flagged per row
-     * any more — see recordersWarning() for the one consolidated notice.
+     * Recorder rows for the form: name, icon, enabled state and detail toggles.
      *
      * @return list<array{name: string, icon: string, enabled: bool, details: list<array{key: string, label: string, enabled: bool}>}>
      */
@@ -466,14 +422,7 @@ class Settings
         return $size * (self::BODY_SIZE_UNITS[$unit] ?? 1);
     }
 
-    /**
-     * One consolidated performance-cost notice for the top of the Settings
-     * form's Recorders section, naming every HEAVY_RECORDERS entry, instead
-     * of a warning line repeated under each individual heavy toggle. Detail
-     * options (RECORDER_DETAILS) aren't named individually — always heavier
-     * than their own recorder's base fields, so one blanket mention below
-     * the recorder list covers them.
-     */
+    /** The Recorders section's single performance notice, naming every HEAVY_RECORDERS entry. */
     public static function recordersWarning(): string
     {
         return __('monitor::messages.settings.recorders_heavy_warning', [
@@ -482,11 +431,8 @@ class Settings
     }
 
     /**
-     * recorders() split into $columns evenly-sized groups, for the Settings
-     * form's side-by-side layout — computed here rather than chunking a
-     * collection in the Blade file, so a recorder whose detail toggles push
-     * it taller never stretches its unrelated row-mate in a shared CSS grid
-     * row (each column is its own independent flex stack instead).
+     * recorders() split into $columns groups, each rendered as its own stack so
+     * a tall row never stretches its neighbour.
      *
      * @return list<list<array{name: string, icon: string, enabled: bool, details: array}>>
      */
@@ -498,9 +444,7 @@ class Settings
     }
 
     /**
-     * Every recorder's own detail-option keys, for the settings form to
-     * validate/persist against without reaching into RECORDER_DETAILS
-     * directly.
+     * Each recorder's detail-option keys, for the settings form to validate against.
      *
      * @return array<string, list<string>>
      */
@@ -538,13 +482,8 @@ class Settings
     }
 
     /**
-     * The stored overrides, or an empty array when nothing has been saved.
-     * Persisted as a plain PHP file returning an array — the same technique
-     * `artisan config:cache` uses — instead of JSON, so a read is a
-     * `require` that PHP's own opcache compiles once and reuses across
-     * requests, rather than paying file_get_contents() + json_decode() on
-     * every single request this is read on (recorders, the dashboard,
-     * Settings::apply() at boot).
+     * The stored overrides ([] when none). Stored as a PHP file returning an
+     * array, like `config:cache`, so opcache serves the read on every request.
      *
      * @return array<string, mixed>
      */
@@ -607,23 +546,13 @@ class Settings
             mkdir($dir, 0755, true);
         }
 
-        // var_export(), not json_encode(): the file must be valid PHP
-        // source (`<?php return [...];`) for all() to require() it — see
-        // there for why. Written to a temp file and renamed into place so a
-        // concurrent require() during the write never sees a half-written
-        // file; rename() is atomic on the same filesystem.
+        // Temp file + rename(), so a concurrent require() never sees a half-written file.
         $tmp = $path.'.'.uniqid('', true).'.tmp';
         file_put_contents($tmp, '<?php'.PHP_EOL.PHP_EOL.'return '.var_export($values, true).';'.PHP_EOL, LOCK_EX);
         rename($tmp, $path);
 
-        // The settings form redirects straight back to this same page, so
-        // the very next require() of this file is almost always inside
-        // opcache.revalidate_freq (2s default) of this write. Without an
-        // explicit invalidation that reload can still serve the pre-save
-        // bytecode, making the save look like it silently reverted until a
-        // second save happens to land outside that window. Force just this
-        // one path to recompile now instead of waiting on the timestamp
-        // check.
+        // The redirect after save lands within opcache.revalidate_freq, which
+        // would still serve the old bytecode.
         if (function_exists('opcache_invalidate')) {
             opcache_invalidate($path, true);
         }

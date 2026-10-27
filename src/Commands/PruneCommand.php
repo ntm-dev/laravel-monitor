@@ -24,12 +24,7 @@ class PruneCommand extends Command
 
         $deleted = $entryWriter->purge($before);
 
-        // Reconcile monitor_issues against what's left after the purge
-        // above — the same open/bump-then-delete-missing pass the Issues
-        // page runs, so a performance issue that's dropped under its
-        // threshold (or an exception whose last entry the purge just
-        // removed) gets deleted here too, instead of only whenever someone
-        // next happens to load the dashboard.
+        // Re-sync open issues against the remaining entries, as the Issues page does.
         $this->syncOpenIssues($aggregateStorage, $issueStorage, $this->since(), $this->until());
 
         $expired = $issueStorage->expireStaleIssues();

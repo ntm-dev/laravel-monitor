@@ -26,7 +26,7 @@ use function strtolower;
 
 class OutgoingRequests extends Recorder
 {
-    /** Body field names (case-insensitive) replaced before storing — mirrors Recorders\Requests::REDACT_BODY_FIELDS. */
+    /** Body field names (case-insensitive) replaced before storing; a subset of Requests::REDACT_BODY_FIELDS. */
     protected const REDACT_BODY_FIELDS = [
         'password', 'password_confirmation', 'token', 'secret',
         'api_key', 'apikey', 'access_token', 'refresh_token',
@@ -82,18 +82,13 @@ class OutgoingRequests extends Recorder
                 'request_body' => ($this->config['details']['record_body'] ?? false) ? $this->lazyBody($event->request->body(...)) : null,
                 'trace' => ($this->config['details']['trace'] ?? false) ? Trace::capture() : null,
             ], fn ($value) => $value !== null),
-            // No HTTP status to group by — kept out of the 5xx bucket (a
-            // connection failure never got a response, so it isn't really a
-            // server error) and grouped as its own NetworkError subtype
-            // instead. payload['status'] stays null so the per-request page
-            // still renders it as "Failed".
+            // No response, so its own NetworkError subtype rather than 5xx.
             subtype: HttpStatusGroup::NetworkError->value,
         );
     }
 
     /**
-     * Flattened to name => value with sensitive values redacted, same shape
-     * Recorders\Requests stores — resolved when the entry is stored.
+     * Headers as name => value, redacted like Requests; resolved at storage time.
      *
      * @param  callable(): array<string, mixed>  $read
      * @return LazyValue<array<string, string>>
@@ -123,8 +118,7 @@ class OutgoingRequests extends Recorder
     }
 
     /**
-     * Reading, redacting and re-encoding the body waits until the entry is
-     * stored; an empty body resolves to null and is dropped there.
+     * Read and redacted at storage time; an empty body resolves to null.
      *
      * @param  callable(): string  $read
      * @return LazyValue<string|null>
@@ -134,11 +128,7 @@ class OutgoingRequests extends Recorder
         return new LazyValue(fn () => $this->body($read()));
     }
 
-    /**
-     * Best-effort body: redacted field-by-field when it's JSON, capped in
-     * size either way. Never thrown from — a body that fails to decode
-     * just falls back to the raw (capped) string.
-     */
+    /** Redacted when JSON, otherwise the raw string; capped either way. */
     protected function body(string $raw): ?string
     {
         if ($raw === '') {
@@ -174,10 +164,7 @@ class OutgoingRequests extends Recorder
         return $result;
     }
 
-    /**
-     * Grouping key for the outgoing-requests list/detail pages: the
-     * destination host, not the full method+path — see Livewire\OutgoingRequests.
-     */
+    /** Grouping key: the destination host. */
     protected function key(string $url): string
     {
         return parse_url($url, PHP_URL_HOST) ?? $url;

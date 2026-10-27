@@ -6,14 +6,9 @@ use Illuminate\Support\Collection;
 use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
- * Shape a fetched exception's raw payload (frames, message, class, ...)
- * into what `exception-detail.blade.php` renders: grouped/numbered stack
- * frames with their source snippets, the "Copy as Markdown" text, and the
- * labelled Summary rows. Pure data transformation — no storage/HTTP
- * dependency — so it's shared by both the tab-based `ExceptionDetail`
- * Livewire card and the standalone `/monitor/issues/{uuid}` page
- * (`Http\Controllers\IssueController`), which fetch the underlying data
- * differently (period-scoped vs. all-time) but shape it identically.
+ * Shapes a raw exception payload into view data: grouped stack frames with
+ * source, "Copy as Markdown" text and Summary rows. Shared by ExceptionDetail
+ * and IssueController.
  */
 trait BuildsExceptionDetail
 {
@@ -45,12 +40,8 @@ trait BuildsExceptionDetail
     }
 
     /**
-     * Shape occurrence rows for the table: date/message/user plus which
-     * request/job/command run the exception happened during, so the
-     * dashboard can link back to it — every event is tagged with the
-     * request/job/command it occurred in. One batched
-     * rootTypesFor()/rootLabelsFor() pair instead of a lookup per row (same
-     * approach as NotificationClassDetail's sourceUrl).
+     * Shape occurrence rows (max 50) with a link to the request/job/command
+     * run they occurred in, resolved in one batched lookup.
      *
      * @param  array<int|string, string>  $names  user_id => display name
      */
@@ -141,9 +132,7 @@ trait BuildsExceptionDetail
             'main' => $main,
             'has_code' => $lines !== [],
             'lines' => $lines,
-            // Type placeholders only (see Recorders\Exceptions::argTypes()) —
-            // absent on exceptions recorded before this field existed, hence
-            // the default.
+            // Type placeholders (Recorders\Exceptions::argTypes()); may be absent.
             'args' => $frame['args'] ?? [],
         ];
     }
@@ -181,17 +170,8 @@ trait BuildsExceptionDetail
             return [null, null];
         }
 
-        // Recorders\Exceptions::relativePath() strips the recording app's own
-        // base_path() prefix, but a frame can point outside that tree
-        // entirely — e.g. this package installed as a composer `path` repo
-        // symlink (see CLAUDE.local.md), where PHP resolves the symlinked
-        // vendor/ntm-dev/laravel-monitor/... frame to its real target
-        // directory, a sibling of the consuming app, not a subdirectory of
-        // it. relativePath()'s str_replace() then has nothing to strip and
-        // silently returns the path unchanged (still absolute). Blindly
-        // prefixing that with base_path() again here produced a nonsense,
-        // non-existent double path, so is_file() always failed, has_code
-        // stayed false, and the frame could never expand.
+        // Frames outside base_path() (e.g. a symlinked path-repo package) stay
+        // absolute after Recorders\Exceptions::relativePath(); don't re-prefix them.
         $path = str_starts_with($relative, DIRECTORY_SEPARATOR) || preg_match('#^[A-Za-z]:[\\\\/]#', $relative) === 1
             ? $relative
             : base_path($relative);

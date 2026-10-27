@@ -12,10 +12,8 @@ use LaravelMonitor\Models\MonitorUser;
 use LaravelMonitor\Support\SetupCode;
 
 /**
- * First-run flow: monitor_users starts empty, and store() always creates
- * that first account as role=owner (later invites pick a role explicitly).
- * verifyCode() must confirm the visitor has shell access — paste the code
- * from `artisan monitor:setup-code` — before show()/store() unlock the form.
+ * First-run flow: creates the first account as owner, gated behind the
+ * code from `artisan monitor:setup-code` (verifyCode()).
  */
 class SetupController
 {
@@ -48,9 +46,7 @@ class SetupController
             ]);
         }
 
-        // Consumed the moment it's verified, not left valid until store()
-        // succeeds — otherwise the same code stays replayable for up to its
-        // full 10-minute TTL after a visitor has already used it once.
+        // Consume on verify so the code can't be replayed within its TTL.
         SetupCode::clear();
 
         $request->session()->put(self::SESSION_VERIFIED_KEY, true);
@@ -85,9 +81,7 @@ class SetupController
         $request->session()->regenerate();
         $request->session()->forget(self::SESSION_VERIFIED_KEY);
 
-        // Straight to Settings, not the dashboard: outside local, the
-        // heavy recorders (see Settings::HEAVY_RECORDERS) start disabled,
-        // so this is where the new owner reviews/enables them.
+        // Land on Settings: outside local, Settings::HEAVY_RECORDERS start disabled.
         return redirect()->route('monitor.dashboard', ['tab' => 'settings']);
     }
 }

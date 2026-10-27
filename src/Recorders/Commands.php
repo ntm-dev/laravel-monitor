@@ -13,30 +13,19 @@ use Symfony\Component\Console\Input\InputInterface;
 
 class Commands extends Recorder
 {
-    /**
-     * A console process runs one command at a time, so a single scalar is
-     * enough to bridge CommandStarting to its matching CommandFinished —
-     * same reasoning as CacheInteractions' $startedAt.
-     */
+    /** One command runs at a time per process, so a scalar bridges Starting to Finished. */
     protected ?float $startedAt = null;
 
     /**
-     * The command line as actually invoked ("app:sync-data --day=3"), or
-     * null when it carries nothing the entry's `key` doesn't already say.
-     * Captured on CommandStarting because that's the only event carrying
-     * the input — same single-scalar reasoning as $startedAt above.
+     * The command line as invoked ("app:sync-data --day=3"), or null when it
+     * adds nothing over `key`. Only CommandStarting carries the input.
      */
     protected ?string $commandLine = null;
 
     /**
-     * Commands that are console plumbing rather than application work.
-     * `schedule:finish` is the bookkeeping subprocess Laravel appends after
-     * every background scheduled task (`... ; php artisan schedule:finish
-     * <mutex> "$?"` — see Console\Scheduling\CommandBuilder), and it
-     * inherits the task's run id from Context exactly like the real command
-     * does. Recording it put a second, overlapping COMMAND bar on every
-     * background task's timeline and floated an entry nobody scheduled to
-     * the top of the Commands list, once per task run.
+     * Console plumbing, not application work: `schedule:finish` is the
+     * bookkeeping subprocess Laravel appends after every background
+     * scheduled task.
      */
     protected const IGNORED = ['schedule:finish'];
 
@@ -55,24 +44,11 @@ class Commands extends Recorder
         $this->startedAt = microtime(true);
         $this->commandLine = $this->commandLine($event->input, $event->command);
 
-        // A command-based scheduled task (Schedule::command()) always runs
-        // this command in a *separate* `php artisan` subprocess, even when
-        // scheduled to run "in the foreground" — see
-        // Illuminate\Console\Scheduling\Event::execute(). The scheduled
-        // task's own id rides across that process boundary via Laravel's
-        // own Context dehydration/hydration (see
-        // Monitor::beginScheduledTaskRun()), so it's already available here,
-        // in the fresh subprocess, before any application code has run.
-        // Stamped onto this run's own entry purely as a cross-reference
-        // (see Monitor::beginCommandRun()'s $scheduledTaskRunId param) — this
-        // run still gets its own fresh id and its own timeline, since
-        // everything it triggers happened after the scheduler already
-        // finished dispatching it.
+        // A Schedule::command() task runs in its own artisan subprocess; its
+        // run id arrives via Context and is stored only as a cross-reference.
         $scheduledTaskRunId = $this->monitor->inheritedScheduledTaskRunId();
 
-        // Before the command's own handle() runs, so everything it triggers
-        // (queries, mail, notifications, dispatched jobs) correlates onto
-        // this run's own timeline — mirrors beginRequest()/beginJobAttempt().
+        // Before handle(), so everything it triggers lands on this run's timeline.
         $this->monitor->beginCommandRun($event->command, $scheduledTaskRunId);
     }
 
@@ -82,23 +58,15 @@ class Commands extends Recorder
             return;
         }
 
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // round(x, 3) strips float noise from subtracting two epoch timestamps.
         $duration = round((microtime(true) - $this->startedAt) * 1000, 3);
         $this->startedAt = null;
 
         $commandLine = $this->commandLine;
         $this->commandLine = null;
 
-        // Closes out the 'action' phase (everything since CommandStarting)
-        // and opens 'terminating' — mirrors markTerminating() for requests,
-        // just with no controller/render/unwinding steps of its own to close
-        // first. Must happen before record() below so the entry's own
-        // finalizePendingCommand() (run from flush() just after) closes
-        // 'terminating' against a phase list that already has 'bootstrap'
-        // and 'action' in it.
+        // Closes the 'action' phase and opens 'terminating'; must precede
+        // record() so the phases are complete when flush() finalizes the entry.
         $this->monitor->markCommandTerminating();
 
         $this->monitor->record(
@@ -106,10 +74,7 @@ class Commands extends Recorder
             key: $event->command,
             payload: array_filter([
                 'exit_code' => $event->exitCode,
-                // Deliberately *not* folded into `key`: the Commands list
-                // and every stat on it group by key, so one row per
-                // argument combination would fragment a single command's
-                // history into an unusable pile of near-duplicates.
+                // Kept out of `key` so stats don't split per argument combination.
                 'command' => $commandLine,
                 'model_count' => $this->monitor->modelCount(),
                 'server' => Host::name(),
@@ -119,20 +84,11 @@ class Commands extends Recorder
             subtype: $event->exitCode === 0 ? 'success' : 'failed',
         );
 
-        // Deliberately *not* flushed here: MonitorServiceProvider's
-        // whenCommandLifecycleIsLongerThan(-1, ...) hook marks the trailing
-        // End phase (everything after CommandFinished — the console
-        // kernel's own Terminating callbacks, app->terminate()) and flushes
-        // from there instead, once that phase's duration is actually known.
-        // Flushing here would persist this entry before End is ever marked,
-        // making it permanently zero-length.
+        // Not flushed here: Hooks\CommandLifecycleEndHook flushes once the
+        // trailing End phase is known.
     }
 
-    /**
-     * Monitor's own housekeeping commands shouldn't show up as recorded
-     * commands themselves, and neither should console plumbing (see
-     * self::IGNORED).
-     */
+    /** Skips the package's own monitor:* commands and console plumbing (self::IGNORED). */
     protected function isIgnored(?string $command): bool
     {
         if ($command === null) {
@@ -143,19 +99,9 @@ class Commands extends Recorder
     }
 
     /**
-     * The command line as invoked, arguments and options included.
-     * CommandStarting::$command only ever carries the bare name, so two runs
-     * of the same command with different arguments ("--day=1" vs "--day=3")
-     * are otherwise indistinguishable in the dashboard. Null when the input
-     * adds nothing over the name, so the payload key stays absent rather
-     * than duplicating `key`.
-     *
-     * A real `php artisan` run hands us an ArgvInput, whose raw tokens are
-     * read directly rather than through __toString(): that escapes every
-     * token not matching /^[\w-]+$/ through escapeshellarg(), which turns
-     * any namespaced command name into "'app:sync-data' --day=3". Anything
-     * else (Artisan::call()'s ArrayInput, a custom InputInterface) has no
-     * raw tokens to read, so it falls back to the escaped rendering.
+     * The command line with arguments/options, or null when it equals the name.
+     * ArgvInput's raw tokens are used because its __toString() shell-escapes
+     * "app:sync-data"; other inputs fall back to that escaped rendering.
      */
     protected function commandLine(InputInterface $input, string $name): ?string
     {

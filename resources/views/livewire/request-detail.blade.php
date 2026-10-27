@@ -67,12 +67,8 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            {{-- One combined "php" block, not three consecutive ones: Blade's
-                                 compiler mis-merges 3+ adjacent inline php blocks (verified via
-                                 the compiled view — the 1st and 2nd got swallowed into the
-                                 3rd's raw-PHP extraction, so $status/$detailUrl never
-                                 actually ran and every row 500'd on "Undefined variable
-                                 $detailUrl"). --}}
+                            {{-- Keep as one php block: 3+ stacked inline ones corrupt
+                                 (see resources/views/CLAUDE.md). --}}
                             @php
                                 $status = (int) ($entry->payload['response']['status'] ?? 0);
                                 $detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'requestId' => $entry->request_id]) : null;

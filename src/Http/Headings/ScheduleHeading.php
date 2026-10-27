@@ -7,12 +7,8 @@ use LaravelMonitor\Contracts\TimelineStorage;
 use LaravelMonitor\Support\Cron;
 
 /**
- * Heading for a scheduled task detail page: the full command as title (the
- * same text Recorders\ScheduledTasks\fullCommand() shows in the schedule
- * list's Task column, e.g. "php artisan app:sync-chain-data"), badged with
- * its cadence (e.g. "Every 5 minutes" — the same phrase as that list's
- * Schedule column) rather than the static "Scheduled Task" label this used
- * to carry.
+ * Heading for a scheduled task page: the full command as title, its cadence
+ * (e.g. "Every 5 minutes") as a trailing badge.
  */
 class ScheduleHeading
 {
@@ -22,9 +18,7 @@ class ScheduleHeading
 
     public function __invoke(string $key): Heading
     {
-        // See ExceptionHeading for why this ignores the dashboard's selected
-        // time range: a heading needs the task's latest known definition
-        // regardless of which period the user is currently viewing.
+        // Latest definition regardless of the selected time range.
         $payload = optional(
             $this->storage
                 ->recent('scheduled_task', CarbonImmutable::now()->subYears(5), 1, null, $key)

@@ -18,11 +18,8 @@ use LaravelMonitor\Support\Nav;
 use LaravelMonitor\Support\Preferences;
 
 /**
- * Renders the standalone Issue Detail page (route: monitor.issues.show).
- * Status/Priority mutations live in the embedded Livewire\IssueManagePanel
- * instead of a controller action, so changing either doesn't reload the
- * exception/performance data already on the page. Owns its own route, same
- * family as RequestDetailController/JobAttemptController.
+ * Issue Detail page (`monitor.issues.show`). Status/priority changes go through
+ * the embedded Livewire\IssueManagePanel so the page data isn't reloaded.
  */
 class IssueController
 {

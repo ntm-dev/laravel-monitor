@@ -6,8 +6,7 @@
             <a href="{{ route('monitor.dashboard', ['tab' => 'exceptions'] + $range) }}" class="mt-4 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">{{ __('monitor::messages.exception.back_to_exceptions') }}</a>
         </x-monitor::card>
     @else
-        {{-- The exception message renders in the page header, beside the range picker. --}}
-        {{-- Summary: metadata + timeline --}}
+        {{-- Summary: metadata + timeline (the message itself renders in the page header) --}}
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <x-monitor::card class="p-4">
                 <p class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.summary') }}</p>
@@ -40,12 +39,8 @@
 
         {{-- Stack trace --}}
         <div class="mt-6">
-            {{-- dark:bg-white/5, not /2: this app loads Tailwind via the
-                 cdn.tailwindcss.com script, whose JIT only generates
-                 color-opacity modifiers on the default scale
-                 (0/5/10/20/25/...); `/2` silently compiled to nothing,
-                 leaving this card stuck on its light-mode `bg-white`
-                 regardless of theme. --}}
+            {{-- Opacity modifiers must be on the default scale (0/5/10/20/25/...):
+                 the CDN Tailwind JIT silently drops others like `/2`. --}}
             <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
                 <div class="flex flex-col gap-3 p-4 md:p-5"
                      x-data="{ copied: false, copy() {

@@ -40,10 +40,8 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($entries as $entry)
-                            {{-- Only processed/failed/released rows carry an attempt id of their
-                                 own (minted at JobProcessing via beginJobAttempt(), see
-                                 Recorders\Jobs) — a 'queued' row's request_id instead points to
-                                 whatever dispatched the job, so it wouldn't resolve here. --}}
+                            {{-- Every row but 'queued' has its own attempt id (Monitor::beginJobAttempt()
+                                 at JobProcessing); a queued row's request_id is its dispatcher's. --}}
                             @php($attemptUrl = ($entry->request_id ?? null) && $entry->subtype !== 'queued' ? route('monitor.jobs.attempts.show', $entry->request_id) : null)
                             <tr class="{{ $attemptUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 @if ($attemptUrl) onclick="window.location='{{ $attemptUrl }}'" @endif>

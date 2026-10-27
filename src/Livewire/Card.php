@@ -22,14 +22,9 @@ abstract class Card extends Component
     public const DEFAULT_PERIOD = '1h';
 
     /**
-     * Candidate bucket widths (seconds), finest first — this chart's own
-     * per-period resolution (1h -> 30s buckets, 24h -> 15m, 7d ->
-     * 2h, 14d -> 4h): the chart uses the *finest* width here that still
-     * keeps the total point count at or under MAX_CHART_BUCKETS, instead of
-     * always slicing every range into the same fixed number of buckets
-     * (which made a 30-day chart exactly as coarse per-pixel as a 1-hour
-     * one). Each width is chosen so it divides evenly into every period in
-     * config('monitor.periods') — see bucketSeconds().
+     * Candidate chart bucket widths (seconds), finest first; bucketSeconds()
+     * picks the finest one within MAX_CHART_BUCKETS (1h -> 30s, 24h -> 15m,
+     * 7d -> 2h, 14d -> 4h, 30d -> 6h).
      */
     protected const NICE_BUCKET_SECONDS = [
         30, 60, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400, 172800, 259200, 604800,
@@ -62,11 +57,9 @@ abstract class Card extends Component
     }
 
     /**
-     * What x-monitor::refresh-button calls, in place of the built-in $refresh.
-     * Empty on purpose — re-rendering is the whole effect. It exists only so a
-     * hand-clicked refresh is distinguishable from the silent auto-refresh
-     * (which does call $refresh), letting the tables' loading skeletons key off
-     * `wire:target.except="$refresh"` and stay put while polling.
+     * Manual refresh from x-monitor::refresh-button. Empty on purpose: it only
+     * differs from the auto-refresh's $refresh so loading skeletons can use
+     * `wire:target.except="$refresh"` and stay hidden while polling.
      */
     public function refreshNow(): void
     {
@@ -86,12 +79,7 @@ abstract class Card extends Component
     /**
      * Validate a custom from/to pair: both parseable, chronological, and
      * never reaching into the future. Returns [null, null] when invalid.
-     *
-     * The <input type="datetime-local"> values arrive as naive wall-clock
-     * strings the viewer picked in their own Preferences::timezone(), not
-     * the app's default timezone — parsing them without that timezone would
-     * silently reinterpret e.g. "14:00" typed in Asia/Ho_Chi_Minh as 14:00
-     * UTC, shifting the whole queried window by the viewer's UTC offset.
+     * Inputs are naive wall-clock strings in the viewer's Preferences::timezone().
      *
      * @return array{0: string|null, 1: string|null}
      */
@@ -128,15 +116,8 @@ abstract class Card extends Component
             return $this->parseCustomBoundary($this->from);
         }
 
-        // Rounded down to the chart's bucket-width grid, not a bare
-        // now()->subHours(): a live window recomputes "since" fresh on
-        // every poll, so an unaligned since drifts forward by however many
-        // seconds elapsed since the last poll — shifting every bucket's
-        // absolute boundary by that same amount and reshuffling which
-        // bucket a row near an edge falls into, even when no new data has
-        // arrived. Aligning to the grid means since only jumps forward in
-        // whole bucket-width steps, so the chart's layout stays fixed
-        // between polls that land inside the same step.
+        // Aligned to the bucket grid so bucket boundaries stay fixed between
+        // polls instead of drifting with every recomputed now().
         $hours = self::periods()[$this->period] ?? 1;
         $bucketSeconds = $this->bucketSeconds();
         $timestamp = CarbonImmutable::now()->subHours($hours)->getTimestamp();
@@ -145,8 +126,7 @@ abstract class Card extends Component
     }
 
     /**
-     * Total width of the selected window, in seconds — the selected range
-     * for a custom period, or the preset's configured hours for a live one.
+     * Width of the selected window (custom range or preset), in seconds.
      */
     protected function windowSeconds(): int
     {
@@ -175,8 +155,7 @@ abstract class Card extends Component
     }
 
     /**
-     * Number of time slices the bar / line charts should render for the
-     * current period or custom range — see bucketSeconds().
+     * Number of chart buckets for the current window.
      */
     public function chartBuckets(): int
     {
@@ -192,14 +171,9 @@ abstract class Card extends Component
     }
 
     /**
-     * Parse a Format::RANGE boundary (from/to) as wall-clock time in the
-     * viewer's Preferences::timezone(), then normalize it to the app's own
-     * timezone. Storage always deals in `created_at` values naive to
-     * config('app.timezone') (see DatabaseEntryWriter::store()/BuildsQueries::hydrate()) — a
-     * Carbon instance still tagged with the viewer's timezone would print
-     * the wrong wall-clock string once it reaches a SQL binding, since
-     * Illuminate\Database\Connection::prepareBindings() formats a
-     * DateTimeInterface value as-is, in whatever timezone it's carrying.
+     * Parse a Format::RANGE boundary in the viewer's timezone, converted to
+     * config('app.timezone'): stored `created_at` values are naive to it, and
+     * SQL bindings format a date in whatever timezone it carries.
      */
     protected function parseCustomBoundary(string $value): CarbonImmutable
     {
@@ -208,9 +182,8 @@ abstract class Card extends Component
     }
 
     /**
-     * Human phrase describing the selected range, e.g. "in the last 24
-     * hours" / "trong 24 giờ qua". Carbon's locale is set explicitly since
-     * Laravel never syncs it to the app's (see Format::durationUnits()).
+     * Human phrase for the selected range, e.g. "in the last 24 hours".
+     * Carbon's locale is set explicitly since Laravel never syncs it.
      */
     public function periodPhrase(): string
     {
@@ -220,8 +193,7 @@ abstract class Card extends Component
 
         $hours = self::periods()[$this->period] ?? 1;
 
-        // Days from 48h up so the 24h preset still reads "24 hours"; skip
-        // week so longer presets stay in days too ("30 days", not "4 weeks 2 days").
+        // Days from 48h up (24h stays "24 hours"); weeks skipped ("30 days").
         $interval = $hours >= 48 && $hours % 24 === 0
             ? CarbonInterval::days(intdiv($hours, 24))
             : CarbonInterval::hours($hours);
@@ -256,14 +228,8 @@ abstract class Card extends Component
     }
 
     /**
-     * One typed accessor per Storage sub-contract (see
-     * MonitorServiceProvider::registerBindings()) instead of a single
-     * generic storage() returning the old god-interface — a card that only
-     * ever calls e.g. $this->userStorage() never triggers autoloading of
-     * DatabaseIssueStorage or any of the others. PHP resolves a method's
-     * return-type class lazily, the first time that specific method actually
-     * runs, so only the accessor(s) a given card actually calls cost
-     * anything here.
+     * One accessor per Storage sub-contract, so a card only autoloads the
+     * storage classes it actually calls.
      */
     protected function aggregateStorage(): AggregateStorage
     {
@@ -301,11 +267,7 @@ abstract class Card extends Component
     }
 
     /**
-     * Pop a toast in the shared corner stack (see components/toast-container
-     * .blade.php, mounted once in layout.blade.php) — available to every
-     * card so a mutation (resolve an issue, save a setting, ...) can
-     * confirm itself the same way everywhere, instead of each page growing
-     * its own one-off inline banner.
+     * Pop a toast in the shared stack (components/toast-container.blade.php).
      *
      * @param  'primary'|'secondary'|'success'|'danger'|'warning'|'info'  $level
      */

@@ -5,11 +5,7 @@ namespace LaravelMonitor\Livewire;
 use LaravelMonitor\Support\EntryId;
 
 /**
- * Detail page for a single outgoing (HTTP client) request — one specific
- * call, not an aggregate across many, matching NotificationDetail/MailDetail.
- * $key is the entry's own row id, disguised by EntryId as a uuid-shaped
- * string. Unlike those two, outgoing requests aren't correlated to another
- * recorder's entry, so there's nothing else to look up here.
+ * A single outgoing HTTP request; $key is the EntryId-encoded row id.
  */
 class OutgoingDetail extends Card
 {

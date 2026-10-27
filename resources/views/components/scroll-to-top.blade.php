@@ -1,9 +1,5 @@
-{{-- Floating "scroll to top" button, shown once the page has scrolled past
-     $threshold px. Assumes the whole window scrolls (true for every
-     dashboard page — see dashboard.blade.php's <main>), not some inner
-     container. x-data lives on this static div, which Livewire's morph
-     keeps in place across a wire:poll auto-refresh, so x-init only ever
-     runs once (no listener piling up on every refresh). --}}
+{{-- Floating "scroll to top" button, shown once the window has scrolled past $threshold px.
+     Lives on a static div that morph keeps across polls, so x-init runs only once. --}}
 @props(['threshold' => 400])
 <div x-data="{ showScrollTop: false }"
     x-init="showScrollTop = window.scrollY > {{ (int) $threshold }}; window.addEventListener('scroll', () => (showScrollTop = window.scrollY > {{ (int) $threshold }}))"

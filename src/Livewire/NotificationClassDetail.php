@@ -3,14 +3,8 @@
 namespace LaravelMonitor\Livewire;
 
 /**
- * Aggregate view for one notification class (all its sends across the
- * selected period) — analogous to JobDetail/QueryDetail. $key is the
- * notification's FQCN, unlike NotificationDetail where $key is one send's
- * own database id. Its "recent sends" list is where a specific occurrence
- * gets picked: each row links to the request/job/command/scheduled task
- * timeline that triggered it — both sides of a mail-channel notification
- * show up together there — falling back to NotificationDetail's own
- * standalone page only when no such correlation exists.
+ * Aggregate view for one notification class ($key is its FQCN). Each send
+ * links to the run that triggered it.
  */
 class NotificationClassDetail extends Card
 {

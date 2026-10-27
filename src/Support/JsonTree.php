@@ -14,9 +14,7 @@ use function is_string;
 use function json_last_error;
 
 /**
- * Decodes a raw JSON string into a {@see JsonNode} tree for the Log Context
- * viewer. Kept separate from JsonNode itself so the parse/decode-error
- * handling doesn't leak into the tree's own shape.
+ * Decodes a raw JSON string into a {@see JsonNode} tree for the log context viewer.
  */
 class JsonTree
 {

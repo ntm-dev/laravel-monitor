@@ -1,15 +1,5 @@
-{{-- Selected event detail panel: a right-hand side panel next to the
-     chart, not a bottom drawer, so inspecting an event never pushes the
-     timeline down the page. The inner wrapper is `sticky` (not the outer
-     flex item) so it pins near the top of the viewport for as long as the
-     row list beside it is tall enough to scroll through. Its offset is
-     `timelineHeaderOffset` (see timeline-script.blade.php), sitting it
-     flush against the sticky title/zoom/ruler header above — using the
-     same offset as that header would make both sticky elements land on the
-     same viewport band, and whichever paints later would cover the other.
-     No x-transition: it silently broke the very first selection after page
-     load (stayed at width 0 until toggled twice) — verified by removing
-     just that, everything else equal. --}}
+{{-- Selected-entry side panel. The inner wrapper is sticky at timelineHeaderOffset, just below the
+     sticky timeline header. No x-transition: it left the first selection stuck at width 0. --}}
 @props(['hasController' => false])
 <div x-show="selectedId !== null" class="w-80 shrink-0">
     <div :style="'top: ' + timelineHeaderOffset + 'px; max-height: calc(100vh - ' + timelineHeaderOffset + 'px)'"
@@ -18,26 +8,8 @@
             <div class="min-w-0">
                 <h3 class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400"
                     x-text="selected()?.badge"></h3>
-                {{-- Same single timestamp line every type has always shown
-                     here — just microsecond-precise now (already formatted
-                     server-side, timezone included, see
-                     Support\Timeline::stampPreciseTimestamps()) rather than
-                     JS's own Date, which only carries millisecond precision.
-                     text-[11px] + whitespace-nowrap (a touch smaller than
-                     this h3's own text-xs above) so the full
-                     microsecond+timezone string ("2026-09-03
-                     22:25:37.082014 +07:00") still fits this 320px-wide
-                     panel on one line instead of wrapping. Always
-                     started_at, uniformly for every type -- it used to show
-                     ended_at instead for query/cache/mail/... (only
-                     phase/attempt got started_at), and for a query whose
-                     whole duration is a fraction of a millisecond the two
-                     only differ in their last couple of digits, reading
-                     (wrongly) like the exact same instant repeated in both
-                     this header AND the Duration row's own end-time tooltip
-                     further down. started_at here + ended_at only on that
-                     tooltip keeps the two genuinely distinct at a glance,
-                     for every type alike. --}}
+                {{-- started_at, pre-formatted with microseconds (Support\Timeline::stampPreciseTimestamps());
+                     ended_at appears only in the duration tooltip. Sized to fit the panel on one line. --}}
                 <span class="mt-0.5 block whitespace-nowrap font-mono text-[11px] text-neutral-400 dark:text-neutral-500"
                     x-text="selected()?.metadata?.started_at"></span>
             </div>
@@ -79,8 +51,7 @@
             </div>
         </div>
 
-        {{-- SQL — highlighted via the highlight.js build already loaded for
-             stack traces (see components/layout.blade.php). --}}
+        {{-- SQL, highlighted by layout.blade.php's highlight.js hook. --}}
         <template x-if="selected()?.type === 'query'">
             <div class="p-4">
                 <div class="mb-1.5 flex items-center justify-between">
@@ -126,11 +97,7 @@
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.connection') }}</dt>
                     <dd class="flex items-center gap-1.5 font-mono text-neutral-800 dark:text-neutral-200">
                         <span x-text="selected()?.metadata?.connection"></span>
-                        {{-- The PDO connection role Laravel actually routed
-                             to (read/write/direct — Recorders\Queries), not
-                             guessed from the SQL verb. Omitted when the
-                             running Laravel doesn't report it (< 12.45) or
-                             it's ambiguous. --}}
+                        {{-- PDO connection role from Recorders\Queries; absent before Laravel 12.45. --}}
                         <template x-if="selected()?.metadata?.connection_type">
                             <span class="rounded px-1 py-0.5 text-[10px] font-medium uppercase"
                                 :class="({
@@ -152,11 +119,7 @@
                             x-text="truncatedPath(selected()?.metadata?.location)"></dd>
                     </div>
                 </template>
-                {{-- Full call stack (Recorders\Queries' 'trace' detail
-                     option — off by default, see Settings::RECORDER_DETAILS).
-                     Shown inline, not collapsed: this panel is already a
-                     one-entry-at-a-time view, unlike Query Detail's table
-                     of every occurrence. --}}
+                {{-- Full call stack, when the Queries 'trace' detail option is on. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
@@ -369,8 +332,7 @@
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                         :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
-                {{-- Full call stack (OutgoingRequests' 'trace' detail option
-                     — off by default, see Settings::RECORDER_DETAILS). Last row. --}}
+                {{-- Full call stack, when the OutgoingRequests 'trace' detail option is on. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
@@ -435,9 +397,7 @@
                             x-text="'#' + selected()?.metadata?.attempts"></dd>
                     </div>
                 </template>
-                {{-- Only set once a job outcome (processed/failed/released)
-                     was actually recorded (Recorders\Jobs) — absent for a
-                     still-'queued' placeholder. --}}
+                {{-- Absent until a job outcome is recorded. --}}
                 <template x-if="selected()?.metadata?.peak_memory">
                     <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                         <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.peak_memory') }}</dt>
@@ -452,8 +412,7 @@
                             x-text="selected()?.metadata?.server"></dd>
                     </div>
                 </template>
-                {{-- Where dispatch() was called (Recorders\Jobs). Only on the
-                     dispatch row — an outcome runs in another process. --}}
+                {{-- Where dispatch() was called; dispatch row only. --}}
                 <template x-if="selected()?.metadata?.location">
                     <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
                         <dt class="shrink-0 text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.queued_from') }}</dt>
@@ -469,10 +428,7 @@
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                         :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
-                {{-- Full call stack (Recorders\Jobs' 'trace' detail option —
-                     off by default, see Settings::RECORDER_DETAILS). Only
-                     ever set on the dispatch ('queued') row, same as location
-                     above. Last row. --}}
+                {{-- Full call stack, when the Jobs 'trace' detail option is on; dispatch row only. --}}
                 <template x-if="selected()?.metadata?.trace">
                     <div class="px-4 py-2.5 text-xs">
                         <dt class="mb-1.5 flex items-center justify-between text-neutral-500 dark:text-neutral-400">
@@ -530,12 +486,7 @@
             </dl>
         </template>
 
-        {{-- A job's own attempt row -- see View\Components\Requests\Timeline's
-             "JOB (Attempt #N)" badge and Support\Timeline::stampPreciseTimestamps().
-             No SQL/recipients/... section like the types above (an attempt
-             has none), so its own duration lives here instead -- its own
-             started_at is shown right under the badge above instead of a
-             labelled row here (see the header block). --}}
+        {{-- A job attempt row: only a duration row (started_at is in the header). --}}
         <template x-if="selected()?.kind === 'attempt'">
             <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                 <div class="flex items-center justify-between gap-2 px-4 py-2.5 text-xs">
@@ -546,21 +497,14 @@
                 </div>
                 <div class="flex items-center justify-between px-4 py-2.5 text-xs">
                     <dt class="text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.duration') }}</dt>
-                    {{-- Hovering the duration shows the precise (microsecond)
-                         moment this attempt actually ended -- ended_at is
-                         only ever absent for a duration-less entry (see
-                         TimelineEntry::$duration), which an attempt never is
-                         (Timeline::rootDuration() always resolves one). --}}
+                    {{-- Tooltip: precise ended_at (an attempt always has a duration). --}}
                     <dd class="font-mono text-neutral-800 dark:text-neutral-200"
                         :data-tooltip="selected()?.metadata?.ended_at" x-text="formatDuration(selected()?.duration)"></dd>
                 </div>
             </dl>
         </template>
 
-        {{-- A lifecycle phase (bootstrap/middleware/.../end) -- same
-             reasoning as the attempt block above: no other section, so its
-             own duration lives here (its own started_at is under the badge
-             above instead, see the header block). --}}
+        {{-- A lifecycle phase: duration plus action/render rows (started_at is in the header). --}}
         <template x-if="selected()?.kind === 'phase'">
             <dl class="divide-y divide-neutral-200 dark:divide-neutral-800">
                 {{-- start row phase action --}}

@@ -15,15 +15,8 @@ use function str_pad;
 use function trim;
 
 /**
- * Turns a scheduled task's raw cron expression back into the phrase it was
- * declared with ("Every 5 minutes", "Daily at 13:30") and into the date it is
- * next due.
- *
- * Recorders\ScheduledTasks stores `expression` / `timezone` / `repeat_seconds`
- * on every entry's payload, so the schedule list describes a task from its own
- * recorded runs rather than from the app's Schedule instance — on Laravel 10
- * only the console kernel populates that instance, leaving it empty during the
- * dashboard's own web request.
+ * Turns a recorded cron expression back into the phrase it was declared with
+ * ("Every 5 minutes", "Daily at 13:30") and the date it is next due.
  */
 class Cron
 {
@@ -49,9 +42,8 @@ class Cron
     }
 
     /**
-     * When the expression is next due, in UTC, or null when it can't be
-     * parsed. dragonmantank/cron-expression ships with illuminate/console, so
-     * it is only missing from an install that never runs a scheduler.
+     * Next due date in UTC; null when unparseable or dragonmantank/cron-expression
+     * (shipped with illuminate/console) isn't installed.
      */
     public static function nextRunAt(
         ?string $expression,
@@ -69,10 +61,8 @@ class Cron
             $now = CarbonImmutable::now($timezone !== null && $timezone !== '' ? $timezone : null);
             $next = CarbonImmutable::instance($cron->getNextRunDate($now));
 
-            // A sub-minute task fires every $repeatSeconds *within* each minute
-            // its expression matches, so while that minute is the current one
-            // the cron date alone points a whole minute past the real next run.
-            // Same correction Illuminate's ScheduleListCommand applies.
+            // Sub-minute task inside a matching minute: next run is the next
+            // $repeatSeconds tick, not the next cron minute (as in ScheduleListCommand).
             if ($repeatSeconds !== null && $repeatSeconds > 0
                 && $now->startOfMinute()->eq($cron->getPreviousRunDate($now, 0, true))) {
                 $next = $now->endOfSecond()->ceilSeconds((int) $repeatSeconds);
@@ -85,17 +75,8 @@ class Cron
     }
 
     /**
-     * The phrase for one of the cadences Illuminate's ManagesFrequencies can
-     * produce, or null for an expression it never emits (a hand-written
-     * `30 4 1,15 * 5`, say) — those are better shown raw than guessed at.
-     *
-     * Ordered most specific first, since match() takes the first arm that
-     * holds: "0 * * * *" is plain "Hourly", not "Hourly at minute 0".
-     *
-     * The matcher returns its captures rather than filling a by-reference
-     * out-param — `$matches` is local to the closure, which is what lets this
-     * stay an arrow function. Each arm binds them to `$found` in its own
-     * condition, and casts, because match() compares against true strictly.
+     * Phrase for a cadence ManagesFrequencies can produce, or null for anything
+     * else (shown raw). Arms run most specific first; `(bool)` because match(true) is strict.
      */
     protected static function phrase(string $expression): ?string
     {
@@ -147,11 +128,7 @@ class Cron
         };
     }
 
-    /**
-     * The expression with its whitespace collapsed to single spaces, or null
-     * when it isn't a five-field cron string. Illuminate never produces
-     * anything else, but a payload recorded by a hand-rolled Event might.
-     */
+    /** Whitespace collapsed to single spaces; null unless it has exactly five fields. */
     protected static function normalize(?string $expression): ?string
     {
         $fields = preg_split('/\s+/', trim((string) $expression), -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -160,10 +137,8 @@ class Cron
     }
 
     /**
-     * "Every minute" / "Every 5 minutes" — two separate keys rather than one
-     * pluralized string, because the singular drops the number entirely and
-     * Illuminate's MessageSelector treats Vietnamese as a single-form locale
-     * (every count would resolve to the "Every minute" half).
+     * Two keys, not one pluralized string: the singular has no number, and
+     * MessageSelector treats Vietnamese as single-form.
      */
     protected static function cadence(string $unit, int $count): string
     {
@@ -173,10 +148,8 @@ class Cron
     }
 
     /**
-     * The locale's own name for a cron weekday number — 0 and 7 are both
-     * Sunday. Carbon's translations rather than the package's own, so a
-     * locale this package doesn't ship still names its days; its locale is
-     * set explicitly for the reason given in Format::durationUnits().
+     * Localized day name for a cron weekday (0 and 7 are Sunday), from Carbon's
+     * translations; Carbon's locale is set explicitly as it isn't synced to the app's.
      */
     protected static function weekday(int $number): string
     {

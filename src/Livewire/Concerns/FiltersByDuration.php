@@ -15,8 +15,7 @@ trait FiltersByDuration
     public string $durationFilter = 'all';
 
     /**
-     * A real method (not wire:click="$set(...)") so the tab buttons can
-     * target it by call signature for their own wire:loading spinner.
+     * A real method, not $set(), so tab buttons can target it with wire:loading.
      */
     public function setDurationFilter(string $value): void
     {
@@ -25,9 +24,7 @@ trait FiltersByDuration
     }
 
     /**
-     * Applies the active tab to $rows. Badge counts are computed before the
-     * tab itself is applied, so every tab shows its count against the same
-     * base set.
+     * Apply the active tab to $rows; badge counts use the unfiltered set.
      *
      * @param  Collection<int, object>  $rows
      * @param  float|int|null  $avg  the period's overall avg, the ≥ Avg bar

@@ -89,12 +89,8 @@
                     </thead>
                     <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                         @foreach ($tasks as $task)
-                            {{-- Cells below carry their own `title` (full command,
-                                 full expression) — a plain title on the <tr> alone
-                                 would be shadowed by those whenever the cursor is
-                                 actually over one, which is most of the row. Swap
-                                 each to this note instead of relying on the row's
-                                 own when inactive. --}}
+                            {{-- Cells have their own data-tooltip, which would shadow the row's;
+                                 when inactive, each cell shows this note instead. --}}
                             @php($inactiveNote = $task->isActive ? null : __('monitor::messages.schedule.no_longer_scheduled'))
                             <tr class="group cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 {{ $task->isActive ? '' : 'line-through opacity-50' }}"
                                 data-tooltip="{{ $inactiveNote }}"

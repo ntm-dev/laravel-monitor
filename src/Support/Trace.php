@@ -9,22 +9,15 @@ use function debug_backtrace;
 use function implode;
 
 /**
- * Full call-stack text for the "trace" detail options (Queries/Jobs/
- * OutgoingRequests — see config/monitor.php's recorders.*.details) — off by
- * default outside local, since capturing and formatting a deep backtrace on
- * every query/dispatch/outgoing call is real overhead most installs don't
- * want paying for unconditionally.
+ * Call-stack text for the Queries/Jobs/OutgoingRequests "trace" detail option
+ * (config/monitor.php recorders.*.details.trace, off by default outside local).
  */
 final class Trace
 {
 
     /**
-     * PHP's own getTraceAsString() style ("#0 file(line): Class->method()"),
-     * one frame per line, relative file paths. Null when there's nothing
-     * past the recorder's own call site to show.
-     *
-     * Only the raw frames are captured here; formatting and shrinking run
-     * when the entry is flushed (see Entry::toArray()), off the hot path.
+     * getTraceAsString()-style text ("#0 file(line): Class->method()"), formatted
+     * lazily when the entry is flushed. Null when there are no frames to show.
      *
      * @return LazyValue<string>|null
      */
@@ -32,8 +25,7 @@ final class Trace
     {
         $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
 
-        // Frame 0 is always inside the recorder's own trace-building method
-        // — never meaningful to show as the caller.
+        // Frame 0 is the recorder's own capture() call.
         array_shift($frames);
 
         if ($frames === []) {
@@ -44,9 +36,8 @@ final class Trace
     }
 
     /**
-     * Vendor frames that name a class are stored as just "Class->method()":
-     * the dashboard shows exactly that for them, and their file:line is only
-     * needed for the one frame the call site is read back from.
+     * Vendor frames with a class are stored as just "Class->method()", except
+     * the call-site frame, which keeps its file:line for location().
      *
      * @param  list<array<string, mixed>>  $frames
      */

@@ -12,10 +12,8 @@ use LaravelMonitor\Support\RecordType;
 use function str_replace;
 
 /**
- * HTML fragments for the Request Detail page's exceptions and logs cards,
- * fetched after the page itself has loaded (see
- * components/requests/deferred-card.blade.php). An empty body (204) means
- * the request has none, so the page keeps the card hidden.
+ * Deferred HTML for the Request Detail exceptions/logs cards (see
+ * components/requests/deferred-card.blade.php); 204 keeps the card hidden.
  */
 class RequestEntriesController
 {

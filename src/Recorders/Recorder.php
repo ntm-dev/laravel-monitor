@@ -19,15 +19,9 @@ abstract class Recorder
     abstract public function register(Dispatcher $events): void;
 
     /**
-     * Scopes memory_get_peak_usage() to the unit of work about to start —
-     * a long-running worker or scheduler never restarts its PHP process
-     * between jobs/tasks, so without this the peak reported for one of
-     * them is really the cumulative peak of every one that process has
-     * ever run.
-     *
-     * memory_reset_peak_usage() only exists from PHP 8.2 onwards while
-     * this package supports ^8.1 (see composer.json), so on 8.1 the peak
-     * stays cumulative rather than fataling on an undefined function.
+     * Scopes memory_get_peak_usage() to the job/task about to start in a
+     * long-running process. No-op on PHP 8.1 (the function is 8.2+), where
+     * the peak stays cumulative.
      */
     protected function resetPeakMemoryUsage(): void
     {

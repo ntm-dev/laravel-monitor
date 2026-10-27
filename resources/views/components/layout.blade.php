@@ -25,9 +25,7 @@
             window.monitorApplyTheme = function (next) { pref = next; root.setAttribute('data-theme', next); apply(); };
         })();
     </script>
-    {{-- Resolve the sidebar collapsed state before first paint (same reasoning
-         as the theme script above) — otherwise the sidebar would render at
-         full width, then jump to collapsed once Alpine hydrates. --}}
+    {{-- Resolve the sidebar collapsed state before first paint, so it doesn't jump on hydration. --}}
     <script>
         if (localStorage.getItem('monitor-nav-collapsed') === '1') {
             document.documentElement.setAttribute('data-nav-collapsed', '1');
@@ -36,21 +34,12 @@
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
-    {{-- Pretty-prints SQL (one clause per line) before it's syntax-highlighted —
-         exposes window.sqlFormatter.format(). See Requests\Timeline's
-         sqlHighlighted(). --}}
+    {{-- window.sqlFormatter.format(), used by timeline-script.blade.php's sqlHighlighted(). --}}
     <script src="https://cdn.jsdelivr.net/npm/sql-formatter@4.0.2/dist/sql-formatter.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        {{-- shadow-top-* mirror Tailwind's own shadow-sm/DEFAULT/md/lg/xl values
-             with the y-offsets negated, for elements that need a shadow cast
-             upward (e.g. a sticky footer shadowing the content scrolled
-             beneath it — components/navigation.blade.php's footer nav).
-             Each still composes with the stock shadow-{color}/{opacity}
-             utilities (shadow-black/5, dark:shadow-white/5, …) the same way
-             shadow-lg does — Tailwind extracts the color from any boxShadow
-             theme value, custom ones included, so that composability isn't
-             something these have to opt into separately. --}}
+        {{-- shadow-top-*: Tailwind's shadow sizes with negated y-offsets, for upward shadows
+             (e.g. the sidebar footer). They still compose with shadow-color utilities. --}}
         tailwind.config = {
             darkMode: 'class',
             theme: {
@@ -71,26 +60,18 @@
         };
     </script>
     <style>[x-cloak] { display: none !important; }</style>
-    {{-- highlight.js only ships the light "github" theme (loaded above) — no
-         dark variant exists to swap in, so override just the token colours
-         that read poorly against a dark background instead of loading a
-         second stylesheet. --}}
+    {{-- Dark-mode overrides for the light highlight.js theme, plus themed scrollbars. --}}
     <style>
         .dark .hljs-string { color: #60748c; }
 
-        /* Firefox: thumb colour matched to neutral-300/neutral-700 (light/dark),
-           transparent track so it doesn't add its own bar under the chart.
-           Set on html (not body) since that's where .dark is toggled — a rule
-           scoped to body would always win over an inherited value from html,
-           leaving body's own scrollbar stuck light regardless of theme. */
+        /* Firefox: set on html, where .dark is toggled. */
         html {
             scrollbar-color: rgb(212 212 212) transparent;
         }
         html.dark {
             scrollbar-color: rgb(64 64 64) transparent;
         }
-        /* Chromium/Safari: the default scrollbar otherwise stays light-themed
-           (native OS chrome) even inside a dark-mode page. */
+        /* Chromium/Safari. */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -102,19 +83,13 @@
             background-color: rgb(212 212 212);
             border-radius: 9999px;
         }
-        /* ".dark ::-webkit-scrollbar-thumb" alone only matches descendants of
-           .dark — it can't reach html's own scrollbar (the outer page/viewport
-           bar), since html isn't a descendant of itself. Add the self-selector
-           too so that one darkens as well. */
+        /* html.dark covers the viewport scrollbar, which ".dark ::" (descendants only) misses. */
         .dark ::-webkit-scrollbar-thumb,
         html.dark::-webkit-scrollbar-thumb {
             background-color: rgb(64 64 64);
         }
     </style>
-    {{-- Sidebar collapse: .monitor-nav-collapsed is toggled client-side by
-         Alpine (components/navigation.blade.php); the html[data-nav-collapsed]
-         selector covers the same result before Alpine hydrates (see the
-         inline script above) so there's no width/label flash on load. --}}
+    {{-- Sidebar collapse: Alpine toggles .monitor-nav-collapsed; html[data-nav-collapsed] covers pre-hydration. --}}
     <style>
         .monitor-nav-aside {
             width: 228px;
@@ -129,12 +104,8 @@
             display: none;
         }
     </style>
-    {{-- Bounce-scroll for a label too long for its box (e.g. the custom-range
-         picker's setting-timezone tab, "Asia/Ho Chi Minh (UTC+7)") — sits at
-         the start, scrolls left far enough to reveal the clipped end, sits
-         there, scrolls back, repeat. The distance is content-dependent, so
-         it's measured client-side (whoever applies .monitor-marquee sets
-         --monitor-marquee-distance to -(overflow)px) rather than guessed here. --}}
+    {{-- Bounce-scroll for an overflowing label. Whoever applies .monitor-marquee sets
+         --monitor-marquee-distance to the negative overflow in px. --}}
     <style>
         @keyframes monitor-marquee-bounce {
             0%, 15% { transform: translateX(0); }
@@ -145,11 +116,7 @@
             animation: monitor-marquee-bounce 6s ease-in-out infinite;
         }
     </style>
-    {{-- Shimmer sweep for skeleton loading bars (components/table-skeleton.blade.php):
-         a light gradient band slides left-to-right over the bar's flat
-         background-color on a loop. Layered as background-image on top of
-         Tailwind's bg-neutral-100/dark:bg-neutral-800 (a separate CSS
-         property, so both coexist) rather than replacing those utilities. --}}
+    {{-- Shimmer for skeleton bars (table-skeleton.blade.php), layered as background-image over their bg colour. --}}
     <style>
         @keyframes monitor-skeleton-shimmer {
             0% { background-position: -150% 0; }
@@ -198,15 +165,7 @@
             .monitor-bounce-once { animation: none; }
         }
     </style>
-    {{-- Global tooltip skin: every data-tooltip="…" attribute in the app
-         renders as this dark box, matching the
-         one components/requests/timeline-row.blade.php already draws by
-         hand for its own bar-hover detail (same bg-neutral-900/border-
-         neutral-700/text-neutral-100 combo, deliberately not dark:-gated —
-         that tooltip doesn't follow the page theme either). Plain CSS, not
-         Tailwind utility classes, since this element is created by the
-         script below rather than written in Blade — see the same reasoning
-         on .monitor-nav-aside just above. --}}
+    {{-- Global data-tooltip box, dark in both themes. Plain CSS since the script below creates the element. --}}
     <style>
         .monitor-global-tooltip {
             position: fixed;
@@ -267,15 +226,8 @@
         })();
     </script>
 
-    {{-- Any Livewire round trip that fails — an action call or a wire:poll
-         cycle alike — pops a toast instead of failing silently. wire:poll in
-         particular gives no other visible sign a refresh cycle didn't land:
-         the page just quietly stops updating until the next successful poll.
-         Livewire.hook('request', …) is registered once, globally, so this
-         covers every component's polls/actions without each one wiring its
-         own handler. preventDefault() is deliberately never called — this
-         only adds the toast on top of Livewire's own default failure
-         handling (e.g. its debug-mode error overlay), it doesn't replace it. --}}
+    {{-- Toast on any failed Livewire round trip (action or poll). Doesn't call preventDefault(),
+         so Livewire's own failure handling still runs. --}}
     <script>
         (function () {
             function hookLivewire() {
@@ -294,25 +246,8 @@
         })();
     </script>
 
-    {{-- Every x-monitor::refresh-button reads this one store: it spins the
-         icon and no-ops the click while a round trip is in flight, for
-         *any* component's poll/action — not just the one the button
-         belongs to — since a single global flag is what "all refresh
-         buttons spin together" means. Registered on alpine:init rather
-         than lazily inside some component's x-data (the monitorClock
-         pattern in refresh-ring.blade.php) because refresh-button reads it
-         immediately on first paint, before any such component could have
-         run its init().
-
-         `active` is a getter over a round-trip *count*, not a plain boolean —
-         the dashboard Overview embeds three independently-polling
-         components at once (Overview/Application/Users cards), so their
-         requests overlap rather than running one at a time. A boolean set true-per-start/false-per-finish would go false
-         the instant the FIRST of several concurrent requests lands, even
-         with others still in flight — cutting every refresh-ring's spin
-         short and having refresh-button's click guard drop early. Counting
-         only reaches zero (active: false) once every concurrent request has
-         actually finished. --}}
+    {{-- Global in-flight flag read by every refresh button/ring, registered on alpine:init so it
+         exists on first paint. `active` counts round trips, since several components poll concurrently. --}}
     <script>
         document.addEventListener('alpine:init', function () {
             Alpine.store('monitorPolling', {
@@ -320,26 +255,11 @@
                 get active() { return this.count > 0; },
             });
 
-            {{-- When the last in-flight request settled. Drives both the
-                 auto-refresh timer below and every refresh-ring's countdown,
-                 so the two can't disagree. --}}
+            {{-- When the last in-flight request settled; drives both the auto-refresh timer and refresh-ring. --}}
             Alpine.store('monitorRefreshClock', { startedAt: Math.floor(Date.now() / 1000) });
 
-            {{-- The 1s heartbeat every countdown/refresh-ring/relative-time
-                 on the page shares, in whole seconds — registered here rather
-                 than lazily by whichever of those hydrates first, so there is
-                 one definition of it. Those components keep their own lazy
-                 fallback for rendering outside this layout.
-
-                 relative-time used to run a setInterval per cell instead:
-                 each started when its own cell hydrated, so a table advanced
-                 at as many sub-second phases as it had rows, every digit
-                 flipping on its own beat. One tick confines every change to
-                 the same instants, and runs one timer rather than one per
-                 visible timestamp.
-
-                 Aligned to the wall-clock second so the first tick after page
-                 load isn't a partial one. --}}
+            {{-- Shared 1s tick (whole seconds) for countdown, refresh-ring and relative-time, aligned
+                 to the wall-clock second. Those components keep a lazy fallback outside this layout. --}}
             Alpine.store('monitorClock', { now: Math.floor(Date.now() / 1000) });
 
             setTimeout(function () {
@@ -347,9 +267,7 @@
                 setInterval(() => (Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000)), 1000);
             }, 1000 - (Date.now() % 1000));
 
-            {{-- A background tab throttles the interval above to a crawl, so
-                 every timestamp is however stale on return: catch them up on
-                 the spot rather than a tick later. --}}
+            {{-- Background tabs throttle the interval; catch up immediately on return. --}}
             document.addEventListener('visibilitychange', function () {
                 if (! document.hidden) {
                     Alpine.store('monitorClock').now = Math.floor(Date.now() / 1000);
@@ -364,13 +282,8 @@
                 }
             }
 
-            {{-- The 'commit' hook's respond(), not 'request''s succeed/fail:
-                 those two only fire once a network response arrives, so a
-                 message Livewire cancels or squashes into another never
-                 decrements and the count wedges above zero for good — which
-                 now jams auto-refresh, not just the spinner. respond() is
-                 wired to the message's onFinish, which runs on success,
-                 error, cancel and squash alike. --}}
+            {{-- Decrement in the commit hook's respond(), which also runs for cancelled/squashed
+                 messages; request's succeed/fail don't, which would wedge the count. --}}
             function hookLivewire() {
                 if (! window.Livewire) return;
                 window.Livewire.hook('commit', function ({ respond }) {
@@ -383,19 +296,14 @@
             hookLivewire();
         })();
 
-        {{-- Auto-refresh driver for every data-monitor-poll root, replacing
-             wire:poll — whose interval is a page-global setInterval Livewire
-             never restarts, so a manual refresh or a filter change left it
-             firing early, mid-countdown. --}}
+        {{-- Auto-refresh driver for every data-monitor-poll root, timed off monitorRefreshClock. --}}
         (function () {
             const interval = {{ (int) config('monitor.refresh', 10) }};
             let timer = null;
 
             function nowSeconds() { return Math.floor(Date.now() / 1000); }
 
-            {{-- Delay measured against Date.now(), not a second-floored "now":
-                 flooring both ends rounds the wait up by up to a second every
-                 cycle. --}}
+            {{-- Measured against unfloored Date.now() so the wait isn't rounded up each cycle. --}}
             function schedule() {
                 clearTimeout(timer);
                 const dueAt = (Alpine.store('monitorRefreshClock').startedAt + interval) * 1000;
@@ -403,9 +311,7 @@
             }
 
             function tick() {
-                {{-- Deliberately re-arms without re-anchoring: that keeps the
-                     page due, so schedule()'s 1s floor retries until the tab
-                     is back rather than waiting out a whole fresh interval. --}}
+                {{-- Re-arm without re-anchoring, so it retries every 1s until the page can refresh. --}}
                 if (document.hidden || ! navigator.onLine || Alpine.store('monitorPolling').active) {
                     return schedule();
                 }
@@ -416,40 +322,19 @@
                     if (wire) wire.$refresh();
                 });
 
-                {{-- Re-anchored again when those requests settle; doing it
-                     here too keeps the timer armed even if none resolved. --}}
+                {{-- Also re-anchored when the requests settle; this keeps the timer armed if none do. --}}
                 Alpine.store('monitorRefreshClock').startedAt = nowSeconds();
             }
 
-            {{-- schedule() reads startedAt, so the effect re-runs — re-arming
-                 the timer — every time anything re-anchors the clock. --}}
+            {{-- schedule() reads startedAt, so the effect re-arms whenever the clock re-anchors. --}}
             document.addEventListener('alpine:initialized', function () {
                 Alpine.effect(schedule);
             });
         })();
     </script>
 
-    {{-- Renders every data-tooltip="…" in the app as the dark box above,
-         instead of each of the ~50 views that set one drawing its own —
-         same idea as components/requests/timeline-row.blade.php's own
-         hand-drawn bar tooltip, generalised. Delegated on document (not
-         bound per-element at load) so it also covers rows/labels that
-         appear later — a Livewire poll swapping in a new table row, a
-         filter re-render, anything wire:poll morphs in. mouseover/mouseout
-         are used rather than mouseenter/mouseleave because only the former
-         bubble, which delegation requires; the relatedTarget checks below
-         are what keep them from re-firing on every inner element the way
-         plain bubbling would.
-
-         Unlike a plain title="…", this is a custom attribute the browser
-         never touches on its own, so there's no native tooltip to fight —
-         no need to strip/restore anything the way an earlier version of
-         this script had to when it was still hijacking title directly.
-         That also means the bound element can keep updating its own
-         data-tooltip live (see refresh-ring.blade.php's :data-tooltip,
-         which ticks every second) — the MutationObserver below re-reads it
-         on change so the box reflects that instead of freezing at
-         whatever the value was on mouseenter. --}}
+    {{-- Renders every data-tooltip in the app, delegated on document (mouseover/mouseout bubble)
+         so morphed-in elements are covered. A MutationObserver picks up live data-tooltip changes. --}}
     <script>
         (function () {
             var tip = null;
@@ -470,23 +355,8 @@
             function position(el) {
                 var rect = el.getBoundingClientRect();
                 var tipEl = ensureTip();
-                // A `position: fixed` box with `width: auto` shrink-to-fits
-                // against "viewport width minus its own current left" — a
-                // *live* recalculation on every layout pass, not a one-off
-                // taken at measurement time here. Resetting `left` to 0
-                // before measuring (so this first pass reflects the content
-                // alone, not whatever `left` a previous tooltip left behind)
-                // isn't enough by itself: the *final* `left` set below is
-                // clamped to leave only a slim 4px margin past the
-                // measured width, and this box keeps recomputing
-                // shrink-to-fit against that narrower "available width" on
-                // every later reflow (a resize, a scroll-triggered repaint,
-                // even just this box's own opacity transition) — a shorter
-                // measured width there re-wraps the text, which then
-                // measures shorter still next time, visibly collapsing a
-                // one-line tooltip into a dozen. Freezing the box at an
-                // explicit pixel width once, from this unconstrained
-                // measurement, stops it from ever shrink-to-fitting again.
+                // Measure at left 0, then freeze the width: a fixed auto-width box keeps
+                // shrink-to-fitting against its clamped left and collapses its text.
                 tipEl.style.width = 'auto';
                 tipEl.style.left = '0px';
                 var tipRect = tipEl.getBoundingClientRect();
@@ -527,9 +397,7 @@
                 requestAnimationFrame(function () { tip.classList.add('is-visible'); });
 
                 observer = new MutationObserver(function () {
-                    // The value can go empty mid-hover (a conditional wrapping the
-                    // attribute in the source flips) — treat that as a hide
-                    // rather than leaving a stale/blank box up.
+                    // Hide if the value goes empty mid-hover.
                     if (! render(el)) {
                         hide();
                     }
@@ -592,10 +460,7 @@
                 }
             });
 
-            // A poll/morph can remove the hovered element outright (a row
-            // drops out of a list) — nothing then fires mouseout, so hide
-            // before the morph applies rather than leave a stale tooltip
-            // pointing at a node that's about to disappear or move.
+            // A morph can remove the hovered element without a mouseout, so hide first.
             document.addEventListener('livewire:init', function () {
                 window.Livewire.hook('morph', hide);
             });

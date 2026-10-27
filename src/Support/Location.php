@@ -54,15 +54,12 @@ final class Location
         $nonInternalLine = null;
 
         foreach ($trace as $index => $frame) {
-            // The first frame will always be the frame where we capture the
-            // stack which is currently in our service provider. Instead of
-            // using `array_shift` and creating an entirely new array we will
-            // just skip the first frame as we never want to consider it.
+            // Frame 0 is the capture site itself (or a caller's pad).
             if ($index === 0 || ! isset($frame['file'])) {
                 continue;
             }
 
-            // First, we want to find the location in the end-user application:
+            // Prefer the first application frame.
             if (! $this->isVendorFile($frame['file'])) {
                 return [
                     $this->normalizeFile($frame['file']),
@@ -70,9 +67,7 @@ final class Location
                 ];
             }
 
-            // We only want to track the first non-internal file we come across,
-            // so once we have that we can ignore any others. Otherwise, we will
-            // capture the first non-internal file and line as the fallback:
+            // Fallback: the first vendor frame outside the framework and this package.
             if ($nonInternalFile === null && ! $this->isInternalFile($frame['file'])) {
                 $nonInternalFile = $frame['file'];
                 $nonInternalLine = $frame['line'] ?? null;
@@ -228,10 +223,7 @@ final class Location
         return substr($file, strlen($this->basePath));
     }
 
-    /**
-     * Inverse of normalizeFile(): a project-relative path put back onto the
-     * base path, anything already absolute left alone.
-     */
+    /** Inverse of normalizeFile(); already-absolute paths are left alone. */
     public function absoluteFile(string $file): string
     {
         return preg_match('#^([a-zA-Z]:[\\\\/]|/)#', $file) === 1 ? $file : $this->basePath.$file;
@@ -239,17 +231,8 @@ final class Location
 
     private function joinPaths(string $basePath, string ...$paths): string
     {
-        // $this->basePath already carries its own trailing separator (see
-        // __construct()) — without this rtrim, every path built from it
-        // (vendorPath, artisanPath, and everything joined from vendorPath
-        // in turn, like frameworkPath/monitorPath) doubled up the
-        // separator, so str_starts_with() against a real single-separator
-        // file path from debug_backtrace() never matched. isVendorFile()/
-        // isInternalFile() silently returned false for every vendor file,
-        // so forQueryTrace() always stopped at the first stack frame after
-        // the internal service-provider frame — typically inside
-        // Illuminate\Events\Dispatcher — and reported that as the query's
-        // origin instead of skipping past it to find the real caller.
+        // $this->basePath ends with a separator; trim it so joined paths don't
+        // double it and break the str_starts_with() prefix checks.
         $basePath = rtrim($basePath, DIRECTORY_SEPARATOR);
 
         foreach ($paths as $index => $path) {

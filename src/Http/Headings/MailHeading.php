@@ -7,11 +7,8 @@ use LaravelMonitor\Support\EntryId;
 use LaravelMonitor\Support\KeyHash;
 
 /**
- * Heading for a mail detail page. $key means one of two things,
- * disambiguated by dashboard.blade.php the same way it routes the page
- * itself: an EntryId-encoded row id (one specific send — MailDetail, subject
- * as title) or the mailable/notification FQCN (aggregate across all its
- * sends — MailClassDetail, same convention as JobHeading/QueryHeading).
+ * Heading for a mail page. $key is an EntryId (one send, subject as title) or
+ * the mailable/notification class (aggregate page).
  */
 class MailHeading
 {
@@ -40,11 +37,8 @@ class MailHeading
         $subject = $entry->payload['subject'] ?? $entry->key;
         $to = $entry->payload['to'] ?? null;
 
-        // Which class this send belongs to (a notification takes priority —
-        // see Recorders\Mail's own $groupKey), so the breadcrumb's second
-        // segment can link back to that class's own aggregate page. Null
-        // for ad-hoc mail with neither (Mail::raw(), a closure view) —
-        // there's no class page to link back to.
+        // Class for the breadcrumb link (notification first, as Recorders\Mail groups);
+        // null for ad-hoc mail such as Mail::raw().
         $classKey = $entry->payload['notification'] ?? $entry->payload['mailable'] ?? null;
 
         return new Heading(

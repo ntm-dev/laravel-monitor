@@ -3,11 +3,8 @@
 namespace LaravelMonitor\Support;
 
 /**
- * One bar on the Request Detail timeline — either a lifecycle phase
- * (bootstrap/middleware/controller/render/unwinding/sending/terminating) or
- * a correlated event (query/cache/mail/notification/queue/http). Kept
- * data-driven so new event types only need an entry in Timeline::EVENT_TYPES,
- * not new Blade branches.
+ * One bar on the Request Detail timeline: the root, a lifecycle phase
+ * (an ExecutionStage value), or a correlated event (see Timeline::EVENT_TYPES).
  */
 class TimelineEntry
 {
@@ -16,7 +13,7 @@ class TimelineEntry
         public string $type,
         public string $label,
         public int|float $start,
-        /** Null when the underlying event has no meaningful duration (e.g. an exception, a failed request) rather than a measured zero. */
+        /** Null when the event has no duration (e.g. an exception), as opposed to a measured zero. */
         public int|float|null $duration,
         public ?string $parentId = null,
         public array $metadata = [],

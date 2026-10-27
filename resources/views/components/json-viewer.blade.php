@@ -1,7 +1,5 @@
-{{-- Syntax-highlighted, collapsible JSON viewer for Log Context — colour per
-     token type, and every object/array is independently expandable. Falls back to a plain dump
-     when $tree is null (payload wasn't valid JSON). $tree is prepared by
-     Support\JsonTree; this component only walks and displays it. --}}
+{{-- Collapsible, syntax-coloured JSON viewer for Log Context ($tree from Support\JsonTree).
+     Falls back to a plain dump when $tree is null (invalid JSON). --}}
 @props(['raw', 'tree'])
 @if ($tree === null)
     <pre class="max-h-64 overflow-auto rounded-md bg-white p-2 font-mono text-[11px] leading-relaxed text-neutral-700 dark:bg-neutral-950 dark:text-neutral-200"><code>{{ $raw }}</code></pre>

@@ -1,18 +1,10 @@
-{{-- RequestSummary: General info (date/status/server/size/memory) and User
-     info (name/id + IP) side by side. --}}
+{{-- General info and User info cards for a request, side by side. --}}
 @props(['root', 'userName', 'timezone'])
 @php
     $payload = $root->payload ?? [];
 
-    // $root->created_at is stamped at the request's own END (see
-    // Support\Timeline's own docs on this), not its start -- 'date' below
-    // shows the *start* instead (matching how every other detail panel in
-    // this package shows a single timestamp, see timeline-detail-panel.blade.php),
-    // reconstructed by walking created_at back by the request's own
-    // duration. Both computed from the same precise (microsecond) epoch
-    // float, not Carbon's own sub*() methods, which only take whole units
-    // and would silently drop the fractional-ms remainder $root->duration
-    // usually carries.
+    // created_at is the request's end; 'date' shows the start (created_at - duration).
+    // Float epoch math keeps the sub-ms part Carbon's sub*() would drop.
     $endEpoch = (float) $root->created_at->format('U.u');
     $startEpoch = $endEpoch - ((float) $root->duration / 1000);
 
@@ -74,9 +66,7 @@
                         @endif
                     </dd>
                 @elseif ($key === 'duration')
-                    {{-- Hovering the duration shows the precise moment this
-                         request actually ended — the same instant the
-                         'date' row above already shows as its main value. --}}
+                    {{-- Tooltip: the precise end time ('date' shows the start). --}}
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200" data-tooltip="{{ $endTime }}">{{ $value }}</dd>
                 @else
                     <dd class="shrink-0 font-mono text-xs text-neutral-800 dark:text-neutral-200">{{ $value }}</dd>

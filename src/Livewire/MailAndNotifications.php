@@ -63,9 +63,7 @@ class MailAndNotifications extends Card
         $direct = $bySubtype->get('direct')?->count ?? 0;
         $viaNotification = $bySubtype->get('notification')?->count ?? 0;
 
-        // Grouped by mailable/notification class (Recorders\Mail's $groupKey)
-        // instead of one row per send — click a row to see its individual
-        // sends.
+        // One row per mailable/notification class (Recorders\Mail's $groupKey).
         $groups = $storage->keyStats('mail', $since, $until);
 
         if ($this->search !== '') {
@@ -81,11 +79,8 @@ class MailAndNotifications extends Card
         $page = min(max(1, $this->page), $lastPage);
 
         return [
-            // $direct + $viaNotification, not the list's total: mail
-            // recorded before the direct/notification subtype existed has no
-            // subtype at all, so it's invisible to statsBySubtype() — this
-            // card's own legends legitimately undercount against the list
-            // below until that older data ages out of the retention window.
+            // Mail rows without a subtype aren't counted here, so these can
+            // undercount against the list total.
             'direct' => $direct,
             'viaNotification' => $viaNotification,
             'directBuckets' => $storage->countsPerBucket('mail', $since, $buckets, 'direct', null, $until),

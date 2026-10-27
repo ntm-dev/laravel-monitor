@@ -5,14 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Single migration file for the whole package, by design: this package is
- * installed into other Laravel apps purely to monitor them, and only one
- * migration file is allowed for that integration to stay simple. Do NOT add
- * a second migration file — when the schema needs to change, edit the
- * relevant Schema::create()/Schema::table() block in this file directly (so
- * a fresh install still gets the right structure), then apply the same
- * change with a manual ALTER against the already-migrated database instead
- * of writing a new migration.
+ * The package's only migration file; never add a second one. Change the schema
+ * here, then apply the same change to migrated databases with a manual ALTER.
  */
 return new class extends Migration
 {
@@ -29,35 +23,18 @@ return new class extends Migration
             $table->string('subtype', 32)->nullable();
             $table->string('key', 255)->nullable();
             $table->longText('payload')->nullable();
-            // 6 decimal places so request/phase timing measured via
-            // microtime() is stored at its full native precision, not
-            // floored away — see Monitor::elapsedMsPrecise() and Entry::toArray(),
-            // neither of which round the value before it reaches here.
-            // microtime(true) itself only resolves to whole microseconds
-            // (3 decimal ms places), so 6 is a deliberately generous margin
-            // above that, not a claim of sub-microsecond accuracy. Entries
-            // whose duration comes from a Laravel core event (e.g.
-            // QueryExecuted::$time) already arrive rounded upstream, so the
-            // extra digits are simply 0 there.
+            // Milliseconds; timings are microsecond-precise (3 decimals), 6 is headroom.
             $table->decimal('duration', 16, 6)->unsigned()->nullable();
-            // string, not unsignedBigInteger: getAuthIdentifier() (used by both
-            // the Requests and Authentication recorders) is typed int|string|null
-            // — a non-numeric primary key (UUID/ULID, string API identifier, ...)
-            // would silently fail to store under an integer column.
+            // String: holds "{guard}:{id}", and ids may be non-numeric (UUID/ULID).
             $table->string('user_id', 255)->nullable();
             $table->string('request_id', 36)->nullable();
             $table->decimal('start_offset', 16, 6)->unsigned()->nullable();
             $table->timestamp('created_at', 6);
 
-            // The narrow/wide pair on the [type, created_at] prefix is
-            // deliberate:
-            // - narrow serves recent()/exceptionGroups()' `ORDER BY
-            //   created_at DESC LIMIT n` as a backward scan; trailing columns
-            //   turn it into a full filesort (2ms vs 9.5s at millions of rows).
-            // - wide covers stats()/routeStats()/aggregateByKey()/durationStats()
-            //   from the index alone, skipping a row lookup per match (4-9x).
-            // [request_id, type] leads on request_id because timelineFor()
-            // filters type only with `!=`, which no type-leading index serves.
+            // Narrow [type, created_at] serves recent()'s ORDER BY ... LIMIT as a
+            // backward scan; the wide ones cover stats()/routeStats() without row
+            // lookups. [request_id, type] leads on request_id: timelineFor() filters
+            // type only with `!=`.
             $table->index(['type', 'created_at']);
             $table->index(['type', 'created_at', 'duration', 'key', 'subtype']);
             $table->index(['type', 'subtype', 'created_at', 'duration', 'key']);
@@ -66,16 +43,9 @@ return new class extends Migration
             $table->index(['request_id', 'type']);
         });
 
-        // Pre-computed per-bucket counts, rolled up from monitor_entries by
-        // the `monitor:aggregate` command — mirrors Laravel Pulse's entries/
-        // aggregates split. Only carries totals (no key/user breakdown), so
-        // it backs the unfiltered trend charts (Overview, Requests, Cache,
-        // ...); a route/job/user-filtered chart still scans raw entries
-        // directly. `subtype` is a plain empty string rather than nullable
-        // so the unique index (and upsert's ON CONFLICT/ON DUPLICATE KEY
-        // matching) behaves consistently across MySQL/Postgres/SQLite — a
-        // nullable column there would let Postgres treat every NULL as
-        // distinct and silently stop upserting.
+        // Per-bucket totals rolled up by `monitor:aggregate`, backing unfiltered
+        // trend charts. `subtype` defaults to '' (not NULL) so the unique index
+        // matches on upsert; Postgres treats NULLs as distinct.
         Schema::create($this->aggregatesTable(), function (Blueprint $table) {
             $table->id();
             $table->unsignedInteger('bucket');
@@ -104,9 +74,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Token hashed with SHA-256 (not Hash::make()/bcrypt) — see
-        // MonitorInvitation::createFor(): it must be queryable by value from
-        // a single URL parameter, which a salted bcrypt hash can't support.
+        // SHA-256 token (not bcrypt) so it can be looked up by value.
         Schema::create($this->invitationsTable(), function (Blueprint $table) {
             $table->id();
             $table->string('email');
@@ -157,12 +125,8 @@ return new class extends Migration
             $table->index('user_id');
         });
 
-        // One row per issue (an exception fingerprint or a performance-
-        // threshold breach), keyed by [type, key] — mirrors monitor_entries'
-        // own type/key vocabulary rather than introducing a separate one.
-        // Kept apart from monitor_entries: this table holds durable
-        // Open/Resolved/Ignored state a user sets, not immutable recorded
-        // facts, and is never pruned by monitor:prune.
+        // One row per issue, keyed by monitor_entries' [type, key], holding
+        // user-set status; monitor:prune only deletes open issues left without entries.
         Schema::create($this->issuesTable(), function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->nullable()->unique();
@@ -179,9 +143,7 @@ return new class extends Migration
             $table->index(['type', 'status']);
         });
 
-        // Backs the 'database' aggregate-cache driver (see
-        // Storage\Concerns\BuildsQueries::aggregateCacheStore()) — same
-        // shape as Laravel's own `cache:table` stub.
+        // Backs the 'database' aggregate-cache driver; same shape as Laravel's cache table.
         Schema::create($this->cacheTable(), function (Blueprint $table) {
             $table->string('key')->primary();
             $table->mediumText('value');

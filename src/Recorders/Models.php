@@ -19,32 +19,17 @@ class Models extends Recorder
     }
 
     /**
-     * Only ever fires for apps that already opted into
-     * Model::preventLazyLoading()/shouldBeStrict() themselves — this
-     * recorder observes that existing behaviour rather than turning it on,
-     * since flipping it on process-wide would be a real runtime behaviour
-     * change for a monitoring package to make unasked.
-     *
-     * Registers fresh every call rather than guarding "once per process":
-     * a real process (HTTP request, queue worker, artisan command) only
-     * ever calls register() once anyway, since Laravel boots service
-     * providers a single time per process regardless of how many
-     * requests/jobs it goes on to handle — the only environment that
-     * re-invokes register() within one process is Testbench's per-test
-     * application rebuild, which also resets Model's static callback slot
-     * back to null between tests. A "register once" guard would miss that
-     * reset and leave the callback permanently unset after the first test.
+     * Only fires for apps that already enabled Model::preventLazyLoading();
+     * this recorder never turns it on. Wraps any existing handler. Not guarded
+     * to once per process: Testbench resets the static callback between tests.
      */
     protected function registerLazyLoadingViolations(): void
     {
         $previous = $this->currentViolationHandler();
 
         Model::handleLazyLoadingViolationUsing(function (Model $model, string $relation) use ($previous) {
-            // Resolved dynamically (not $this->monitor) so this single,
-            // process-lifetime registration always records onto whichever
-            // app/Monitor instance is currently active — matters under
-            // Testbench, where a fresh application (and Monitor singleton)
-            // boots per test but Eloquent's static callback slot persists.
+            // Resolved per call: Eloquent's static callback can outlive this
+            // app instance (e.g. across Testbench tests).
             app(Monitor::class)->record(
                 type: RecordType::LazyLoading,
                 key: get_class($model).'::'.$relation,
@@ -59,10 +44,7 @@ class Models extends Recorder
                 return call_user_func($previous, $model, $relation);
             }
 
-            // Replicate Eloquent's own default (no custom handler
-            // registered) so installing this package never silently
-            // swallows an app's existing strict-mode crash-in-dev
-            // behaviour — see HasAttributes::handleLazyLoadingViolation().
+            // Eloquent's default behaviour (HasAttributes::handleLazyLoadingViolation()).
             if (! $model->exists || $model->wasRecentlyCreated) {
                 return null;
             }

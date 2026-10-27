@@ -7,11 +7,8 @@ use Illuminate\Support\Collection;
 trait CombinesSubtypeStats
 {
     /**
-     * Collapse a statsBySubtype() breakdown back into one overall stats()-
-     * shaped object (count, avg_duration, max_duration, min_duration,
-     * total_duration) — the same total a direct stats() call with no
-     * subtype filter would return, derived from the single grouped query
-     * instead of a second, separate scan.
+     * Collapse a statsBySubtype() breakdown into one unfiltered stats()-shaped
+     * object, avoiding a second scan.
      *
      * @param  Collection<string, object{count: int, avg_duration: ?float, max_duration: ?float, min_duration: ?float, total_duration: ?float}>  $bySubtype
      */

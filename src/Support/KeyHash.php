@@ -3,11 +3,8 @@
 namespace LaravelMonitor\Support;
 
 /**
- * Stable, opaque path-segment id for a grouping key (a route signature, job/
- * command/mailable FQCN, normalized SQL shape, ...) — same shape as
- * Fingerprint's exception hash, but generic. One-way: turning a hash back
- * into its raw key means matching it against known keys, see
- * Contracts\HashResolver::resolveKeyHash()/resolveUserIdHash().
+ * Stable, opaque path-segment id for a grouping key (route, class name, SQL shape, ...).
+ * One-way; Contracts\HashResolver reverses it by matching against known keys.
  */
 class KeyHash
 {

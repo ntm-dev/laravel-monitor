@@ -19,7 +19,7 @@ class UserDetail extends Card
     /** How many rows the Top Routes / Slowest Routes ranked lists show. */
     protected const MAX_ROUTES_SHOWN = 5;
 
-    /** Same status/duration filter tabs as Livewire\RequestDetail, scoped to this user instead of one route. */
+    /** Same status/duration filter tabs as RequestDetail, scoped to this user. */
     public const STATUS_FILTERS = ['all', 'ok', '4xx', '5xx'];
 
     public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
@@ -63,13 +63,10 @@ class UserDetail extends Card
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until, $userId);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until, $userId);
 
-        // Computed before the filter tab counts below so the >= AVG / >= P95
-        // tabs have this user's own overall avg/p95 to compare each entry
-        // against — same approach as Livewire\RequestDetail::data().
+        // This user's overall avg/p95, used as the duration tab bars.
         $duration = $storage->durationStats('request', $since, $buckets, null, null, $until, $userId);
 
-        // One query grouped by subtype instead of five separate stats()
-        // calls, same approach as Livewire\RequestDetail::data().
+        // One grouped query instead of a stats() call per status group.
         $bySubtype = $storage->statsBySubtype('request', $since, $until, $userId);
         $stats = $this->combineStats($bySubtype);
 
@@ -83,16 +80,13 @@ class UserDetail extends Card
             '5xx' => HttpStatusGroup::ServerError->value,
         ];
 
-        // null for 'all' means "no duration bar" (a real, intentional
-        // filter value); avg/p95 can also come back null from durationStats()
-        // when the period has no duration data at all.
+        // null means "no bar" for 'all', but "no duration data" for avg/p95.
         $durationBars = ['all' => null, 'avg' => $duration->avg, 'p95' => $duration->p95, 'threshold' => (float) $threshold];
 
         $subtype = $statusSubtypes[$statusFilter];
         $minDuration = $durationBars[$durationFilter];
 
-        // Each tab group's badges are cross-filtered against the OTHER
-        // group's currently selected tab, same as Livewire\RequestDetail.
+        // Each tab group's badges count within the other group's active tab.
         $statusFilterCounts = [];
 
         foreach ($statusSubtypes as $filterKey => $filterSubtype) {
@@ -111,15 +105,12 @@ class UserDetail extends Card
             };
         }
 
-        // Both filters apply together, so the actually-shown total/pagination
-        // is exactly this filter combination's own badge count above.
+        // Both filters apply together, so this badge count is the shown total.
         $totalEntries = $durationFilterCounts[$durationFilter];
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        // This user's own per-route breakdown, ranked two different ways —
-        // most-hit and slowest — same routeStats() the Requests tab's own
-        // route list reads, just scoped to this one user via $userId.
+        // This user's routes, ranked by hits and by p95.
         $routes = $storage->routeStats('request', $since, $until, $userId);
 
         $topRoutes = $routes->sortByDesc('count')->take(self::MAX_ROUTES_SHOWN)->map($this->presentRoute(...))->values();
@@ -157,12 +148,7 @@ class UserDetail extends Card
         ];
     }
 
-    /**
-     * Adds display-ready method/path fields, same as
-     * Livewire\Requests::presentRoute() — a plain "METHOD URI" split for an
-     * ordinary route, or the capped method list for the merged Unmatched
-     * Route row.
-     */
+    /** Same as Requests::presentRoute(). */
     protected function presentRoute(object $route): object
     {
         if ($route->methods !== null) {

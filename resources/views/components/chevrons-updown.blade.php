@@ -1,10 +1,5 @@
-{{-- Double-chevron expand/collapse icon, ported directly from Laravel's own
-     exception renderer (vendor/laravel/framework/.../icons/chevrons-up-down.blade.php
-     and chevrons-down-up.blade.php) — a two-path icon our generic
-     <x-monitor::icon> (single <path>, heroicons-style) can't express, so it
-     gets its own tiny component instead of a Support\Icons constant.
-     "up-down" (arrows pointing apart) reads as collapsed/expandable;
-     "down-up" (arrows pointing together) reads as expanded/collapsible. --}}
+{{-- Two-path expand/collapse icon from Laravel's exception renderer (x-monitor::icon takes a single path).
+     "up-down" means expandable; "down-up" means collapsible. --}}
 @props(['direction' => 'up-down'])
 @if ($direction === 'down-up')
     <svg {{ $attributes->merge(['class' => 'h-3 w-2']) }} viewBox="0 0 8 12" fill="none">

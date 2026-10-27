@@ -3,13 +3,8 @@
 namespace LaravelMonitor\Support;
 
 /**
- * Per-viewer dashboard preferences (theme, language, timezone).
- *
- * Persisted in a single JSON cookie so they survive across requests without a
- * database table, and are available to both the Blade shell and Livewire card
- * re-renders (which carry the same cookie). When a preference is unset we fall
- * back to the viewer's "local machine" hints — the request's preferred language
- * and the app timezone — mirroring what a fresh browser would report.
+ * Per-viewer dashboard preferences (theme, language, timezone), stored in one
+ * JSON cookie. Unset values fall back to Accept-Language and the app timezone.
  */
 class Preferences
 {
@@ -59,7 +54,7 @@ class Preferences
             return $stored;
         }
 
-        // Unset: honour the browser's Accept-Language ("local machine"), then app default.
+        // Unset: the browser's Accept-Language, then the app default.
         $preferred = request()?->getPreferredLanguage($available);
 
         if (is_string($preferred) && in_array($preferred, $available, true)) {
@@ -128,9 +123,8 @@ class Preferences
     }
 
     /**
-     * Timezone options for the searchable picker: identifier plus its current
-     * UTC offset (e.g. "UTC+7"), sorted west-to-east. Current-of-day time is
-     * rendered client-side so it stays live.
+     * Timezone picker options: identifier plus current UTC offset (e.g. "UTC+7"),
+     * sorted west-to-east.
      *
      * @return list<array{value: string, name: string, offset: string, minutes: int}>
      */

@@ -1,18 +1,11 @@
-{{-- Settings page — one form, one save button, posting to
-     monitor.settings.system:
-     - Preferences (theme/language/timezone) → cookie, always submitted —
-       a personal display choice, not a team setting.
-     - Environment + Recorders overrides over config/monitor.php → stored
-       server-side via Support\Settings. Its fieldset is disabled for
-       anyone $canManageSettings is false for, so the browser omits those
-       fields from the request entirely rather than the server rejecting
-       the whole submission (see SettingsController::system()).
+{{-- Settings page: one form posting to monitor.settings.system. Preferences go to a
+     cookie for everyone; config overrides (Support\Settings) sit in a fieldset disabled
+     unless $canManageSettings (see SettingsController::system()).
      Data prepared by Http\Controllers\DashboardController. --}}
 @php
     $rowClass = 'flex items-center justify-between gap-4 py-2.5';
     $labelClass = 'text-sm text-neutral-700 dark:text-neutral-300';
-    // Shared disabled look for every text/number/select field below (a
-    // viewer's read-only <fieldset>), not just the browser's own default.
+    // Disabled look for every field inside a viewer's read-only <fieldset>.
     $disabledClass = 'disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-neutral-800/60 dark:disabled:text-neutral-500';
     $fieldClass =
         "w-44 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 {$disabledClass}";
@@ -41,8 +34,7 @@
         x-data="{ theme: '{{ $prefs['theme'] }}', recordingEnabled: @js($system['enabled']), confirmingDisable: false }" class="space-y-4">
         @csrf
 
-        {{-- Preferences: always submitted, regardless of $canManageSettings —
-             not inside the read-only <fieldset> below. --}}
+        {{-- Preferences: outside the read-only <fieldset>, so always submitted. --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::PREFERENCES" icon-view-box="0 0 76 76" icon-fill="currentColor" title="{{ __('monitor::messages.settings.preferences') }}" class="group" x-data="{ open: true }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
@@ -144,10 +136,8 @@
             </div>
         @endunless
 
-        {{-- Environment + Recorders + Threshold: gated to $canManageSettings
-             — app-wide config, not a personal preference. Its <fieldset>
-             below is disabled rather than this whole section left out of
-             the DOM, so a viewer can still see the current values. --}}
+        {{-- App-wide config: the <fieldset> is disabled (not omitted) without
+             $canManageSettings, so viewers still see the current values. --}}
         <x-monitor::section :icon="\LaravelMonitor\Support\Icons::SETTINGS" title="{{ __('monitor::messages.settings.environment') }}" class="group" x-data="{ open: false }" :collapsible="true">
             <x-slot:actions>
                 <x-monitor::settings-section-toggle/>
@@ -169,7 +159,7 @@
                             x-on:change="if (! $event.target.checked) { $event.target.checked = true; recordingEnabled = true; confirmingDisable = true }" />
                     </div>
 
-                    {{-- Recorders: shown right below the Recording toggle, only while recording is enabled --}}
+                    {{-- Recorders: shown only while recording is enabled --}}
                     <div x-show="recordingEnabled" x-cloak x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
                         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
@@ -177,15 +167,11 @@
                         <label class="mb-1.5 block {{ $labelClass }}">{{ __('monitor::messages.settings.recorders') }}</label>
                         <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
                             {{ __('monitor::messages.settings.recorders_hint') }}</p>
-                        {{-- One consolidated notice (Settings::recordersWarning()) instead of
-                             a warning line repeated under every heavy toggle below. --}}
+                        {{-- One shared notice for every heavy recorder (Settings::recordersWarning()). --}}
                         <p class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
                             {{ $system['recordersWarning'] }}</p>
-                        {{-- Independent flex columns (Settings::recorderColumns()), not a
-                             CSS grid pairing left/right by row: a recorder whose detail
-                             toggles push it taller would otherwise stretch its unrelated
-                             row-mate on the other side too, since grid rows size to their
-                             tallest cell. --}}
+                        {{-- Independent flex columns (Settings::recorderColumns()), not a grid:
+                             a recorder grown by its detail toggles mustn't stretch its row-mate. --}}
                         <div class="flex flex-col gap-x-8 sm:flex-row">
                             {{-- start recorder toggle column --}}
                             @foreach ($system['recorderColumns'] as $column)
@@ -343,10 +329,8 @@
                         {{-- end aggregate cache config mode --}}
 
                         @foreach ($system['aggregate_cache_option_fields'] as $driver => $fields)
-                            {{-- x-cloak avoids a one-frame flash of every driver's fields before Alpine
-                                 evaluates x-show on first paint. cacheStore is a store *name*, which can
-                                 differ from its driver — resolved via storeDrivers, same as the PHP side
-                                 (Settings::aggregateCacheDriver()). --}}
+                            {{-- driver() maps the store name to its driver via storeDrivers,
+                                 same as Settings::aggregateCacheDriver(). --}}
                             <div x-show="driver() === '{{ $driver }}' && mode !== 'app'" x-cloak
                                 class="mb-2 flex flex-col gap-2 border-l border-neutral-200 pl-3 dark:border-neutral-700">
                                 @if ($driver === 'database')
@@ -561,8 +545,7 @@
     {{-- end team settings --}}
 </div>
 
-{{-- Searchable timezone combobox: filter by name/offset, live current time per
-     zone (computed client-side via Intl so it stays accurate). --}}
+{{-- Searchable timezone combobox: filter by name/offset, live per-zone time via Intl. --}}
 <script>
     window.monitorTimezonePicker = function(options, selected) {
         return {
@@ -616,10 +599,8 @@
                 if (!tz) {
                     return;
                 }
-                // The browser may report a legacy CLDR alias (e.g. "Asia/Saigon")
-                // while our options use IANA canonical ids ("Asia/Ho_Chi_Minh").
-                // Intl normalises any id passed as timeZone to the same alias
-                // form, so compare options through that normalisation.
+                // The browser may report a legacy alias ("Asia/Saigon") for an
+                // option's IANA id ("Asia/Ho_Chi_Minh"); compare both through Intl.
                 const canonical = (value) => {
                     try {
                         return Intl.DateTimeFormat('en', {

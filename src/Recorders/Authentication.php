@@ -42,11 +42,8 @@ class Authentication extends Recorder
             return;
         }
 
-        // While this listener runs, the guard involved still has $event->user
-        // set — Illuminate\Auth\SessionGuard::logout() fires Logout before
-        // clearing it. See Monitor::rememberLoggedOutUser()'s own docblock
-        // for why capturing it here matters for entries recorded earlier in
-        // this same request/job/command.
+        // SessionGuard::logout() fires Logout before clearing the user, so
+        // earlier entries in this lifecycle can still resolve to them.
         $this->monitor->rememberLoggedOutUser($event->guard, $event->user);
 
         $this->monitor->record(
@@ -77,25 +74,13 @@ class Authentication extends Recorder
         );
     }
 
-    /**
-     * The Monitor dashboard has its own, separate auth system (MonitorUser,
-     * guard configurable via monitor.auth.guard) — its own logins/logouts
-     * aren't activity of the application being monitored and must not be
-     * recorded as such, mirroring how Recorders\Requests already excludes
-     * requests to the dashboard's own routes.
-     */
+    /** The dashboard's own auth guard (MonitorUser) isn't app activity. */
     protected function isMonitorsOwnGuard(string $guard): bool
     {
         return $guard === MonitorUser::guardName();
     }
 
-    /**
-     * Prefixed with the guard name — two different guards can independently
-     * assign the same id to two entirely different users (separate
-     * providers/tables), and even share a user model class. Without the
-     * guard qualifier those would record under an identical key, showing up
-     * on the dashboard as if a single user logged in/out across both.
-     */
+    /** Guard-prefixed: two guards can reuse the same id (and model class) for different users. */
     protected function identifier(string $guard, ?Authenticatable $user): string
     {
         if ($user === null) {
@@ -105,12 +90,7 @@ class Authentication extends Recorder
         return "{$guard}:".get_class($user).'#'.$user->getAuthIdentifier();
     }
 
-    /**
-     * Same guard-qualification as identifier() (see its docblock), applied
-     * to the entry's user_id column instead of its key — every "by user"
-     * query/filter across the dashboard reads that column, so it needs the
-     * same disambiguation.
-     */
+    /** Guard-prefixed like identifier(), for the user_id column. */
     protected function userId(string $guard, ?Authenticatable $user): ?string
     {
         return $user === null ? null : "{$guard}:{$user->getAuthIdentifier()}";

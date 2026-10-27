@@ -10,11 +10,8 @@ class JobDetail extends Card
     public const PER_PAGE = 25;
 
     /**
-     * Raw rows fetched per groupedRuns() call before collapsing to one row per
-     * job_id — same cap-not-a-second-query tradeoff as Livewire\Jobs::MAX_KEYS:
-     * a run whose job_id first appears past this cap is invisible to
-     * groupedRuns() (undercounts totalEntries/pending pages) rather than
-     * costing a second, unbounded query to find it.
+     * Raw rows groupedRuns() fetches before collapsing by job_id; runs past
+     * the cap are left out of the list and its total.
      */
     protected const MAX_RAW_ENTRIES = 5000;
 
@@ -52,8 +49,7 @@ class JobDetail extends Card
         $buckets = $this->chartBuckets();
         $key = $this->key;
 
-        // One query grouped by subtype instead of four separate stats()
-        // calls (queued/processed/failed/released) — see Livewire/Overview.php.
+        // One grouped query instead of a stats() call per subtype.
         $bySubtype = $storage->statsBySubtype('job', $since, $until, key: $key);
 
         $groups = $this->groupedRuns($since, $until, $key);
@@ -81,18 +77,8 @@ class JobDetail extends Card
     }
 
     /**
-     * Collapses every row belonging to the same dispatch (payload['job_id'],
-     * shared by its 'queued' placeholder and every attempt it went through —
-     * see Recorders\Jobs::recordQueued()/recordProcessing()) down to just
-     * its single most current row, instead of listing a 'processing' row and
-     * its eventual processed/released/failed outcome as two separate,
-     * unrelated runs. recent() already orders newest-first, so the first row
-     * seen for a job_id is that dispatch's current status, and its own
-     * payload['attempts'] is already the right attempt count to show
-     * alongside it — no separate counting pass needed. A row with no job_id
-     * (predates that payload field, or the sync connection, which never
-     * fires JobQueued/gets a uuid) falls back to its own row id so it never
-     * collapses into an unrelated row.
+     * One row per dispatch (payload['job_id']): the newest, since recent()
+     * orders newest-first. Rows without a job_id stay separate by row id.
      */
     protected function groupedRuns(DateTimeInterface $since, ?DateTimeInterface $until, string $key): Collection
     {

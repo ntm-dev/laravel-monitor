@@ -16,10 +16,7 @@ class Mail extends Recorder
     /** Stored bodies larger than this (chars) are truncated. */
     protected const MAX_BODY_CHARS = 10000;
 
-    /**
-     * When the current send started, set by MessageSending and read back by
-     * MessageSent — same technique as CacheInteractions' before/after timing.
-     */
+    /** Set by MessageSending, read by MessageSent. */
     protected ?float $startedAt = null;
 
     public function register(Dispatcher $events): void
@@ -32,11 +29,7 @@ class Mail extends Recorder
 
     public function record(MessageSent $event): void
     {
-        // Monitor sends its own transactional mail for dashboard account
-        // management (team invitations, password resets, email-change
-        // verification) — never activity of the application being
-        // monitored, so it must not be recorded as such, the same way
-        // Recorders\Authentication excludes the dashboard's own guard.
+        // Skip the dashboard's own account mail (invitations, password resets, ...).
         $mailableClass = $event->data['__laravel_mailable'] ?? null;
 
         if (is_string($mailableClass) && str_starts_with($mailableClass, 'LaravelMonitor\\')) {
@@ -48,20 +41,12 @@ class Mail extends Recorder
         $mailable = is_string($mailableClass) ? $mailableClass : null;
         $body = ($this->config['details']['record_body'] ?? false) ? $this->body($event->message) : null;
 
-        // round(x, 3): both operands are ~1.7-billion-magnitude Unix epoch
-        // floats, so subtracting them is a floating-point catastrophic
-        // cancellation — see Monitor::elapsedMsPrecise()'s own docs. 3
-        // decimals matches microtime()'s own microsecond resolution.
+        // round(x, 3) strips float noise from subtracting two epoch timestamps.
         $duration = $this->startedAt !== null
             ? round((microtime(true) - $this->startedAt) * 1000, 3)
             : null;
 
-        // Grouped by "type of email" — the notification/mailable class —
-        // rather than the subject, so the dashboard list can show one row
-        // per Mailable/notification (e.g. InvoiceMail) instead of one row
-        // per send. Only ad-hoc mail with neither (Mail::raw(), a closure
-        // view) falls back to the subject, since there's no class identity
-        // to group by at all.
+        // Grouped by notification/mailable class; ad-hoc mail (Mail::raw()) falls back to the subject.
         $groupKey = $notification ?? $mailable ?? Str::limit($envelope['subject'], 250);
 
         $this->monitor->record(
@@ -141,9 +126,7 @@ class Mail extends Recorder
     }
 
     /**
-     * Best-effort rendered body (HTML preferred, text as a fallback), capped
-     * in size — alongside its format, so the dashboard can render it back the
-     * way the recipient's mail client did instead of guessing from content.
+     * Best-effort body (HTML preferred, else text), capped, with its format.
      *
      * @return array{format: 'html'|'text', content: string}|null
      */

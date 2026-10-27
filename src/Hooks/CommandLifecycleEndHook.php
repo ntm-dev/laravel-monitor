@@ -5,13 +5,8 @@ namespace LaravelMonitor\Hooks;
 use LaravelMonitor\Monitor;
 
 /**
- * Console counterpart of RequestLifecycleEndHook — marks the terminating →
- * end boundary for a standalone command run and flushes it, registered
- * against Kernel::whenCommandLifecycleIsLongerThan(-1, ...) (see
- * MonitorServiceProvider::registerConsoleHooks()). Recorders\Commands
- * deliberately stops short of flushing its own `command` entry (see
- * recordFinished()), so this hook is the one place that entry actually gets
- * persisted — any earlier and End would always measure zero.
+ * Console counterpart of RequestLifecycleEndHook: marks End for the command
+ * run and flushes it, the one place its `command` entry is persisted.
  */
 class CommandLifecycleEndHook
 {

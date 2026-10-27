@@ -14,37 +14,17 @@ use LaravelMonitor\Support\Timeline as TimelineSupport;
 use LaravelMonitor\Support\TimelineEntry;
 
 /**
- * Merged multi-track waterfall timeline: one track for
- * this page's own root (request/command/scheduled task/job) and one per job
- * it dispatched that has since resolved (see
- * Http\Controllers\Concerns\MergesJobTimelines::buildTracks()), rendered as
- * a single shared timeline — one ruler, one zoom slider, one inspector
- * panel — rather than a separate widget per track.
- *
- * Every bar is positioned against ONE fixed scale for the whole page, built
- * once from every track's *real* wall-clock offset relative to the
- * `$defaultTrack` track (see MergesJobTimelines::defaultTrackId() — the root
- * by default, or a specific dispatched job when landing here from that job's
- * own link): 0% is the earliest thing happening across every track (which
- * can predate the default track itself — a job worker can pick a job up long
- * after its dispatching request finished) and 100% is the latest thing
- * ending, so the ruler always has ticks under everything on the page instead
- * of stopping at the default track's own duration. The default track starts
- * expanded; every other track starts collapsed to just its own root-level
- * bar. Expanding/collapsing any track is purely a visibility toggle
- * (`expandedTracks` in timeline.blade.php) — unlike an accordion, expanding
- * one track never collapses another, and the scale itself never moves once
- * rendered.
+ * Merged multi-track waterfall: the page's own root plus one track per resolved
+ * dispatched job (see MergesJobTimelines::buildTracks()), sharing one ruler, zoom and
+ * inspector. All bars sit on one fixed scale spanning every track; only the default
+ * track starts expanded, and toggling a track never moves the scale.
  */
 class Timeline extends Component
 {
     /** Percent of its request's duration at which a query (group) is flagged in the detail panel. */
     protected const SLOW_QUERY_SHARE = 20.0;
 
-    /**
-     * The shortest real (non-zero) duration bar on the page must still be
-     * at least this many px wide at 1x zoom — see $minWidthPx.
-     */
+    /** Target px width of the shortest real-duration bar; see $minWidthPx. */
     protected const MIN_ITEM_PX = 3;
 
     /**
@@ -57,57 +37,25 @@ class Timeline extends Component
     /** JSON entry map (id => type/label/start/duration/metadata) for Alpine, across every track. */
     public string $entriesJson;
 
-    /** Whether any phase carries a controller action — only a request's does, so a command page never gets the Action row's markup. */
+    /** Whether any entry carries a controller action (requests only). */
     public bool $hasController = false;
 
-    /**
-     * The fixed scale every bar/tick on the page is positioned against —
-     * spans from the earliest row's start to the latest row's end, across
-     * every track (see the class docblock). Left unrounded (a float, not the
-     * whole-ms int this used to be) — it's handed to Alpine as-is
-     * (`totalDuration` in timeline.blade.php's x-data) for every downstream
-     * ms/pct computation there (ruler ticks, the hover crosshair's ms
-     * readout, ...), each of which does its own rounding at the point it
-     * actually renders a number, so nothing here should round first and
-     * force that later, more-informed rounding to work from an
-     * already-lossy input.
-     */
+    /** Scale every bar/tick is positioned against: earliest start to latest end across all tracks. Unrounded. */
     public float $totalDuration;
 
     /**
-     * The chart pane's own minimum width in px at 1x zoom (see
-     * timeline.blade.php), chosen so the page's shortest real-duration bar
-     * is still at least self::MIN_ITEM_PX wide — every other bar/gap is
-     * measured in px against that exact same px-per-ms ratio, so the whole
-     * pane stretches as one unit and every bar keeps its true proportional
-     * share of the timeline (start time, end time, and the gaps between
-     * bars) instead of a lone short bar being widened past its real size.
-     * Left unrounded for the same reason as $totalDuration above — Alpine
-     * multiplies it by the live zoom level (`zoom * minWidthPx` in
-     * timeline.blade.php) to get the pane's actual CSS min-width, so
-     * rounding it here would just make that later multiplication work from
-     * a less accurate number for no benefit (CSS tolerates arbitrary
-     * sub-pixel precision fine). 0.0 when nothing on the page has a real
-     * (non-zero) duration to measure against, leaving the pane at its normal
-     * viewport-fit width.
+     * Pane width in px at which the shortest real-duration bar is MIN_ITEM_PX wide;
+     * Alpine derives maxZoom() from it. 0.0 when no entry has a non-zero duration.
      */
     public float $minWidthPx = 0.0;
 
-    /**
-     * The specific attempt row (see addAttemptRows()) whose {@see TimelineEntry::$id}
-     * matches $scrollToOutcomeId, null when that constructor param is null or
-     * matches no attempt on the page. timeline-script.blade.php's init()
-     * scrolls straight to this row (via its `data-row-id`) instead of merely
-     * the default track's own root row — the requested attempt can otherwise
-     * still sit well below the fold, e.g. a job's 3rd retry several rows
-     * under its track's root.
-     */
+    /** Row id of the attempt matching $scrollToOutcomeId, which init() scrolls to; else null. */
     public ?string $scrollTargetRowId = null;
 
     /**
      * @param  list<array{id: string, badge: string, label: string, start: float, duration: float, entries: TimelineEntry[], attempts?: list<array{attempt: int, status: string, outcomeId: string, start: float, duration: float, entries: TimelineEntry[]}>, totalAttemptsDuration?: float}>  $tracks
-     * @param  ?string  $jobBaseUrl  This page's own url (see RequestDetailController::requestUrl()) a job track's own row appends its latest attempt's outcome id onto, so clicking it navigates there instead of merely expanding in place — null on every other page this component renders on (job/command/schedule detail), which has nowhere of that kind to navigate a job track to.
-     * @param  ?string  $scrollToOutcomeId  The route's own trailing job-id segment forwarded by the calling controller (see MergesJobTimelines::defaultTrackId(), which the same value already selects the default *track* from) — names one specific attempt's own outcome id, so landing here from that exact attempt's link scrolls straight to its row instead of just expanding (and scrolling to the top of) its track.
+     * @param  ?string  $jobBaseUrl  this page's URL that job track rows append an outcome id to; null on pages with nowhere to navigate
+     * @param  ?string  $scrollToOutcomeId  outcome id of the attempt to scroll to on load
      */
     public function __construct(public array $tracks, public string $defaultTrack = 'root', public ?string $jobBaseUrl = null, public ?string $scrollToOutcomeId = null)
     {
@@ -119,22 +67,11 @@ class Timeline extends Component
         $entriesById = [];
 
         foreach ($this->tracks as $track) {
-            // This track's own start, rebased onto the fixed scale (0 = the
-            // *default* track's own start, not necessarily this track's) —
-            // every row below adds its own (track- or attempt-local) start
-            // on top of this so a dispatched job's attempt lands at its real
-            // offset instead of resetting to 0ms.
+            // Track start relative to the default track's start; rows add their local start on top.
             $barStartOffset = (float) $track['start'] - $primaryStart;
 
             if (isset($track['attempts'])) {
-                // A job track has no phases/events of its own — every one of
-                // those belongs to a specific attempt instead (see
-                // MergesJobTimelines::jobTrack()). Its root row is therefore
-                // synthetic: a bounding box spanning every attempt, shown
-                // with the *sum* of their individual durations rather than
-                // that (potentially much longer, once idle retry-wait time
-                // is included) span — see TimelineRow's own handling of
-                // 'attemptsDuration'.
+                // Synthetic job root: a bounding box over every attempt, labelled with their summed duration.
                 $this->rows[] = [
                     'kind' => 'root',
                     'entry' => new TimelineEntry(
@@ -151,10 +88,7 @@ class Timeline extends Component
                     'attempt' => null,
                     'jobStatus' => null,
                     'attemptsDuration' => $track['totalAttemptsDuration'],
-                    // The track's own latest attempt (last = most recent —
-                    // see jobTrack()'s own docblock) is what a click on this
-                    // row navigates to; there's no single "outcome" for a
-                    // whole track otherwise.
+                    // Links to the latest attempt (attempts are ordered oldest first).
                     'jobUrl' => $this->jobBaseUrl !== null
                         ? $this->jobBaseUrl.'/'.end($track['attempts'])['outcomeId']
                         : null,
@@ -180,16 +114,8 @@ class Timeline extends Component
             );
         }
 
-        // The primary track's own duration alone isn't a wide enough scale
-        // once another track can land well outside 0-100% of it (see
-        // $barStartOffset above — a queue worker can pick a job up long
-        // after its dispatching request finished, or (landing here scoped to
-        // that job, see MergesJobTimelines::defaultTrackId()) the request
-        // that dispatched it can just as easily sit *before* 0). A ruler
-        // fixed to just the primary's own span would leave every mark
-        // outside it blank the moment you scroll/expand into such a track.
-        // Rebase the whole page onto the earliest thing happening across
-        // every track instead, so 0-100% always covers everything on it.
+        // Other tracks can start before or end after the default track, so the
+        // scale spans every row and is rebased onto the earliest start.
         $nonDividerRows = collect($this->rows)->reject(fn (array $row) => $row['kind'] === 'divider');
         $minStart = min(0.0, $nonDividerRows->min('barStart') ?? 0.0);
         $maxEnd = $nonDividerRows->max(fn (array $row) => $row['barStart'] + ($row['entry']->duration ?? 0)) ?? $primaryDuration;
@@ -216,21 +142,7 @@ class Timeline extends Component
         $this->entriesJson = Js::from($entriesById)->toHtml();
         $this->hasController = collect($entriesById)->contains(fn (array $entry) => isset($entry['metadata']['controller']));
 
-        // A zero-duration entry (an instantaneous marker, not a span) has no
-        // real proportional share of the timeline to render at all — it
-        // borrows the shortest real bar's own share instead of a fixed
-        // magic-number percentage, so it stays exactly as wide as
-        // self::MIN_ITEM_PX too rather than a size unrelated to everything
-        // else on the same scale. Falls back to the pre-stretch 0.15% when
-        // nothing on the page has a real duration to borrow from. Left
-        // unrounded like every other value here (see $totalDuration/
-        // $minWidthPx above) — PHP is this value's own final consumer (baked
-        // directly into the rendered `style` attribute below, nothing
-        // downstream computes with it further), but the browser accepts
-        // arbitrary float precision in a CSS percentage just as happily as a
-        // 4-decimal one, so rounding here would only reintroduce the exact
-        // proportional drift $minWidthPx exists to avoid, for no display
-        // benefit.
+        // A zero-duration entry borrows the shortest real bar's width; 0.15% when there is none.
         $pointWidthPct = $shortestDuration !== null
             ? ($shortestDuration / $totalDuration) * 100
             : 0.15;
@@ -243,11 +155,7 @@ class Timeline extends Component
             $duration = (float) ($row['entry']->duration ?? 0);
 
             $row['left'] = $totalDuration > 0 ? ($row['barStart'] / $totalDuration) * 100 : 0.0;
-            // No floor on a positive-duration bar's own share: $minWidthPx
-            // above already stretched the whole pane so the shortest one on
-            // the page renders at self::MIN_ITEM_PX, so clamping any
-            // individual bar's percentage here would only widen it past its
-            // true proportional size relative to every other bar and gap.
+            // No floor here, so every bar keeps its true proportional width.
             $row['width'] = $totalDuration > 0
                 ? ($duration > 0 ? ($duration / $totalDuration) * 100 : $pointWidthPct)
                 : 0.15;
@@ -260,13 +168,8 @@ class Timeline extends Component
     }
 
     /**
-     * One retry's worth of rows, nested under its job track's own (synthetic,
-     * always neutral) root — see the 'attempts' branch in __construct(). Its
-     * own root entry becomes this attempt's 'attempt' row instead of a
-     * second 'root' (see addEntrySourceRows()'s $attemptNumber handling):
-     * the track identifies *what* ran, each attempt identifies *how that one
-     * try went*, at its own real position (this attempt's own start, not the
-     * track's bounding-box start).
+     * One attempt's rows under its job track's synthetic root; the attempt's own
+     * root entry becomes an 'attempt' row, placed at the attempt's real start.
      *
      * @param  array{id: string, badge: string, label: string, start: float, duration: int}  $track
      * @param  array{attempt: int, status: string, outcomeId: string, start: float, duration: int, entries: TimelineEntry[]}  $attempt
@@ -275,23 +178,12 @@ class Timeline extends Component
     {
         $idPrefix = "{$track['id']}:attempt-{$attempt['attempt']}";
 
-        // addEntrySourceRows() below namespaces this attempt's own 'request'
-        // entry (see Timeline::build()) as "{$idPrefix}:request" — computed
-        // here rather than read back off $this->rows after the call, since
-        // that id is a known, already-relied-upon format (the job track's
-        // own root row hardcodes the same "{id}:request" shape above).
+        // addEntrySourceRows() namespaces the attempt's root entry as "{$idPrefix}:request".
         if ($this->scrollToOutcomeId !== null && $attempt['outcomeId'] === $this->scrollToOutcomeId) {
             $this->scrollTargetRowId = "{$idPrefix}:request";
         }
 
-        // $attempt['start']/$track['start'] are both offsets from the same
-        // origin (the page's overall root — see MergesJobTimelines::jobTrack()),
-        // so their difference is this attempt's own offset *within* the
-        // track's bounding box — added on top of $trackBarStartOffset (the
-        // box's own offset from the fixed scale) below. Using
-        // $trackBarStartOffset + $attempt['start'] directly would double-count
-        // the box's own offset for every attempt (correct only for a single-
-        // attempt track, where the two happen to be equal).
+        // Both starts share one origin, so their difference is the attempt's offset within the track.
         $this->addEntrySourceRows(
             entries: $attempt['entries'],
             idPrefix: $idPrefix,
@@ -306,16 +198,8 @@ class Timeline extends Component
     }
 
     /**
-     * Builds every row for one "request"-shaped bundle of entries — a
-     * track's own top-level entries for a request/command/scheduled-task
-     * track, or one job attempt's own entries for a job track (see
-     * addAttemptRows()) — and appends them to $this->rows/$entriesById.
-     * $attemptNumber/$attemptStatus turn what would otherwise be this
-     * bundle's own 'root' row into an 'attempt' row instead (see
-     * TimelineRow's handling of both kinds) — null for every non-attempt
-     * caller, which keeps the normal 'root' row. A job track's own root row
-     * (the one carrying the sum-of-attempts duration) is built directly in
-     * __construct() instead of through here — it has no entries of its own.
+     * Appends the rows and entry details for one bundle: a non-job track's entries
+     * or one job attempt's. A non-null $attemptNumber turns the root row into an 'attempt' row.
      */
     protected function addEntrySourceRows(
         array $entries,
@@ -340,10 +224,7 @@ class Timeline extends Component
         $rows = $this->buildRows($byId->get('request'), $phases, $byParent);
         $orphanRows = $this->buildOrphanRows($phases, $byParent);
 
-        // Synthetic ids ('request', 'phase-*') collide across tracks/attempts
-        // once merged into one row/entry map — a real event's id (its own
-        // database row id) is already globally unique, so only these two
-        // need namespacing.
+        // Synthetic ids ('request', 'phase-*') collide across bundles; event ids are already unique.
         foreach ([...$rows, ...$orphanRows] as $row) {
             if ($row['kind'] !== 'event') {
                 $row['entry']->id = "{$idPrefix}:{$row['entry']->id}";
@@ -353,10 +234,7 @@ class Timeline extends Component
         foreach ($rows as $row) {
             $attemptFields = ['focusable' => $focusable, 'attempt' => null, 'jobStatus' => null];
 
-            // `$row + [...]` keeps $row's OWN value for any key already
-            // present in it (array union favours the left side) — 'kind' is
-            // one of those, so overriding it to 'attempt' has to happen on
-            // $row itself first, not through the union below.
+            // Array union keeps $row's own 'kind', so override it on $row directly.
             if ($row['kind'] === 'root' && $attemptNumber !== null) {
                 $row['kind'] = 'attempt';
                 $attemptFields = ['focusable' => false, 'attempt' => $attemptNumber, 'jobStatus' => $attemptStatus];
@@ -367,16 +245,7 @@ class Timeline extends Component
                 'rootLabel' => $rootBadge,
                 'barStart' => $barStartOffset + $row['entry']->start,
                 'attemptsDuration' => null,
-                // The primary (non-job) track's own root row gets
-                // $jobBaseUrl itself here -- the same base URL a job
-                // track's own row (built directly in __construct(), not
-                // here) appends an outcome id onto, but bare, since this
-                // root's own info is what already shows there with no
-                // trailing job id at all. Lets a visitor who navigated to a
-                // job's own info click back to this root's, the way
-                // switching between two different jobs' own tracks already
-                // works. Every other row built through here (phase/event/
-                // attempt) has nothing of that kind to navigate to.
+                // A non-job root links to the bare $jobBaseUrl, i.e. back to its own info.
                 'jobUrl' => $row['kind'] === 'root' ? $this->jobBaseUrl : null,
             ];
         }
@@ -386,22 +255,14 @@ class Timeline extends Component
         $this->addEntryDetails($entries, $rootBadge, $attemptNumber, (float) ($byId->get('request')?->duration ?? 0), $entriesById);
     }
 
-    /**
-     * Appends one bundle's events that fall outside every phase, under an
-     * "Other" divider.
-     */
+    /** Appends one bundle's events that fall outside every phase, under an "Other" divider. */
     protected function addOrphanRows(array $orphanRows, bool $hasPhases, string $trackId, string $rootBadge, float $barStartOffset): void
     {
         if ($orphanRows === []) {
             return;
         }
 
-        // The "Other" header only means something when there are real
-        // phases for these events to be "other than" (a request's
-        // bootstrap/middleware/controller/...) — a job attempt has no
-        // phases at all (see Support\Timeline::phases()), so *every* one
-        // of its events ends up here, and labelling the whole list
-        // "Other" is just noise.
+        // No divider without phases (e.g. a job attempt), where every event lands here.
         if ($hasPhases) {
             $this->rows[] = ['kind' => 'divider', 'entry' => null, 'track' => $trackId];
         }
@@ -434,11 +295,7 @@ class Timeline extends Component
     ): void {
         $attemptLabel = $attemptNumber !== null ? __('monitor::messages.common.attempt') : null;
 
-        // How many times each normalized SQL shape shows up among this
-        // bundle's own (threshold-recorded) queries — surfaced in the
-        // inspector panel as "Calls". Scoped per bundle (track, or one
-        // job attempt), matching Support\Timeline::assignDuplicateColors(),
-        // which stamps the tree pane's coloured dot the same way.
+        // Queries grouped by normalized SQL, per bundle (the panel's "Calls").
         $queryGroups = collect($entries)
             ->filter(fn (TimelineEntry $entry) => $entry->type === 'query')
             ->groupBy(fn (TimelineEntry $entry) => Sql::normalizeKey($entry->metadata['sql'] ?? $entry->label));
@@ -446,14 +303,7 @@ class Timeline extends Component
         $queryGroupTotals = $queryGroups->map(static fn (Collection $group) => (float) $group->sum('duration'));
 
         foreach ($entries as $entry) {
-            // 'root'/'attempt'/'phase'/'event' — same classification
-            // TimelineRow's own $kind param already drives (see
-            // buildRows()), re-derived here since entriesById is built
-            // straight off $entries, not $this->rows. Lets the detail
-            // panel (timeline-detail-panel.blade.php) branch on kind rather
-            // than $entry->type, which is ambiguous for this purpose
-            // ('request' is shared by every root AND attempt entry, and a
-            // phase's own type varies per phase name).
+            // Same kinds as the rows, re-derived for the panel since type 'request' is ambiguous.
             $kind = match (true) {
                 $entry->parentId === null => $attemptNumber !== null ? 'attempt' : 'root',
                 in_array($entry->type, TimelineSupport::phases(), true) => 'phase',
@@ -463,12 +313,7 @@ class Timeline extends Component
             $entriesById[$entry->id] = [
                 'type' => $entry->type,
                 'kind' => $kind,
-                // "JOB (Attempt #N)" for an attempt row -- $rootBadge is
-                // already this track's own "JOB" (see MergesJobTimelines::jobTrack()),
-                // and TimelineRow::badgeFor() has nothing better to offer
-                // here anyway (every attempt/root entry shares the same
-                // generic $entry->type === 'request', which falls back to a
-                // plain, unhelpful "REQUEST").
+                // "JOB (Attempt #N)" for an attempt row.
                 'badge' => $kind === 'attempt'
                     ? "{$rootBadge} ({$attemptLabel} #{$attemptNumber})"
                     : TimelineRow::badgeFor($entry->type, $entry->label),
@@ -476,16 +321,8 @@ class Timeline extends Component
                 'start' => $entry->start,
                 'duration' => $entry->duration,
                 'metadata' => $entry->metadata,
-                // The colour of the duplicate-SQL group this query belongs
-                // to (see Support\Timeline::assignDuplicateColors()), null
-                // for a non-duplicate.
                 'duplicateColor' => $entry->metadata['duplicateColor'] ?? null,
-                // This group's own key, null for a non-duplicate — lets the
-                // inspector panel pulse every dot in the *same* group when
-                // this one's selected (see selectRow() in timeline.blade.php).
-                // Not duplicateColor above: two unrelated groups can share a
-                // colour (only 10 in the palette), which would otherwise
-                // pulse both together.
+                // Unique per group, unlike duplicateColor; selectRow() pulses by it.
                 'duplicateGroup' => $entry->metadata['duplicateGroup'] ?? null,
                 ...self::queryDetail($entry, $queryDuplicateCounts, $queryGroupTotals, $bundleDuration),
                 ...self::occurrenceUrls($entry),
@@ -494,8 +331,7 @@ class Timeline extends Component
     }
 
     /**
-     * The inspector panel's call-count, share and detail-link fields — all
-     * null for a non-query entry.
+     * The inspector panel's call-count, share and detail-link fields; all null for a non-query entry.
      *
      * @param  Collection<string, int>  $duplicateCounts
      * @param  Collection<string, float>  $groupTotals
@@ -533,25 +369,19 @@ class Timeline extends Component
     {
         $urls = ['notificationUrl' => null, 'mailUrl' => null, 'exceptionUrl' => null, 'outgoingUrl' => null];
 
-        // EntryId::encode($entry->id): the entry's own row id, not the
-        // *class* hash (metadata['key']).
         $occurrence = static fn (string $route) => route($route, ['hash' => KeyHash::for($entry->metadata['key']), 'id' => EntryId::encode((int) $entry->id)]);
 
         return match ($entry->type) {
             'notification' => ['notificationUrl' => $occurrence('monitor.notifications.sends.show')] + $urls,
             'mail' => ['mailUrl' => $occurrence('monitor.mail.sends.show')] + $urls,
-            // Exceptions already group by an opaque Fingerprint hash — no
-            // KeyHash::for() reverse lookup needed.
+            // Exception keys are already a fingerprint hash, so no KeyHash::for().
             'exception' => ['exceptionUrl' => route('monitor.exceptions.show', ['hash' => $entry->metadata['key']])] + $urls,
             'http' => ['outgoingUrl' => $occurrence('monitor.outgoing.sends.show')] + $urls,
             default => $urls,
         };
     }
 
-    /**
-     * "60%" — $part's share of $whole, or null when $whole is zero or the
-     * share is under $minimum.
-     */
+    /** "60%": $part's share of $whole, or null when $whole is zero or the share is under $minimum. */
     protected static function share(float $part, float $whole, float $minimum = 0.0): ?string
     {
         if ($whole <= 0) {

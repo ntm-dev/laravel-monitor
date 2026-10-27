@@ -1,7 +1,4 @@
-{{-- CommandSummary: General info (exit code/started at/duration/peak
-     memory/models loaded/server) for a single command run — the
-     command-run-page's equivalent of requests/summary.blade.php and
-     jobs/summary.blade.php. --}}
+{{-- General info card for a single command run. --}}
 @props(['root', 'scheduledTask' => null])
 @php
     $payload = $root->payload ?? [];
@@ -10,9 +7,7 @@
 
     $general = array_filter([
         'exit_code' => $payload['exit_code'] ?? '—',
-        // The full command line as invoked, arguments included — only worth
-        // a row of its own when it says more than the `key` already on the
-        // page heading (see Recorders\Commands::commandLine()).
+        // Full command line; null when it adds nothing to the key (Recorders\Commands::commandLine()).
         'command' => $payload['command'] ?? null,
         'started_at' => $startedAt !== null ? \LaravelMonitor\Support\Format::datetime($startedAt) : null,
         'duration' => \LaravelMonitor\Support\Format::duration($root->duration),

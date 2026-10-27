@@ -5,42 +5,28 @@ namespace LaravelMonitor\State;
 use LaravelMonitor\ExecutionStage;
 
 /**
- * The artisan command run Monitor.php is currently tracking — mirrors
- * RequestState for a console run instead of an HTTP request. Every
- * property here is one Monitor.php itself reads or writes; see
- * ExecutionStage for the stage sequence this walks through.
+ * The artisan command run Monitor is tracking; the console counterpart of RequestState.
  *
  * @internal
  */
 final class CommandState
 {
     /**
-     * Every individual lifecycle phase this run has passed through so far,
-     * in order — see RequestState::$phases for why start/duration per phase
-     * is what Support\Timeline's waterfall needs.
+     * Lifecycle phases passed through so far, in order.
      *
      * @var array<int, array{name: string, start: float, duration: float}>
      */
     public array $phases = [];
 
-    /**
-     * The pid this run actually started under — see Monitor::record()'s
-     * fork detection (`php artisan tinker` forks the whole REPL loop into a
-     * child process that SIGKILLs itself, skipping shutdown functions).
-     */
+    /** The pid the run started under, for Monitor::record()'s fork detection. */
     public ?int $pid = null;
 
-    /**
-     * When this run is a command-based scheduled task's own subprocess, the
-     * dispatching task's own run id — see Monitor::beginCommandRun().
-     */
+    /** The dispatching scheduled task's run id, when this is a command-based task's subprocess. */
     public ?string $scheduledTaskRunId = null;
 
     /**
-     * @param  float  $currentExecutionStageStartedAtMicrotime  ms elapsed
-     *                since the run started (Monitor.php's own existing
-     *                clock base), not an absolute microtime() — see
-     *                RequestState's own note on this same parameter.
+     * @param  float  $currentExecutionStageStartedAtMicrotime  ms elapsed since the run started,
+     *                not an absolute microtime()
      */
     public function __construct(
         public float $timestamp,

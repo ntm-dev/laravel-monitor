@@ -13,19 +13,12 @@ class RequestDetail extends Card
 
     public const PER_PAGE = 25;
 
-    /**
-     * Status filter tabs above the entries table: 'all' shows every entry;
-     * 'ok' keeps the combined 1xx/2xx/3xx group, '4xx'/'5xx' keep just that
-     * status group.
-     */
+    /** Status filter tabs; 'ok' covers 1xx/2xx/3xx. */
     public const STATUS_FILTERS = ['all', 'ok', '4xx', '5xx'];
 
     /**
-     * Duration filter tabs above the entries table: 'all' shows every
-     * entry; the rest keep only entries whose own duration is at or above
-     * the given bar — the period's overall avg/p95 for 'avg'/'p95', or the
-     * configured monitor.thresholds.request for 'threshold'. Same bars the
-     * route list's own tabs use, see Livewire\Requests::DURATION_FILTERS.
+     * Duration filter tabs: keep entries at or above the period's avg/p95 or
+     * monitor.thresholds.request, same as Requests::DURATION_FILTERS.
      */
     public const DURATION_FILTERS = ['all', 'avg', 'p95', 'threshold'];
 
@@ -43,9 +36,7 @@ class RequestDetail extends Card
     }
 
     /**
-     * Real methods (not wire:click="$set(...)") so each tab button can
-     * target it precisely by call signature for its own wire:loading
-     * spinner — $set()'s own call isn't reliably matchable that way.
+     * A real method, not $set(), so tab buttons can target it with wire:loading.
      */
     public function setStatusFilter(string $value): void
     {
@@ -80,8 +71,7 @@ class RequestDetail extends Card
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, $key, $until);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, $key, $until);
 
-        // One query grouped by subtype instead of five separate stats()
-        // calls (total + 2xx/3xx/4xx/5xx) — see Livewire/Overview.php.
+        // One grouped query instead of a stats() call per status group.
         $bySubtype = $storage->statsBySubtype('request', $since, $until, key: $key);
         $stats = $this->combineStats($bySubtype);
 
@@ -97,20 +87,13 @@ class RequestDetail extends Card
             '5xx' => HttpStatusGroup::ServerError->value,
         ];
 
-        // null for 'all' means "no duration bar" (a real, intentional
-        // filter value); avg/p95 can also come back null from durationStats()
-        // when the period has no duration data at all, which the loop below
-        // tells apart from 'all' since only 'all' is expected to be null.
+        // null means "no bar" for 'all', but "no duration data" for avg/p95.
         $durationBars = ['all' => null, 'avg' => $duration->avg, 'p95' => $duration->p95, 'threshold' => (float) $threshold];
 
         $subtype = $statusSubtypes[$statusFilter];
         $minDuration = $durationBars[$durationFilter];
 
-        // Each tab group's badges are cross-filtered against the OTHER
-        // group's currently selected tab — e.g. with durationFilter='p95'
-        // active, the status badges show how many of those p95+ entries
-        // fall into each status, not each status's independent total
-        // (which would still show "100 4xx" even with zero of them >= p95).
+        // Each tab group's badges count within the other group's active tab.
         $statusFilterCounts = [];
 
         foreach ($statusSubtypes as $filterKey => $filterSubtype) {
@@ -129,8 +112,7 @@ class RequestDetail extends Card
             };
         }
 
-        // Both filters apply together, so the actually-shown total/pagination
-        // is exactly this filter combination's own badge count above.
+        // Both filters apply together, so this badge count is the shown total.
         $totalEntries = $durationFilterCounts[$durationFilter];
         $lastPage = max(1, (int) ceil($totalEntries / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);

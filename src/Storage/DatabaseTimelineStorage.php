@@ -65,13 +65,8 @@ class DatabaseTimelineStorage implements TimelineStorage
     {
         return $this->table()
             ->where('type', $rootType)
-            // A run's root is its outcome, never one of the dispatches it
-            // made (share its request_id AND its type — see
-            // Recorders\Jobs::DISPATCH) or its own still-in-flight
-            // 'processing' marker (shares its request_id too, recorded
-            // before the outcome — see Recorders\Jobs::PROCESSING) — without
-            // this the root could resolve to either placeholder instead.
-            // Same rule jobExecutionsByJobId() already applies.
+            // A job root is its outcome, not a dispatch it made or its 'processing'
+            // marker, which share its request_id and type.
             ->when(
                 $rootType === RecordType::Job->value,
                 fn (Builder $query) => $query->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING]),
@@ -91,10 +86,7 @@ class DatabaseTimelineStorage implements TimelineStorage
 
     public function findByCorrelationId(string $type, string $correlationId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
     {
-        // Narrowed by the existing [type, created_at] index before the JSON
-        // lookup — a correlated pair always lands moments apart, so callers
-        // pass a tight since/until around the source entry rather than the
-        // dashboard's full selected range.
+        // Narrow by [type, created_at] before the JSON lookup; callers pass a tight window.
         $row = $this->table()
             ->where('type', $type)
             ->where('created_at', '>=', $since)
@@ -142,12 +134,8 @@ class DatabaseTimelineStorage implements TimelineStorage
     {
         return $this->table()
             ->whereIn('request_id', $requestIds)
-            // Excluding the root's own type drops too much for a job root:
-            // the jobs this run dispatched are children of it, yet share its
-            // type (see Recorders\Jobs::DISPATCH). Dropping them left a job
-            // that queued further jobs with no dispatch rows on its timeline
-            // and, since MergesJobTimelines reads them from here, no tracks
-            // for those jobs either.
+            // For a job root, keep the jobs it dispatched (same type, DISPATCH subtype);
+            // MergesJobTimelines builds their tracks from these rows.
             ->when(
                 $rootType === RecordType::Job->value,
                 fn (Builder $query) => $query->where(fn (Builder $q) => $q
@@ -161,8 +149,7 @@ class DatabaseTimelineStorage implements TimelineStorage
 
     public function findQueuedJobByJobId(string $jobId, DateTimeInterface $since, ?DateTimeInterface $until = null): ?object
     {
-        // Narrowed by the existing [type, created_at] index before the JSON
-        // lookup — same reasoning as findByCorrelationId().
+        // Narrow by type/created_at before the JSON lookup, as in findByCorrelationId().
         $row = $this->table()
             ->where('type', 'job')
             ->where('subtype', 'queued')
@@ -180,16 +167,10 @@ class DatabaseTimelineStorage implements TimelineStorage
             return collect();
         }
 
-        // Oldest first: jobTrack() numbers attempts by array position, so an
-        // unordered result can show "Attempt #3" starting before "#2".
-        // Their children come back in one timelinesFor() call below, not one
-        // query per attempt.
+        // Oldest first: MergesJobTimelines::jobTrack() numbers attempts by position.
         $outcomes = $this->table()
             ->where('type', 'job')
-            // Excludes the dispatch placeholder and the outcome's own
-            // still-in-flight 'processing' marker (see Recorders\Jobs) —
-            // neither is a real execution, just the DISPATCH/PROCESSING
-            // rootQuery() already excludes for the same reason.
+            // Outcomes only, as in rootQuery().
             ->whereNotIn('subtype', [Jobs::DISPATCH, Jobs::PROCESSING])
             ->whereIn('payload->job_id', $jobIds)
             ->where('created_at', '>=', $since)
@@ -215,8 +196,7 @@ class DatabaseTimelineStorage implements TimelineStorage
             return collect();
         }
 
-        // The `request` entry's key is already stored as "METHOD /path"
-        // (see Recorders\Requests) — no need to decode payload for this.
+        // A request's key is already "METHOD /path" (see Recorders\Requests::record()).
         return $this->table()
             ->where('type', 'request')
             ->whereIn('request_id', $requestIds)

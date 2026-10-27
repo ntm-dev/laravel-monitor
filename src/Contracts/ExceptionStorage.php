@@ -8,11 +8,9 @@ use Illuminate\Support\Collection;
 interface ExceptionStorage
 {
     /**
-     * Grouped exceptions: one item per fingerprint key exposing
-     * key, class, message, file, line, count, handled, unhandled, users
-     * (distinct impacted users), first_seen and last_seen. Sampled at high
-     * volume — `count` and the handled/unhandled/users tallies are exact
-     * only up to maxSampleRows() matching rows.
+     * One row per fingerprint key: key, class, message, file, line (from the latest occurrence),
+     * count, handled, unhandled, users (distinct), first_seen, last_seen.
+     * Computed from a capped set of the most recent rows, so exact only below that cap.
      */
     public function exceptionGroups(
         DateTimeInterface $since,

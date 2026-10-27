@@ -3,12 +3,8 @@
 namespace LaravelMonitor\Support;
 
 /**
- * Stable grouping key for exceptions.
- *
- * Occurrences collapse into one group when they share an exception class,
- * a normalized message (numbers / quoted ids stripped so "model 41" and
- * "model 92" group together) and the same top stack-trace frame. Kept in
- * sync with database/demo/seed.php, which builds the same hash by hand.
+ * Exception grouping key: class + normalized message + top stack frame.
+ * Kept in sync with database/demo/seed.php, which builds the same hash by hand.
  */
 class Fingerprint
 {
@@ -21,10 +17,7 @@ class Fingerprint
         ])), 0, 32);
     }
 
-    /**
-     * Strip volatile bits (ids, numbers, quoted values, hashes) so messages
-     * that differ only by runtime data map to the same fingerprint.
-     */
+    /** Replaces hex literals, hashes, numbers and quoted values with placeholders. */
     public static function normalizeMessage(string $message): string
     {
         $message = preg_replace('/0x[0-9a-fA-F]+/', '{hex}', $message) ?? $message;

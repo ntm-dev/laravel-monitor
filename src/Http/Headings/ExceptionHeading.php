@@ -6,9 +6,8 @@ use Carbon\CarbonImmutable;
 use LaravelMonitor\Contracts\TimelineStorage;
 
 /**
- * Heading for an exception detail page: the message as both title and tooltip
- * (no badge — the handled/unhandled status lives in the trace card), while the
- * exception class names the browser tab.
+ * Heading for an exception detail page: the message as title and tooltip, the
+ * class as tab title, no badge. Reads the latest entry regardless of the selected range.
  */
 class ExceptionHeading
 {

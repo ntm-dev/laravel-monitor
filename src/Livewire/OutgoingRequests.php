@@ -70,7 +70,7 @@ class OutgoingRequests extends Card
         $lastPage = max(1, (int) ceil($total / self::PER_PAGE));
         $page = min(max(1, $this->page), $lastPage);
 
-        // One query grouped by subtype instead of separate stats() calls — see Requests.php.
+        // One grouped query instead of a stats() call per subtype.
         $bySubtype = $storage->statsBySubtype('outgoing_request', $since, $until);
 
         return [

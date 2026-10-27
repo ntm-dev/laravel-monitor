@@ -3,14 +3,8 @@
 namespace LaravelMonitor\Support;
 
 /**
- * Reversibly disguises a monitor_entries row's own auto-increment id as a
- * uuid-shaped path segment (e.g. mail/notification/outgoing "single send"
- * detail links) — unlike KeyHash, which is one-way and resolved by matching
- * against known keys, an id has no small enumerable set to match against, so
- * this has to decode straight back to the int instead. AES-128-ECB on a
- * single 16-byte block: exactly one block in, one block out, no IV/padding
- * bookkeeping — not a security boundary, just enough to stop a raw
- * incrementing id in the URL.
+ * Reversibly encodes a monitor_entries id as a uuid-shaped path segment
+ * (AES-128-ECB on one 16-byte block). Hides the raw incrementing id; not a security boundary.
  */
 class EntryId
 {

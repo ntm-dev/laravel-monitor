@@ -168,8 +168,7 @@ class Team extends Card
             return;
         }
 
-        // Never a real email collision to guard against separately: '@' isn't
-        // in the allowed charset above, so a username can never equal one.
+        // No email clash check needed: '@' isn't in the allowed charset.
         $taken = MonitorUser::query()
             ->where('id', '!=', $actor->id)
             ->where('username', $username)

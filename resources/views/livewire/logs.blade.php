@@ -1,10 +1,5 @@
-{{-- #monitor-logs-list below is wire:ignore'd: Logs::$oldestId/$newestId are
-     the only state Livewire tracks for the list, so its wire:snapshot stays
-     tiny no matter how far the user has scrolled. Growth happens purely
-     client-side — loadMore()/the auto-refresh top-up dispatch just the new
-     batch's rendered HTML, and these listeners splice it in directly instead
-     of Livewire re-rendering (and re-transferring) the whole accumulated list
-     on every request. --}}
+{{-- Livewire tracks only Logs::$oldestId/$newestId for the list; each new batch
+     arrives as rendered HTML and these listeners splice it into #monitor-logs-list. --}}
 <div data-monitor-poll x-data
     x-init="
         $wire.on('monitor-logs-replace', ({ html }) => {
@@ -43,10 +38,8 @@
     </div>
     {{-- end log filters --}}
 
-    {{-- Only the very first paint's rows come from this @forelse — Blade
-         still computes it on every request, but wire:ignore above means the
-         browser only ever applies it once; every later change arrives via
-         the monitor-logs-* events instead. --}}
+    {{-- wire:ignore: only the first paint's rows come from this loop; later
+         changes arrive via the monitor-logs-* events. --}}
     <div id="monitor-logs-list" wire:ignore class="divide-y divide-neutral-100 dark:divide-neutral-800 mt-1 grid gap-y-1 grid-cols-1">
         @forelse ($logs as $log)
             @include('monitor::livewire.logs-entry', ['log' => $log])
@@ -58,18 +51,11 @@
     </div>
 
     @if ($hasMore)
-        {{-- Infinite-scroll sentinel: enters the viewport once the list is
-             scrolled to its end and calls loadMore(), which dispatches the
-             next batch's HTML for the x-init listener above to append.
-             Deliberately outside #monitor-logs-list (not wire:ignore'd), so
-             Livewire can still remove this element itself once storage runs
-             dry, without needing a client-side "no more results" guard. --}}
+        {{-- Infinite-scroll sentinel calling loadMore(). Kept outside the
+             wire:ignore'd list so Livewire removes it once $hasMore is false. --}}
         <div wire:key="logs-load-more-sentinel" x-intersect="$wire.loadMore()"
             class="flex items-center justify-center border-t border-neutral-100 py-3 dark:border-neutral-800">
-            {{-- wire:loading.flex (not bare wire:loading): Livewire's
-                 default reveal sets display:inline-block inline,
-                 which beat the flex class below and stacked the icon
-                 and text instead of placing them side by side. --}}
+            {{-- wire:loading.flex: bare wire:loading sets an inline display that overrides `flex`. --}}
             <span wire:loading.flex wire:target="loadMore" class="items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -82,17 +68,8 @@
 
     <x-monitor::scroll-to-top/>
 
-    {{-- Same shape as Tailwind's own animate-ping (fade to 0 while scaling
-         up, cubic-bezier(0, 0, 0.2, 1) infinite), but capped at scale(1.2)
-         — the default scale(2) blew the emergency badge up past its
-         neighbours in the row. Tailwind's own keyframes only define 75%/100%
-         (no 0%), so the browser interpolates the *whole* 0%-75% span from
-         the base style to that 75% value — a continuous fade, not a pause —
-         which pings back-to-back with no rest. The explicit "0%, 75%" stop
-         below holds flat at the resting look instead, so the badge sits
-         still for 3s (75% of the 4s cycle) between pings, then does the
-         actual grow-and-fade in the last 1s (still 75%/100%, matching
-         Tailwind's own pacing) before snapping back to rest. --}}
+    {{-- Like Tailwind's animate-ping, but capped at scale(1.1) so the emergency badge
+         stays within its row, and held still for the first 75% of each 2s cycle. --}}
     <style>
         @keyframes monitor-log-emergency-ping {
 

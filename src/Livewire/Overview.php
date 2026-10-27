@@ -24,10 +24,7 @@ class Overview extends Card
         $ok2xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Successful->value, null, $until);
         $ok3xx = $storage->countsPerBucket('request', $since, $buckets, HttpStatusGroup::Redirection->value, null, $until);
 
-        // One query grouped by subtype instead of five separate stats()
-        // calls (total + 2xx/3xx/4xx/5xx) — each stats() call scans the
-        // same underlying rows, so calling it five times over just meant
-        // paying for the same scan five times over.
+        // One grouped query instead of a stats() call per status group.
         $bySubtype = $storage->statsBySubtype('request', $since, $until);
 
         return [

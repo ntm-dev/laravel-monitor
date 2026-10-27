@@ -1,10 +1,5 @@
-{{-- 4 ascending bars, replacing the old single-icon priority indicator so
-     the level itself (not just its colour) is legible at a glance: how many
-     bars are lit, and which colour, both encode the level — low lights the
-     shortest bar blue, medium the two shortest orange, high the three
-     shortest red, urgent lights all four red and pulses. Also reused,
-     always with priority="none", as the priority-column sort toggle in
-     issues.blade.php's <thead>. --}}
+{{-- 4 ascending bars; lit count and colour encode the priority level.
+     priority="none" is used for the Issues priority sort header. --}}
 @props(['priority' => 'none'])
 @php
     $litCount = match ($priority) {

@@ -5,11 +5,8 @@ namespace LaravelMonitor\Livewire;
 class Notifications extends Card
 {
     /**
-     * Built-in Laravel channel keys. Anything else recorded as $event->channel
-     * is a custom channel class's FQCN — charted and labelled as one combined
-     * "Custom" series/row rather than by its (often long, app-specific) class
-     * name, since the raw class name isn't meaningful chart/legend text and
-     * an app can define arbitrarily many of them.
+     * Built-in Laravel channel keys; any other channel (a custom class FQCN)
+     * is combined into one "Custom" series.
      */
     public const KNOWN_CHANNELS = ['mail', 'database', 'broadcast', 'vonage', 'nexmo', 'slack'];
 

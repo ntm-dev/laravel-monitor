@@ -24,11 +24,8 @@
         <x-monitor::duration-chart-card :duration="$duration" :since="$since" :until="$until" height="h-[167px]"/>
     </div>
 
-    {{-- Info: metrics list on the left half, the full SQL as a nested card
-         on the right half. The page header already shows a wrapped copy of
-         the SQL for quick reference; this is the canonical full text,
-         wrapping instead of scrolling horizontally, capped in height with
-         its own vertical scroll for pathologically long queries. --}}
+    {{-- Info: metrics on the left, the full wrapped SQL on the right
+         (height-capped with its own vertical scroll). --}}
     <x-monitor::card class="mt-1.5 flex flex-col gap-6 p-4 md:flex-row">
         <div class="md:w-1/2">
             <h3 class="pb-4 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.info') }}</h3>
@@ -83,8 +80,7 @@
                  sqlCopied: false,
                  sqlHighlighted() {
                      if (! this.sql) return '';
-                     {{-- Same 'mysql' dialect choice as Requests\Timeline's sqlHighlighted() —
-                          keep this in sync if that reasoning ever changes. --}}
+                     {{-- Same 'mysql' dialect as sqlHighlighted() in components/requests/timeline-script.blade.php. --}}
                      const formatted = window.sqlFormatter ? window.sqlFormatter.format(this.sql, { language: 'mysql' }) : this.sql;
                      return window.hljs ? window.hljs.highlight(formatted, { language: 'sql', ignoreIllegals: true }).value : formatted;
                  },
@@ -110,11 +106,8 @@
         </div>
     </x-monitor::card>
 
-    {{-- Full call stack of the most recent occurrence — the 'trace' detail
-         option (Settings::RECORDER_DETAILS) is off by default, so this card
-         is absent for most installs. Collapsed by default even when
-         present: unlike the timeline panel's one-entry view, this page
-         already has the SQL card open above it. --}}
+    {{-- Call stack of the latest occurrence; needs the Queries 'trace' detail
+         (default on only in local). Starts collapsed below the SQL card. --}}
     @if ($trace)
         {{-- x-data sits on an inner div: a directive inside a component tag's attribute is not compiled. --}}
         <x-monitor::card class="mt-1.5">
@@ -171,9 +164,8 @@
                         </thead>
                         <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
                             @foreach ($entries as $entry)
-                                {{-- request_id is a generic correlation id (request/job/command/scheduled task) —
-                                     sourceType/sourceLabel/sourceUrl (set in QueryDetail::data()) resolve it to the
-                                     right detail page instead of assuming every call came from an HTTP request. --}}
+                                {{-- request_id may belong to any request/job/command/task;
+                                     QueryDetail::data() sets sourceType/sourceLabel/sourceUrl. --}}
                                 @php
                                     $commandName = $entry->payload['command'] ?? null;
                                     $location = $entry->payload['location'] ?? \LaravelMonitor\Support\Trace::location($entry->payload['trace'] ?? null);

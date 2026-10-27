@@ -57,13 +57,8 @@ class DatabaseAggregateStorage implements AggregateStorage
 
         $orderColumn = $orderBy === 'count' ? 'aggregate_count' : $orderBy;
 
-        // See cacheKeyStats() for why the GROUP BY runs over a capped
-        // subquery, ordered by created_at rather than id, rather than the
-        // raw filtered table directly. Unlike cacheKeyStats' count-only
-        // aggregates, avg_duration/max_duration below are computed from
-        // this sample's actual values, so created_at alone isn't a safe
-        // sort within a tied second — see sampleDurationsAcrossBuckets()
-        // for why `id` is added as a deterministic tiebreaker.
+        // Capped subquery: see DatabaseCacheAndQueryStorage::cacheKeyStatsUncached().
+        // `id` tiebreak: see sampleDurationsAcrossBuckets().
         $sample = $this->query($type, $since, $subtype, null, $until, $userId)
             ->select(['key', 'duration', 'created_at', 'user_id'])
             ->orderByDesc('created_at')
@@ -99,10 +94,8 @@ class DatabaseAggregateStorage implements AggregateStorage
         int|string|null $userId = null,
         ?float $minDuration = null,
     ): object {
-        // The aggregates table only carries type+subtype totals (see
-        // countsPerBucketFromAggregates()'s own docs) — no per-row duration
-        // to compare against a bar, and no array-of-subtypes breakdown — so
-        // either one always falls back to the raw scan below.
+        // monitor_aggregates holds single-subtype totals only: no per-row
+        // duration filter, subtype list, key or user.
         if ($minDuration === null && ! is_array($subtype) && $key === null && $userId === null && $this->aggregatesCover($type, $since, $until)) {
             return $this->statsFromAggregates($type, $subtype, $since, $until);
         }
@@ -164,13 +157,7 @@ class DatabaseAggregateStorage implements AggregateStorage
 
         $counts = array_fill(0, $buckets, 0);
 
-        // Capped and ordered by created_at — see cacheKeyStats() for why —
-        // same as every other raw-scan fallback in this class. This one
-        // was missed when the others were capped: a range aggregatesCover()
-        // correctly declines to serve (not yet backfilled, or filtered by
-        // key/user) falls all the way back to this pluck(), which is
-        // otherwise unbounded and will exhaust PHP's memory limit outright
-        // on a wide enough window — measured directly on a 7-day range.
+        // Capped like every raw-scan fallback; an unbounded pluck() can exhaust memory on wide ranges.
         $this->query($type, $since, $subtype, $key, $until, $userId)
             ->orderByDesc('created_at')
             ->limit($this->maxSampleRows())
@@ -220,21 +207,9 @@ class DatabaseAggregateStorage implements AggregateStorage
     }
 
     /**
-     * Samples up to maxSampleRows() / $buckets rows per bucket instead of the
-     * most recent maxSampleRows() overall. A flat "most recent N" cap starves
-     * the earlier buckets once total volume for the range exceeds the cap —
-     * e.g. a busy install with 250k requests in a 24h window would only ever
-     * see duration data for roughly the last 19 of those 24 hours, while the
-     * request-count chart (backed by monitor_aggregates, which isn't capped
-     * by row count) kept showing real traffic throughout, making the gap look
-     * like missing data rather than a sampling artifact.
-     *
-     * One SQL statement — a UNION ALL of one capped, ordered subquery per
-     * bucket — not one round trip per bucket. The last bucket has no
-     * exclusive upper bound of its own (it instead reuses the same `$until`
-     * constraint the other methods apply): its computed boundary is derived
-     * from float division and could, by a fraction of a second, fall short
-     * of the actual end of the range and silently drop the most recent row.
+     * Up to maxSampleRows() / $buckets rows per bucket (one UNION ALL query), so a global cap
+     * can't starve the earlier buckets. The last bucket is bounded only by $until, since its
+     * rounded end could fall just short of the range.
      */
     protected function sampleDurationsAcrossBuckets(
         string $type,
@@ -268,18 +243,8 @@ class DatabaseAggregateStorage implements AggregateStorage
                 ->when($bucketEnd !== null, fn (Builder $q) => $q->where('created_at', '<', $bucketEnd))
                 ->when($until !== null, fn (Builder $q) => $q->where('created_at', '<=', $until))
                 ->select(['created_at', 'duration'])
-                // created_at, not id, as the primary sort — see cacheKeyStats()
-                // for why — but unlike the count-only aggregates there, this
-                // sample's actual duration *values* feed avg/p95/min/max
-                // directly, so which rows land inside a tied created_at
-                // second isn't safe to leave to the storage engine: without a
-                // deterministic secondary sort, two runs of the same query
-                // (e.g. a wire:poll refresh vs. the next page load) can each
-                // pick a different subset of a busy second's rows and yield
-                // different stats for what's effectively the same window —
-                // the chart visibly changing shape on every refresh. `id`
-                // tiebreaks deterministically without disturbing the
-                // created_at-first ordering the index above is built for.
+                // Sampled durations feed the stats, so `id` breaks created_at ties
+                // deterministically; otherwise each poll could pick different rows.
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->limit($capPerBucket);
@@ -315,39 +280,24 @@ class DatabaseAggregateStorage implements AggregateStorage
         int|string|null $userId,
     ): Collection {
         $rows = $this->query($type, $since, null, null, $until, $userId)
-            // created_at, not id, as the primary sort — see cacheKeyStats()
-            // for why — plus `id` as a deterministic tiebreaker, since
-            // avg_duration/p95_duration below are computed from this
-            // sample's actual values — see sampleDurationsAcrossBuckets()
-            // for why a tied created_at second isn't safe to leave
-            // unordered when the sample feeds a duration statistic.
+            // `id` tiebreak: see sampleDurationsAcrossBuckets().
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
             ->get(['key', 'subtype', 'duration', 'created_at']);
 
-        // A single foreach pass with plain arrays, not groupBy()->map()
-        // with pluck()/filter()/whereIn() chains per group: at the sample
-        // cap (50k rows across thousands of routes), building and
-        // re-collecting a Collection per group was costing over a second of
-        // pure PHP time on top of an 85ms query — the grouping itself, not
-        // the SQL, was the bottleneck here.
+        // Plain arrays, not a Collection per group: too slow at the sample cap.
         $groups = [];
 
         foreach ($rows as $row) {
-            // Every method that hit no Laravel route (404s, arbitrary probed
-            // paths) is still stored under its own "{METHOD} Unmatched
-            // Route" key (see Requests::record()) — collapse them into one
-            // group here, or they'd fragment the route list into one row
-            // per method instead of the single record the list should show.
+            // Merge every "{METHOD} Unmatched Route" key into one row.
             $unmatched = $type === RecordType::Request->value
                 && $row->key !== null
                 && Str::endsWith($row->key, ' '.Requests::UNMATCHED_ROUTE);
             $groupKey = $unmatched ? Requests::UNMATCHED_ROUTE : $row->key;
 
             $group = &$groups[$groupKey];
-            // Rows arrive newest-first, so the first row seen per group is
-            // its last_seen.
+            // Rows arrive newest-first, so the first row seen is last_seen.
             $group ??= ['count' => 0, 'success' => 0, 'client_errors' => 0, 'server_errors' => 0, 'network_errors' => 0, 'durations' => [], 'methods' => [], 'last_seen' => $row->created_at];
 
             if ($unmatched) {
@@ -379,9 +329,7 @@ class DatabaseAggregateStorage implements AggregateStorage
 
             $result[] = (object) [
                 'key' => $key,
-                // Distinct methods behind the merged Unmatched Route row
-                // (capped by the sample above), null for every ordinary
-                // route — see Livewire\Requests::presentRoute().
+                // Only the merged Unmatched Route row lists its methods.
                 'methods' => $key === Requests::UNMATCHED_ROUTE ? $methods : null,
                 'count' => $group['count'],
                 'success' => $group['success'],
@@ -406,13 +354,8 @@ class DatabaseAggregateStorage implements AggregateStorage
         ?string $subtype = null,
     ): Collection {
         $rows = $this->query($type, $since, $subtype, null, $until, $userId)
-            // created_at, not id, as the primary sort — see cacheKeyStats()
-            // for why. Rows arrive newest-first, so the first row seen per
-            // key is its last_seen. `id` is added as a deterministic
-            // tiebreaker because — unlike cacheKeyStats' count-only
-            // aggregates — avg_duration/p95_duration below are computed
-            // from this sample's actual values; see
-            // sampleDurationsAcrossBuckets() for why that matters.
+            // Newest-first, so the first row per key is last_seen.
+            // `id` tiebreak: see sampleDurationsAcrossBuckets().
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($this->maxSampleRows())
@@ -455,11 +398,8 @@ class DatabaseAggregateStorage implements AggregateStorage
         ?DateTimeInterface $until = null,
         int $limit = 1000,
     ): Collection {
-        // Two narrow queries rather than one sampled scan: the GROUP BY reads
-        // only ids, so the payload column — by far the widest in the table —
-        // is fetched for one row per key instead of for the whole sample.
-        // `max(id)`, not max(created_at), so a tie within the same second
-        // still resolves to a single, actually-latest row.
+        // Group on ids only, then fetch the wide payload for one row per key.
+        // max(id) resolves same-second ties to a single row.
         $ids = $this->query($type, $since, null, null, $until)
             ->selectRaw('max(id) as latest_id')
             ->groupBy('key')

@@ -75,9 +75,7 @@ class Queries extends Card
 
         $queries = $this->cacheAndQueryStorage()->queryStats($since, $until);
 
-        // Connection list is derived from the current period's data rather
-        // than a separate query — cheap since queryStats() already fetched
-        // everything, and it only ever lists connections actually in use.
+        // Only connections used in this period, taken from queryStats().
         $connections = $queries->pluck('connection')->unique()->sort()->values();
 
         if ($this->connection !== '') {
@@ -89,8 +87,7 @@ class Queries extends Card
             $queries = $queries->filter(fn ($query) => str_contains(strtolower($query->key), $needle))->values();
         }
 
-        // Computed before the tabs so ≥ Avg / ≥ P95 have the period's own
-        // overall avg/p95 to compare each query against.
+        // The period's overall avg/p95, used as the duration tab bars.
         $duration = $storage->durationStats('query', $since, $buckets, null, null, $until);
         $threshold = (int) config('monitor.thresholds.query', 500);
 
@@ -112,10 +109,7 @@ class Queries extends Card
         $page = min(max(1, $this->page), $lastPage);
 
         return [
-            // Calls/duration charts summarize every query regardless of the
-            // connection filter — filtering the time-bucketed charts by a
-            // JSON-payload field isn't worth the extra query complexity for
-            // a secondary UI control.
+            // Calls/duration charts ignore the connection filter.
             'calls' => $storage->stats('query', $since, null, null, $until)->count,
             'callBuckets' => $storage->countsPerBucket('query', $since, $buckets, null, null, $until),
             'duration' => $duration,

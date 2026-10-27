@@ -40,15 +40,8 @@ class Monitor
     protected bool $recording = true;
 
     /**
-     * State of the HTTP request currently being recorded, or null outside a
-     * request (console, queue workers): a shared per-request identity plus
-     * a *live* lifecycle stage pointer
-     * (`stage`) — not a set of independent timestamp markers — so every
-     * entry recorded during the request can be tagged with the stage it
-     * actually happened in (see `record()`), instead of being classified
-     * after the fact by comparing its timestamp against stored phase
-     * intervals (see `Support\Timeline::containingPhase()`, still used only
-     * as a fallback for rows stored before this stage tag existed).
+     * The HTTP request being recorded, or null outside one. Its live `stage`
+     * tags every entry recorded during the request (see record()).
      */
     protected ?RequestState $request = null;
 
@@ -56,53 +49,24 @@ class Monitor
     protected ?Entry $pendingRequest = null;
 
     /**
-     * Stack of queued job attempts currently being processed, outermost
-     * first — same shape/purpose as $request but for jobs, so everything a
-     * job's handle() triggers (queries, mail, notifications) can be
-     * correlated onto a job attempt timeline the same way request children
-     * are. A worker process handles jobs from the queue one at a time and
-     * never concurrently with an HTTP request, so $request and this stack
-     * are never both non-empty — but a job's own handle() can still dispatch
-     * another job synchronously (e.g. dispatchSync(), or any queue
-     * connection like 'sync' that fires JobProcessing/JobProcessed
-     * in-process instead of through a separate worker), nesting a second
-     * attempt inside the first. A stack (rather than a single nullable
-     * frame) keeps the outer attempt's id/start/models intact while the
-     * inner one is active, so entries recorded after the inner attempt ends
-     * still correlate back onto the outer one instead of losing correlation
-     * entirely.
+     * Queued job attempts being processed, outermost first. A stack because a
+     * job can dispatch another synchronously; popping the inner attempt
+     * restores the outer one as the correlation target.
      *
      * @var list<array{id: string, start: float, models: int}>
      */
     protected array $jobStack = [];
 
-    /**
-     * State of the artisan command currently running, or null outside one —
-     * same shape/purpose as $job but for console commands, so anything a
-     * command triggers (queries, mail, notifications, jobs it dispatches)
-     * correlates onto its own timeline the same way. A console process runs
-     * one command at a time, never concurrently with a request or a queued
-     * job attempt, so at most one of $request/$job/$command is ever set.
-     *
-     */
+    /** The artisan command being run, or null outside one; its children correlate onto its own timeline. */
     protected ?CommandState $command = null;
 
-    /** The buffered root `command` entry, finalised (phases, duration) on flush — mirrors $pendingRequest. */
+    /** The buffered root `command` entry, finalised (phases, duration) on flush. */
     protected ?Entry $pendingCommand = null;
 
     /**
-     * State of the scheduled task currently running, or null outside one —
-     * same shape/purpose as $command, but for `Schedule::call()`/closure
-     * tasks executing directly in the scheduler's own process. Command-based
-     * tasks (`Schedule::command()`) always run as a *separate* `php artisan`
-     * subprocess even when "foreground" (see
-     * Illuminate\Console\Scheduling\Event::execute()) — that subprocess mints
-     * its own, independent `command` entry (own id, own timeline) rather than
-     * sharing this one, and only references this run's id in its payload
-     * (see beginScheduledTaskRun(), Recorders\Commands::recordStarting()):
-     * everything the subprocess triggers happened well after the scheduler
-     * itself finished dispatching it, so it belongs on the command's own
-     * timeline, not this one.
+     * The in-process scheduled task (`Schedule::call()`) being run, or null.
+     * A `Schedule::command()` task runs as its own artisan subprocess with
+     * its own `command` entry, which only references this run's id.
      *
      * @var array{id: string, start: float, models: int}|null
      */
@@ -123,15 +87,8 @@ class Monitor
     protected array $flushingCallbacks = [];
 
     /**
-     * Context key a scheduled task's own id rides under across the process
-     * boundary a command-based task's own `php artisan` subprocess creates,
-     * so that subprocess's own `command` entry can reference which task
-     * dispatched it. Laravel's scheduler already dehydrates the whole
-     * Context into that subprocess's `__LARAVEL_CONTEXT` env var and
-     * rehydrates it there before any application code runs (see
-     * Illuminate\Log\Context\ContextServiceProvider) — riding on that
-     * existing, framework-native mechanism instead of a bespoke env var means
-     * no changes are needed to how the subprocess is spawned at all.
+     * Context key carrying a scheduled task's run id into a command-based
+     * task's subprocess; Laravel's scheduler propagates Context there itself.
      */
     protected const SCHEDULED_TASK_CONTEXT_KEY = 'monitor_scheduled_task_id';
 
@@ -156,26 +113,16 @@ class Monitor
     }
 
     /**
-     * The guard-qualified id of whoever a guard in $rememberedUserIds' key
-     * position just logged out of, this lifecycle — see rememberLoggedOutUser()
-     * for why this exists. Keyed by guard name so a later login on that same
-     * guard (naturally picked up by the live check in currentUserId(), since
-     * the guard has a user again) still takes priority over the stale
-     * logged-out one.
+     * Guard-qualified ids of users logged out during this lifecycle, keyed by
+     * guard; see rememberLoggedOutUser().
      *
      * @var array<string, string>
      */
     private array $rememberedUserIds = [];
 
     /**
-     * The currently authenticated application user's id, prefixed with
-     * whichever guard it came from ("{guard}:{id}") — two different guards
-     * can independently hand out the same id to two entirely different
-     * users, so a bare id would conflate them wherever entries get grouped
-     * or filtered by user. Checks the default guard first, then every
-     * other configured guard, skipping the dashboard's own guard (its own
-     * logins aren't activity of the application being monitored). Returns
-     * null when none of them has a user.
+     * The authenticated application user as "{guard}:{id}", checking the
+     * default guard first and skipping the dashboard's own guard.
      */
     public function currentUserId(): int|string|null
     {
@@ -183,16 +130,8 @@ class Monitor
             try {
                 $resolved = Auth::guard($guard);
 
-                // hasUser() (a plain "is $this->user set" property read, see
-                // Illuminate\Auth\GuardHelpers) rather than user(): user()
-                // *resolves* the guard — session lookup, "remember me" cookie,
-                // and the provider's own SELECT — so calling it on a guard the
-                // application itself never touched makes monitoring the sole
-                // cause of a query that would otherwise never have run, which
-                // Recorders\Queries then records as if the application had
-                // issued it. Only guards something else already resolved are
-                // read here, and for those user() is free: it returns the
-                // instance already cached on the guard.
+                // hasUser(), not user(): resolving an untouched guard would
+                // run a query the Queries recorder then captures.
                 if (! $resolved->hasUser()) {
                     continue;
                 }
@@ -207,11 +146,7 @@ class Monitor
             }
         }
 
-        // No guard currently has anyone — but one might have, moments ago in
-        // this same request/job/command, before Recorders\Authentication saw
-        // it log out (see rememberLoggedOutUser()'s own docblock for why an
-        // entry recorded before that logout would otherwise lose its user
-        // once lazyCurrentUserId() finally resolves at flush()).
+        // Fall back to a user logged out earlier in this lifecycle.
         foreach ($this->authGuardsToCheck() as $guard) {
             if (isset($this->rememberedUserIds[$guard])) {
                 return $this->rememberedUserIds[$guard];
@@ -222,15 +157,8 @@ class Monitor
     }
 
     /**
-     * Called by Recorders\Authentication right as it observes a Logout event
-     * — while the guard involved still has its (about to be cleared) user,
-     * since Illuminate\Auth\SessionGuard::logout() fires Logout before
-     * nulling out $this->user. Without this, an entry recorded earlier in the
-     * same request/job/command — e.g. a log line right before the logout
-     * call — would carry a lazyCurrentUserId() (see its own docblock) that
-     * only resolves once flush() runs, by which point the guard genuinely
-     * has no one: the request's own last known user would be lost from every
-     * entry that came before the logout, not just the logout entry itself.
+     * Called on Logout, so entries recorded before the logout still resolve
+     * their lazy user id once flush() runs.
      */
     public function rememberLoggedOutUser(string $guard, ?Authenticatable $user): void
     {
@@ -242,14 +170,8 @@ class Monitor
     }
 
     /**
-     * currentUserId(), deferred until the entry carrying it is actually
-     * written (Entry::toArray(), reached only from flush()). Recorders fire
-     * mid-lifecycle — Recorders\Logs on every MessageLogged, Recorders\Jobs
-     * on every dispatch — often before the application has authenticated
-     * anyone, so resolving eagerly would stamp a null user onto entries whose
-     * request does have one moments later. By flush() every middleware,
-     * controller and terminating callback has run, so whatever the
-     * application was ever going to resolve is resolved.
+     * currentUserId(), deferred until the entry is written at flush(), when
+     * the application has finished authenticating.
      *
      * @return LazyValue<int|string|null>
      */
@@ -271,10 +193,7 @@ class Monitor
         return array_values(array_diff($ordered, [MonitorUser::guardName()]));
     }
 
-    /**
-     * Buffer a new entry. It is persisted on flush (end of request/job) or
-     * as soon as the buffer limit is reached.
-     */
+    /** Buffer a new entry; persisted on flush() or once the buffer limit is reached. */
     public function record(
         RecordType $type,
         string|LazyValue|null $key = null,
@@ -287,11 +206,7 @@ class Monitor
             return;
         }
 
-        // Live-tag the entry with the request's (or command's) current stage
-        // — the fix for queries that run while a middleware is unwinding
-        // after `$next()` (e.g. session persistence) getting swept into
-        // whatever phase happened to be open the longest, purely because
-        // their stored start_offset fell inside that phase's interval.
+        // Tag the entry with the request's (or command's) live lifecycle stage.
         if ($type !== RecordType::Request && $this->request !== null) {
             $payload['phase'] = $this->request->stage->value;
         } elseif ($type !== RecordType::Command && $this->command !== null) {
@@ -305,29 +220,9 @@ class Monitor
             $duration,
             $subtype,
             $userId,
-            // currentJob() before request: a job processed synchronously
-            // inside the same process as the request that dispatched it
-            // (e.g. a route that calls Artisan::call('queue:work') itself,
-            // rather than a separate worker process) still has $this->request
-            // set the whole time — without this, every entry the job's own
-            // handle() produces (its own 'processed'/'failed' entry included)
-            // would correlate onto the outer request instead of this specific
-            // attempt, so findByRequestId($attemptId, 'job') could never find
-            // it again by its own id, and its 'processed' entry would show up
-            // as a stray extra "Queued Job" row among the request's own
-            // children (see Support\Timeline::EVENT_TYPES, which doesn't
-            // distinguish a job entry's subtype). A real, separate queue
-            // worker process never has $this->request set at all, so this
-            // reordering changes nothing for that (overwhelmingly more
-            // common) case.
-            //
-            // scheduledTask before command: a command-based scheduled task's
-            // own subprocess starts life already inside the outer
-            // schedule:run command's own $command context (its
-            // CommandStarting fired first) — a fresh $scheduledTask, begun
-            // right before this specific task ran, must win so everything
-            // it triggers correlates onto *this* task's run, not onto
-            // schedule:run itself.
+            // Innermost context wins: a job run in-process during a request
+            // correlates onto the job attempt, and a scheduled task onto its
+            // own run rather than the enclosing schedule:run command.
             $this->currentJob()['id'] ?? $this->request?->id ?? $this->scheduledTask['id'] ?? $this->command?->id ?? null,
             $this->startOffsetFor($type, $duration, $subtype),
         );
@@ -342,17 +237,8 @@ class Monitor
 
         $this->entries[] = $entry;
 
-        // `php artisan tinker` forks the whole PsySH REPL loop into a child
-        // process (Psy\ExecutionLoop\ProcessForker), so every query/job/mail/
-        // notification/... a user triggers interactively runs there — then
-        // the child reports back over a socket and SIGKILLs itself. SIGKILL
-        // skips PHP shutdown functions entirely, so CommandFinished (and the
-        // flush() Commands::recordFinished() triggers from it) only ever
-        // fires back in the *parent*, which never executed any of that code
-        // and has nothing of it buffered. Detecting the fork — the live pid
-        // no longer matches the one recorded when the run began — and
-        // flushing immediately closes that window: a doomed child persists
-        // its own entries before it can be killed, instead of losing them.
+        // Flush immediately in a forked child (e.g. tinker's PsySH loop): it
+        // is SIGKILLed without shutdown, so its buffer would never flush.
         if (
             $this->command !== null
             && $this->command->pid !== null
@@ -366,13 +252,8 @@ class Monitor
     }
 
     /**
-     * Where on the request timeline this entry started, in ms: an event's
-     * start is "now minus how long it took". The root request itself starts
-     * at zero. Measured via elapsedMsPrecise() (not elapsedMs()) so the
-     * offset keeps microtime()'s own microsecond precision instead of being
-     * floored to a whole millisecond before it ever reaches storage — see
-     * elapsedMsPrecise()'s own docs for why that still means round(x, 3),
-     * not leaving the raw subtraction unrounded.
+     * Where on the active timeline this entry started, in ms ("now minus its
+     * duration"); the root entry itself starts at zero.
      */
     protected function startOffsetFor(RecordType $type, ?float $duration, ?string $subtype = null): ?float
     {
@@ -385,14 +266,8 @@ class Monitor
         }
 
         if (($job = $this->currentJob()) !== null) {
-            // Only the run's own outcome sits at zero. A 'queued' entry here
-            // is a job this run dispatched — an event within it, offset like
-            // any other child (see Recorders\Jobs::DISPATCH) — and this same
-            // attempt's own still-in-flight 'processing' marker (Recorders\Jobs::PROCESSING)
-            // isn't the outcome either, just recorded moments before it. The
-            // request branch above needs no such check: a dispatch is
-            // RecordType::Job there, already distinct from its
-            // RecordType::Request root.
+            // Only the attempt's own outcome sits at zero; a dispatch or the
+            // 'processing' marker is offset like any other child.
             if ($type === RecordType::Job && ! in_array($subtype, [Jobs::DISPATCH, Jobs::PROCESSING], true)) {
                 return 0.0;
             }
@@ -431,13 +306,8 @@ class Monitor
     }
 
     /**
-     * Whether the current request is Monitor's own dashboard — checked
-     * directly by path, or via memo.path for a Livewire wire:poll/
-     * component-interaction request (those POST to Livewire's own update
-     * endpoint instead, carrying the originating page's URL in the
-     * snapshot rather than the request path). $ignorePaths lets a recorder
-     * fold in its own extra exclusions (e.g. Requests also excludes other
-     * dev-tool dashboards like Telescope/Pulse/Horizon).
+     * Whether the current request targets the dashboard (or $ignorePaths),
+     * by path or, for a Livewire update request, by its snapshot's page path.
      */
     public function isSelfRequest(array $ignorePaths = []): bool
     {
@@ -487,16 +357,9 @@ class Monitor
     }
 
     /**
-     * Start tracking the current HTTP request. Called from
-     * MonitorServiceProvider's app->booted() callback, once the framework
-     * has finished booting but before any middleware has run; offsets are
-     * measured from PHP's request start so they line up with the recorded
-     * request duration.
-     *
-     * LARAVEL_START (set on the first line of public/index.php) takes
-     * priority over REQUEST_TIME_FLOAT (set by the SAPI before PHP even
-     * starts executing the script), so duration doesn't include
-     * webserver/PHP bootstrap time outside Laravel's own lifecycle.
+     * Start tracking the HTTP request, from the app->booted() callback. Offsets
+     * count from LARAVEL_START (preferred over REQUEST_TIME_FLOAT so webserver
+     * time is excluded), with the boot itself recorded as the Bootstrap phase.
      */
     public function beginRequest(): void
     {
@@ -519,13 +382,7 @@ class Monitor
         return $this->request?->id;
     }
 
-    /**
-     * Starts tracking a queued job attempt. Called by the Jobs recorder on
-     * JobProcessing, before the job's own handle() runs — everything it
-     * triggers (queries, mail, notifications, cache) picks up this id via
-     * record()'s request_id fallback, the same way an HTTP request's
-     * children do.
-     */
+    /** Starts tracking a queued job attempt (on JobProcessing); its children correlate onto it. */
     public function beginJobAttempt(): void
     {
         $this->rememberedUserIds = [];
@@ -543,12 +400,7 @@ class Monitor
         return $this->currentJob()['id'] ?? null;
     }
 
-    /**
-     * Called by the Jobs recorder once the attempt's own `job` entry has
-     * been recorded. Pops just the innermost attempt — if handle() dispatched
-     * a nested job synchronously, this restores the outer attempt as current
-     * rather than clearing job-tracking state entirely.
-     */
+    /** Pops the innermost attempt, restoring any outer one as current. */
     public function endJobAttempt(): void
     {
         array_pop($this->jobStack);
@@ -561,45 +413,25 @@ class Monitor
     }
 
     /**
-     * Starts tracking an artisan command run. Called by the Commands
-     * recorder on CommandStarting, before the command's own handle() runs —
-     * everything it triggers (queries, mail, notifications, jobs) picks up
-     * this id via record()'s request_id fallback, the same way an HTTP
-     * request's or a job attempt's children do. Always mints its own fresh
-     * id, even for a command-based scheduled task's own subprocess — see
-     * $scheduledTaskRunId.
+     * Starts tracking an artisan command run (on CommandStarting) under a
+     * fresh id; its children correlate onto it.
      *
-     * @param  ?string  $scheduledTaskRunId  when this run is a command-based
-     *                                 scheduled task's own subprocess, the
-     *                                 dispatching task's own run id (see
-     *                                 inheritedScheduledTaskRunId()) — stamped
-     *                                 into this run's own entry (see
-     *                                 finalizePendingCommand()) purely as a
-     *                                 cross-reference the dashboard uses to
-     *                                 link the two runs together. Everything
-     *                                 this subprocess triggers still belongs
-     *                                 on *its own* timeline: it all happened
-     *                                 after the scheduler already finished
-     *                                 dispatching it.
+     * @param  ?string  $scheduledTaskRunId  the dispatching scheduled task's run id when this
+     *                                 is a command-based task's subprocess; stored only as a cross-reference
      */
     public function beginCommandRun(string $name, ?string $scheduledTaskRunId = null): void
     {
         $this->rememberedUserIds = [];
 
         $this->command = new CommandState(
-            // LARAVEL_START (the artisan entry script sets this the same way
-            // public/index.php does for requests) rather than "now" — so the
-            // bootstrap phase below, and every child entry's start_offset,
-            // account for the framework boot that already happened before
-            // CommandStarting fired, the same way beginRequest() does.
+            // LARAVEL_START, so the boot before CommandStarting counts as Bootstrap.
             timestamp: $this->timestamp ?? microtime(true),
             id: (string) Str::uuid(),
             name: $name,
             stage: ExecutionStage::Action,
         );
 
-        // The pid this run actually started under — see record()'s fork
-        // detection, which this exists solely to support.
+        // For record()'s fork detection.
         $this->command->pid = function_exists('posix_getpid') ? posix_getpid() : null;
         $this->command->scheduledTaskRunId = $scheduledTaskRunId;
 
@@ -610,16 +442,8 @@ class Monitor
     }
 
     /**
-     * Milliseconds elapsed since the running command's own process started
-     * (LARAVEL_START), or null outside one. round(x, 3): microtime() and
-     * $this->command->timestamp are both ~1.7-billion-magnitude Unix epoch
-     * floats, so subtracting them is a textbook floating-point catastrophic
-     * cancellation — the large integer part eats into a double's ~15-17
-     * significant digits, so what should be an exact "918" can come out as
-     * "918.00000762939453125". Rounding to 3 decimals (microtime()'s own
-     * microsecond resolution — the true precision ceiling here) snaps the
-     * result back to the value it actually represents; this is cleanup of
-     * an arithmetic artifact, not a premature display-rounding shortcut.
+     * Milliseconds since the running command's process started, or null
+     * outside one; rounded as in elapsedMsPrecise().
      */
     public function commandElapsedMsPrecise(): ?float
     {
@@ -644,38 +468,19 @@ class Monitor
         ];
     }
 
-    /**
-     * Marks the handle()-done → terminating boundary. Called by the Commands
-     * recorder on CommandFinished, before the command's own entry is
-     * recorded — mirrors markTerminating(), but a command only ever has the
-     * one Action phase to close out first (no render/unwinding steps of its
-     * own).
-     */
+    /** Marks the action → terminating boundary, on CommandFinished. */
     public function markCommandTerminating(): void
     {
         $this->transitionCommandStage(ExecutionStage::Terminating);
     }
 
-    /**
-     * Marks the terminating → end boundary — called from
-     * MonitorServiceProvider's whenCommandLifecycleIsLongerThan hook, the
-     * last thing the console kernel runs (after every terminating callback,
-     * including the app's own `terminating()` ones) before the process
-     * exits. Closes out whatever the Terminating phase's own duration
-     * turns out to be once that trailing work is included.
-     */
+    /** Marks the terminating → end boundary, from Hooks\CommandLifecycleEndHook. */
     public function markCommandEnd(): void
     {
         $this->transitionCommandStage(ExecutionStage::End);
     }
 
-    /**
-     * Move the running command to a new lifecycle stage, closing out the
-     * phase it was previously in — the command-side counterpart of
-     * transitionStage(), without the `$from` guard (nothing currently needs
-     * it: markCommandTerminating()/markCommandEnd() are each only ever
-     * called from one place, in a fixed order).
-     */
+    /** Move the running command to a new stage, closing out the previous phase. */
     protected function transitionCommandStage(ExecutionStage $stage): void
     {
         if ($this->command === null || $this->command->stage === $stage) {
@@ -708,12 +513,8 @@ class Monitor
     }
 
     /**
-     * Starts tracking a scheduled task run. Called by the ScheduledTasks
-     * recorder on ScheduledTaskStarting, before the task itself runs —
-     * everything a closure/`Schedule::call()` task triggers in-process picks
-     * up this id via record()'s request_id fallback. Also stamped onto
-     * Context so a command-based task's own subprocess can reference it —
-     * see SCHEDULED_TASK_CONTEXT_KEY.
+     * Starts tracking a scheduled task run (on ScheduledTaskStarting); the id
+     * is also put on Context for a command-based task's subprocess.
      */
     public function beginScheduledTaskRun(): void
     {
@@ -727,10 +528,7 @@ class Monitor
             'models' => 0,
         ];
 
-        // Context is Laravel 11+ only (this package supports 10-13) — on 10,
-        // a command-based task's subprocess simply won't correlate back to
-        // its parent scheduled_task entry (same as "no such correlation
-        // exists" elsewhere), rather than fatal on a missing class.
+        // Context is Laravel 11+; on 10 the subprocess just isn't linked back.
         if (class_exists(Context::class)) {
             Context::add(self::SCHEDULED_TASK_CONTEXT_KEY, $id);
         }
@@ -752,16 +550,8 @@ class Monitor
     }
 
     /**
-     * The scheduled-task-run id inherited from the parent scheduler process
-     * via Laravel's own Context dehydration/hydration, or null when running
-     * standalone (a manually-invoked command, or one running outside any
-     * scheduled task). Read by the Commands recorder on CommandStarting so a
-     * command-based task's own subprocess can stamp which scheduled task
-     * dispatched it into its own `command` entry's payload (see
-     * beginCommandRun()) — a reference for the dashboard to link the two
-     * runs together, not an id this run adopts as its own: everything this
-     * subprocess triggers happened after the scheduler already finished
-     * dispatching it, so it belongs on *this* run's own timeline instead.
+     * The scheduled task run id inherited via Context from the parent
+     * scheduler process, or null when the command runs standalone.
      */
     public function inheritedScheduledTaskRunId(): ?string
     {
@@ -775,21 +565,12 @@ class Monitor
     }
 
     /**
-     * Correlation id shared between a mail-channel notification's own entry
-     * and the `mail` entry its send produces, set while that channel's send
-     * is in flight (between `NotificationSending` and `NotificationSent`).
-     * One scalar is enough — same reasoning as CacheInteractions'
-     * `$startedAt`: Laravel dispatches a notification's channels
-     * sequentially within a single request/job, never concurrently, so
-     * nothing else can interleave and overwrite it mid-flight.
+     * Correlation id pairing a mail-channel notification with the `mail`
+     * entry it produces; set only while that send is in flight.
      */
     protected ?string $pendingNotificationCorrelationId = null;
 
-    /**
-     * Starts a new correlation window for a mail-channel notification about
-     * to be sent, returning the id both the Notifications and Mail
-     * recorders should stamp onto their respective entries.
-     */
+    /** Starts a correlation window for a mail-channel notification and returns its id. */
     public function beginNotificationDispatch(): string
     {
         return $this->pendingNotificationCorrelationId = (string) Str::uuid();
@@ -806,10 +587,7 @@ class Monitor
         $this->pendingNotificationCorrelationId = null;
     }
 
-    /**
-     * Count every query executed during the request, tracked independently
-     * of the Queries recorder's slow/fast tagging.
-     */
+    /** Count a query executed during the request, stored as the request's `query_count`. */
     public function incrementQueryCount(): void
     {
         if ($this->request !== null && $this->enabled()) {
@@ -822,13 +600,7 @@ class Monitor
         return $this->request?->queries ?? 0;
     }
 
-    /**
-     * Count every Eloquent model hydrated during the current request, job
-     * attempt or command run — mirrors incrementQueryCount(), but across
-     * whichever context is active (a job/command has no bootstrap/
-     * middleware phases of its own, so unlike queries it can't fall back to
-     * "outside a request means uncounted").
-     */
+    /** Count every Eloquent model hydrated in the active request, job attempt, scheduled task or command. */
     public function incrementModelCount(): void
     {
         if (! $this->enabled()) {
@@ -862,22 +634,8 @@ class Monitor
     }
 
     /**
-     * Milliseconds elapsed since the request started, to 3 decimal places
-     * (microsecond precision). Used wherever a recorded `duration` or
-     * `start_offset` is derived from wall-clock time, including lifecycle
-     * phase boundaries (bootstrap/middleware/...) — a whole-millisecond
-     * elapsedMs() would round phases shorter than 1ms (e.g. "sending") down
-     * to a reported 0ms. The round(x, 3) here isn't a premature
-     * display-rounding shortcut: microtime() and $this->request->timestamp
-     * are both ~1.7-billion-magnitude Unix epoch floats, so subtracting
-     * them is a textbook floating-point catastrophic cancellation — the
-     * large integer part eats into a double's ~15-17 significant digits, so
-     * what should be an exact "400" can come out as
-     * "400.00009536743164062500". Rounding to 3 decimals (microtime()'s own
-     * microsecond resolution — the true precision ceiling of this
-     * subtraction) snaps it back to the value it actually represents,
-     * before that noise reaches Support\Timeline or
-     * View\Components\Requests\Timeline's own percentage math.
+     * Milliseconds since the request started, at microsecond precision.
+     * round(x, 3) strips float noise from subtracting two epoch timestamps.
      */
     public function elapsedMsPrecise(): ?float
     {
@@ -888,25 +646,13 @@ class Monitor
         return max(0.0, round((microtime(true) - $this->request->timestamp) * 1000, 3));
     }
 
-    /**
-     * Marks the middleware → action (controller) boundary. Called from a
-     * closure middleware attached directly onto the matched route at
-     * RouteMatched time (see Hooks\ControllerStartHook), as the route's own
-     * last middleware entry — i.e. after every other route middleware's
-     * `handle()` has run, right before the controller.
-     */
+    /** Marks the middleware → action boundary, from the route's last middleware (Hooks\ControllerStartHook). */
     public function markControllerStart(): void
     {
         $this->transitionStage(ExecutionStage::Action, from: ExecutionStage::BeforeMiddleware);
     }
 
-    /**
-     * Marks the action (controller) → render boundary. Called on
-     * Illuminate\Routing\Events\PreparingResponse, dispatched by
-     * Router::prepareResponse() while still deep inside the route's own
-     * middleware pipeline (Route::run()'s Pipeline `then()` callback) —
-     * before bubbling back out through any middleware's post-`$next()` code.
-     */
+    /** Marks the action → render boundary, on PreparingResponse (still inside the route's middleware). */
     public function markRenderStart(mixed $event = null): void
     {
         if ($this->request !== null && $this->request->stage === ExecutionStage::Action) {
@@ -935,24 +681,15 @@ class Monitor
         return null;
     }
 
-    /**
-     * Marks the render → unwinding boundary. Called on
-     * Illuminate\Routing\Events\ResponsePrepared, dispatched immediately
-     * after PreparingResponse, once the Response object is finalized — from
-     * here on, only middleware's own post-`$next()` work remains (e.g.
-     * StartSession::handleStatefulRequest() persisting the session), which
-     * is genuinely "still middleware", not "still rendering".
-     */
+    /** Marks the render → after-middleware boundary, on ResponsePrepared. */
     public function markUnwinding(): void
     {
         $this->transitionStage(ExecutionStage::AfterMiddleware, from: ExecutionStage::Render);
     }
 
     /**
-     * Same boundary as markUnwinding(), but for a request an uncaught
-     * exception interrupted — PreparingResponse/ResponsePrepared never fire
-     * on that path, so without this the stage stays stuck wherever the
-     * exception hit. Only ever advances the stage, never backward.
+     * Advances to after-middleware when an uncaught exception skips the
+     * response events; never moves the stage backward.
      */
     public function markUnhandledException(): void
     {
@@ -972,15 +709,7 @@ class Monitor
         }
     }
 
-    /**
-     * Marks the point every middleware (route and global alike) has finished
-     * unwinding and the response is about to be sent. Called on
-     * Illuminate\Foundation\Http\Events\RequestHandled, which fires only
-     * after the *entire* middleware pipeline has returned — whatever stage
-     * the request is still in gets closed out here, not just 'render' or
-     * 'unwinding', so an early return/exception that skipped those still
-     * gets a sensible boundary instead of an open-ended phase.
-     */
+    /** Opens the sending phase on RequestHandled, closing whatever stage is still open. */
     public function markResponseReady(): void
     {
         $this->transitionStage(ExecutionStage::Sending);
@@ -992,31 +721,15 @@ class Monitor
         $this->transitionStage(ExecutionStage::Terminating);
     }
 
-    /**
-     * Marks the terminating → end boundary — called from
-     * MonitorServiceProvider's whenRequestLifecycleIsLongerThan hook, the
-     * very last thing the HTTP kernel runs (after every terminable
-     * middleware and the app's own `terminating()` callbacks) before
-     * control returns to the web server. Closes out whatever the
-     * Terminating phase's own duration turns out to be once that trailing
-     * work is included.
-     */
+    /** Marks the terminating → end boundary, from Hooks\RequestLifecycleEndHook. */
     public function markEnd(): void
     {
         $this->transitionStage(ExecutionStage::End);
     }
 
     /**
-     * Whether a request or command run currently owns its own end-of-
-     * lifecycle flush (see MonitorServiceProvider's
-     * whenRequestLifecycleIsLongerThan/whenCommandLifecycleIsLongerThan
-     * registration, which marks End then flushes) — the generic
-     * app->terminating() safety net (jobs and scheduled tasks flush
-     * explicitly per-attempt/per-run and never reach this at all) must skip
-     * flushing here when true, since the HTTP/console kernel always runs
-     * app->terminating() *before* those lifecycle hooks: flushing here too
-     * would persist the entry before End ever gets marked, making it dead
-     * on arrival.
+     * Whether a request or command run will flush from its own lifecycle-end
+     * hook, so the earlier app->terminating() flush must be skipped.
      */
     public function hasTrackedExecution(): bool
     {
@@ -1024,22 +737,10 @@ class Monitor
     }
 
     /**
-     * Move to a new lifecycle stage, closing out the phase the request was
-     * previously in. Replaces the old approach of recording a handful of
-     * independent timestamp markers and matching every entry's stored
-     * start_offset against them after the fact (still available as
-     * Support\Timeline::containingPhase(), kept only as a fallback for rows
-     * stored before this stage tag existed): that approach couldn't tell
-     * "still rendering the view" apart from "a middleware doing its own
-     * post-`$next()` work" — both looked identical (just elapsed time)
-     * once measured from outside. Tagging entries with the *live* stage at
-     * record() time (see `record()`) removes that ambiguity entirely.
+     * Move the request to a new lifecycle stage, closing out the previous phase.
      *
-     * @param  ?ExecutionStage  $from  if given, the transition is ignored
-     *                                 unless the request is currently in
-     *                                 this stage — guards against a
-     *                                 framework event firing out of order,
-     *                                 more than once, or not at all.
+     * @param  ?ExecutionStage  $from  if given, the transition only applies from this stage
+     *                                 (guards against events firing out of order or twice)
      */
     protected function transitionStage(ExecutionStage $stage, ?ExecutionStage $from = null): void
     {
@@ -1074,11 +775,8 @@ class Monitor
     }
 
     /**
-     * Complete the buffered root `request` entry right before it is stored:
-     * close out whichever stage the request was still in (mirroring every
-     * other stage transition), attach the collected phases and extend the
-     * duration to cover the full lifecycle, so the recorded request
-     * duration is the sum of every execution stage including Terminating.
+     * Complete the root `request` entry before storing: close the open stage,
+     * attach phases and counts, and extend duration to the full lifecycle.
      */
     protected function finalizePendingRequest(): void
     {
@@ -1106,13 +804,8 @@ class Monitor
     }
 
     /**
-     * Complete the buffered root `command` entry right before it is stored —
-     * mirrors finalizePendingRequest(): closes out whichever stage the
-     * command was still in (always 'terminating' in practice, since
-     * Commands::recordFinished() calls markCommandTerminating() just before
-     * recording this entry), attaches the collected phases and extends the
-     * duration to cover the full lifecycle (bootstrap through terminating),
-     * not just the action/handle() portion Commands.php itself measures.
+     * Complete the root `command` entry before storing, like
+     * finalizePendingRequest(): duration covers bootstrap through terminating.
      */
     protected function finalizePendingCommand(): void
     {
@@ -1129,21 +822,11 @@ class Monitor
         $this->recordCommandPhase($this->command->stage, $this->command->currentExecutionStageStartedAtMicrotime, $elapsed - $this->command->currentExecutionStageStartedAtMicrotime);
 
         $entry->payload['phases'] = $this->command->phases;
-        // The run's real start (LARAVEL_START), stamped the same way
-        // Recorders\Requests/Jobs stamp theirs — created_at is only stored
-        // at second precision and marks the run's *end*, so reconstructing
-        // "started at" from created_at - duration disagrees with this by up
-        // to a whole second (see Support\Format::startedAt()).
+        // created_at is second-precision and marks the end; see Support\Format::startedAt().
         $entry->payload['started_at'] = $this->command->timestamp;
 
-        // Only set for a command-based scheduled task's own subprocess (see
-        // beginCommandRun()'s $scheduledTaskRunId param) — the same
-        // correlation_id mechanism Recorders\Mail/Notifications use to pair
-        // their own two entries (see Contracts\TimelineStorage::findByCorrelationId()),
-        // reused here so CommandRunController can look up the dispatching
-        // scheduled_task entry to link to, and ScheduleRunController the
-        // reverse. Purely a cross-reference — this run's own timeline stays
-        // entirely its own regardless (see startOffsetFor()).
+        // Links a scheduled task's subprocess to its scheduled_task entry
+        // (and back) via findByCorrelationId().
         if ($this->command->scheduledTaskRunId !== null) {
             $entry->payload['correlation_id'] = $this->command->scheduledTaskRunId;
         }
@@ -1151,11 +834,7 @@ class Monitor
         $entry->duration = max($entry->duration ?? 0.0, $elapsed ?? 0.0);
     }
 
-    /**
-     * Persist all buffered entries through the configured storage driver.
-     * Recording is paused while flushing so the storage writes themselves
-     * (e.g. database queries) are never captured.
-     */
+    /** Persist all buffered entries; recording is paused so the writes aren't captured. */
     public function flush(): void
     {
         foreach ($this->flushingCallbacks as $callback) {
@@ -1177,10 +856,7 @@ class Monitor
         try {
             $this->storage()->store($entries);
         } catch (Throwable $e) {
-            // Monitoring must never take the application down, but a storage
-            // failure (e.g. schema drift after an update whose migration
-            // wasn't run) should still be diagnosable instead of silently
-            // dropping every entry — reported rather than swallowed outright.
+            // Never break the app, but keep storage failures diagnosable.
             $this->reportStorageFailure($e);
         } finally {
             $this->recording = true;

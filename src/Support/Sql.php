@@ -7,12 +7,8 @@ use Illuminate\Support\Collection;
 class Sql
 {
     /**
-     * Collapses placeholder-count variance out of a query's shape before
-     * it's used as a grouping key — an `IN (?, ?, ?)` filtering 3 ids and
-     * the same query filtering 30 otherwise look like unrelated queries
-     * and split the Queries page into one row per distinct list length.
-     * Same idea for a multi-row `INSERT ... VALUES (?,?), (?,?), ...`
-     * bulk insert: every batch size collapses to one representative row.
+     * Grouping key for a query: collapses `IN (?, ?, ...)` lists and multi-row
+     * `VALUES (?,?), (?,?), ...` so differing list/batch sizes group together.
      */
     public static function normalizeKey(string $sql): string
     {
@@ -28,9 +24,8 @@ class Sql
     }
 
     /**
-     * How many distinct normalized SQL shapes repeat among this
-     * request/job/command's own `query` rows (N+1 signal) — three rows
-     * sharing one shape count as one duplicate, not three.
+     * Number of query shapes (`key`) that occur more than once (N+1 signal);
+     * three rows sharing one shape count as one.
      *
      * @param  Collection<int, object>  $queryRows
      */

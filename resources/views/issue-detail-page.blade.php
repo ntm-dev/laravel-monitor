@@ -1,7 +1,6 @@
-{{-- Standalone Issue Detail page (route: monitor.issues.show). Shows the
-     full picture for one exception, or a compact summary for a
-     performance-threshold issue, plus a Manage panel (Status/Priority).
-     See Http\Controllers\IssueController. --}}
+{{-- Standalone Issue Detail page (route: monitor.issues.show, see
+     Http\Controllers\IssueController): exception or performance-threshold
+     details plus the Status/Priority panel. --}}
 <x-monitor::layout :title="'Issue #'.$issue->id">
     <div class="flex min-h-screen">
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="'issues'" :range="[]" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false"/>
@@ -36,12 +35,8 @@
                                 </dl>
                             </x-monitor::card>
 
-                            {{-- dark:bg-white/5, not /2: this app loads Tailwind via the
-                                 cdn.tailwindcss.com script, whose JIT only generates
-                                 color-opacity modifiers on the default scale
-                                 (0/5/10/20/25/...); `/2` silently compiled to nothing,
-                                 leaving this card stuck on its light-mode `bg-white`
-                                 regardless of theme. --}}
+                            {{-- Opacity modifiers must be on the default scale (0/5/10/20/25/...):
+                                 the CDN Tailwind JIT silently drops others like `/2`. --}}
                             <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
                                 <div class="flex flex-col gap-3 p-4 md:p-5"
                                      x-data="{ copied: false, copy() {

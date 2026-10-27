@@ -1,5 +1,5 @@
-{{-- First-run flow: shown only while monitor_users is empty. See
-     Http\Controllers\Auth\SetupController. --}}
+{{-- First-run flow, step 2: owner-account form, shown only while monitor_users is empty.
+     See Http\Controllers\Auth\SetupController. --}}
 <x-monitor::layout :title="__('monitor::messages.auth.set_up')">
     <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
         <div class="w-full max-w-sm">
