@@ -53,7 +53,7 @@ class Monitor
      * job can dispatch another synchronously; popping the inner attempt
      * restores the outer one as the correlation target.
      *
-     * @var list<array{id: string, start: float, models: int}>
+     * @var list<array{id: string, start: float, models: int, attempts: int}>
      */
     protected array $jobStack = [];
 
@@ -406,7 +406,7 @@ class Monitor
         array_pop($this->jobStack);
     }
 
-    /** @return array{id: string, start: float, models: int}|null */
+    /** @return array{id: string, start: float, models: int, attempts: int}|null */
     protected function currentJob(): ?array
     {
         return $this->jobStack === [] ? null : $this->jobStack[array_key_last($this->jobStack)];

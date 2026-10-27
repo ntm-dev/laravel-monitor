@@ -177,7 +177,7 @@ class Exceptions extends Recorder
      * Structured, Ignition-style frames — the call stack from the throw site
      * outward, each tagged as application or vendor code.
      *
-     * @return array<int, array{file: string, line: int, function: string|null, label: string, vendor: bool}>
+     * @return array<int, array{file: string, line: int, function: string|null, label: string, vendor: bool, args: list<string>}>
      */
     protected function frames(Throwable $exception): array
     {

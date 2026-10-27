@@ -82,7 +82,7 @@ trait SyncsOpenIssues
      * Keys of every PERFORMANCE_AREAS type whose max duration breached its
      * configured threshold, worst first.
      *
-     * @return Collection<int, object{type: string, badge: string, label: string, key: string, count: int, max_duration: float}>
+     * @return Collection<int, object{type: string, badge: string, tab: string, label: string, key: string, count: int, max_duration: float, last_seen: CarbonImmutable|null}>
      */
     protected function performanceIssues(AggregateStorage $aggregateStorage, DateTimeInterface $since, ?DateTimeInterface $until): Collection
     {
