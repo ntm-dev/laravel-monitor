@@ -119,6 +119,13 @@ jobs:
         run: |
           composer remove web-auth/webauthn-lib --dev --no-interaction --no-update
 
+      # prefer-lowest otherwise resolves autoloaded `files` with implicit-nullable
+      # params, which PHP 8.4+ reports as deprecations before PHPUnit boots.
+      - name: Set minimum PHP 8.4 versions
+        if: matrix.php >= 8.4
+        run: |
+          composer require "guzzlehttp/promises:^2.0.3" "psy/psysh:^0.12.1" "symfony/translation:^6.4.7|^7.0.7" --dev --no-interaction --no-update
+
       - name: Install dependencies
         run: |
           composer update --prefer-dist --no-interaction --no-progress --${{ matrix.stability }}
