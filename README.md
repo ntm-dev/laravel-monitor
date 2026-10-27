@@ -1,8 +1,8 @@
 # Laravel Monitor
 
-Local-first application monitoring for Laravel. Requests, queries, jobs, commands, scheduled tasks,
+Self-hosted application monitoring for Laravel. Requests, queries, jobs, commands, scheduled tasks,
 exceptions, cache, mail, notifications and outgoing HTTP are captured from framework events, stored
-in your own database, and browsed on a self-hosted Livewire dashboard. No external service, no
+in your own database, and browsed on a Livewire dashboard inside your app. No external service, no
 agent, no fee.
 
 ![Laravel Monitor dashboard](docs/screenshots/dashboard.png)
