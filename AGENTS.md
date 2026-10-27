@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## What this is
-Laravel package (`ntm-dev/laravel-monitor`): local-first monitoring
+Laravel package (`ntm-dev/laravel-monitor`): self-hosted monitoring
 dashboard (Livewire) for requests, queries, jobs, exceptions,
 cache, mail, etc. Package root is this repo; source (`autoload: LaravelMonitor\`) lives in `src/`.
 
