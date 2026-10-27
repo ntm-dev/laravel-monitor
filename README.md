@@ -5,6 +5,8 @@ exceptions, cache, mail, notifications and outgoing HTTP are captured from frame
 in your own database, and browsed on a self-hosted Livewire dashboard. No external service, no
 agent, no fee.
 
+![Laravel Monitor dashboard](docs/screenshots/dashboard.png)
+
 ## Features
 
 **Dashboard tabs**
@@ -33,6 +35,20 @@ violations for apps that already enable `Model::preventLazyLoading()`.
 Google / Apple sign-in.
 
 The UI ships in English and Vietnamese; each viewer picks language, theme and timezone.
+
+## Screenshots
+
+**Requests**: per-route counts, duration trend and thresholds
+
+![Requests page](docs/screenshots/requests.png)
+
+**Exceptions**: grouped by fingerprint, with an occurrence chart
+
+![Exceptions page](docs/screenshots/exceptions.png)
+
+**Exception detail**: summary and stack trace with source
+
+![Exception detail page](docs/screenshots/exception-detail.png)
 
 ## Requirements
 
