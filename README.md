@@ -42,6 +42,10 @@ The UI ships in English and Vietnamese; each viewer picks language, theme and ti
 
 ![Requests page](docs/screenshots/requests.png)
 
+**Request timeline**: every lifecycle phase with the queries, cache calls, HTTP calls, mail and notifications inside it, plus the queued job it dispatched
+
+![Request timeline](docs/screenshots/request-timeline.png)
+
 **Exceptions**: grouped by fingerprint, with an occurrence chart
 
 ![Exceptions page](docs/screenshots/exceptions.png)
