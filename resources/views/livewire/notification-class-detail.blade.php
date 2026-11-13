@@ -38,47 +38,49 @@
             @if ($entries->isEmpty())
                 <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_sends_recorded_in_period') }}</p>
             @else
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.notifiable') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.channel') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
-                            <th class="w-8 pb-2"></th>
-                        </tr>
-                    </thead>
-                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        @foreach ($entries as $entry)
-                            {{-- $sourceUrl: whatever triggered this send, if any; $sendUrl: this send's detail page. --}}
-                            @php
-                                $sourceUrl = $entry->sourceUrl;
-                                $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
-                            @endphp
-                            <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeUs($entry->created_at) }}</td>
-                                <td class="{{ $sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($sourceUrl) onclick="window.location='{{ $sourceUrl }}'" @endif>
-                                    <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$sourceUrl"/>
-                                </td>
-                                <td class="max-w-[16rem] truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['notifiable'] ?? '' }}">{{ $entry->payload['notifiable'] ?? '—' }}</td>
-                                <td class="py-2 pr-3">
-                                    <span class="rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">{{ $entry->subtype ?? '—' }}</span>
-                                </td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
-                                <td class="cursor-pointer py-2 pl-2 text-right" onclick="window.location='{{ $sendUrl }}'">
-                                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm"
-                                          data-tooltip="{{ __('monitor::messages.common.open_notification') }}">
-                                        <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
-                                    </span>
-                                </td>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.source') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.notifiable') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.channel') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
+                                <th class="w-8 pb-2"></th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            @foreach ($entries as $entry)
+                                {{-- $sourceUrl: whatever triggered this send, if any; $sendUrl: this send's detail page. --}}
+                                @php
+                                    $sourceUrl = $entry->sourceUrl;
+                                    $sendUrl = route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'id' => \LaravelMonitor\Support\EntryId::encode($entry->id)] + $range);
+                                @endphp
+                                <tr class="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ Format::datetimeUs($entry->created_at) }}</td>
+                                    <td class="{{ $sourceUrl ? 'cursor-pointer' : '' }} max-w-[16rem] py-2 pr-3" @if ($sourceUrl) onclick="window.location='{{ $sourceUrl }}'" @endif>
+                                        <x-monitor::exception-source-badge :type="$entry->sourceType" :label="$entry->sourceLabel" :url="$sourceUrl"/>
+                                    </td>
+                                    <td class="max-w-[16rem] truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['notifiable'] ?? '' }}">{{ $entry->payload['notifiable'] ?? '—' }}</td>
+                                    <td class="py-2 pr-3">
+                                        <span class="rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-tight text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">{{ $entry->subtype ?? '—' }}</span>
+                                    </td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->duration !== null ? $fmt($entry->duration) : '—' }}</td>
+                                    <td class="cursor-pointer py-2 pl-2 text-right" onclick="window.location='{{ $sendUrl }}'">
+                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm"
+                                              data-tooltip="{{ __('monitor::messages.common.open_notification') }}">
+                                            <x-monitor::icon :path="Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
+                        </tbody>
+                    </table>
+                </div>
 
                 @if ($lastPage > 1)
                     <x-monitor::pagination :page="$page" :last-page="$lastPage"

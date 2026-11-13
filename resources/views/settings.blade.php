@@ -63,7 +63,7 @@
                                     class="flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium"
                                     :class="theme === '{{ $value }}'
                                         ?
-                                        'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' :
+                                        'monitor-glass-pill text-neutral-900 dark:text-neutral-100' :
                                         'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'">
                                     <input type="radio" name="theme" value="{{ $value }}" class="sr-only"
                                         @checked($prefs['theme'] === $value)>
@@ -498,7 +498,7 @@
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                 <div x-data="{ phrase: '', get matches() { return this.phrase.trim() === @js(\LaravelMonitor\Support\Settings::DISABLE_CONFIRMATION) } }"
                     x-init="$watch('confirmingDisable', open => { phrase = ''; open && $nextTick(() => $refs.disablePhrase.focus()) })"
-                    class="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+                    class="monitor-glass-strong max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border p-5">
                     <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.settings.disable_title') }}</h3>
 
                     <ul class="mt-3 list-inside list-disc space-y-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400">

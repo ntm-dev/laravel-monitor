@@ -24,9 +24,9 @@
                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::REQUESTS" class="h-4 w-4 text-blue-600 dark:text-blue-400"/>
                 <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalEntries) }} {{ trans_choice('monitor::messages.common.request_count', $totalEntries) }}</h2>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <x-monitor::duration-filter :active="$durationFilter" :counts="$durationFilterCounts"/>
-                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
+                <div class="flex h-8 items-center gap-0.5 rounded-lg border monitor-glass-control p-0.5 text-xs">
                     @foreach ([
                         'all' => ['label' => __('monitor::messages.common.view_all'), 'badge' => 'bg-neutral-200/80 dark:bg-neutral-500/80 text-neutral-600 dark:text-neutral-300'],
                         'ok' => ['label' => __('monitor::messages.common.ok_status'), 'badge' => 'bg-green-600 dark:border-green-500 dark:bg-green-600 text-white dark:text-white'],
@@ -37,8 +37,8 @@
                                 wire:loading.attr="disabled" wire:target="setStatusFilter('{{ $filterKey }}')"
                                 @class([
                                     'flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 transition-colors',
-                                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $statusFilter === $filterKey,
-                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $statusFilter !== $filterKey,
+                                    'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $statusFilter === $filterKey,
+                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-white/5' => $statusFilter !== $filterKey,
                                 ])>
                             {{ $filter['label'] }}
                             <span class="rounded {{ $filter['badge'] }} px-1.5 font-mono text-[10px]">{{ $statusFilterCounts[$filterKey] }}</span>
@@ -55,43 +55,45 @@
             @if ($entries->isEmpty())
                 <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_individual_requests_recorded_in_period') }}</p>
             @else
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.method') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.details') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.status') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        @foreach ($entries as $entry)
-                            {{-- Keep as one php block: 3+ stacked inline ones corrupt
-                                 (see resources/views/CLAUDE.md). --}}
-                            @php
-                                $status = (int) ($entry->payload['response']['status'] ?? 0);
-                                $detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'requestId' => $entry->request_id]) : null;
-                            @endphp
-                            <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
-                                <td class="py-2 pr-3 font-mono text-xs">
-                                    @if ($detailUrl)
-                                        <a href="{{ $detailUrl }}" class="text-neutral-700 hover:underline dark:text-neutral-200" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</a>
-                                    @else
-                                        <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</span>
-                                    @endif
-                                </td>
-                                <td class="py-2 pr-3 font-mono text-xs font-bold uppercase tracking-tight {{ \LaravelMonitor\Support\Format::httpMethodClass($entry->payload['request']['method'] ?? null) }}">{{ $entry->payload['request']['method'] ?? '—' }}</td>
-                                <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['request']['path'] ?? '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs font-bold {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs {{ ($entry->duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.method') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.details') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.status') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="5" :rows="count($entries)"/>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            @foreach ($entries as $entry)
+                                {{-- Keep as one php block: 3+ stacked inline ones corrupt
+                                     (see resources/views/CLAUDE.md). --}}
+                                @php
+                                    $status = (int) ($entry->payload['response']['status'] ?? 0);
+                                    $detailUrl = ($entry->request_id ?? null) ? route('monitor.requests.routes.request', ['hash' => \LaravelMonitor\Support\KeyHash::for($key), 'requestId' => $entry->request_id]) : null;
+                                @endphp
+                                <tr @if ($detailUrl) onclick="window.location='{{ $detailUrl }}'" class="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @else class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50" @endif>
+                                    <td class="py-2 pr-3 font-mono text-xs">
+                                        @if ($detailUrl)
+                                            <a href="{{ $detailUrl }}" class="text-neutral-700 hover:underline dark:text-neutral-200" onclick="event.stopPropagation()">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</a>
+                                        @else
+                                            <span class="text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-2 pr-3 font-mono text-xs font-bold uppercase tracking-tight {{ \LaravelMonitor\Support\Format::httpMethodClass($entry->payload['request']['method'] ?? null) }}">{{ $entry->payload['request']['method'] ?? '—' }}</td>
+                                    <td class="max-w-[18rem] truncate py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['request']['path'] ?? '—' }}</td>
+                                    <td class="py-2 text-right font-mono text-xs font-bold {{ $status >= 500 ? 'text-rose-600 dark:text-rose-400' : ($status >= 400 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400') }}">{{ $status ?: '—' }}</td>
+                                    <td class="py-2 text-right font-mono text-xs {{ ($entry->duration ?? 0) >= $threshold ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $fmt($entry->duration) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <x-monitor::table-skeleton :columns="5" :rows="count($entries)"/>
+                        </tbody>
+                    </table>
+                </div>
 
                 @if ($lastPage > 1)
                     <x-monitor::pagination :page="$page" :last-page="$lastPage"

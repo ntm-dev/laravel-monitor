@@ -4,7 +4,7 @@
 
     $fmt = fn ($ms) => Format::duration($ms);
     $glitch = collect(range(1, 60))->map(fn ($i) => strtoupper(base_convert(md5('monitor'.$i), 16, 36)))->implode(' ');
-    $actionButton = 'shrink-0 whitespace-nowrap rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
+    $actionButton = 'shrink-0 whitespace-nowrap rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50 hover:text-neutral-900 dark:hover:text-neutral-100';
     $pagePairs = $view === 'exceptions'
         ? $exceptions->map(fn ($e) => ['exception', $e->key])->values()
         : $performance->map(fn ($item) => [$item->issue_type, $item->key])->values();
@@ -32,13 +32,13 @@
         selectedText: {{ Js::from(__('monitor::messages.issue.selected')) }},
      }">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800">
+        <div class="flex h-9 items-center gap-0.5 rounded-lg border monitor-glass-control p-0.5">
             @foreach (['exceptions' => [__('monitor::messages.nav.exceptions'), $exceptionCount], 'performance' => [__('monitor::messages.issue.performance'), $performanceCount]] as $issueTab => [$issueLabel, $issueCount])
                 <button type="button" wire:click="$set('view', '{{ $issueTab }}')" @click="clear()"
                         @class([
                             'flex h-full items-center gap-2 rounded-md px-3 text-sm transition-colors',
-                            'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $view === $issueTab,
-                            'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $view !== $issueTab,
+                            'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $view === $issueTab,
+                            'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-white/5' => $view !== $issueTab,
                         ])>
                     {{ $issueLabel }}
                     <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[11px] text-neutral-600 dark:text-neutral-300">{{ $issueCount }}</span>
@@ -46,19 +46,19 @@
             @endforeach
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <div class="relative">
                 <x-monitor::icon :path="Icons::SEARCH" class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
                 <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search') }}"
-                       class="h-9 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-3 text-sm text-neutral-700 dark:text-neutral-200 shadow-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none">
+                       class="h-9 w-52 rounded-lg border monitor-glass-control pl-8 pr-3 text-sm text-neutral-700 dark:text-neutral-200 shadow-sm placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none">
             </div>
-            <div class="flex h-9 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-sm dark:border-neutral-700/50 dark:bg-neutral-800">
+            <div class="flex h-9 items-center gap-0.5 rounded-lg border monitor-glass-control p-0.5 text-sm">
                 @foreach (['open' => __('monitor::messages.issue.status_open'), 'resolved' => __('monitor::messages.issue.status_resolved'), 'ignored' => __('monitor::messages.issue.status_ignored')] as $statusKey => $statusLabel)
                     <button type="button" wire:click="$set('status', '{{ $statusKey }}')" @click="clear()"
                             @class([
                                 'flex h-full items-center gap-2 rounded-md px-3 transition-colors',
-                                'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $status === $statusKey,
-                                'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $status !== $statusKey,
+                                'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $status === $statusKey,
+                                'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-white/5' => $status !== $statusKey,
                             ])>
                         {{ $statusLabel }}
                         @if ($statusKey === 'open' && $openIssueCount > 0)

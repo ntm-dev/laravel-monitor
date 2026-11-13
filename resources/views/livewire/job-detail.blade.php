@@ -27,51 +27,53 @@
             @if ($entries->isEmpty())
                 <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_job_runs_recorded_in_period') }}</p>
             @else
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.queue') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.attempts') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
-                            <th class="w-8 pb-2"></th>
-                        </tr>
-                    </thead>
-                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        @foreach ($entries as $entry)
-                            {{-- Every row but 'queued' has its own attempt id (Monitor::beginJobAttempt()
-                                 at JobProcessing); a queued row's request_id is its dispatcher's. --}}
-                            @php($attemptUrl = ($entry->request_id ?? null) && $entry->subtype !== 'queued' ? route('monitor.jobs.attempts.show', $entry->request_id) : null)
-                            <tr class="{{ $attemptUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                @if ($attemptUrl) onclick="window.location='{{ $attemptUrl }}'" @endif>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</td>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['queue'] ?? 'default' }}</td>
-                                <td class="py-2 pr-3">
-                                    <span @class([
-                                        'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                                        'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'processed',
-                                        'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' => $entry->subtype === 'queued',
-                                        'border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' => $entry->subtype === 'released',
-                                        'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
-                                    ])>{{ $entry->subtype }}</span>
-                                </td>
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ __('monitor::messages.common.attempt_count') }}">{{ $entry->payload['attempts'] ?? '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
-                                <td class="py-2 pl-2 text-right">
-                                    @if ($attemptUrl)
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
-                                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
-                                        </span>
-                                    @endif
-                                </td>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.date') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.queue') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.attempts') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
+                                <th class="w-8 pb-2"></th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            @foreach ($entries as $entry)
+                                {{-- Every row but 'queued' has its own attempt id (Monitor::beginJobAttempt()
+                                     at JobProcessing); a queued row's request_id is its dispatcher's. --}}
+                                @php($attemptUrl = ($entry->request_id ?? null) && $entry->subtype !== 'queued' ? route('monitor.jobs.attempts.show', $entry->request_id) : null)
+                                <tr class="{{ $attemptUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                                    @if ($attemptUrl) onclick="window.location='{{ $attemptUrl }}'" @endif>
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ \LaravelMonitor\Support\Format::datetimeUs($entry->created_at) }}</td>
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['queue'] ?? 'default' }}</td>
+                                    <td class="py-2 pr-3">
+                                        <span @class([
+                                            'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
+                                            'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'processed',
+                                            'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' => $entry->subtype === 'queued',
+                                            'border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' => $entry->subtype === 'released',
+                                            'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
+                                        ])>{{ $entry->subtype }}</span>
+                                    </td>
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-600 dark:text-neutral-300" data-tooltip="{{ __('monitor::messages.common.attempt_count') }}">{{ $entry->payload['attempts'] ?? '—' }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
+                                    <td class="py-2 pl-2 text-right">
+                                        @if ($attemptUrl)
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 group-hover:shadow-sm">
+                                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
+                        </tbody>
+                    </table>
+                </div>
 
                 @if ($lastPage > 1)
                     <x-monitor::pagination :page="$page" :last-page="$lastPage"

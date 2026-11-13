@@ -21,7 +21,7 @@
     <x-monitor::section>
         <x-slot:actions>
             <div class="flex items-center gap-2">
-                <select wire:model.live="connection" class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                <select wire:model.live="connection" class="h-8 rounded-md border monitor-glass-control px-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
                     <option value="">{{ __('monitor::messages.common.all_connections') }}</option>
                     @foreach ($connections as $conn)
                         <option value="{{ $conn }}">{{ $conn }}</option>
@@ -52,11 +52,11 @@
         {{-- Query table --}}
         <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalQueries) }} {{ trans_choice('monitor::messages.common.query_count', $totalQueries) }}</h3>
-            <div class="flex items-center gap-2">
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <div class="relative">
                     <x-monitor::icon :path="Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_queries') }}"
-                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                           class="h-8 w-56 rounded-md border monitor-glass-control pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
                 </div>
                 <x-monitor::duration-filter :active="$durationFilter" :counts="$durationFilterCounts"/>
             </div>

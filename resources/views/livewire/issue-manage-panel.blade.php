@@ -1,6 +1,6 @@
 {{-- Status + Priority controls for issue-detail-page.blade.php. Livewire actions
      (not a POST form), so a change re-renders only this panel. --}}
-<div class="rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+<div class="monitor-glass rounded-lg border">
     <p class="border-b border-neutral-100 dark:border-neutral-800 px-4 py-3 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.manage') }}</p>
 
     <div class="space-y-4 p-4">
@@ -23,7 +23,7 @@
         <div>
             <label for="priority" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.issue.priority') }}</label>
             <select name="priority" id="priority" wire:change="setPriority($event.target.value)"
-                    class="mt-2 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-700 dark:text-neutral-200 focus:outline-none">
+                    class="mt-2 w-full rounded-md border monitor-glass-control px-2 py-1.5 text-sm text-neutral-700 dark:text-neutral-200 focus:outline-none">
                 @foreach ($priorities as $value => $label)
                     <option value="{{ $value }}" @selected($issue->priority === $value)>{{ $label }}</option>
                 @endforeach

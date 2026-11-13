@@ -41,17 +41,17 @@
                     <div class="mt-5 relative{{ $slowRouteCount > 3 ? ' pb-2' : '' }}">
                         @if ($slowRouteCount > 3)
                             {{-- start stacked-card peek effect: one card tucked behind the last route row, hinting at more hidden below it --}}
-                            <div class="absolute inset-x-2 bottom-0 h-2 rounded-b-lg border border-neutral-200 dark:border-neutral-700/70 bg-neutral-100 dark:bg-neutral-800/60"></div>
+                            <div class="absolute inset-x-2 bottom-0 h-2 rounded-b-lg border border-neutral-900/5 dark:border-white/10 bg-white/30 dark:bg-white/[0.03]"></div>
                             {{-- end stacked-card peek effect: one card tucked behind the last route row, hinting at more hidden below it --}}
                         @endif
                         <div class="relative z-10 space-y-2">
                             @foreach ($slowRoutes as $route)
                                 <a href="{{ route('monitor.requests.routes.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($route->key)] + $range) }}"
                                    class="flex items-center justify-between gap-3 rounded-lg border
-                                   border-neutral-200 dark:border-neutral-700 bg-white
-                                   dark:bg-neutral-800/50 p-3 transition-transform duration-200
+                                   border-neutral-900/5 dark:border-white/10 bg-white/40
+                                   dark:bg-white/[0.04] p-3 transition-transform duration-200
                                    ease-out hover:scale-105 hover:border-neutral-300
-                                   dark:hover:border-neutral-700 hover:bg-white
+                                   dark:hover:border-white/20 hover:bg-white/80 dark:hover:bg-white/[0.08]
                                    hover:shadow-xl shadow-md shadow-black/5 dark:shadow-white/5"
                                 >
                                     <span class="min-w-0">

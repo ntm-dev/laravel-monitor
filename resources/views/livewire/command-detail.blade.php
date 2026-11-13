@@ -41,50 +41,52 @@
             @if ($entries->isEmpty())
                 <p class="py-6 text-center text-sm text-neutral-400 dark:text-neutral-500">{{ __('monitor::messages.common.no_runs_recorded_in_period') }}</p>
             @else
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.command') }}</th>
-                            <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.exit_code') }}</th>
-                            <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
-                            <th class="w-8 pb-2"></th>
-                        </tr>
-                    </thead>
-                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        @foreach ($entries as $entry)
-                            @php($runUrl = ($entry->request_id ?? null) ? route('monitor.commands.runs.show', $entry->request_id) : null)
-                            <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
-                                @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
-                                {{-- The run's start, not created_at (stamped when it finishes). --}}
-                                <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }}</td>
-                                {{-- Bare command name when no arguments were captured, same as
-                                     command-run-page.blade.php's $invocation. --}}
-                                <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['command'] ?? $entry->key }}">{{ $entry->payload['command'] ?? $entry->key }}</td>
-                                <td class="py-2 pr-3">
-                                    <span @class([
-                                        'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                                        'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'success',
-                                        'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
-                                    ])>{{ $entry->subtype }}</span>
-                                </td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['exit_code'] ?? '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
-                                <td class="py-2 pl-2 text-right">
-                                    @if ($runUrl)
-                                        <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
-                                            <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
-                                        </span>
-                                    @endif
-                                </td>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.command.started_at') }} <span class="text-neutral-300 dark:text-neutral-600">{{ $tz }}</span></th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.command') }}</th>
+                                <th class="pb-2 font-normal">{{ __('monitor::messages.common.status') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.exit_code') }}</th>
+                                <th class="pb-2 text-right font-normal">{{ __('monitor::messages.common.duration') }}</th>
+                                <th class="w-8 pb-2"></th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            @foreach ($entries as $entry)
+                                @php($runUrl = ($entry->request_id ?? null) ? route('monitor.commands.runs.show', $entry->request_id) : null)
+                                <tr class="{{ $runUrl ? 'group cursor-pointer' : '' }} hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                                    @if ($runUrl) onclick="window.location='{{ $runUrl }}'" @endif>
+                                    {{-- The run's start, not created_at (stamped when it finishes). --}}
+                                    <td class="py-2 pr-3 font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $startedAt($entry) }}</td>
+                                    {{-- Bare command name when no arguments were captured, same as
+                                         command-run-page.blade.php's $invocation. --}}
+                                    <td class="max-w-xs truncate py-2 pr-3 font-mono text-xs text-neutral-500 dark:text-neutral-400" data-tooltip="{{ $entry->payload['command'] ?? $entry->key }}">{{ $entry->payload['command'] ?? $entry->key }}</td>
+                                    <td class="py-2 pr-3">
+                                        <span @class([
+                                            'rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase',
+                                            'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $entry->subtype === 'success',
+                                            'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' => $entry->subtype === 'failed',
+                                        ])>{{ $entry->subtype }}</span>
+                                    </td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $entry->payload['exit_code'] ?? '—' }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ $fmt($entry->duration) }}</td>
+                                    <td class="py-2 pl-2 text-right">
+                                        @if ($runUrl)
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md border border-transparent text-neutral-300 dark:text-neutral-600 group-hover:border-neutral-200 dark:group-hover:border-neutral-700 group-hover:bg-white dark:group-hover:bg-neutral-900 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 group-hover:shadow-sm">
+                                                <x-monitor::icon :path="\LaravelMonitor\Support\Icons::ARROW_UP_RIGHT" :stroke="2" class="h-3 w-3"/>
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <x-monitor::table-skeleton :columns="6" :rows="count($entries)"/>
+                        </tbody>
+                    </table>
+                </div>
 
                 @if ($lastPage > 1)
                     <x-monitor::pagination :page="$page" :last-page="$lastPage"

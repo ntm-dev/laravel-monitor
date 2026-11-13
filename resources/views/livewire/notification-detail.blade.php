@@ -41,7 +41,7 @@
                 </dl>
             </div>
 
-            <div class="flex flex-col justify-between gap-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900 md:w-1/2">
+            <div class="flex flex-col justify-between gap-4 monitor-glass rounded-lg border p-4 md:w-1/2">
                 <div>
                     <h3 class="pb-3 font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.notification_class') }}</h3>
                     <p class="break-all font-mono text-xs text-neutral-700 dark:text-neutral-200">{{ $entry->payload['notification'] ?? $entry->key }}</p>

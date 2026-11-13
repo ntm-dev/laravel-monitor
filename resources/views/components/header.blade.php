@@ -13,8 +13,10 @@
     // e.g. "Asia/Ho Chi Minh (UTC+7)", same format as Preferences::timezoneOptions().
     $timezoneLabel = str_replace('_', ' ', $timezoneIdentifier).' ('.\LaravelMonitor\Support\Preferences::formatOffset($timezoneOffsetSeconds).')';
 @endphp
-<header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
-    <div class="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-5 md:px-8">
+{{-- The transparent gutter around the glass bar lets clicks through to content scrolled beneath it. --}}
+<header class="pointer-events-none sticky top-0 z-10 px-4 pb-4 pt-3 md:px-8">
+    <div class="pointer-events-auto mx-auto w-full max-w-[1600px] rounded-3xl border monitor-glass-liquid">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 md:flex-nowrap md:px-5">
         @if ($detail !== null)
             <div class="min-w-0">
                 <nav class="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -93,12 +95,12 @@
             })();
         </script>
         {{-- end period session memory --}}
-        <div class="flex h-8 shrink-0 items-center gap-0.5 rounded-lg border border-neutral-200 bg-white p-0.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex h-9 shrink-0 items-center gap-0.5 rounded-full border monitor-glass-control p-1">
             @foreach ($periods as $value)
                 <a href="{{ route($currentRouteName, $currentRouteParams + array_filter(['period' => $value])) }}"
                    @class([
-                       'flex h-full min-w-8 items-center justify-center rounded-md border px-2.5 font-mono text-xs',
-                       'border-blue-500 bg-blue-600 text-white' => ! $hasCustomRange && $period === $value,
+                       'flex h-full min-w-8 items-center justify-center rounded-full border px-2.5 font-mono text-xs transition-colors',
+                       'border-blue-400/60 bg-blue-600 text-white shadow-[0_4px_12px_-4px_rgb(37_99_235/.6),inset_0_1px_0_rgb(255_255_255/.35)]' => ! $hasCustomRange && $period === $value,
                        'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100' => $hasCustomRange || $period !== $value,
                    ])>{{ strtoupper($value) }}</a>
             @endforeach
@@ -112,16 +114,17 @@
     </div>
 
     {{-- Mobile navigation --}}
-    <nav class="flex gap-1 overflow-x-auto px-4 pb-2 text-xs md:hidden">
+    <nav class="flex gap-1 overflow-x-auto px-4 pb-2 text-xs [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
         @foreach ($groups as $items)
             @foreach ($items as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
                    @class([
-                       'shrink-0 rounded-md border px-2.5 py-1.5',
-                       'border-neutral-200 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100' => $tab === $tabKey,
+                       'shrink-0 rounded-full border px-3 py-1.5',
+                       'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $tab === $tabKey,
                        'border-transparent text-neutral-500 dark:text-neutral-400' => $tab !== $tabKey,
                    ])>{{ $item['label'] }}</a>
             @endforeach
         @endforeach
     </nav>
+    </div>
 </header>

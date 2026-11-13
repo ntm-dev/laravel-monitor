@@ -31,7 +31,9 @@
             document.documentElement.setAttribute('data-nav-collapsed', '1');
         }
     </script>
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
     {{-- window.sqlFormatter.format(), used by timeline-script.blade.php's sqlHighlighted(). --}}
@@ -45,8 +47,8 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['InterVariable', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-                        mono: ['"CommitMono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+                        sans: ['"Fira Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        mono: ['"Fira Code"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
                     },
                     boxShadow: {
                         'top-sm': '0 -1px 2px 0 rgb(0 0 0 / 0.05)',
@@ -59,6 +61,7 @@
             },
         };
     </script>
+    <x-monitor::glass-theme/>
     <style>[x-cloak] { display: none !important; }</style>
     {{-- Dark-mode overrides for the light highlight.js theme, plus themed scrollbars. --}}
     <style>
@@ -159,7 +162,7 @@
             82% { transform: translateY(-5px); animation-timing-function: cubic-bezier(.4, 0, 1, 1); }
         }
         .monitor-bounce-once {
-            animation: monitor-bounce-once 1s both;
+            animation: monitor-bounce-once 1s;
         }
         @media (prefers-reduced-motion: reduce) {
             .monitor-bounce-once { animation: none; }
@@ -194,7 +197,9 @@
     </style>
     @livewireStyles
 </head>
-<body class="min-h-screen bg-neutral-50 font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
+<body class="min-h-screen bg-[#dfe7f3] font-sans text-neutral-900 antialiased dark:bg-[#060a14] dark:text-neutral-100">
+    <div class="monitor-aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
     {{ $slot }}
 
     <x-monitor::toast-container/>

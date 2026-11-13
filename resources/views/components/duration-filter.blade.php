@@ -1,6 +1,7 @@
 {{-- start duration filter tabs --}}
+{{-- Scrolls sideways on narrow screens only: overflow would also clip the selected pill's shadow. --}}
 @props(['active', 'counts'])
-<div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 text-xs dark:border-neutral-700/50 dark:bg-neutral-800">
+<div class="flex h-8 items-center gap-0.5 rounded-lg border monitor-glass-control p-0.5 text-xs max-md:max-w-full max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
     @foreach ([
         'all' => __('monitor::messages.common.view_all'),
         'avg' => '≥ '.__('monitor::messages.common.avg'),
@@ -11,8 +12,8 @@
                 wire:loading.attr="disabled" wire:target="setDurationFilter('{{ $filterKey }}')"
                 @class([
                     'flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 transition-colors',
-                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $active === $filterKey,
-                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $active !== $filterKey,
+                    'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $active === $filterKey,
+                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-white/5' => $active !== $filterKey,
                 ])>
             {{ $filterLabel }}
             <span class="rounded bg-neutral-200/80 dark:bg-neutral-700/80 px-1.5 font-mono text-[10px] text-neutral-600 dark:text-neutral-300">{{ $counts[$filterKey] }}</span>

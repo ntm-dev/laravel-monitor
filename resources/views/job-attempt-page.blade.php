@@ -16,8 +16,8 @@
         <x-monitor::navigation :groups="$groups" :footer-tabs="$footerTabs" :tab="$tab" :range="$range" :refresh="$refresh" :app-initial="$appInitial" :auto-refreshes="false"/>
 
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="sticky top-0 z-10 bg-neutral-50/80 backdrop-blur dark:bg-neutral-950/80">
-                <div class="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-8">
+            <header class="pointer-events-none sticky top-0 z-10 px-4 pb-4 pt-3 md:px-8">
+                <div class="pointer-events-auto mx-auto w-full max-w-[1600px] rounded-3xl border monitor-glass-liquid px-4 py-3 md:px-5">
                     <a href="{{ route('monitor.dashboard', ['tab' => 'jobs'] + $range) }}"
                        class="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
                         ← {{ __('monitor::messages.nav.jobs') }}

@@ -22,21 +22,21 @@
         {{-- Grouped exception table --}}
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
             <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ number_format($totalGroups) }} {{ trans_choice('monitor::messages.common.exception_count', $totalGroups) }}</h3>
-            <div class="flex items-center gap-2">
-                <div class="flex h-8 items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-200/40 p-0.5 dark:border-neutral-700/50 dark:bg-neutral-800">
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="flex h-8 items-center gap-0.5 rounded-lg border monitor-glass-control p-0.5">
                     @foreach ($filters as $value => $label)
                         <button type="button" wire:click="setStatus('{{ $value }}')"
                                 @class([
                                     'flex h-full items-center rounded-md px-2.5 text-xs font-medium transition-colors',
-                                    'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-neutral-100' => $status === $value,
-                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-neutral-900/20' => $status !== $value,
+                                    'monitor-glass-pill text-neutral-900 dark:text-neutral-100' => $status === $value,
+                                    'text-neutral-600 hover:bg-neutral-200/20 dark:text-neutral-400 dark:hover:bg-white/5' => $status !== $value,
                                 ])>{{ $label }}</button>
                     @endforeach
                 </div>
                 <div class="relative">
                     <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SEARCH" :stroke="1.8" class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"/>
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('monitor::messages.common.search_exceptions') }}"
-                           class="h-8 w-56 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
+                           class="h-8 w-56 rounded-md border monitor-glass-control pl-8 pr-2 text-xs text-neutral-600 dark:text-neutral-300 shadow-sm focus:outline-none">
                 </div>
             </div>
         </div>

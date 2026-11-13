@@ -23,7 +23,7 @@
     <template x-teleport="body">
         <div x-show="open" x-cloak @click.outside="open = false"
              :style="`top: ${top}px; left: ${left}px;`"
-             class="fixed z-30 w-40 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+             class="monitor-glass-strong fixed z-30 w-40 rounded-lg border py-1">
             @foreach ($levels as $level)
                 <button type="button" @click="open = false"
                         @if ($priority !== $level) wire:click="setPriority({{ Js::from($type) }}, {{ Js::from($issueKey) }}, {{ Js::from($level) }})" @endif

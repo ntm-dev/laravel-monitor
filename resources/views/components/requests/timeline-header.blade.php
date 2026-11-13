@@ -1,7 +1,7 @@
 {{-- Sticky header: title/zoom slider over the tree pane, ruler over the chart pane. z-20 keeps it
      above the sticky bar labels; its top offset comes from measureHeaderOffsets(). --}}
 <div x-ref="stickyHeader" :style="'top: ' + pageHeaderOffset + 'px'"
-    class="sticky z-20 flex items-stretch divide-x divide-neutral-200 border-b border-neutral-100 bg-white dark:divide-neutral-800 dark:border-neutral-800 dark:bg-neutral-900">
+    class="sticky z-20 flex items-stretch divide-x divide-neutral-200 border-b monitor-glass-strong dark:divide-neutral-800">
     <div class="flex w-1/5 max-w-[250px] shrink-0 items-center justify-between gap-3 px-4 py-3">
         <h2 class="font-semibold text-neutral-900 dark:text-neutral-100">{{ __('monitor::messages.common.timeline') }}</h2>
         <div class="flex items-center gap-1.5">

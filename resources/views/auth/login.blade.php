@@ -1,13 +1,15 @@
 {{-- Sign-in page. See Http\Controllers\Auth\LoginController. --}}
 <x-monitor::layout :title="__('monitor::messages.auth.sign_in')">
-    <div class="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
+    <div class="flex min-h-screen items-center justify-center px-4">
         <div class="w-full max-w-sm">
             <div class="monitor-rotational-wave mb-6 flex items-center justify-center gap-2.5">
                 <span class="flex h-9 w-9 items-center justify-center rounded-md bg-neutral-900 text-sm font-semibold text-white dark:bg-neutral-700">{{ strtoupper(mb_substr(config('app.name', 'L'), 0, 1)) }}</span>
                 <span class="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{{ config('app.name', 'Laravel') }} Monitor</span>
             </div>
 
-            <div class="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 monitor-bounce-once">
+            {{-- Bounce on a wrapper: a transform on the card itself would make it a stacking context mid-animation. --}}
+            <div class="monitor-bounce-once">
+            <div class="rounded-lg monitor-glass border p-6">
                 <h1 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 monitor-rotational-wave">{{ __('monitor::messages.auth.sign_in') }}</h1>
                 <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400 monitor-rotational-wave">{{ __('monitor::messages.auth.sign_in_hint') }}</p>
 
@@ -22,12 +24,12 @@
                     <div class="monitor-rotational-wave">
                         <label for="login" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.email_or_username') }}</label>
                         <input type="text" name="login" id="login" value="{{ old('login') }}" required autofocus autocomplete="username"
-                               class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+                               class="mt-1 w-full rounded-md border monitor-glass-control px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-neutral-100">
                     </div>
                     <div class="monitor-rotational-wave">
                         <label for="password" class="block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.auth.password') }}</label>
                         <input type="password" name="password" id="password" required
-                               class="mt-1 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+                               class="mt-1 w-full rounded-md border monitor-glass-control px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-neutral-100">
                     </div>
                     <button type="submit" class="w-full rounded-md bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-500 monitor-rotational-wave">{{ __('monitor::messages.auth.sign_in') }}</button>
                 </form>
@@ -113,6 +115,7 @@
                 <p class="mt-3 text-center text-sm text-neutral-500 dark:text-neutral-400 monitor-rotational-wave">
                     <a href="{{ route('monitor.password.request') }}" class="text-blue-600 hover:underline dark:text-blue-400">Forgot your password?</a>
                 </p>
+            </div>
             </div>
         </div>
     </div>

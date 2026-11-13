@@ -7,7 +7,7 @@
     <span>{{ $label }}</span>
     <div class="flex items-center gap-1.5">
         <button type="button" wire:click="previousPage" wire:loading.attr="disabled" wire:target="previousPage,nextPage" @disabled($page <= 1)
-                class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">
+                class="inline-flex items-center gap-1.5 rounded-md border monitor-glass-control px-2.5 py-1 disabled:opacity-40">
             {{ __('monitor::messages.common.prev') }}
             <svg wire:loading wire:target="previousPage" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -16,7 +16,7 @@
         </button>
         <span>{{ $page }} / {{ $lastPage }}</span>
         <button type="button" wire:click="nextPage" wire:loading.attr="disabled" wire:target="previousPage,nextPage" @disabled($page >= $lastPage)
-                class="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 disabled:opacity-40">
+                class="inline-flex items-center gap-1.5 rounded-md border monitor-glass-control px-2.5 py-1 disabled:opacity-40">
             {{ __('monitor::messages.common.next') }}
             <svg wire:loading wire:target="nextPage" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

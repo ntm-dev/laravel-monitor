@@ -41,7 +41,7 @@
         <div class="mt-6">
             {{-- Opacity modifiers must be on the default scale (0/5/10/20/25/...):
                  the CDN Tailwind JIT silently drops others like `/2`. --}}
-            <div class="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-md shadow-black/5 dark:border-white/5 dark:bg-white/5 dark:shadow-black/20 overflow-hidden">
+            <div class="monitor-glass flex flex-col rounded-lg border overflow-hidden">
                 <div class="flex flex-col gap-3 p-4 md:p-5"
                      x-data="{ copied: false, copy() {
                          navigator.clipboard.writeText(@js($markdown)).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1600); });
@@ -55,7 +55,7 @@
                                 <span x-text="copied ? '{{ __('monitor::messages.common.copied') }}' : '{{ __('monitor::messages.common.copy_as_markdown') }}'"></span>
                             </button>
                             <div
-                                class="flex h-6 w-fit shrink-0 items-center divide-x divide-neutral-200 dark:divide-neutral-700 rounded-sm border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 font-mono text-xs">
+                                class="flex h-6 w-fit shrink-0 items-center divide-x divide-neutral-200 dark:divide-neutral-700 rounded-sm border monitor-glass-control font-mono text-xs">
                                 <div class="flex items-center gap-2 px-2 py-0.5">
                                     <div class="uppercase text-neutral-500 dark:text-neutral-400">{{ __('monitor::messages.common.laravel') }}</div>
                                     <div>{{ $laravelVersion ?? '—' }}</div>

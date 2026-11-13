@@ -2,7 +2,7 @@
      Alpine state comes from timeline-script.blade.php rendered into x-data (a component tag's attributes
      don't compile directives); the sub-views share that Alpine scope. `isolate` keeps sticky labels under
      the page header; clip-path (not overflow) rounds corners so the sticky detail panel still works. --}}
-<x-monitor::card id="timeline" class="isolate p-0 [clip-path:inset(0_round_0.5rem)]"
+<x-monitor::card id="timeline" class="isolate p-0 [clip-path:inset(0_round_1rem)]"
     @monitor-duplicates-heartbeat.window="
          heartbeatActive = true;
          clearTimeout(heartbeatTimer);

@@ -38,47 +38,49 @@
             <x-monitor::empty-state :label="__('monitor::messages.nav.cache')" :message="__('monitor::messages.common.no_cache_activity_recorded')" :period-phrase="$periodPhrase"/>
         @else
             <x-monitor::card class="p-4">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
-                            @foreach ($columns as $field => $column)
-                                <th class="cursor-pointer select-none pb-2 font-normal {{ $column['align'] === 'right' ? 'text-right' : 'text-left' }}"
-                                    wire:click="sort('{{ $field }}')">
-                                    <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row' : '' }}">
-                                        {{ $column['label'] }}
-                                        <div class="-right-3 flex flex-col gap-[2px]">
-                                            <div
-                                                class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection === 'asc' ? 'border-b-blue-500' : '' }}"
-                                            >
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-neutral-100 dark:border-neutral-800 text-left font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                @foreach ($columns as $field => $column)
+                                    <th class="cursor-pointer select-none pb-2 font-normal {{ $column['align'] === 'right' ? 'text-right' : 'text-left' }}"
+                                        wire:click="sort('{{ $field }}')">
+                                        <span class="inline-flex items-center gap-1 {{ $column['align'] === 'right' ? 'flex-row' : '' }}">
+                                            {{ $column['label'] }}
+                                            <div class="-right-3 flex flex-col gap-[2px]">
+                                                <div
+                                                    class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection === 'asc' ? 'border-b-blue-500' : '' }}"
+                                                >
+                                                </div>
+                                                <div
+                                                    class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection !== 'asc' ? 'border-b-blue-500' : '' }} rotate-180"
+                                                >
+                                                </div>
                                             </div>
-                                            <div
-                                                class="inline-block size-1.75 h-0 w-0 border-t-0 border-r-[3.5px] border-b-[4px] border-l-[3.5px] border-solid border-t-transparent border-r-transparent border-l-transparent max-md:hidden {{ $sortBy === $field && $sortDirection !== 'asc' ? 'border-b-blue-500' : '' }} rotate-180"
-                                            >
-                                            </div>
-                                        </div>
-                                    </span>
-                                </th>
-                            @endforeach
-                        </tr>
-                    </thead>
-                    <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        @foreach ($keys as $row)
-                            <tr class="{{ $row->failures > 0 ? 'bg-rose-50/60 dark:bg-rose-500/10 hover:bg-rose-50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">
-                                <td class="max-w-[24rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $row->key }}">{{ $row->key }}</td>
-                                <td class="py-2 text-right font-mono text-xs {{ $row->hit_ratio !== null && $row->hit_ratio < 50 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $row->hit_ratio !== null ? $row->hit_ratio.'%' : '—' }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->deletes) }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->hits) }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->misses) }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->writes) }}</td>
-                                <td class="py-2 text-right font-mono text-xs {{ $row->failures > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($row->failures) }}</td>
-                                <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->total) }}</td>
+                                        </span>
+                                    </th>
+                                @endforeach
                             </tr>
-                        @endforeach
-                    </tbody>
-                    <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
-                        <x-monitor::table-skeleton :columns="8" :rows="count($keys)"/>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody wire:loading.class="hidden" wire:target.except="$refresh" class="divide-y divide-neutral-100 dark:divide-neutral-800">
+                            @foreach ($keys as $row)
+                                <tr class="{{ $row->failures > 0 ? 'bg-rose-50/60 dark:bg-rose-500/10 hover:bg-rose-50 dark:hover:bg-rose-500/10' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">
+                                    <td class="max-w-[24rem] truncate py-2 pr-2 font-mono text-xs text-neutral-700 dark:text-neutral-200" data-tooltip="{{ $row->key }}">{{ $row->key }}</td>
+                                    <td class="py-2 text-right font-mono text-xs {{ $row->hit_ratio !== null && $row->hit_ratio < 50 ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ $row->hit_ratio !== null ? $row->hit_ratio.'%' : '—' }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->deletes) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->hits) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->misses) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->writes) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs {{ $row->failures > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-neutral-600 dark:text-neutral-300' }}">{{ number_format($row->failures) }}</td>
+                                    <td class="py-2 text-right font-mono text-xs text-neutral-600 dark:text-neutral-300">{{ number_format($row->total) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tbody wire:loading.class.remove="hidden" wire:target.except="$refresh" class="hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                            <x-monitor::table-skeleton :columns="8" :rows="count($keys)"/>
+                        </tbody>
+                    </table>
+                </div>
 
                 @if ($lastPage > 1)
                     <x-monitor::pagination :page="$page" :last-page="$lastPage"

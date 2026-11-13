@@ -113,7 +113,7 @@
             </div>
 
             @if ($hasSidePanel)
-                <div class="flex flex-col justify-between gap-4 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900 md:w-1/2">
+                <div class="flex flex-col justify-between gap-4 monitor-glass rounded-lg border p-4 md:w-1/2">
                     @if ($notification !== null)
                         <a href="{{ route('monitor.notifications.sends.show', ['hash' => \LaravelMonitor\Support\KeyHash::for($notification->key), 'id' => \LaravelMonitor\Support\EntryId::encode($notification->id)] + $range) }}"
                            class="flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20">

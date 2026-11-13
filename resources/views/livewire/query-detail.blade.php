@@ -74,7 +74,7 @@
             </dl>
         </div>
 
-        <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 md:w-1/2"
+        <div class="monitor-glass rounded-lg border md:w-1/2"
              x-data="{
                  sql: @js($sql),
                  sqlCopied: false,

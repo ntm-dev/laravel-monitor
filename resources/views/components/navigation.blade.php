@@ -7,11 +7,11 @@
     $navActor = request()->user(\LaravelMonitor\Models\MonitorUser::guardName());
 
     // Active tab is $tab === $tabKey, or the Alpine $reactiveTabExpr when set (Request Detail).
-    $linkActiveClasses = 'border-neutral-200 bg-white text-neutral-900 shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100';
+    $linkActiveClasses = 'monitor-glass-pill text-neutral-900 dark:text-neutral-100';
     $linkInactiveClasses = 'border-transparent text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100';
     $iconActiveClasses = 'text-blue-600 dark:text-blue-400';
     $iconInactiveClasses = 'text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300';
-    $linkBaseClasses = 'group flex h-9 w-full items-center gap-3 rounded-md border px-2 text-sm';
+    $linkBaseClasses = 'group flex h-9 w-full items-center gap-3 rounded-xl border px-2.5 text-sm';
     $iconBaseClasses = 'h-4 w-4 shrink-0';
 
     // Static class with the server-side state, so the nav is styled before Alpine boots.
@@ -33,8 +33,8 @@
 {{-- Same localStorage key layout.blade.php's pre-paint script reads, so hydration doesn't flash. --}}
 <aside x-data="{ collapsed: localStorage.getItem('monitor-nav-collapsed') === '1' }"
        :class="{ 'monitor-nav-collapsed': collapsed }"
-       class="monitor-nav-aside sticky top-0 hidden h-screen shrink-0 flex-col border-r border-neutral-200 bg-white md:flex dark:border-neutral-800 dark:bg-neutral-900">
-    <div class="p-2 shadow-lg dark:shadow-md dark:shadow-white/5">
+       class="monitor-nav-aside sticky top-3 my-3 ml-3 hidden h-[calc(100vh-1.5rem)] shrink-0 flex-col rounded-3xl border monitor-glass-liquid md:flex">
+    <div class="rounded-t-3xl border-b border-neutral-900/5 p-2 dark:border-white/5">
         {{-- Collapsed: the label hides and flex-col stacks icon and toggle in the narrow rail. --}}
         <div class="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5" :class="{ 'flex-col': collapsed }">
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-sm font-semibold text-white dark:bg-neutral-700">{{ $appInitial }}</span>
@@ -84,7 +84,7 @@
         @endforeach
     </nav>
 
-    <div class="p-2 shadow-top-lg dark:shadow-top-md dark:shadow-white/5">
+    <div class="rounded-b-3xl border-t border-neutral-900/5 p-2 dark:border-white/5">
         <div class="space-y-px pb-2">
             @foreach ($footerTabs as $tabKey => $item)
                 <a href="{{ route('monitor.dashboard', ['tab' => $tabKey] + $range) }}"
@@ -103,7 +103,7 @@
             @endforeach
             <a href="https://github.com/ntm-dev/laravel-monitor" target="_blank" rel="noopener"
                data-tooltip="{{ __('monitor::messages.nav.support') }}"
-               class="group flex h-9 w-full items-center gap-3 rounded-md border border-transparent px-2 text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
+               class="group flex h-9 w-full items-center gap-3 rounded-xl border border-transparent px-2.5 text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100">
                 <x-monitor::icon :path="\LaravelMonitor\Support\Icons::SUPPORT" class="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-neutral-600 dark:text-neutral-500 dark:group-hover:text-neutral-300"/>
                 <span class="monitor-nav-label">{{ __('monitor::messages.nav.support') }}</span>
             </a>

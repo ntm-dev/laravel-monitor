@@ -13,11 +13,11 @@
         'admin' => 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
         default => 'border-neutral-200 dark:border-neutral-700 bg-neutral-100/80 dark:bg-neutral-800/80 text-neutral-500 dark:text-neutral-400',
     };
-    $popupCard = 'w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-5 shadow-lg dark:border-neutral-800 dark:bg-neutral-900';
+    $popupCard = 'monitor-glass-strong w-full max-w-sm rounded-lg border p-5';
     $popupOverlay = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4';
-    $fieldClass = 'mt-1 w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none';
+    $fieldClass = 'mt-1 w-full rounded-md border monitor-glass-control px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none';
     $labelClass = 'block font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400';
-    $secondaryButton = 'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50';
+    $secondaryButton = 'rounded-md border monitor-glass-control px-3 py-1.5 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50';
     $primaryButton = 'rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500';
 @endphp
 {{-- No data-monitor-poll: an auto-refresh would wipe the inline-edit forms mid-edit. --}}
@@ -45,7 +45,7 @@
                         </div>
                         <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">{{ $t('save') }}</button>
                         <button type="button" x-on:click="editing = false"
-                                class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
+                                class="h-8 rounded-md border monitor-glass-control px-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
                     </form>
                 </template>
             </div>
@@ -75,7 +75,7 @@
                         </div>
                         <button type="submit" class="h-8 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-500">{{ $t('save') }}</button>
                         <button type="button" x-on:click="editing = false"
-                                class="h-8 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
+                                class="h-8 rounded-md border monitor-glass-control px-3 text-sm font-medium text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
                     </form>
                 </template>
             </div>
@@ -125,7 +125,7 @@
             <div class="flex items-center gap-3 justify-between">
                 <span class="font-mono text-xs uppercase tracking-tight text-neutral-500 dark:text-neutral-400">{{ $t('password') }}</span>
                 <button type="button" x-on:click="open = true"
-                        class="h-8 rounded-md text border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('change_password') }}</button>
+                        class="h-8 rounded-md text border monitor-glass-control px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('change_password') }}</button>
 
             </div>
             <div x-show="open" x-cloak x-on:keydown.escape.window="open = false" class="{{ $popupOverlay }}">
@@ -248,7 +248,7 @@
 
                     <div x-data="{ open: false }">
                         <button type="button" x-on:click="open = true"
-                                class="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                                class="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border monitor-glass-control px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                             <x-monitor::icon :path="Icons::KEY" class="h-4 w-4"/>
                             {{ $t('add_passkey') }}
                         </button>
@@ -357,7 +357,7 @@
                             </div>
                             @if ($emailChange->canDecide)
                                 <button type="button" wire:click="approveEmailChange({{ $emailChange->id }})"
-                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('approve') }}</button>
+                                        class="shrink-0 rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('approve') }}</button>
                                 <button type="button" wire:click="rejectEmailChange({{ $emailChange->id }})" wire:confirm="{{ $t('reject_email_change_confirm') }}"
                                         class="shrink-0 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-rose-600 dark:text-rose-400 shadow-sm hover:bg-rose-50 dark:hover:bg-rose-500/10">{{ $t('reject') }}</button>
                             @endif
@@ -377,9 +377,9 @@
             </h3>
             <div class="flex flex-wrap items-center gap-2">
                 <input type="text" wire:model.live.debounce.300ms="memberSearch" placeholder="{{ $t('search_members') }}"
-                       class="min-w-0 flex-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                       class="min-w-0 flex-1 rounded-md border monitor-glass-control px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
                 <select wire:model.live="memberRoleFilter"
-                        class="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
+                        class="rounded-md border monitor-glass-control px-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none">
                     <option value="all">{{ $t('all_roles') }}</option>
                     <option value="owner">{{ $t('role_owner') }}</option>
                     <option value="admin">{{ $t('role_admin') }}</option>
@@ -388,7 +388,7 @@
             @if ($actor->canManageTeam())
                 <div x-data="{ open: false }" x-on:member-invited.window="open = false" >
                     <button type="button" x-on:click="open = true"
-                            class="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                            class="inline-flex h-8 items-center gap-1.5 rounded-md border monitor-glass-control px-3 text-sm font-medium text-neutral-700 dark:text-neutral-200 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                         <x-monitor::icon :path="Icons::TEAM" :view-box="'0 0 24 24'" :fill="'none'" :transform="null" class="h-4 w-4"/>
                         {{ $t('invite') }}
                     </button>
@@ -454,7 +454,7 @@
                                             action: () => $wire.changeRole({{ $member->id }}, newRole),
                                             onCancel: () => { role = '{{ $member->role }}' },
                                         })"
-                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-1.5 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
+                                    class="shrink-0 rounded-md border monitor-glass-control px-1.5 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400">
                                     <option value="admin" @selected($member->role === 'admin')>{{ $t('role_admin') }}</option>
                                     <option value="viewer" @selected($member->role === 'viewer')>{{ $t('role_viewer') }}</option>
                                 </select>
@@ -466,10 +466,10 @@
                                         confirmLabel: @js($t('make_owner')),
                                         action: () => $wire.transferOwnership({{ $member->id }}),
                                     })"
-                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('make_owner') }}</button>
+                                    class="shrink-0 rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('make_owner') }}</button>
                             @if ($member->hasTotpEnabled())
                                 <button type="button" wire:click="disableMemberTotp({{ $member->id }})" wire:confirm="{{ $t('disable_2fa_confirm', ['name' => $member->name]) }}"
-                                        class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('disable_2fa') }}</button>
+                                        class="shrink-0 rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('disable_2fa') }}</button>
                             @endif
                             <button type="button"
                                     x-on:click="$dispatch('open-confirm-modal', {
@@ -485,7 +485,7 @@
                         @endif
                         @if ($member->id === $actor->id)
                             <button type="button" wire:click="leave" @unless ($soleOwner) wire:confirm="{{ $t('leave_confirm') }}" @endunless
-                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm {{ $soleOwner ? 'cursor-not-allowed opacity-50' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">{{ $t('leave') }}</button>
+                                    class="shrink-0 rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm {{ $soleOwner ? 'cursor-not-allowed opacity-50' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50' }}">{{ $t('leave') }}</button>
                         @endif
                     </div>
                     @if ($member->id === $actor->id)
@@ -507,7 +507,7 @@
                         <span class="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-tight {{ $roleBadge($invitation->role) }}">{{ $roleLabel($invitation->role) }}</span>
                         @if ($actor->isOwner() || $invitation->invited_by === $actor->id)
                             <button type="button" wire:click="cancelInvite({{ $invitation->id }})"
-                                    class="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
+                                    class="shrink-0 rounded-md border monitor-glass-control px-2 py-1 font-mono text-[10px] uppercase tracking-tight text-neutral-500 dark:text-neutral-400 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/50">{{ $t('cancel') }}</button>
                         @endif
                     </div>
                 @endforeach

@@ -321,7 +321,7 @@
      }" class="relative h-full">
     <button type="button" @click="open = ! open"
             @class([
-                'flex h-full items-center gap-1 rounded-md border px-2',
+                'flex h-full items-center gap-1 rounded-full border px-2',
                 'border-blue-500 bg-blue-600 text-white' => $hasCustomRange,
                 'border-transparent text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-neutral-100' => ! $hasCustomRange,
             ])>
